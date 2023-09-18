@@ -18,7 +18,7 @@ app.use('/api/user', userRoute);
 
 // handle any downstream errors
 app.use((err: string, req: Request, res: Response) => {
-  console.log(err, 'ln 15 index.ts');
+  console.log(err, 'downstream errors - index.ts');
   res.status(500).send('Server Error');
 });
 

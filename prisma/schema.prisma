@@ -7,20 +7,159 @@ datasource db {
   url      = env("STELLAR_PSQL_URI")
 }
 
+enum CommunityType {
+  Music
+  Applications
+  EBooks
+  ELearningVideos
+  Audiobooks
+  Comedy
+  Comics
+}
+
+enum FileType {
+  txt
+  wav
+  pdf
+  wmv
+  ogg
+  lua
+  jpg
+  png
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum RegistrationStatus {
+  open
+  invite
+  closed
+}
+
+enum ReleaseType {
+  Music
+  Applications
+  EBooks
+  ELearningVideos
+  Audiobooks
+  Comedy
+  Comics
+}
+
+enum ReleaseCategory {
+  Album
+  Single
+  EP
+  Anthology
+  Compilation
+  DJMix
+  Live
+  Remix
+  Bootleg
+  Interview
+  Mixtape
+  Demo
+  ConcertRecording
+  Unknown
+}
+
+model ArtistHistory {
+  id Int @id @default(autoincrement())
+  artistId Int
+  artist Artist @relation(fields: [artistId], references: [id])
+  data Json
+  editedBy Int
+  editedUser User @relation("HistoryEditedBy", fields: [editedBy], references: [id])
+  editedAt ßDateTime @default(now())
+  description String?
+
+  @@map("artist_histories")
+}
+
+model Artist {
+  id Int @id @default(autoincrement())
+  name String
+  vanityHouse Boolean @default(false)
+  histories ArtistHistory[]
+
+  @@map("artists")
+}
+
+model Community {
+  id Int @id @default(autoincrement())
+  name String @unique
+  image String
+  consumers Consumer[]
+  contributors Contributor[]
+  releases Release[]
+  comments Comment[]
+  registrationStatus RegistrationStatus
+  type CommunityType
+  staff User[]
+
+  @@map("communities")
+  @@updatedAt
+  @@createdAt
+}
+
 model Consumer {
   id Int @id @default(autoincrement())
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+  releases Release[]
 
+  @@map("consumers")
+  @@updatedAt
+  @@createdAt
+}
+
+model Contribution {
+  id                Int        @id @default(autoincrement())
+  userId            Int
+  user              User       @relation(fields: [userId], references: [id])
+  releaseId         Int
+  release           Release    @relation(fields: [releaseId], references: [id])
+  releaseDescription String?   @maxLength(1000)
+  createdAt         DateTime   @default(now()) @map("_created_at")
+  updatedAt         DateTime   @updatedAt      @map("_updated_at")
+  consumers         Consumer[]
+  contributors      Contributor[]
+  collaborators     Artist[]
+  comments          Comment[]
+  sizeInBytes       Int
+  type              FileType
+  jsonFile          Boolean    @default(false)
+
+  @@index([userId])
+  @@index([releaseId])
 }
 
 model Contributor {
   id Int @id @default(autoincrement())
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+  communityId Int
+  community Community @relation(fields: [communityId], references: [id])
+  contributions Contribution[]
 
+  @@map("contributors")
+  @@updatedAt
+  @@createdAt
 }
 
 model Invite {
   id Int @id @default(autoincrement())
-  userId Int
-  inviter User @relation(fields: [userId], references: [id])
+  inviterId Int
+  inviter User @relation(fields: [inviterId], references: [id])
+  inviteKey String @unique
+  email String @unique
+  expires DateTime @default(now() + "7 days")
+  reason String @default("")
+  status InviteStatus @default(pending)
 }
 
 model Profile {
@@ -30,14 +169,34 @@ model Profile {
 
 model Release {
   id Int @id @default(autoincrement())
-  title String
-  description String
-  size Int
-  contributorId Int
-  consumerId Int
-  contributors Contributor[] @relation(fields: [contributorId], references: [id])
-  consumers Consumer[] @relation(fields: [contributorId], references: [id])
-  releaseYear Int
+  artistId Int
+  artist Artist @relation(fields: [artistId], references: [id])
+  title String @maxLength(100)
+  tags Tag[]
+  image String?
+  description String @maxLength(1000)
+  communityId Int?
+  community Community? @relation(fields: [communityId], references: [id])
+  consumers Consumer[] @relation("ReleaseConsumers")
+  contributors Contributor[] @relation("ReleaseContributors")
+  contributions Contribution[]
+  type ReleaseType
+  releaseType ReleaseCategory
+  year Int
+  isEdition Boolean @default(false)
+  edition Json?
+
+  @@index([artistId])
+  @@index([communityId])
+}
+
+model Tag {
+  id          Int      @id @default(autoincrement())
+  name        String
+  occurrences Int      @default(0)
+  releases    Release[]
+
+  @@map("tags")
 }
 
 model User {
@@ -50,8 +209,7 @@ model User {
   avatar String?
   userRankId Int
   userRank UserRank @relation(fields: [userRankId], references: [id])
-  inviterId Int
-  invites Invite[] @relation(fields: [inviterId], references: [id])
+  invites Invite[]
   inviteCount Int @default(0)
   lastLogin DateTime?
   dateRegistered DateTime @default(now())
@@ -61,10 +219,11 @@ model User {
   profileId Int
   profile Profile @relation(fields: [profileId], references: [id])
   canDownload Boolean @default(true)
-  consumerId Int
-  consumer Consumer @relation(fields: [consumerId], references: [id])
-  contributorId Int
-  contributor Contributor @relation(fields: [contributorId], references: [id])
+  consumerId Int?
+  consumer Consumer? @relation(fields: [consumerId], references: [id])
+  contributorId Int?
+  contributor Contributor? @relation(fields: [contributorId], references: [id])
+  contributions Contribution[]
   adminComment String?
   banDate DateTime?
   banReason String?
