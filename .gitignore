@@ -1,8 +1,6 @@
 build/
-dist/
 lib/
 node_modules/
 .env
 package-lock.json
-CLAUDE.md
 

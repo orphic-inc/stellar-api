@@ -7,8 +7,8 @@
     "module": "NodeNext" /* Specify what module code is generated. */,
     "moduleResolution": "NodeNext",
     /* Emit */
-    "outDir": "dist",
     "sourceMap": true /* Create source map files for emitted JavaScript files. */,
+    // "outFile": "./build/tsc.js" /* Specify a file that bundles all outputs into one JavaScript file. If 'declaration' is true, also designates a file that bundles all .d.ts output. */,
     "removeComments": true /* Disable emitting comments. */,
 
     /* Interop Constraints */
@@ -17,7 +17,8 @@
 
     /* Type Checking */
     "strict": true /* Enable all strict type-checking options. */,
-    "skipLibCheck": true /* Skip type checking all .d.ts files. */
+    "skipLibCheck": true /* Skip type checking all .d.ts files. */,
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.spec.ts"]

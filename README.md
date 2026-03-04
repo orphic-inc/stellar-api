@@ -18,15 +18,6 @@ See the [compose](https://github.com/orphic-inc/stellar-compose) repository for 
     npm i
     npm start
 
-## Claude Code
-
-This project supports [Claude Code](https://claude.ai/code). The `CLAUDE.md` file is gitignored since it may contain personal workflow preferences. To create one:
-
-1. Run `/init` inside Claude Code, or
-2. Copy `CLAUDE.md.example` from a teammate
-
-If you make changes to `CLAUDE.md` that should be shared, commit it with `git add -f CLAUDE.md`.
-
 ## Configuration
 
 | Variable              | Description                  | Default   |

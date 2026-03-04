@@ -17,13 +17,3 @@ export const http = {
   port: parseInt(process.env.STELLAR_HTTP_PORT || '8080', 10),
   corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN
 };
-
-export const bigcommerce = {
-  clientId: process.env.STELLAR_BC_CLIENT_ID,
-  accessToken: process.env.STELLAR_BC_ACCESS_TOKEN,
-  storeHash: process.env.STELLAR_BC_STORE_HASH,
-  storefrontToken: process.env.STELLAR_BC_STOREFRONT_TOKEN,
-  graphqlUrl: process.env.STELLAR_BC_STORE_HASH
-    ? `https://store-${process.env.STELLAR_BC_STORE_HASH}.mybigcommerce.com/graphql`
-    : ''
-};

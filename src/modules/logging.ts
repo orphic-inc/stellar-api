@@ -1,5 +1,5 @@
 import winston from 'winston';
-import { logging as config } from './config.js';
+import { logging as config } from './config.ts';
 
 interface LoggerConfig {
   level: string;
