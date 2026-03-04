@@ -10,7 +10,10 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "watch": "tsc -w",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm"
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@prisma/client": "^5.3.1",
@@ -30,6 +33,7 @@
     "@types/gravatar": "^1.8.3",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^20.6.0",
+    "@types/supertest": "^7.2.0",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-import-resolver-node": "^0.3.7",
@@ -40,7 +44,9 @@
     "nodemon": "^3.0.1",
     "prettier": "^3.0.0",
     "prisma": "^5.3.0",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^4.0.18"
   }
 }

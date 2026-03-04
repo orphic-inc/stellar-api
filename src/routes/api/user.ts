@@ -1,22 +1,13 @@
-import { PrismaClient } from '@prisma/client';
 import express, { Request, Response } from 'express';
 import gravatar from 'gravatar';
 import bcrypt from 'bcryptjs';
 import { check, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import { asyncHandler } from '../../modules/asyncHandler';
-import * as dotenv from 'dotenv';
+import { asyncHandler } from '../../modules/asyncHandler.js';
+import { prisma } from '../../modules/prisma.js';
+import { auth } from '../../modules/config.js';
 
-dotenv.config({ path: __dirname + '../../../.env' });
-
-const prisma = new PrismaClient();
 const router = express.Router();
-
-interface UserCreationRequest {
-  username: string;
-  email: string;
-  password: string;
-}
 
 interface UserPayload {
   user: {
@@ -24,6 +15,8 @@ interface UserPayload {
   };
 }
 
+// @route   POST /api/user
+// @desc    Register user
 router.post(
   '/',
   [
@@ -40,12 +33,14 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { username, email, password }: UserCreationRequest = req.body;
+    const { username, email, password } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
-      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'User already exists' }] });
     }
 
     const avatar = gravatar.url(email, {
@@ -55,7 +50,7 @@ router.post(
     });
 
     const defaultRank = await prisma.userRank.findFirst({
-      where: { field1: 100 }
+      where: { level: 100 }
     });
 
     if (!defaultRank) {
@@ -71,25 +66,65 @@ router.post(
         email,
         password: hashedPassword,
         avatar,
-        userRankId: defaultRank.id
+        userRank: { connect: { id: defaultRank.id } },
+        userSettings: { create: {} },
+        profile: { create: {} },
+        communityPass: ''
       }
     });
 
-    const payload: UserPayload = {
-      user: {
-        id: user.id
-      }
-    };
+    const payload: UserPayload = { user: { id: user.id } };
 
-    jwt.sign(
-      payload,
-      process.env.STELLAR_AUTH_JWT_SECRET as string,
-      { expiresIn: 3600 },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token, user });
-      }
-    );
+    const token = jwt.sign(payload, auth.jwtSecret as string, {
+      expiresIn: 3600
+    });
+    res.json({ token, user: { id: user.id, username, email, avatar } });
+  })
+);
+
+// @route   POST /api/user/login
+// @desc    Authenticate user & get token
+router.post(
+  '/login',
+  [
+    check('email', 'Please include a valid email').isEmail(),
+    check('password', 'Password is required').exists()
+  ],
+  asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email, password } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'Invalid credentials' }] });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'Invalid credentials' }] });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
+
+    const payload: UserPayload = { user: { id: user.id } };
+
+    const token = jwt.sign(payload, auth.jwtSecret as string, {
+      expiresIn: 3600
+    });
+    res.json({ token });
   })
 );
 
