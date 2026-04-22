@@ -8,35 +8,37 @@ const router = express.Router();
 // GET /api/tools/permissions — list all user ranks
 router.get(
   '/permissions',
-  requirePermission('admin'),
+  ...requirePermission('admin'),
   asyncHandler(async (_req: Request, res: Response) => {
     const ranks = await prisma.userRank.findMany({
       orderBy: { level: 'asc' },
-      include: { _count: { select: { users: true } } },
+      include: { _count: { select: { users: true } } }
     });
-    res.json(ranks.map((r) => ({
-      id: r.id,
-      name: r.name,
-      level: r.level,
-      permissions: r.permissions,
-      color: r.color,
-      badge: r.badge,
-      userCount: r._count.users,
-    })));
+    res.json(
+      ranks.map((r) => ({
+        id: r.id,
+        name: r.name,
+        level: r.level,
+        permissions: r.permissions,
+        color: r.color,
+        badge: r.badge,
+        userCount: r._count.users
+      }))
+    );
   })
 );
 
 // GET /api/tools/permissions/:id — get single rank
 router.get(
   '/permissions/:id',
-  requirePermission('admin'),
+  ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
 
     const rank = await prisma.userRank.findUnique({
       where: { id },
-      include: { _count: { select: { users: true } } },
+      include: { _count: { select: { users: true } } }
     });
     if (!rank) return res.status(404).json({ msg: 'Rank not found' });
 
@@ -47,11 +49,14 @@ router.get(
 // POST /api/tools/permissions — create rank
 router.post(
   '/permissions',
-  requirePermission('admin'),
+  ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { name, level, permissions, color, badge } = req.body as {
-      name: string; level: number; permissions?: Record<string, boolean>;
-      color?: string; badge?: string;
+      name: string;
+      level: number;
+      permissions?: Record<string, boolean>;
+      color?: string;
+      badge?: string;
     };
 
     if (!name || level === undefined) {
@@ -64,8 +69,8 @@ router.post(
         level,
         permissions: permissions ?? {},
         color: color ?? '',
-        badge: badge ?? '',
-      },
+        badge: badge ?? ''
+      }
     });
     res.status(201).json(rank);
   })
@@ -74,7 +79,7 @@ router.post(
 // PUT /api/tools/permissions/:id — update rank
 router.put(
   '/permissions/:id',
-  requirePermission('admin'),
+  ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
@@ -87,8 +92,8 @@ router.put(
         ...(level !== undefined && { level }),
         ...(permissions !== undefined && { permissions }),
         ...(color !== undefined && { color }),
-        ...(badge !== undefined && { badge }),
-      },
+        ...(badge !== undefined && { badge })
+      }
     });
     res.json(rank);
   })
@@ -97,7 +102,7 @@ router.put(
 // DELETE /api/tools/permissions/:id — delete rank (blocks if users are assigned)
 router.delete(
   '/permissions/:id',
-  requirePermission('admin'),
+  ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
@@ -105,7 +110,7 @@ router.delete(
     const userCount = await prisma.user.count({ where: { userRankId: id } });
     if (userCount > 0) {
       return res.status(409).json({
-        msg: `Cannot delete rank: ${userCount} user(s) currently assigned to it`,
+        msg: `Cannot delete rank: ${userCount} user(s) currently assigned to it`
       });
     }
 

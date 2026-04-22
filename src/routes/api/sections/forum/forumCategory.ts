@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { requirePermission } from '../../../../middleware/permissions';
 
 const router = express.Router();
 
-// GET /api/forums/categories
+// GET /api/forums/categories — PUBLIC read
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
@@ -21,6 +21,7 @@ router.get(
 // GET /api/forums/categories/:id
 router.get(
   '/:id',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
@@ -36,32 +37,28 @@ router.get(
 // POST /api/forums/categories
 router.post(
   '/',
-  requireAuth,
-  [check('name', 'Name is required').not().isEmpty()],
+  ...requirePermission('forums_manage'),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const { name, sort } = req.body as { name: string; sort?: number };
+    if (!name) return res.status(400).json({ msg: 'Name is required' });
     const category = await prisma.forumCategory.create({
       data: { name, sort: sort ?? 0 }
     });
-    res.json(category);
+    res.status(201).json(category);
   })
 );
 
 // PUT /api/forums/categories/:id
 router.put(
   '/:id',
-  requireAuth,
-  [check('name', 'Name is required').not().isEmpty()],
+  ...requirePermission('forums_manage'),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     const { name, sort } = req.body as { name: string; sort?: number };
+    if (!name) return res.status(400).json({ msg: 'Name is required' });
     const category = await prisma.forumCategory.update({
       where: { id },
       data: { name, ...(sort !== undefined && { sort }) }
@@ -73,14 +70,14 @@ router.put(
 // DELETE /api/forums/categories/:id
 router.delete(
   '/:id',
-  requireAuth,
+  ...requirePermission('forums_manage'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     await prisma.forumCategory.delete({ where: { id } });
-    res.json({ msg: 'Category removed' });
+    res.status(204).send();
   })
 );
 

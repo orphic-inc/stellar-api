@@ -1,8 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import * as dotenv from 'dotenv';
-dotenv.config();
 
 import { getLogger } from './modules/logging';
 import { http } from './modules/config';
