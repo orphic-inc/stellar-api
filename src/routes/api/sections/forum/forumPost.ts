@@ -8,6 +8,15 @@ import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
 
 const router = express.Router({ mergeParams: true });
 
+const isModerator = async (userId: number): Promise<boolean> => {
+  const rank = await prisma.userRank.findFirst({
+    where: { users: { some: { id: userId } } },
+    select: { permissions: true }
+  });
+  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
+  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
+};
+
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
   '/',
@@ -75,7 +84,7 @@ router.post(
   })
 );
 
-// PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id
+// PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id — author only
 router.put(
   '/:id',
   requireAuth,
@@ -87,7 +96,7 @@ router.put(
     if (post.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
 
     const edits = (post.edits as Array<Record<string, unknown>>) ?? [];
-    edits.push({ userId: req.user!.id, time: new Date().toISOString() });
+    edits.push({ userId: req.user!.id, time: new Date().toISOString(), previousBody: post.body });
 
     const updated = await prisma.forumPost.update({
       where: { id },
@@ -97,20 +106,29 @@ router.put(
   })
 );
 
-// DELETE /api/forums/:forumId/topics/:forumTopicId/posts/:id
+// DELETE /api/forums/:forumId/topics/:forumTopicId/posts/:id — author or moderator
 router.delete(
   '/:id',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.id);
     const post = await prisma.forumPost.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    if (post.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
+
+    const isOwner = post.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req.user!.id))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
     await prisma.$transaction([
       prisma.forumPost.delete({ where: { id } }),
       prisma.forumTopic.update({
         where: { id: post.forumTopicId },
+        data: { numPosts: { decrement: 1 } }
+      }),
+      prisma.forum.update({
+        where: { id: forumId },
         data: { numPosts: { decrement: 1 } }
       })
     ]);

@@ -11,6 +11,15 @@ const router = express.Router({ mergeParams: true });
 
 router.use('/:forumTopicId/posts', forumPostRouter);
 
+const isModerator = async (userId: number): Promise<boolean> => {
+  const rank = await prisma.userRank.findFirst({
+    where: { users: { some: { id: userId } } },
+    select: { permissions: true }
+  });
+  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
+  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
+};
+
 // GET /api/forums/:forumId/topics
 router.get(
   '/',
@@ -95,7 +104,7 @@ router.post(
   })
 );
 
-// PUT /api/forums/:forumId/topics/:forumTopicId — update title / lock / sticky
+// PUT /api/forums/:forumId/topics/:forumTopicId — author or moderator
 router.put(
   '/:forumTopicId',
   requireAuth,
@@ -104,7 +113,11 @@ router.put(
     const id = parseInt(req.params.forumTopicId);
     const topic = await prisma.forumTopic.findUnique({ where: { id } });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
-    if (topic.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
+
+    const isOwner = topic.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req.user!.id))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
 
     const { title, isLocked, isSticky } = req.body;
     const updated = await prisma.forumTopic.update({
@@ -119,16 +132,32 @@ router.put(
   })
 );
 
-// DELETE /api/forums/:forumId/topics/:forumTopicId
+// DELETE /api/forums/:forumId/topics/:forumTopicId — author or moderator
 router.delete(
   '/:forumTopicId',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
     const topic = await prisma.forumTopic.findUnique({ where: { id } });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
-    if (topic.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
-    await prisma.forumTopic.delete({ where: { id } });
+
+    const isOwner = topic.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req.user!.id))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
+
+    await prisma.$transaction([
+      prisma.forumTopic.delete({ where: { id } }),
+      prisma.forum.update({
+        where: { id: forumId },
+        data: {
+          numTopics: { decrement: 1 },
+          numPosts: { decrement: topic.numPosts }
+        }
+      })
+    ]);
+
     res.json({ msg: 'Topic removed' });
   })
 );
