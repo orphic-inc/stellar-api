@@ -7,6 +7,7 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { markInstalled } from '../../modules/installState';
+import { installLimiter } from '../../middleware/rateLimiter';
 
 const router = express.Router();
 
@@ -82,6 +83,7 @@ router.get('/', asyncHandler(async (_req: Request, res: Response) => {
 // POST /api/install — one-time setup: seed ranks and create first SysOp user
 router.post(
   '/',
+  installLimiter,
   [
     check('username', 'Username is required').not().isEmpty(),
     check('email', 'Please include a valid email').isEmail(),
