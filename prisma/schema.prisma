@@ -7,6 +7,8 @@ datasource db {
   url      = env("STELLAR_PSQL_URI")
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum CommunityType {
   Music
   Applications
@@ -67,174 +69,938 @@ enum ReleaseCategory {
   Unknown
 }
 
+enum CommentPage {
+  artist
+  collages
+  requests
+  communities
+}
+
+enum SubscriptionPage {
+  forums
+  artist
+  collages
+  requests
+  communities
+}
+
+enum ThreadType {
+  forum
+  application
+}
+
+enum ApiUserState {
+  inactive
+  active
+}
+
+enum NoteVisibility {
+  public
+  staff
+}
+
+// ─── User & Auth ──────────────────────────────────────────────────────────────
+
+model UserRank {
+  id             Int    @id @default(autoincrement())
+  level          Int
+  name           String
+  permissions    Json
+  color          String @default("")
+  badge          String @default("")
+  uploadRequired Int    @default(0)
+  users          User[]
+
+  @@map("user_ranks")
+}
+
+model UserSettings {
+  id                 Int     @id @default(autoincrement())
+  siteAppearance     String  @default("cayer_make")
+  externalStylesheet String?
+  styledTooltips     Boolean @default(true)
+  paranoia           Int     @default(0)
+  user               User?
+
+  @@map("user_settings")
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  username           String    @unique
+  email              String    @unique
+  password           String
+  avatar             String?
+  userRankId         Int
+  userRank           UserRank  @relation(fields: [userRankId], references: [id])
+  userSettingsId     Int       @unique
+  userSettings       UserSettings @relation(fields: [userSettingsId], references: [id])
+  profileId          Int       @unique
+  profile            Profile   @relation(fields: [profileId], references: [id])
+  inviteCount        Int       @default(0)
+  uploaded           Int       @default(0)
+  downloaded         Int       @default(0)
+  ratio              Float     @default(1)
+  ratioWatchDownload Int?
+  lastLogin          DateTime?
+  dateRegistered     DateTime  @default(now())
+  disabled           Boolean   @default(false)
+  isArtist           Boolean   @default(false)
+  isDonor            Boolean   @default(false)
+  canDownload        Boolean   @default(true)
+  adminComment       String?
+  banDate            DateTime?
+  banReason          String?
+  warned             DateTime?
+  warnedTimes        Int       @default(0)
+  communityPass      String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  invitesSent            Invite[]
+  inviteTree             InviteTree[]
+  friends                Friend[]              @relation("UserFriends")
+  friendOf               Friend[]              @relation("FriendOf")
+  communityStaff         Community[]           @relation("CommunityStaff")
+  consumer               Consumer?
+  contributor            Contributor?
+  contributions          Contribution[]
+  forumTopics            ForumTopic[]
+  forumPosts             ForumPost[]
+  forumTopicNotes        ForumTopicNote[]
+  artistHistories        ArtistHistory[]       @relation("HistoryEditedBy")
+  bookmarkArtists        BookmarkArtist[]
+  bookmarkCollages       BookmarkCollage[]
+  bookmarkCommunities    BookmarkCommunity[]
+  bookmarkRequests       BookmarkRequest[]
+  subscriptions          Subscription[]
+  commentSubscriptions   CommentSubscription[]
+  notifications          Notification[]        @relation("NotificationUser")
+  quotedInNotifications  Notification[]        @relation("NotificationQuoter")
+  blogs                  Blog[]
+  posts                  Post[]
+  apiApplications        ApiApplication[]
+  apiUsers               ApiUser[]
+  donorReward            DonorReward?
+  donorForumUsername     DonorForumUsername?
+  donations              Donation[]
+  notes                  Note[]
+  applicants             Applicant[]
+  comments               Comment[]             @relation("CommentAuthor")
+  editedComments         Comment[]             @relation("CommentEditor")
+
+  @@map("users")
+}
+
+model Invite {
+  id        Int          @id @default(autoincrement())
+  inviterId Int
+  inviter   User         @relation(fields: [inviterId], references: [id])
+  inviteKey String       @unique
+  email     String       @unique
+  expires   DateTime
+  reason    String       @default("")
+  status    InviteStatus @default(pending)
+
+  @@map("invites")
+}
+
+model InviteTree {
+  id           Int  @id @default(autoincrement())
+  userId       Int
+  user         User @relation(fields: [userId], references: [id])
+  inviterId    Int
+  treePosition Int  @default(1)
+  treeId       Int  @default(1)
+  treeLevel    Int  @default(0)
+
+  @@map("invite_trees")
+}
+
+model Friend {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation("UserFriends", fields: [userId], references: [id])
+  friendId Int
+  friend   User   @relation("FriendOf", fields: [friendId], references: [id])
+  comment  String @default("")
+
+  @@unique([userId, friendId])
+  @@map("friends")
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+model Profile {
+  id                  Int     @id @default(autoincrement())
+  avatar              String?
+  avatarMouseoverText String?
+  profileTitle        String?
+  profileInfo         String? @db.Text
+  user                User?
+
+  @@map("profiles")
+}
+
+model Stylesheet {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  cssUrl    String
+  createdAt DateTime @default(now())
+
+  @@map("stylesheets")
+}
+
+// ─── Forum ────────────────────────────────────────────────────────────────────
+
+model ForumCategory {
+  id     Int     @id @default(autoincrement())
+  name   String
+  sort   Int
+  forums Forum[]
+
+  @@map("forum_categories")
+}
+
+model Forum {
+  id              Int           @id @default(autoincrement())
+  forumCategoryId Int
+  forumCategory   ForumCategory @relation(fields: [forumCategoryId], references: [id])
+  sort            Int
+  name            String
+  description     String        @default("")
+  minClassRead    Int           @default(0)
+  minClassWrite   Int           @default(0)
+  minClassCreate  Int           @default(0)
+  numTopics       Int           @default(0)
+  numPosts        Int           @default(0)
+  autoLock        Boolean       @default(true)
+  autoLockWeeks   Int           @default(4)
+  lastTopicId     Int?
+  lastTopic       ForumTopic?   @relation("ForumLastTopic", fields: [lastTopicId], references: [id])
+  topics          ForumTopic[]  @relation("ForumTopics")
+  specificRules   ForumSpecificRule[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("forums")
+}
+
+model ForumTopic {
+  id          Int                 @id @default(autoincrement())
+  forumId     Int
+  forum       Forum               @relation("ForumTopics", fields: [forumId], references: [id])
+  threadId    Int?
+  thread      Thread?             @relation(fields: [threadId], references: [id])
+  title       String
+  authorId    Int
+  author      User                @relation(fields: [authorId], references: [id])
+  isLocked    Boolean             @default(false)
+  isSticky    Boolean             @default(false)
+  ranking     Int                 @default(0)
+  numPosts    Int                 @default(0)
+  lastPostId  Int?
+  lastPost    ForumPost?          @relation("TopicLastPost", fields: [lastPostId], references: [id])
+  posts       ForumPost[]         @relation("TopicPosts")
+  lastForumOf Forum[]             @relation("ForumLastTopic")
+  notes       ForumTopicNote[]
+  poll        ForumPoll?
+  lastRead    ForumLastReadTopic[]
+  concert     Concert?
+  specificRules ForumSpecificRule[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("forum_topics")
+}
+
+model ForumPost {
+  id           Int                 @id @default(autoincrement())
+  forumTopicId Int
+  forumTopic   ForumTopic          @relation("TopicPosts", fields: [forumTopicId], references: [id])
+  authorId     Int
+  author       User                @relation(fields: [authorId], references: [id])
+  body         String              @db.Text
+  edits        Json                @default("[]")
+  lastPostOf   ForumTopic[]        @relation("TopicLastPost")
+  lastReadOf   ForumLastReadTopic[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([forumTopicId])
+  @@map("forum_posts")
+}
+
+model ForumPoll {
+  id           Int           @id @default(autoincrement())
+  forumTopicId Int           @unique
+  forumTopic   ForumTopic    @relation(fields: [forumTopicId], references: [id])
+  question     String
+  answers      String        @db.Text
+  featured     DateTime?
+  closed       Boolean       @default(false)
+  votes        ForumPollVote[]
+
+  @@map("forum_polls")
+}
+
+model ForumPollVote {
+  id          Int       @id @default(autoincrement())
+  forumPollId Int
+  forumPoll   ForumPoll @relation(fields: [forumPollId], references: [id])
+  userId      Int
+  vote        Int
+
+  @@unique([forumPollId, userId])
+  @@map("forum_poll_votes")
+}
+
+model ForumLastReadTopic {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  forumTopicId Int
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+  forumPostId  Int
+  forumPost    ForumPost  @relation(fields: [forumPostId], references: [id])
+
+  @@unique([userId, forumTopicId])
+  @@map("forum_last_read_topics")
+}
+
+model ForumTopicNote {
+  id           Int        @id @default(autoincrement())
+  forumTopicId Int
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+  authorId     Int
+  author       User       @relation(fields: [authorId], references: [id])
+  body         String     @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("forum_topic_notes")
+}
+
+model ForumSpecificRule {
+  id           Int        @id @default(autoincrement())
+  forumId      Int?
+  forum        Forum?     @relation(fields: [forumId], references: [id])
+  threadId     Int?
+  thread       Thread?    @relation(fields: [threadId], references: [id])
+  forumTopicId Int?
+  forumTopic   ForumTopic? @relation(fields: [forumTopicId], references: [id])
+
+  @@map("forum_specific_rules")
+}
+
+model Thread {
+  id            Int                 @id @default(autoincrement())
+  type          ThreadType
+  createdAt     DateTime            @default(now())
+  forumTopics   ForumTopic[]
+  applicants    Applicant[]
+  notes         Note[]
+  specificRules ForumSpecificRule[]
+
+  @@map("threads")
+}
+
+// ─── Artist ───────────────────────────────────────────────────────────────────
+
+model Artist {
+  id            Int             @id @default(autoincrement())
+  name          String
+  vanityHouse   Boolean         @default(false)
+  histories     ArtistHistory[]
+  aliases       ArtistAlias[]   @relation("ArtistAliases")
+  redirects     ArtistAlias[]   @relation("ArtistRedirects")
+  tags          ArtistTag[]
+  concerts      Concert[]
+  similarTo     SimilarArtist[] @relation("ArtistSimilar")
+  similarFrom   SimilarArtist[] @relation("SimilarArtistRef")
+  releases       Release[]
+  collaborations Contribution[] @relation("ContributionCollaborators")
+  bookmarks      BookmarkArtist[]
+  comments       Comment[]
+
+  @@map("artists")
+}
+
 model ArtistHistory {
-  id Int @id @default(autoincrement())
-  artistId Int
-  artist Artist @relation(fields: [artistId], references: [id])
-  data Json
-  editedBy Int
-  editedUser User @relation("HistoryEditedBy", fields: [editedBy], references: [id])
-  editedAt ßDateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  artistId    Int
+  artist      Artist   @relation(fields: [artistId], references: [id])
+  data        Json
+  editedBy    Int
+  editedUser  User     @relation("HistoryEditedBy", fields: [editedBy], references: [id])
+  editedAt    DateTime @default(now())
   description String?
 
   @@map("artist_histories")
 }
 
-model Artist {
-  id Int @id @default(autoincrement())
-  name String
-  vanityHouse Boolean @default(false)
-  histories ArtistHistory[]
+model ArtistAlias {
+  id         Int    @id @default(autoincrement())
+  artistId   Int
+  artist     Artist @relation("ArtistAliases", fields: [artistId], references: [id])
+  redirectId Int
+  redirect   Artist @relation("ArtistRedirects", fields: [redirectId], references: [id])
+  userId     Int?
 
-  @@map("artists")
+  @@map("artist_aliases")
 }
 
+model ArtistTag {
+  id            Int    @id @default(autoincrement())
+  artistId      Int
+  artist        Artist @relation(fields: [artistId], references: [id])
+  tagId         Int
+  tag           Tag    @relation(fields: [tagId], references: [id])
+  positiveVotes Int    @default(1)
+  negativeVotes Int    @default(1)
+  userId        Int?
+
+  @@unique([artistId, tagId])
+  @@map("artist_tags")
+}
+
+model Concert {
+  id           Int        @id @default(autoincrement())
+  artistId     Int
+  artist       Artist     @relation(fields: [artistId], references: [id])
+  forumTopicId Int        @unique
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+
+  @@map("concerts")
+}
+
+model SimilarArtist {
+  id              Int    @id @default(autoincrement())
+  artistId        Int
+  artist          Artist @relation("ArtistSimilar", fields: [artistId], references: [id])
+  similarArtistId Int
+  similarArtist   Artist @relation("SimilarArtistRef", fields: [similarArtistId], references: [id])
+  score           Int    @default(0)
+  votes           Json   @default("[]")
+
+  @@unique([artistId, similarArtistId])
+  @@map("similar_artists")
+}
+
+// ─── Community ────────────────────────────────────────────────────────────────
+
 model Community {
-  id Int @id @default(autoincrement())
-  name String @unique
-  image String
-  consumers Consumer[]
-  contributors Contributor[]
-  releases Release[]
-  comments Comment[]
+  id                 Int                @id @default(autoincrement())
+  name               String             @unique
+  image              String
   registrationStatus RegistrationStatus
-  type CommunityType
-  staff User[]
+  type               CommunityType
+  consumers          Consumer[]         @relation("CommunityConsumers")
+  contributors       Contributor[]
+  releases           Release[]
+  comments           Comment[]
+  staff              User[]             @relation("CommunityStaff")
+  doNotUpload        DoNotUpload[]
+  bookmarks          BookmarkCommunity[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@map("communities")
-  @@updatedAt
-  @@createdAt
 }
 
 model Consumer {
-  id Int @id @default(autoincrement())
-  userId Int
-  user User @relation(fields: [userId], references: [id])
-  releases Release[]
+  id            Int            @id @default(autoincrement())
+  userId        Int            @unique
+  user          User           @relation(fields: [userId], references: [id])
+  releases      Release[]      @relation("ReleaseConsumers")
+  communities   Community[]    @relation("CommunityConsumers")
+  contributions Contribution[] @relation("ContributionConsumers")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@map("consumers")
-  @@updatedAt
-  @@createdAt
-}
-
-model Contribution {
-  id                Int        @id @default(autoincrement())
-  userId            Int
-  user              User       @relation(fields: [userId], references: [id])
-  releaseId         Int
-  release           Release    @relation(fields: [releaseId], references: [id])
-  releaseDescription String?   @maxLength(1000)
-  createdAt         DateTime   @default(now()) @map("_created_at")
-  updatedAt         DateTime   @updatedAt      @map("_updated_at")
-  consumers         Consumer[]
-  contributors      Contributor[]
-  collaborators     Artist[]
-  comments          Comment[]
-  sizeInBytes       Int
-  type              FileType
-  jsonFile          Boolean    @default(false)
-
-  @@index([userId])
-  @@index([releaseId])
 }
 
 model Contributor {
-  id Int @id @default(autoincrement())
-  userId Int
-  user User @relation(fields: [userId], references: [id])
-  communityId Int
-  community Community @relation(fields: [communityId], references: [id])
+  id            Int            @id @default(autoincrement())
+  userId        Int            @unique
+  user          User           @relation(fields: [userId], references: [id])
+  communityId   Int
+  community     Community      @relation(fields: [communityId], references: [id])
   contributions Contribution[]
+  releases      Release[]      @relation("ReleaseContributors")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@map("contributors")
-  @@updatedAt
-  @@createdAt
-}
-
-model Invite {
-  id Int @id @default(autoincrement())
-  inviterId Int
-  inviter User @relation(fields: [inviterId], references: [id])
-  inviteKey String @unique
-  email String @unique
-  expires DateTime @default(now() + "7 days")
-  reason String @default("")
-  status InviteStatus @default(pending)
-}
-
-model Profile {
-  id Int @id @default(autoincrement())
-
 }
 
 model Release {
-  id Int @id @default(autoincrement())
-  artistId Int
-  artist Artist @relation(fields: [artistId], references: [id])
-  title String @maxLength(100)
-  tags Tag[]
-  image String?
-  description String @maxLength(1000)
-  communityId Int?
-  community Community? @relation(fields: [communityId], references: [id])
-  consumers Consumer[] @relation("ReleaseConsumers")
-  contributors Contributor[] @relation("ReleaseContributors")
+  id            Int              @id @default(autoincrement())
+  artistId      Int
+  artist        Artist           @relation(fields: [artistId], references: [id])
+  title         String           @db.VarChar(100)
+  tags          Tag[]
+  image         String?
+  description   String           @db.VarChar(1000)
+  communityId   Int?
+  community     Community?       @relation(fields: [communityId], references: [id])
+  consumers     Consumer[]       @relation("ReleaseConsumers")
+  contributors  Contributor[]    @relation("ReleaseContributors")
   contributions Contribution[]
-  type ReleaseType
-  releaseType ReleaseCategory
-  year Int
-  isEdition Boolean @default(false)
-  edition Json?
+  type          ReleaseType
+  releaseType   ReleaseCategory
+  year          Int
+  isEdition     Boolean          @default(false)
+  edition       Json?
+  bookmarks     BookmarkCommunity[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@index([artistId])
   @@index([communityId])
+  @@map("releases")
 }
 
-model Tag {
-  id          Int      @id @default(autoincrement())
+model Contribution {
+  id                 Int           @id @default(autoincrement())
+  userId             Int
+  user               User          @relation(fields: [userId], references: [id])
+  releaseId          Int
+  release            Release       @relation(fields: [releaseId], references: [id])
+  contributorId      Int
+  contributor        Contributor   @relation(fields: [contributorId], references: [id])
+  releaseDescription String?       @db.VarChar(1000)
+  consumers          Consumer[]    @relation("ContributionConsumers")
+  collaborators      Artist[]      @relation("ContributionCollaborators")
+  comments           Comment[]
+  sizeInBytes        Int
+  type               FileType
+  jsonFile           Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([releaseId])
+  @@map("contributions")
+}
+
+model DoNotUpload {
+  id          Int       @id @default(autoincrement())
   name        String
-  occurrences Int      @default(0)
+  comment     String    @db.Text
+  communityId Int
+  community   Community @relation(fields: [communityId], references: [id])
+  userId      Int
+  createdAt   DateTime  @default(now())
+
+  @@map("do_not_upload")
+}
+
+// ─── Comment ──────────────────────────────────────────────────────────────────
+
+model Comment {
+  id             Int           @id @default(autoincrement())
+  page           CommentPage
+  authorId       Int
+  author         User          @relation("CommentAuthor", fields: [authorId], references: [id])
+  body           String        @db.Text
+  editedUserId   Int?
+  editedUser     User?         @relation("CommentEditor", fields: [editedUserId], references: [id])
+  editedAt       DateTime?
+  artistId       Int?
+  artist         Artist?       @relation(fields: [artistId], references: [id])
+  communityId    Int?
+  community      Community?    @relation(fields: [communityId], references: [id])
+  contributionId Int?
+  contribution   Contribution? @relation(fields: [contributionId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@map("comments")
+}
+
+model CommentEdit {
+  id         Int               @id @default(autoincrement())
+  page       SubscriptionPage?
+  postId     Int?
+  editUserId Int?
+  editedAt   DateTime?
+  body       String            @db.Text
+
+  @@index([postId])
+  @@map("comment_edits")
+}
+
+// ─── Donation ─────────────────────────────────────────────────────────────────
+
+model Donation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Float
+  email     String
+  donatedAt DateTime
+  currency  String   @default("USD")
+  source    String   @default("")
+  reason    String
+  rank      Int      @default(0)
+  addedBy   Int      @default(0)
+  totalRank Int      @default(0)
+
+  @@index([userId])
+  @@index([donatedAt])
+  @@map("donations")
+}
+
+model BitcoinDonation {
+  id             Int    @id @default(autoincrement())
+  bitcoinAddress String
+  amount         Float
+
+  @@index([bitcoinAddress])
+  @@map("bitcoin_donations")
+}
+
+model DonorForumUsername {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @unique
+  user     User    @relation(fields: [userId], references: [id])
+  prefix   String  @default("")
+  suffix   String  @default("")
+  useComma Boolean @default(true)
+
+  @@map("donor_forum_usernames")
+}
+
+model DonorReward {
+  id                  Int    @id @default(autoincrement())
+  userId              Int    @unique
+  user                User   @relation(fields: [userId], references: [id])
+  iconMouseOverText   String @default("")
+  avatarMouseOverText String @default("")
+  customIcon          String @default("")
+  secondAvatar        String @default("")
+  customIconLink      String @default("")
+  profileInfo1        String @default("")
+  profileInfo2        String @default("")
+  profileInfo3        String @default("")
+  profileInfo4        String @default("")
+  profileInfoTitle1   String @default("")
+  profileInfoTitle2   String @default("")
+  profileInfoTitle3   String @default("")
+  profileInfoTitle4   String @default("")
+
+  @@map("donor_rewards")
+}
+
+// ─── Bookmark ─────────────────────────────────────────────────────────────────
+
+model BookmarkArtist {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  artistId  Int
+  artist    Artist   @relation(fields: [artistId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, artistId])
+  @@map("bookmark_artists")
+}
+
+model BookmarkCollage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  collageId Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, collageId])
+  @@map("bookmark_collages")
+}
+
+model BookmarkCommunity {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  user        User       @relation(fields: [userId], references: [id])
+  releaseId   Int
+  release     Release    @relation(fields: [releaseId], references: [id])
+  communityId Int?
+  community   Community? @relation(fields: [communityId], references: [id])
+  sort        Int        @default(0)
+  createdAt   DateTime   @default(now())
+
+  @@unique([userId, releaseId])
+  @@map("bookmark_communities")
+}
+
+model BookmarkRequest {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  requestId Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, requestId])
+  @@map("bookmark_requests")
+}
+
+// ─── Featured ─────────────────────────────────────────────────────────────────
+
+model Blog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  body      String   @db.Text
+  threadId  Int?
+  important Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("blogs")
+}
+
+model ContestLeaderboard {
+  id              Int      @id @default(autoincrement())
+  contestId       Int
+  userId          Int
+  flacCount       Int
+  lastTorrentId   Int
+  lastTorrentName String
+  artistList      String   @db.Text
+  artistNames     String   @db.Text
+  lastUpload      DateTime
+
+  @@index([flacCount])
+  @@index([lastUpload])
+  @@index([userId])
+  @@map("contest_leaderboards")
+}
+
+model ContestType {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  @@map("contest_types")
+}
+
+model CoverArt {
+  id      Int       @id @default(autoincrement())
+  groupId Int
+  image   String    @default("")
+  summary String?
+  userId  Int       @default(0)
+  addedAt DateTime?
+
+  @@unique([groupId, image])
+  @@map("cover_art")
+}
+
+model FeaturedAlbum {
+  id       Int      @id @default(autoincrement())
+  groupId  Int
+  threadId Int
+  title    String   @default("")
+  started  DateTime
+  ended    DateTime
+
+  @@map("featured_albums")
+}
+
+model FeaturedMerch {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  title     String   @default("")
+  image     String   @default("")
+  started   DateTime
+  ended     DateTime
+  artistId  Int      @default(0)
+
+  @@map("featured_merch")
+}
+
+// ─── Subscriptions & Notifications ───────────────────────────────────────────
+
+model Subscription {
+  id      Int  @id @default(autoincrement())
+  userId  Int
+  user    User @relation(fields: [userId], references: [id])
+  topicId Int
+
+  @@unique([userId, topicId])
+  @@map("subscriptions")
+}
+
+model CommentSubscription {
+  id     Int              @id @default(autoincrement())
+  userId Int
+  user   User             @relation(fields: [userId], references: [id])
+  page   SubscriptionPage
+  pageId Int
+
+  @@unique([userId, page, pageId])
+  @@map("comment_subscriptions")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation("NotificationUser", fields: [userId], references: [id])
+  quoterId  Int
+  quoter    User             @relation("NotificationQuoter", fields: [quoterId], references: [id])
+  page      SubscriptionPage
+  pageId    Int
+  postId    Int
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+// ─── Content ──────────────────────────────────────────────────────────────────
+
+model Tag {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  occurrences Int         @default(0)
   releases    Release[]
+  artistTags  ArtistTag[]
 
   @@map("tags")
 }
 
-model User {
-  id Int @id @default(autoincrement())
-  userSettingsId Int
-  userSettings UserSettings @relation(fields: [userSettingsId], references: [id])
-  username String @unique
-  email String @unique
-  password String
-  avatar String?
-  userRankId Int
-  userRank UserRank @relation(fields: [userRankId], references: [id])
-  invites Invite[]
-  inviteCount Int @default(0)
-  lastLogin DateTime?
-  dateRegistered DateTime @default(now())
-  disabled Boolean @default(false)
-  isArtist Boolean @default(false)
-  isDonor Boolean @default(false)
-  profileId Int
-  profile Profile @relation(fields: [profileId], references: [id])
-  canDownload Boolean @default(true)
-  consumerId Int?
-  consumer Consumer? @relation(fields: [consumerId], references: [id])
-  contributorId Int?
-  contributor Contributor? @relation(fields: [contributorId], references: [id])
-  contributions Contribution[]
-  adminComment String?
-  banDate DateTime?
-  banReason String?
-  warned DateTime?
-  warnedTimes Int @default(0)
-  communityPass String
+model Post {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  text      String   @db.Text
+  category  String
+  tags      String[]
+  comments  Json     @default("[]")
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@map("posts")
 }
 
-model UserSettings {
-  id Int @id @default(autoincrement())
+model News {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
 
+  @@map("news")
+}
+
+// ─── Applications ─────────────────────────────────────────────────────────────
+
+model Applicant {
+  id        Int      @id @default(autoincrement())
+  roleId    String
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  threadId  Int
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  resolved  Boolean  @default(false)
+  body      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("applicants")
+}
+
+model Note {
+  id         Int            @id @default(autoincrement())
+  threadId   Int
+  thread     Thread         @relation(fields: [threadId], references: [id])
+  userId     Int
+  user       User           @relation(fields: [userId], references: [id])
+  text       String         @db.Text
+  visibility NoteVisibility
+  createdAt  DateTime       @default(now())
+
+  @@map("notes")
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+
+model ApiApplication {
+  id       Int       @id @default(autoincrement())
+  userId   Int
+  user     User      @relation(fields: [userId], references: [id])
+  token    String    @unique
+  name     String    @db.VarChar(50)
+  apiUsers ApiUser[]
+
+  @@map("api_applications")
+}
+
+model ApiUser {
+  id               Int            @id @default(autoincrement())
+  userId           Int
+  user             User           @relation(fields: [userId], references: [id])
+  apiApplicationId Int
+  apiApplication   ApiApplication @relation(fields: [apiApplicationId], references: [id])
+  token            String         @unique
+  state            ApiUserState
+  access           String
+  createdAt        DateTime       @default(now())
+
+  @@map("api_users")
+}
+
+model Permission {
+  id        Int    @id @default(autoincrement())
+  name      String
+  level     Int
+  userCount Int    @default(0)
+
+  @@map("permissions")
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+
+model BadPassword {
+  id       Int    @id @default(autoincrement())
+  password String @unique
+
+  @@map("bad_passwords")
+}
+
+model CurrencyConversionRate {
+  id        Int       @id @default(autoincrement())
+  currency  String    @unique
+  rate      Float?
+  updatedAt DateTime?
+
+  @@map("currency_conversion_rates")
+}
+
+model EmailBlacklist {
+  id      Int      @id @default(autoincrement())
+  userId  Int
+  email   String
+  addedAt DateTime
+  comment String   @db.Text
+
+  @@index([email])
+  @@map("email_blacklists")
+}
+
+model IpBan {
+  id     Int @id @default(autoincrement())
+  fromIp Int
+  toIp   Int
+
+  @@map("ip_bans")
+}
+
+model GroupLog {
+  id          Int      @id @default(autoincrement())
+  groupId     Int
+  communityId Int
+  userId      Int      @default(0)
+  info        String?  @db.Text
+  loggedAt    DateTime
+  hidden      Int      @default(0)
+
+  @@map("group_logs")
 }
