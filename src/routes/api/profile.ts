@@ -4,6 +4,7 @@ import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { profileUpdateSchema } from '../../schemas/profile';
+import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
 
@@ -83,10 +84,10 @@ router.put(
       prisma.profile.update({
         where: { id: user.profileId },
         data: {
-          ...(avatar !== undefined && { avatar }),
-          ...(avatarMouseoverText !== undefined && { avatarMouseoverText }),
-          ...(profileTitle !== undefined && { profileTitle }),
-          ...(profileInfo !== undefined && { profileInfo })
+          ...(avatar !== undefined && { avatar: sanitizePlain(avatar) }),
+          ...(avatarMouseoverText !== undefined && { avatarMouseoverText: sanitizePlain(avatarMouseoverText) }),
+          ...(profileTitle !== undefined && { profileTitle: sanitizePlain(profileTitle) }),
+          ...(profileInfo !== undefined && { profileInfo: sanitizeHtml(profileInfo) })
         }
       }),
       prisma.userSettings.update({

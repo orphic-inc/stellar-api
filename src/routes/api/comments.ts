@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { CommentPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { sanitizeHtml } from '../../lib/sanitize';
 
 const router = express.Router();
 
@@ -46,23 +46,20 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('page', 'Page is required').not().isEmpty(),
-    check('body', 'Body is required').not().isEmpty()
-  ],
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { page, body, communityId, contributionId, artistId } = req.body as {
       page: CommentPage; body: string;
       communityId?: number; contributionId?: number; artistId?: number;
     };
 
+    if (!page || !body) {
+      return res.status(400).json({ msg: 'page and body are required' });
+    }
+
     const comment = await prisma.comment.create({
       data: {
         page,
-        body,
+        body: sanitizeHtml(body),
         authorId: req.user!.id,
         ...(communityId && { communityId }),
         ...(contributionId && { contributionId }),
@@ -78,10 +75,9 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  [check('body', 'Body is required').not().isEmpty()],
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { body } = req.body as { body: string };
+    if (!body) return res.status(400).json({ msg: 'Body is required' });
 
     const id = parseInt(req.params.id);
     const comment = await prisma.comment.findUnique({ where: { id } });
@@ -90,7 +86,7 @@ router.put(
 
     const updated = await prisma.comment.update({
       where: { id },
-      data: { body: req.body.body, editedUserId: req.user!.id, editedAt: new Date() }
+      data: { body: sanitizeHtml(body), editedUserId: req.user!.id, editedAt: new Date() }
     });
     res.json(updated);
   })

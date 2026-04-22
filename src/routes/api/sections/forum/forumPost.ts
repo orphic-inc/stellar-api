@@ -7,6 +7,7 @@ import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
+import { sanitizeHtml } from '../../../../lib/sanitize';
 
 const router = express.Router({ mergeParams: true });
 
@@ -75,7 +76,7 @@ router.post(
 
     const [post] = await prisma.$transaction(async (tx) => {
       const post = await tx.forumPost.create({
-        data: { forumTopicId, authorId: req.user!.id, body: req.body.body }
+        data: { forumTopicId, authorId: req.user!.id, body: sanitizeHtml(req.body.body) }
       });
       await tx.forumTopic.update({
         where: { id: forumTopicId },
@@ -108,7 +109,7 @@ router.put(
 
     const updated = await prisma.forumPost.update({
       where: { id },
-      data: { body: req.body.body, edits: edits as never }
+      data: { body: sanitizeHtml(req.body.body), edits: edits as never }
     });
     res.json(updated);
   })

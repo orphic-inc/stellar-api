@@ -7,6 +7,7 @@ import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createTopicSchema, updateTopicSchema } from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
+import { sanitizeHtml } from '../../../../lib/sanitize';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
@@ -86,7 +87,7 @@ router.post(
       });
 
       const post = await tx.forumPost.create({
-        data: { forumTopicId: topic.id, authorId: req.user!.id, body }
+        data: { forumTopicId: topic.id, authorId: req.user!.id, body: sanitizeHtml(body) }
       });
 
       await tx.forumTopic.update({
