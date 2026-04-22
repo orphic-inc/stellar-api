@@ -83,7 +83,7 @@ router.post(
       },
       include: { release: true, collaborators: true }
     });
-    res.json(contribution);
+    res.status(201).json(contribution);
   })
 );
 

@@ -7,7 +7,7 @@ import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createTopicSchema, updateTopicSchema } from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
-import { sanitizeHtml } from '../../../../lib/sanitize';
+import { sanitizeHtml, sanitizePlain } from '../../../../lib/sanitize';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
@@ -102,14 +102,14 @@ router.post(
 
       if (question && answers) {
         await tx.forumPoll.create({
-          data: { forumTopicId: topic.id, question, answers }
+          data: { forumTopicId: topic.id, question: sanitizePlain(question), answers: sanitizePlain(answers) }
         });
       }
 
       return topic;
     });
 
-    res.json(topic);
+    res.status(201).json(topic);
   })
 );
 
