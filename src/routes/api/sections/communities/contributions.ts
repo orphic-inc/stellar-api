@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { FileType } from '@prisma/client';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 
 const router = express.Router();
 
@@ -11,15 +11,21 @@ const router = express.Router();
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (_req: Request, res: Response) => {
-    const contributions = await prisma.contribution.findMany({
-      include: {
-        user: { select: { id: true, username: true } },
-        release: { select: { id: true, title: true } },
-        collaborators: { select: { id: true, name: true } }
-      }
-    });
-    res.json(contributions);
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const [contributions, total] = await Promise.all([
+      prisma.contribution.findMany({
+        skip: pg.skip,
+        take: pg.limit,
+        include: {
+          user: { select: { id: true, username: true } },
+          release: { select: { id: true, title: true } },
+          collaborators: { select: { id: true, name: true } }
+        }
+      }),
+      prisma.contribution.count()
+    ]);
+    paginatedResponse(res, contributions, total, pg);
   })
 );
 
@@ -48,16 +54,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('releaseId', 'Release id is required').isInt(),
-    check('contributorId', 'Contributor id is required').isInt(),
-    check('type', 'Type is required').not().isEmpty(),
-    check('sizeInBytes', 'Size is required').isInt()
-  ],
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const {
       releaseId, contributorId, releaseDescription,
       type, sizeInBytes, jsonFile, collaboratorIds
@@ -66,6 +63,10 @@ router.post(
       type: FileType; sizeInBytes: number; jsonFile?: boolean;
       collaboratorIds?: number[];
     };
+
+    if (!releaseId || !contributorId || !type || !sizeInBytes) {
+      return res.status(400).json({ msg: 'releaseId, contributorId, type, and sizeInBytes are required' });
+    }
 
     const contribution = await prisma.contribution.create({
       data: {

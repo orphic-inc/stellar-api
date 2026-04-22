@@ -5,6 +5,7 @@ import { requireAuth } from '../../../../middleware/auth';
 import { requirePermission } from '../../../../middleware/permissions';
 import { validate } from '../../../../middleware/validate';
 import { createGroupSchema, updateGroupSchema } from '../../../../schemas/community';
+import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 
 const router = express.Router({ mergeParams: true });
 
@@ -15,15 +16,21 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const communityId = parseInt(req.params.communityId);
     if (isNaN(communityId)) return res.status(400).json({ msg: 'Invalid community id' });
-    const releases = await prisma.release.findMany({
-      where: { communityId },
-      include: {
-        artist: { select: { id: true, name: true } },
-        tags: true,
-        contributors: { include: { user: { select: { id: true, username: true } } } }
-      }
-    });
-    res.json(releases);
+    const pg = parsePage(req);
+    const [releases, total] = await Promise.all([
+      prisma.release.findMany({
+        where: { communityId },
+        skip: pg.skip,
+        take: pg.limit,
+        include: {
+          artist: { select: { id: true, name: true } },
+          tags: true,
+          contributors: { include: { user: { select: { id: true, username: true } } } }
+        }
+      }),
+      prisma.release.count({ where: { communityId } })
+    ]);
+    paginatedResponse(res, releases, total, pg);
   })
 );
 

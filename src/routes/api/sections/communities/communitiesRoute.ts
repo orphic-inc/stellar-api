@@ -5,6 +5,7 @@ import { requireAuth } from '../../../../middleware/auth';
 import { requirePermission } from '../../../../middleware/permissions';
 import { validate } from '../../../../middleware/validate';
 import { createCommunitySchema, updateCommunitySchema } from '../../../../schemas/community';
+import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 import communityGroupRouter from './communityGroup';
 
 const router = express.Router();
@@ -15,11 +16,17 @@ router.use('/:communityId/groups', communityGroupRouter);
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (_req: Request, res: Response) => {
-    const communities = await prisma.community.findMany({
-      include: { _count: { select: { contributors: true, releases: true } } }
-    });
-    res.json(communities);
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const [communities, total] = await Promise.all([
+      prisma.community.findMany({
+        skip: pg.skip,
+        take: pg.limit,
+        include: { _count: { select: { contributors: true, releases: true } } }
+      }),
+      prisma.community.count()
+    ]);
+    paginatedResponse(res, communities, total, pg);
   })
 );
 

@@ -6,6 +6,7 @@ import { validate } from '../../../../middleware/validate';
 import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
+import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 
 const router = express.Router({ mergeParams: true });
 
@@ -24,12 +25,18 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const forumTopicId = parseInt(req.params.forumTopicId);
     if (isNaN(forumTopicId)) return res.status(400).json({ msg: 'Invalid topic id' });
-    const posts = await prisma.forumPost.findMany({
-      where: { forumTopicId },
-      orderBy: { createdAt: 'asc' },
-      include: { author: { select: { id: true, username: true, avatar: true } } }
-    });
-    res.json(posts);
+    const pg = parsePage(req);
+    const [posts, total] = await Promise.all([
+      prisma.forumPost.findMany({
+        where: { forumTopicId },
+        orderBy: { createdAt: 'asc' },
+        skip: pg.skip,
+        take: pg.limit,
+        include: { author: { select: { id: true, username: true, avatar: true } } }
+      }),
+      prisma.forumPost.count({ where: { forumTopicId } })
+    ]);
+    paginatedResponse(res, posts, total, pg);
   })
 );
 
