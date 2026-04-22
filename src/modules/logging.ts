@@ -1,48 +1,39 @@
 import winston from 'winston';
 import { logging as config } from './config';
 
-interface LoggerConfig {
-  level: string;
-  timestampFormat?: string;
-}
-
 const { Container, format, transports } = winston;
-const { combine, label, prettyPrint, printf, timestamp } = format;
+const { combine, json, label, prettyPrint, printf, timestamp } = format;
 
 const loggers: { [key: string]: winston.Logger } = {};
 const container = new Container();
 
-const createLogger = (
-  category: string,
-  categoryLabel: string
-): winston.Logger => {
-  // Custom log formatter
-  let formatter = (info: winston.Logform.TransformableInfo) =>
-    `[${info.level}][${info.label}] ${info.message}`;
+const createLogger = (category: string, categoryLabel: string): winston.Logger => {
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  // Initial set of formats to apply
-  const formatters: Array<typeof winston.format> = [
-    label({ label: categoryLabel }) as any
-  ];
+  let fmt: winston.Logform.Format;
 
-  // Optional timestamp format from config
-  if (config.timestampFormat) {
-    formatters.push(timestamp({ format: config.timestampFormat }) as any);
-    formatter = (info) =>
-      `${info.timestamp} [${info.level}][${info.label}] ${info.message}`;
+  if (isProduction) {
+    fmt = combine(timestamp(), label({ label: categoryLabel }), json());
+  } else {
+    let formatter = (info: winston.Logform.TransformableInfo) =>
+      `[${info.level}][${info.label}] ${info.message}`;
+
+    const formatters: Array<typeof winston.format> = [
+      label({ label: categoryLabel }) as any
+    ];
+
+    if (config.timestampFormat) {
+      formatters.push(timestamp({ format: config.timestampFormat }) as any);
+      formatter = (info) =>
+        `${info.timestamp} [${info.level}][${info.label}] ${info.message}`;
+    }
+
+    formatters.push(prettyPrint() as any, printf(formatter) as any);
+    fmt = combine(...(formatters as any));
   }
 
-  // Adding pretty print and custom formatter
-  formatters.push(prettyPrint() as any, printf(formatter) as any);
-
-  // Adding a new logger to the container
   container.add(category, {
-    transports: [
-      new transports.Console({
-        level: config.level,
-        format: combine(...(formatters as any))
-      })
-    ]
+    transports: [new transports.Console({ level: config.level, format: fmt })]
   });
 
   return container.get(category);

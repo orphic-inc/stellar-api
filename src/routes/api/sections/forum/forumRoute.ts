@@ -2,6 +2,9 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { requirePermission } from '../../../../middleware/permissions';
+import { validate } from '../../../../middleware/validate';
+import { createForumSchema } from '../../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();
@@ -41,7 +44,9 @@ router.get(
           orderBy: [{ isSticky: 'desc' }, { updatedAt: 'desc' }],
           include: {
             author: { select: { id: true, username: true } },
-            lastPost: { include: { author: { select: { id: true, username: true } } } }
+            lastPost: {
+              include: { author: { select: { id: true, username: true } } }
+            }
           }
         }
       }
@@ -51,33 +56,73 @@ router.get(
   })
 );
 
-// POST /api/forums
+// POST /api/forums — requires forums_manage permission
 router.post(
   '/',
-  requireAuth,
+  ...requirePermission('forums_manage'),
+  validate(createForumSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
       forumCategoryId, sort, name, description,
-      minClassRead, minClassWrite, minClassCreate,
-      autoLock, autoLockWeeks
-    } = req.body as {
-      forumCategoryId: number; sort: number; name: string; description?: string;
-      minClassRead?: number; minClassWrite?: number; minClassCreate?: number;
-      autoLock?: boolean; autoLockWeeks?: number;
-    };
+      minClassRead, minClassWrite, minClassCreate, autoLock, autoLockWeeks
+    } = req.body;
 
     const forum = await prisma.forum.create({
       data: {
-        forumCategoryId, sort, name,
+        forumCategoryId,
+        sort,
+        name,
         description: description ?? '',
-        minClassRead: minClassRead ?? 0,
-        minClassWrite: minClassWrite ?? 0,
-        minClassCreate: minClassCreate ?? 0,
-        autoLock: autoLock ?? true,
-        autoLockWeeks: autoLockWeeks ?? 4
+        minClassRead,
+        minClassWrite,
+        minClassCreate,
+        autoLock,
+        autoLockWeeks
+      }
+    });
+    res.status(201).json(forum);
+  })
+);
+
+// PUT /api/forums/:id — requires forums_manage permission
+router.put(
+  '/:id',
+  ...requirePermission('forums_manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const existing = await prisma.forum.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ msg: 'Forum not found' });
+
+    const { name, description, sort, minClassRead, minClassWrite, minClassCreate, autoLock, autoLockWeeks } = req.body;
+    const forum = await prisma.forum.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(sort !== undefined && { sort }),
+        ...(minClassRead !== undefined && { minClassRead }),
+        ...(minClassWrite !== undefined && { minClassWrite }),
+        ...(minClassCreate !== undefined && { minClassCreate }),
+        ...(autoLock !== undefined && { autoLock }),
+        ...(autoLockWeeks !== undefined && { autoLockWeeks })
       }
     });
     res.json(forum);
+  })
+);
+
+// DELETE /api/forums/:id — requires forums_manage permission
+router.delete(
+  '/:id',
+  ...requirePermission('forums_manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const existing = await prisma.forum.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ msg: 'Forum not found' });
+    await prisma.forum.delete({ where: { id } });
+    res.status(204).send();
   })
 );
 

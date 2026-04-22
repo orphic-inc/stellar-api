@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
+import { profileUpdateSchema } from '../../schemas/profile';
 
 const router = express.Router();
 
@@ -64,6 +66,7 @@ router.get(
 router.put(
   '/me',
   requireAuth,
+  validate(profileUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
       avatar, avatarMouseoverText, profileTitle, profileInfo,

@@ -1,33 +1,95 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
+import { authLimiter } from '../../middleware/rateLimiter';
+import { loginSchema, registerSchema } from '../../schemas/auth';
 
 const router = express.Router();
 
+const TOKEN_TTL_SECONDS = 3600; // 1 hour
+const TOKEN_TTL_MS = TOKEN_TTL_SECONDS * 1000;
+
+const issueToken = (userId: number): Promise<string> =>
+  new Promise((resolve, reject) => {
+    jwt.sign({ user: { id: userId } }, authConfig.jwtSecret, { expiresIn: TOKEN_TTL_SECONDS }, (err, token) => {
+      if (err || !token) return reject(err ?? new Error('Token generation failed'));
+      resolve(token);
+    });
+  });
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: TOKEN_TTL_MS
+};
+
 // GET /api/auth/status
-router.get('/status', (req: Request, res: Response) => {
-  const token = req.cookies?.token;
-  if (!token) return res.status(403).json({ isAuthenticated: false });
-  try {
-    const decoded = jwt.verify(token, authConfig.jwtSecret) as { user: { id: number } };
-    res.json({ isAuthenticated: true, user: { id: decoded.user.id } });
-  } catch {
-    res.status(403).json({ isAuthenticated: false });
-  }
+router.get('/status', requireAuth, (req: Request, res: Response) => {
+  res.json({ isAuthenticated: true, user: req.user });
 });
 
-// GET /api/auth/logout
-router.get('/logout', (_req: Request, res: Response) => {
-  res.clearCookie('token');
-  res.json({ msg: 'User logged out' });
+// POST /api/auth/logout
+router.post('/logout', (_req: Request, res: Response) => {
+  res.clearCookie('token', { sameSite: 'lax', httpOnly: true });
+  res.json({ msg: 'Logged out' });
 });
 
-// GET /api/auth — get current user
+// POST /api/auth/register — public self-registration
+router.post(
+  '/register',
+  authLimiter,
+  validate(registerSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { username, email, password } = req.body as {
+      username: string;
+      email: string;
+      password: string;
+    };
+
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ email: email.toLowerCase() }, { username }] }
+    });
+    if (existing) {
+      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+    }
+
+    const defaultRank = await prisma.userRank.findFirst({ where: { level: 100 } });
+    if (!defaultRank) throw new Error('Default rank not found');
+
+    const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
+    const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
+
+    const user = await prisma.$transaction(async (tx) => {
+      const settings = await tx.userSettings.create({ data: {} });
+      const profile = await tx.profile.create({ data: {} });
+      return tx.user.create({
+        data: {
+          username,
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          avatar,
+          userRankId: defaultRank.id,
+          userSettingsId: settings.id,
+          profileId: profile.id
+        },
+        select: { id: true, username: true, email: true, avatar: true }
+      });
+    });
+
+    const token = await issueToken(user.id);
+    res.cookie('token', token, cookieOptions);
+    res.status(201).json({ token, user });
+  })
+);
+
+// GET /api/auth — get current user profile
 router.get(
   '/',
   requireAuth,
@@ -35,9 +97,16 @@ router.get(
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: {
-        id: true, username: true, email: true, avatar: true,
-        isArtist: true, isDonor: true, canDownload: true,
-        inviteCount: true, dateRegistered: true, lastLogin: true,
+        id: true,
+        username: true,
+        email: true,
+        avatar: true,
+        isArtist: true,
+        isDonor: true,
+        canDownload: true,
+        inviteCount: true,
+        dateRegistered: true,
+        lastLogin: true,
         userRank: { select: { name: true, color: true, badge: true, permissions: true } },
         profile: true,
         userSettings: true
@@ -51,14 +120,9 @@ router.get(
 // POST /api/auth — login
 router.post(
   '/',
-  [
-    check('email', 'Please include a valid email').isEmail(),
-    check('password', 'Password is required').exists()
-  ],
+  authLimiter,
+  validate(loginSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { email, password } = req.body as { email: string; password: string };
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
@@ -69,20 +133,11 @@ router.post(
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() }
-    });
+    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
 
-    const payload = { user: { id: user.id } };
-    jwt.sign(payload, authConfig.jwtSecret, { expiresIn: 360000 }, (err, token) => {
-      if (err) throw err;
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production'
-      });
-      res.json({ token });
-    });
+    const token = await issueToken(user.id);
+    res.cookie('token', token, cookieOptions);
+    res.json({ token });
   })
 );
 

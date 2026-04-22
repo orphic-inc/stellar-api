@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
-import { CommunityType, RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { requirePermission } from '../../../../middleware/permissions';
+import { validate } from '../../../../middleware/validate';
+import { createCommunitySchema, updateCommunitySchema } from '../../../../schemas/community';
 import communityGroupRouter from './communityGroup';
 
 const router = express.Router();
@@ -41,26 +42,15 @@ router.get(
   })
 );
 
-// POST /api/communities
+// POST /api/communities — requires communities_manage
 router.post(
   '/',
-  requireAuth,
-  [
-    check('name', 'Name is required').not().isEmpty(),
-    check('type', 'Type is required').not().isEmpty(),
-    check('registrationStatus', 'Registration status is required').not().isEmpty()
-  ],
+  ...requirePermission('communities_manage'),
+  validate(createCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { name, image, type, registrationStatus, staffIds } = req.body;
 
-    const { name, image, type, registrationStatus, staffIds } = req.body as {
-      name: string; image?: string;
-      type: CommunityType; registrationStatus: RegistrationStatus;
-      staffIds?: number[];
-    };
-
-    const defaultImages: Record<CommunityType, string> = {
+    const defaultImages: Record<string, string> = {
       Music: '/images/defaults/music.png',
       Applications: '/images/defaults/applications.png',
       EBooks: '/images/defaults/ebooks.png',
@@ -72,19 +62,24 @@ router.post(
 
     const community = await prisma.community.create({
       data: {
-        name, type, registrationStatus,
+        name,
+        type,
+        registrationStatus,
         image: image ?? defaultImages[type],
-        ...(staffIds?.length && { staff: { connect: staffIds.map((id) => ({ id })) } })
+        ...(staffIds?.length && {
+          staff: { connect: staffIds.map((sid: number) => ({ id: sid })) }
+        })
       }
     });
-    res.json(community);
+    res.status(201).json(community);
   })
 );
 
-// PUT /api/communities/:id
+// PUT /api/communities/:id — requires communities_manage
 router.put(
   '/:id',
-  requireAuth,
+  ...requirePermission('communities_manage'),
+  validate(updateCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
@@ -98,10 +93,26 @@ router.put(
         ...(name !== undefined && { name }),
         ...(image !== undefined && { image }),
         ...(registrationStatus !== undefined && { registrationStatus }),
-        ...(staffIds !== undefined && { staff: { set: staffIds.map((sid: number) => ({ id: sid })) } })
+        ...(staffIds !== undefined && {
+          staff: { set: staffIds.map((sid: number) => ({ id: sid })) }
+        })
       }
     });
     res.json(community);
+  })
+);
+
+// DELETE /api/communities/:id — requires communities_manage
+router.delete(
+  '/:id',
+  ...requirePermission('communities_manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const existing = await prisma.community.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ msg: 'Community not found' });
+    await prisma.community.delete({ where: { id } });
+    res.status(204).send();
   })
 );
 

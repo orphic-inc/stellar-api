@@ -1,8 +1,10 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import { writeLimiter } from '../../../../middleware/rateLimiter';
+import { createTopicSchema, updateTopicSchema } from '../../../../schemas/forum';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
@@ -50,14 +52,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('title', 'Title is required').not().isEmpty(),
-    check('body', 'Body is required').not().isEmpty()
-  ],
+  writeLimiter,
+  validate(createTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const forumId = parseInt(req.params.forumId);
     const forum = await prisma.forum.findUnique({ where: { id: forumId } });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
@@ -102,6 +99,7 @@ router.post(
 router.put(
   '/:forumTopicId',
   requireAuth,
+  validate(updateTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.forumTopicId);
     const topic = await prisma.forumTopic.findUnique({ where: { id } });
