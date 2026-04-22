@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
@@ -112,6 +113,48 @@ router.delete(
     await prisma.user.delete({ where: { id: req.user!.id } });
     res.clearCookie('token');
     res.json({ msg: 'User deleted' });
+  })
+);
+
+// POST /api/profile/referral/create-invite
+router.post(
+  '/referral/create-invite',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email, reason } = req.body as { email: string; reason?: string };
+    if (!email) return res.status(400).json({ msg: 'Email is required' });
+
+    const inviter = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { inviteCount: true }
+    });
+    if (!inviter || inviter.inviteCount <= 0) {
+      return res.status(403).json({ msg: 'No invites remaining' });
+    }
+
+    const existing = await prisma.invite.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ msg: 'An invite has already been sent to that address' });
+
+    const inviteKey = crypto.randomBytes(20).toString('hex');
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await prisma.$transaction([
+      prisma.invite.create({
+        data: {
+          inviterId: req.user!.id,
+          inviteKey,
+          email: sanitizePlain(email),
+          expires,
+          reason: reason ? sanitizePlain(reason) : ''
+        }
+      }),
+      prisma.user.update({
+        where: { id: req.user!.id },
+        data: { inviteCount: { decrement: 1 } }
+      })
+    ]);
+
+    res.status(201).json({ msg: 'Invite sent', inviteKey });
   })
 );
 

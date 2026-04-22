@@ -5,6 +5,15 @@ import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { sanitizeHtml } from '../../lib/sanitize';
 
+const isModerator = async (userId: number): Promise<boolean> => {
+  const rank = await prisma.userRank.findFirst({
+    where: { users: { some: { id: userId } } },
+    select: { permissions: true }
+  });
+  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
+  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
+};
+
 const router = express.Router();
 
 // GET /api/comments
@@ -89,6 +98,27 @@ router.put(
       data: { body: sanitizeHtml(body), editedUserId: req.user!.id, editedAt: new Date() }
     });
     res.json(updated);
+  })
+);
+
+// DELETE /api/comments/:id
+router.delete(
+  '/:id',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+
+    const comment = await prisma.comment.findUnique({ where: { id } });
+    if (!comment) return res.status(404).json({ msg: 'Comment not found' });
+
+    const isOwner = comment.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req.user!.id))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
+
+    await prisma.comment.delete({ where: { id } });
+    res.json({ msg: 'Comment deleted' });
   })
 );
 
