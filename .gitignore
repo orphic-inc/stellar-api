@@ -1,5 +1,6 @@
 build/
 lib/
+!src/lib/
 node_modules/
 .env
 package-lock.json

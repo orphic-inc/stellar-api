@@ -5,6 +5,7 @@ import { requireAuth } from '../../../../middleware/auth';
 import { validate } from '../../../../middleware/validate';
 import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
+import { audit } from '../../../../lib/audit';
 
 const router = express.Router({ mergeParams: true });
 
@@ -121,6 +122,8 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
+    const isModAction = !isOwner;
+
     await prisma.$transaction([
       prisma.forumPost.delete({ where: { id } }),
       prisma.forumTopic.update({
@@ -130,6 +133,14 @@ router.delete(
       prisma.forum.update({
         where: { id: forumId },
         data: { numPosts: { decrement: 1 } }
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: req.user!.id,
+          action: isModAction ? 'post.mod_delete' : 'post.delete',
+          targetType: 'ForumPost',
+          targetId: id
+        }
       })
     ]);
     res.json({ msg: 'Forum post removed' });

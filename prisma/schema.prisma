@@ -188,6 +188,7 @@ model User {
   applicants             Applicant[]
   comments               Comment[]             @relation("CommentAuthor")
   editedComments         Comment[]             @relation("CommentEditor")
+  auditLogs              AuditLog[]
 
   @@map("users")
 }
@@ -1003,4 +1004,18 @@ model GroupLog {
   hidden      Int      @default(0)
 
   @@map("group_logs")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  action     String
+  targetType String
+  targetId   Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor      User     @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
 }

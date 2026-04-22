@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import { validate } from '../../middleware/validate';
 import { adminCreateUserSchema, userSettingsSchema } from '../../schemas/user';
+import { audit } from '../../lib/audit';
 
 const router = express.Router();
 
@@ -120,6 +121,8 @@ router.post(
         select: { id: true, username: true, email: true }
       });
     });
+
+    await audit(prisma, req.user!.id, 'user.create', 'User', user.id, { username, email });
 
     // No JWT or cookie — admin-created accounts require explicit login
     res.status(201).json(user);

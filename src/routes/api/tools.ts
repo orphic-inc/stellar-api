@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
+import { audit } from '../../lib/audit';
 
 const router = express.Router();
 
@@ -72,6 +73,8 @@ router.post(
         badge: badge ?? ''
       }
     });
+
+    await audit(prisma, req.user!.id, 'rank.create', 'UserRank', rank.id, { name, level });
     res.status(201).json(rank);
   })
 );
@@ -95,6 +98,8 @@ router.put(
         ...(badge !== undefined && { badge })
       }
     });
+
+    await audit(prisma, req.user!.id, 'rank.update', 'UserRank', id, { name, level, permissions });
     res.json(rank);
   })
 );
@@ -114,7 +119,12 @@ router.delete(
       });
     }
 
-    await prisma.userRank.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.userRank.delete({ where: { id } }),
+      prisma.auditLog.create({
+        data: { actorId: req.user!.id, action: 'rank.delete', targetType: 'UserRank', targetId: id }
+      })
+    ]);
     res.status(204).send();
   })
 );
