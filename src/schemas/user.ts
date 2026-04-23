@@ -11,7 +11,8 @@ export const userSettingsSchema = z.object({
   siteAppearance: z.string().optional(),
   externalStylesheet: z.string().url().optional().or(z.literal('')),
   styledTooltips: z.boolean().optional(),
-  paranoia: z.boolean().optional()
+  paranoia: z.number().int().min(0).max(3).optional(),
+  avatar: z.string().optional()
 });
 
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
