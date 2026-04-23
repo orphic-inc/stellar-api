@@ -10,7 +10,7 @@ import {
   updateCommunitySchema
 } from '../../../schemas/community';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
-import releaseRouter from './releaseGroup';
+import releaseRouter from './release';
 
 const router = express.Router();
 const communityIdParamsSchema = z.object({
