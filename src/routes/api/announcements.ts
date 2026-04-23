@@ -4,7 +4,10 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, validateParams } from '../../middleware/validate';
-import { announcementSchema } from '../../schemas/announcement';
+import {
+  announcementSchema,
+  type AnnouncementInput
+} from '../../schemas/announcement';
 import { sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
@@ -34,7 +37,7 @@ router.post(
   ...requirePermission('news_manage'),
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { title, body } = req.body as { title: string; body: string };
+    const { title, body } = req.body as AnnouncementInput;
     const news = await prisma.news.create({
       data: { title: sanitizePlain(title), body: sanitizePlain(body) }
     });
@@ -50,7 +53,7 @@ router.put(
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params as unknown as { id: number };
-    const { title, body } = req.body as { title: string; body: string };
+    const { title, body } = req.body as AnnouncementInput;
     const news = await prisma.news.update({
       where: { id },
       data: {
@@ -80,7 +83,7 @@ router.post(
   ...requirePermission('news_manage'),
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { title, body } = req.body as { title: string; body: string };
+    const { title, body } = req.body as AnnouncementInput;
     const post = await prisma.blog.create({
       data: {
         title: sanitizePlain(title),

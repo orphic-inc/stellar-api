@@ -10,3 +10,6 @@ export const postSchema = z.object({
 export const postCommentSchema = z.object({
   text: z.string().min(1, 'Text is required')
 });
+
+export type PostInput = z.infer<typeof postSchema>;
+export type PostCommentInput = z.infer<typeof postCommentSchema>;
