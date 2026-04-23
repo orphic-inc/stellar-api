@@ -1,0 +1,4 @@
+exclude_paths:
+  - "prisma/migrations/**/*.sql"
+  - "openapi.json"
+  - "dist/**"
