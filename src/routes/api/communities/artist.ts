@@ -1,14 +1,14 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { validate } from '../../../../middleware/validate';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { validate } from '../../../middleware/validate';
 import {
   artistSchema,
   similarArtistSchema,
   artistAliasSchema,
   artistTagSchema
-} from '../../../../schemas/artist';
+} from '../../../schemas/artist';
 
 const router = express.Router();
 

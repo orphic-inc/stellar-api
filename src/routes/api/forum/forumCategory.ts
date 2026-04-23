@@ -1,15 +1,15 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { requirePermission } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
 import {
   createForumCategorySchema,
   updateForumCategorySchema,
   type CreateForumCategoryInput,
   type UpdateForumCategoryInput
-} from '../../../../schemas/forumCategory';
+} from '../../../schemas/forumCategory';
 
 const router = express.Router();
 

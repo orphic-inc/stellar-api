@@ -1,17 +1,17 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { isModerator } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
-import { writeLimiter } from '../../../../middleware/rateLimiter';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { isModerator } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
+import { writeLimiter } from '../../../middleware/rateLimiter';
 import {
   createTopicSchema,
   updateTopicSchema
-} from '../../../../schemas/forum';
-import { audit } from '../../../../lib/audit';
-import { parsePage, paginatedResponse } from '../../../../lib/pagination';
-import { sanitizeHtml, sanitizePlain } from '../../../../lib/sanitize';
+} from '../../../schemas/forum';
+import { audit } from '../../../lib/audit';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import { sanitizeHtml, sanitizePlain } from '../../../lib/sanitize';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });

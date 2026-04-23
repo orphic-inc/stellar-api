@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { requirePermission } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
-import { createForumSchema } from '../../../../schemas/forum';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
+import { createForumSchema } from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();

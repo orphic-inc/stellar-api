@@ -1,11 +1,11 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { requirePermission } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
-import { createGroupSchema, updateGroupSchema } from '../../../../schemas/community';
-import { parsePage, paginatedResponse } from '../../../../lib/pagination';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
+import { createGroupSchema, updateGroupSchema } from '../../../schemas/community';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
 
 const router = express.Router({ mergeParams: true });
 

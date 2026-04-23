@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { validate } from '../../../../middleware/validate';
-import { pollSchema } from '../../../../schemas/poll';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { validate } from '../../../middleware/validate';
+import { pollSchema } from '../../../schemas/poll';
 
 const router = express.Router();
 
