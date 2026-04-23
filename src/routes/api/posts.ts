@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import {
   appendToJsonArray,
   jsonObjectArray,
@@ -11,6 +12,13 @@ import {
 import { postSchema, postCommentSchema } from '../../schemas/post';
 
 const router = express.Router();
+const postIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+const postCommentParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  commentIdx: z.coerce.number().int().min(0)
+});
 
 // GET /api/posts
 router.get(
@@ -29,9 +37,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(postIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const post = await prisma.post.findUnique({
       where: { id },
       include: { user: { select: { id: true, username: true, avatar: true } } }
@@ -66,9 +74,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(postIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.userId !== req.user!.id)
@@ -82,9 +90,10 @@ router.delete(
 router.post(
   '/comment/:id',
   requireAuth,
+  validateParams(postIdParamsSchema),
   validate(postCommentSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
+    const { id } = req.params as unknown as { id: number };
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
@@ -106,9 +115,12 @@ router.post(
 router.delete(
   '/comment/:id/:commentIdx',
   requireAuth,
+  validateParams(postCommentParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    const idx = parseInt(req.params.commentIdx);
+    const { id, commentIdx: idx } = req.params as unknown as {
+      id: number;
+      commentIdx: number;
+    };
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 

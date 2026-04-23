@@ -795,12 +795,24 @@ registry.registerPath({
 
 // ─── Communities ──────────────────────────────────────────────────────────────
 
+const CommunityStaffMember = registry.register(
+  'CommunityStaffMember',
+  z.object({
+    id: z.number(),
+    username: z.string()
+  })
+);
+
 const Community = registry.register(
   'Community',
   z.object({
     id: z.number(),
     name: z.string(),
-    type: z.string(),
+    description: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+    registrationStatus: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
+    staff: z.array(CommunityStaffMember).optional(),
     _count: z
       .object({
         releases: z.number(),
@@ -811,15 +823,68 @@ const Community = registry.register(
   })
 );
 
+const ReleaseTag = registry.register(
+  'ReleaseTag',
+  z.object({
+    id: z.number(),
+    name: z.string()
+  })
+);
+
+const ReleaseArtist = registry.register(
+  'ReleaseArtist',
+  z.object({
+    id: z.number(),
+    name: z.string()
+  })
+);
+
+const ReleaseContribution = registry.register(
+  'ReleaseContribution',
+  z.object({
+    id: z.number(),
+    user: z.object({
+      id: z.number(),
+      username: z.string()
+    }),
+    collaborators: z.array(
+      z.object({
+        id: z.number(),
+        name: z.string(),
+        vanityHouse: z.boolean().optional()
+      })
+    ),
+    releaseDescription: z.string().nullable().optional()
+  })
+);
+
 const Release = registry.register(
   'Release',
   z.object({
     id: z.number(),
     title: z.string(),
     communityId: z.number().nullable(),
-    year: z.number(),
-    type: z.string(),
-    createdAt: z.string()
+    year: z.number().nullable().optional(),
+    type: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+    artist: ReleaseArtist.optional(),
+    tags: z.array(ReleaseTag).optional(),
+    contributions: z.array(ReleaseContribution).optional()
+  })
+);
+
+const UserRank = registry.register(
+  'UserRank',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    level: z.number(),
+    permissions: z.record(z.string(), z.boolean()).optional(),
+    color: z.string().optional(),
+    badge: z.string().optional(),
+    userCount: z.number().optional()
   })
 );
 
@@ -879,6 +944,57 @@ registry.registerPath({
           })
         }
       }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{communityId}/releases/{releaseId}',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Release',
+      content: { 'application/json': { schema: Release } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/user-ranks',
+  tags: ['Tools'],
+  responses: {
+    200: {
+      description: 'User ranks',
+      content: { 'application/json': { schema: z.array(UserRank) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/user-ranks/{id}',
+  tags: ['Tools'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'User rank',
+      content: { 'application/json': { schema: UserRank } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
