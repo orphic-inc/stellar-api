@@ -9,7 +9,12 @@ import {
   jsonObjectArray,
   removeFromJsonArrayAtIndex
 } from '../../lib/jsonHelpers';
-import { postSchema, postCommentSchema } from '../../schemas/post';
+import {
+  postSchema,
+  postCommentSchema,
+  type PostInput,
+  type PostCommentInput
+} from '../../schemas/post';
 
 const router = express.Router();
 const postIdParamsSchema = z.object({
@@ -55,12 +60,7 @@ router.post(
   requireAuth,
   validate(postSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { title, text, category, tags } = req.body as {
-      title: string;
-      text: string;
-      category: string;
-      tags?: string[];
-    };
+    const { title, text, category, tags } = req.body as PostInput;
 
     const post = await prisma.post.create({
       data: { userId: req.user!.id, title, text, category, tags: tags ?? [] },
@@ -94,6 +94,7 @@ router.post(
   validate(postCommentSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params as unknown as { id: number };
+    const { text } = req.body as PostCommentInput;
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
@@ -102,7 +103,7 @@ router.post(
       data: {
         comments: appendToJsonArray(post.comments, {
           userId: req.user!.id,
-          text: req.body.text,
+          text,
           date: new Date().toISOString()
         })
       }
