@@ -19,24 +19,57 @@ router.get(
     startOfMonth.setDate(now.getDate() - 30);
 
     const [
+      totalUsers,
       enabledUsers,
       activeToday,
       activeThisWeek,
       activeThisMonth,
       communities,
       releases,
-      artists
+      artists,
+      blogPosts,
+      announcements,
+      comments,
+      contributedLinks,
+      contributionDownloadCounts
     ] = await Promise.all([
+      prisma.user.count(),
       prisma.user.count({ where: { disabled: false } }),
       prisma.user.count({ where: { lastLogin: { gte: startOfToday } } }),
       prisma.user.count({ where: { lastLogin: { gte: startOfWeek } } }),
       prisma.user.count({ where: { lastLogin: { gte: startOfMonth } } }),
       prisma.community.count(),
       prisma.release.count(),
-      prisma.artist.count()
+      prisma.artist.count(),
+      prisma.blog.count(),
+      prisma.news.count(),
+      prisma.comment.count({ where: { deletedAt: null } }),
+      prisma.contribution.count(),
+      prisma.contribution.findMany({
+        select: { _count: { select: { consumers: true } } }
+      })
     ]);
 
-    res.json({ enabledUsers, activeToday, activeThisWeek, activeThisMonth, communities, releases, artists });
+    const contributedLinkDownloads = contributionDownloadCounts.reduce(
+      (sum, contribution) => sum + contribution._count.consumers,
+      0
+    );
+
+    res.json({
+      totalUsers,
+      enabledUsers,
+      activeToday,
+      activeThisWeek,
+      activeThisMonth,
+      communities,
+      releases,
+      artists,
+      blogPosts,
+      announcements,
+      comments,
+      contributedLinks,
+      contributedLinkDownloads
+    });
   })
 );
 

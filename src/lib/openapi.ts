@@ -27,6 +27,7 @@ import {
   artistAliasSchema,
   artistTagSchema
 } from '../schemas/artist';
+import { stylesheetSchema } from '../schemas/stylesheet';
 
 extendZodWithOpenApi(z);
 
@@ -628,6 +629,35 @@ const AnnouncementsResponse = registry.register(
   })
 );
 
+const SiteStats = registry.register(
+  'SiteStats',
+  z.object({
+    totalUsers: z.number(),
+    enabledUsers: z.number(),
+    activeToday: z.number(),
+    activeThisWeek: z.number(),
+    activeThisMonth: z.number(),
+    communities: z.number(),
+    releases: z.number(),
+    artists: z.number(),
+    blogPosts: z.number(),
+    announcements: z.number(),
+    comments: z.number(),
+    contributedLinks: z.number(),
+    contributedLinkDownloads: z.number()
+  })
+);
+
+const Stylesheet = registry.register(
+  'Stylesheet',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    cssUrl: z.string(),
+    createdAt: z.string()
+  })
+);
+
 registry.registerPath({
   method: 'get',
   path: '/announcements',
@@ -638,6 +668,85 @@ registry.registerPath({
       content: {
         'application/json': { schema: AnnouncementsResponse }
       }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Site statistics',
+      content: { 'application/json': { schema: SiteStats } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet',
+  tags: ['Stylesheets'],
+  responses: {
+    200: {
+      description: 'Available stylesheets',
+      content: {
+        'application/json': { schema: z.array(Stylesheet) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Stylesheet',
+      content: { 'application/json': { schema: Stylesheet } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/stylesheet',
+  tags: ['Stylesheets'],
+  request: {
+    body: { content: { 'application/json': { schema: stylesheetSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Stylesheet created',
+      content: { 'application/json': { schema: Stylesheet } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Stylesheet removed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
