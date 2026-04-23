@@ -1,15 +1,15 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { isModerator } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
-import { writeLimiter } from '../../../../middleware/rateLimiter';
-import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
-import { audit } from '../../../../lib/audit';
-import { appendToJsonArray } from '../../../../lib/jsonHelpers';
-import { parsePage, paginatedResponse } from '../../../../lib/pagination';
-import { sanitizeHtml } from '../../../../lib/sanitize';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { isModerator } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
+import { writeLimiter } from '../../../middleware/rateLimiter';
+import { createPostSchema, updatePostSchema } from '../../../schemas/forum';
+import { audit } from '../../../lib/audit';
+import { appendToJsonArray } from '../../../lib/jsonHelpers';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import { sanitizeHtml } from '../../../lib/sanitize';
 
 const router = express.Router({ mergeParams: true });
 

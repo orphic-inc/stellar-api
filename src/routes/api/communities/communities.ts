@@ -1,16 +1,16 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { requirePermission } from '../../../../middleware/permissions';
-import { validate } from '../../../../middleware/validate';
-import { createCommunitySchema, updateCommunitySchema } from '../../../../schemas/community';
-import { parsePage, paginatedResponse } from '../../../../lib/pagination';
-import communityGroupRouter from './communityGroup';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
+import { validate } from '../../../middleware/validate';
+import { createCommunitySchema, updateCommunitySchema } from '../../../schemas/community';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import releaseGroupRouter from './releaseGroup';
 
 const router = express.Router();
 
-router.use('/:communityId/groups', communityGroupRouter);
+router.use('/:communityId/groups', releaseGroupRouter);
 
 // GET /api/communities
 router.get(

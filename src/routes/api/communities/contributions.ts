@@ -1,13 +1,13 @@
 import express, { Request, Response } from 'express';
-import { prisma } from '../../../../lib/prisma';
-import { asyncHandler } from '../../../../modules/asyncHandler';
-import { requireAuth } from '../../../../middleware/auth';
-import { validate } from '../../../../middleware/validate';
-import { parsePage, paginatedResponse } from '../../../../lib/pagination';
+import { prisma } from '../../../lib/prisma';
+import { asyncHandler } from '../../../modules/asyncHandler';
+import { requireAuth } from '../../../middleware/auth';
+import { validate } from '../../../middleware/validate';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   createContributionSchema,
   type CreateContributionInput
-} from '../../../../schemas/contribution';
+} from '../../../schemas/contribution';
 
 const router = express.Router();
 
