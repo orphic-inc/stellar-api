@@ -4,6 +4,8 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { profileUpdateSchema, inviteSchema } from '../schemas/profile';
+import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
 
 extendZodWithOpenApi(z);
 
@@ -198,7 +200,104 @@ const PublicUser = registry.register(
     dateRegistered: z.string(),
     isArtist: z.boolean(),
     isDonor: z.boolean(),
-    userRank: z.object({ name: z.string(), color: z.string() })
+    userRank: z.object({ name: z.string(), color: z.string() }),
+    profile: z.object({
+      id: z.number(),
+      avatar: z.string().nullable().optional(),
+      avatarMouseoverText: z.string().nullable().optional(),
+      profileTitle: z.string().nullable().optional(),
+      profileInfo: z.string().nullable().optional()
+    })
+  })
+);
+
+const ProfileDetails = registry.register(
+  'ProfileDetails',
+  z.object({
+    id: z.number(),
+    avatar: z.string().nullable().optional(),
+    avatarMouseoverText: z.string().nullable().optional(),
+    profileTitle: z.string().nullable().optional(),
+    profileInfo: z.string().nullable().optional()
+  })
+);
+
+const UserRankSummary = registry.register(
+  'UserRankSummary',
+  z.object({
+    name: z.string(),
+    color: z.string(),
+    badge: z.string().optional()
+  })
+);
+
+const UserSettings = registry.register(
+  'UserSettings',
+  z.object({
+    id: z.number(),
+    siteAppearance: z.string(),
+    externalStylesheet: z.string().nullable().optional(),
+    styledTooltips: z.boolean(),
+    paranoia: z.number()
+  })
+);
+
+const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    email: z.string().email(),
+    joinedAt: z.string(),
+    lastSeen: z.string().nullable().optional(),
+    uploaded: z.string().optional(),
+    downloaded: z.string().optional(),
+    ratio: z.string().optional(),
+    children: z.array(InviteNodeSchema).optional()
+  })
+);
+
+const InviteNode = registry.register('InviteNode', InviteNodeSchema);
+
+const PublicProfile = registry.register(
+  'PublicProfile',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable(),
+    dateRegistered: z.string(),
+    isArtist: z.boolean(),
+    isDonor: z.boolean(),
+    userRank: UserRankSummary,
+    profile: ProfileDetails,
+    userSettings: z.object({
+      siteAppearance: z.string().optional(),
+      styledTooltips: z.boolean().optional()
+    })
+  })
+);
+
+const MyProfile = registry.register(
+  'MyProfile',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable(),
+    profile: ProfileDetails,
+    userSettings: UserSettings,
+    userRank: z.object({
+      name: z.string(),
+      color: z.string()
+    }),
+    inviteTree: z.array(InviteNode)
+  })
+);
+
+const AdminCreatedUser = registry.register(
+  'AdminCreatedUser',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    email: z.string().email()
   })
 );
 
@@ -214,6 +313,249 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/settings',
+  tags: ['Users'],
+  responses: {
+    200: {
+      description: 'Current user settings',
+      content: { 'application/json': { schema: UserSettings } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/settings',
+  tags: ['Users'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: userSettingsSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated current user settings',
+      content: {
+        'application/json': {
+          schema: UserSettings.extend({
+            avatar: z.string().optional()
+          })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users',
+  tags: ['Users'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: adminCreateUserSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Created user',
+      content: {
+        'application/json': {
+          schema: AdminCreatedUser
+        }
+      }
+    },
+    400: {
+      description: 'Validation error or duplicate user',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me',
+  tags: ['Profile'],
+  responses: {
+    200: {
+      description: 'Current user profile',
+      content: { 'application/json': { schema: MyProfile } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Profile not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/user/{userId}',
+  tags: ['Profile'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Public profile',
+      content: { 'application/json': { schema: PublicProfile } }
+    },
+    404: {
+      description: 'Profile not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/profile/me',
+  tags: ['Profile'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: profileUpdateSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated current user profile',
+      content: { 'application/json': { schema: MyProfile } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Profile not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/profile/referral/create-invite',
+  tags: ['Profile'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: inviteSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Invite created',
+      content: {
+        'application/json': {
+          schema: z.object({
+            msg: z.string(),
+            inviteKey: z.string()
+          })
+        }
+      }
+    },
+    403: {
+      description: 'No invites remaining',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Invite already exists',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Home ─────────────────────────────────────────────────────────────────────
+
+const HomepageFeaturedRelease = registry.register(
+  'HomepageFeaturedRelease',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    year: z.number().nullable().optional(),
+    image: z.string().nullable().optional(),
+    communityId: z.number(),
+    artist: z
+      .object({
+        id: z.number(),
+        name: z.string()
+      })
+      .nullable()
+      .optional()
+  })
+);
+
+const HomepageFeaturedAlbum = registry.register(
+  'HomepageFeaturedAlbum',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    started: z.string(),
+    ended: z.string(),
+    threadId: z.number().nullable().optional(),
+    release: HomepageFeaturedRelease
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/home/featured',
+  tags: ['Home'],
+  responses: {
+    200: {
+      description: 'Homepage featured content',
+      content: {
+        'application/json': {
+          schema: z.object({
+            albumOfTheMonth: HomepageFeaturedAlbum.nullable(),
+            vanityHouse: HomepageFeaturedRelease.nullable()
+          })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
