@@ -7,6 +7,20 @@ import { z } from 'zod';
 import { profileUpdateSchema, inviteSchema } from '../schemas/profile';
 import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
 import { createContributionSchema } from '../schemas/contribution';
+import {
+  createForumSchema,
+  updateForumSchema,
+  createTopicSchema,
+  updateTopicSchema,
+  createPostSchema,
+  updatePostSchema,
+  lastReadSchema
+} from '../schemas/forum';
+import {
+  createForumCategorySchema,
+  updateForumCategorySchema
+} from '../schemas/forumCategory';
+import { pollSchema, pollVoteSchema } from '../schemas/poll';
 
 extendZodWithOpenApi(z);
 
@@ -618,10 +632,36 @@ const Forum = registry.register(
   'Forum',
   z.object({
     id: z.number(),
+    sort: z.number(),
     name: z.string(),
     description: z.string(),
+    minClassRead: z.number().optional(),
+    minClassWrite: z.number().optional(),
+    minClassCreate: z.number().optional(),
     numTopics: z.number(),
-    numPosts: z.number()
+    numPosts: z.number(),
+    forumCategory: z
+      .object({
+        id: z.number(),
+        name: z.string()
+      })
+      .optional(),
+    lastTopic: z
+      .object({
+        id: z.number(),
+        title: z.string()
+      })
+      .optional()
+  })
+);
+
+const ForumCategory = registry.register(
+  'ForumCategory',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    sort: z.number(),
+    forums: z.array(Forum).optional()
   })
 );
 
@@ -635,7 +675,27 @@ const ForumTopic = registry.register(
     isLocked: z.boolean(),
     isSticky: z.boolean(),
     numPosts: z.number(),
-    createdAt: z.string()
+    author: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional(),
+    lastPost: z
+      .object({
+        id: z.number(),
+        createdAt: z.string(),
+        author: z
+          .object({
+            id: z.number(),
+            username: z.string()
+          })
+          .optional()
+      })
+      .optional(),
+    createdAt: z.string(),
+    updatedAt: z.string()
   })
 );
 
@@ -646,8 +706,47 @@ const ForumPost = registry.register(
     forumTopicId: z.number(),
     authorId: z.number(),
     body: z.string(),
+    author: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional(),
     createdAt: z.string(),
     updatedAt: z.string()
+  })
+);
+
+const ForumPollVote = registry.register(
+  'ForumPollVote',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    vote: z.number()
+  })
+);
+
+const ForumPoll = registry.register(
+  'ForumPoll',
+  z.object({
+    id: z.number(),
+    forumTopicId: z.number(),
+    question: z.string(),
+    answers: z.string(),
+    featured: z.string().nullable().optional(),
+    closed: z.boolean(),
+    votes: z.array(ForumPollVote)
+  })
+);
+
+const ForumLastReadTopic = registry.register(
+  'ForumLastReadTopic',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    forumTopicId: z.number(),
+    forumPostId: z.number()
   })
 );
 
@@ -667,16 +766,77 @@ registry.registerPath({
     200: {
       description: 'All categories with forums',
       content: {
-        'application/json': {
-          schema: z.array(
-            z.object({
-              id: z.number(),
-              name: z.string(),
-              forums: z.array(Forum)
-            })
-          )
-        }
+        'application/json': { schema: z.array(ForumCategory) }
       }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/categories',
+  tags: ['Forums'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createForumCategorySchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Category created',
+      content: { 'application/json': { schema: ForumCategory } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/forums/categories/{id}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateForumCategorySchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Category updated',
+      content: { 'application/json': { schema: ForumCategory } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/forums/categories/{id}',
+  tags: ['Forums'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Category deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums',
+  tags: ['Forums'],
+  responses: {
+    200: {
+      description: 'Forums',
+      content: { 'application/json': { schema: z.array(Forum) } }
     }
   }
 });
@@ -691,6 +851,59 @@ registry.registerPath({
       description: 'Forum',
       content: { 'application/json': { schema: Forum } }
     },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums',
+  tags: ['Forums'],
+  request: {
+    body: { content: { 'application/json': { schema: createForumSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Forum created',
+      content: { 'application/json': { schema: Forum } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/forums/{id}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateForumSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Forum updated',
+      content: { 'application/json': { schema: Forum } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/forums/{id}',
+  tags: ['Forums'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Forum deleted' },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -715,22 +928,32 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: '/forums/{forumId}/topics/{topicId}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ forumId: z.string(), topicId: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Topic',
+      content: { 'application/json': { schema: ForumTopic } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'post',
   path: '/forums/{forumId}/topics',
   tags: ['Forums'],
   request: {
     params: z.object({ forumId: z.string() }),
     body: {
-      content: {
-        'application/json': {
-          schema: z.object({
-            title: z.string().min(1),
-            body: z.string().min(1),
-            question: z.string().optional(),
-            answers: z.string().optional()
-          })
-        }
-      }
+      content: { 'application/json': { schema: createTopicSchema } }
     }
   },
   responses: {
@@ -744,6 +967,45 @@ registry.registerPath({
     },
     401: {
       description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/forums/{forumId}/topics/{topicId}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ forumId: z.string(), topicId: z.string() }),
+    body: { content: { 'application/json': { schema: updateTopicSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Topic updated',
+      content: { 'application/json': { schema: ForumTopic } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/forums/{forumId}/topics/{topicId}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ forumId: z.string(), topicId: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Topic removed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -773,16 +1035,35 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: '/forums/{forumId}/topics/{topicId}/posts/{id}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({
+      forumId: z.string(),
+      topicId: z.string(),
+      id: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Post',
+      content: { 'application/json': { schema: ForumPost } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'post',
   path: '/forums/{forumId}/topics/{topicId}/posts',
   tags: ['Forums'],
   request: {
     params: z.object({ forumId: z.string(), topicId: z.string() }),
-    body: {
-      content: {
-        'application/json': { schema: z.object({ body: z.string().min(1) }) }
-      }
-    }
+    body: { content: { 'application/json': { schema: createPostSchema } } }
   },
   responses: {
     201: {
@@ -796,6 +1077,158 @@ registry.registerPath({
     403: {
       description: 'Topic locked',
       content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/forums/{forumId}/topics/{topicId}/posts/{id}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({
+      forumId: z.string(),
+      topicId: z.string(),
+      id: z.string()
+    }),
+    body: { content: { 'application/json': { schema: updatePostSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Post updated',
+      content: { 'application/json': { schema: ForumPost } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/forums/{forumId}/topics/{topicId}/posts/{id}',
+  tags: ['Forums'],
+  request: {
+    params: z.object({
+      forumId: z.string(),
+      topicId: z.string(),
+      id: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Post removed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/polls/{topicId}',
+  tags: ['Forums'],
+  request: { params: z.object({ topicId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Poll',
+      content: { 'application/json': { schema: ForumPoll } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/polls',
+  tags: ['Forums'],
+  request: {
+    body: { content: { 'application/json': { schema: pollSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Poll created',
+      content: { 'application/json': { schema: ForumPoll } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/forums/polls/{id}/close',
+  tags: ['Forums'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Poll closed',
+      content: { 'application/json': { schema: ForumPoll } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/poll-votes',
+  tags: ['Forums'],
+  request: {
+    body: { content: { 'application/json': { schema: pollVoteSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Vote recorded',
+      content: { 'application/json': { schema: ForumPollVote } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/last-read',
+  tags: ['Forums'],
+  responses: {
+    200: {
+      description: 'Last-read markers',
+      content: {
+        'application/json': { schema: z.array(ForumLastReadTopic) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/last-read',
+  tags: ['Forums'],
+  request: {
+    body: { content: { 'application/json': { schema: lastReadSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Last-read marker saved',
+      content: { 'application/json': { schema: ForumLastReadTopic } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
