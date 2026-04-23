@@ -1,12 +1,16 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { announcementSchema } from '../../schemas/announcement';
 import { sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
+const idParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/announcements
 router.get(
@@ -15,11 +19,15 @@ router.get(
     const [news, blogs] = await Promise.all([
       prisma.news.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
       prisma.blog.findMany({
-        orderBy: { createdAt: 'desc' }, take: 20,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
         include: { user: { select: { username: true, avatar: true } } }
       })
     ]);
-    res.json({ status: 'success', data: { announcements: news, blogPosts: blogs } });
+    res.json({
+      status: 'success',
+      data: { announcements: news, blogPosts: blogs }
+    });
   })
 );
 
@@ -41,10 +49,10 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('news_manage'),
+  validateParams(idParamsSchema),
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const { title, body } = req.body as { title: string; body: string };
     const news = await prisma.news.update({
       where: { id },
@@ -61,9 +69,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('news_manage'),
+  validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     await prisma.news.delete({ where: { id } });
     res.json({ msg: 'Deleted' });
   })
@@ -92,9 +100,9 @@ router.post(
 router.delete(
   '/blog/:id',
   ...requirePermission('news_manage'),
+  validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     await prisma.blog.delete({ where: { id } });
     res.json({ msg: 'Deleted' });
   })

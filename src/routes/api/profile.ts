@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -12,6 +13,9 @@ import {
 import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
+const userIdParamsSchema = z.object({
+  userId: z.coerce.number().int().positive()
+});
 
 type InviteTreeNode = {
   id: number;
@@ -126,8 +130,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const user = await getCurrentProfile(req.user!.id);
-    if (!user)
-      return res.status(404).json({ msg: 'Profile not found' });
+    if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
 );
@@ -153,9 +156,9 @@ router.get(
 // GET /api/profile/user/:userId
 router.get(
   '/user/:userId',
+  validateParams(userIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const userId = parseInt(req.params.userId);
-    if (isNaN(userId)) return res.status(400).json({ msg: 'Invalid user id' });
+    const { userId } = req.params as unknown as { userId: number };
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -225,8 +228,7 @@ router.put(
     ]);
 
     const updatedUser = await getCurrentProfile(req.user!.id);
-    if (!updatedUser)
-      return res.status(404).json({ msg: 'Profile not found' });
+    if (!updatedUser) return res.status(404).json({ msg: 'Profile not found' });
 
     res.json(updatedUser);
   })

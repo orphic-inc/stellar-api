@@ -1,10 +1,11 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import {
   adminCreateUserSchema,
   userSettingsSchema,
@@ -13,6 +14,9 @@ import {
 import { audit } from '../../lib/audit';
 
 const router = express.Router();
+const userIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/users/settings — must be declared before /:id to avoid shadowing
 router.get(
@@ -37,7 +41,13 @@ router.put(
   requireAuth,
   validate(userSettingsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { siteAppearance, externalStylesheet, styledTooltips, paranoia, avatar } = req.body;
+    const {
+      siteAppearance,
+      externalStylesheet,
+      styledTooltips,
+      paranoia,
+      avatar
+    } = req.body;
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: { userSettingsId: true }
@@ -55,7 +65,12 @@ router.put(
         }
       }),
       ...(avatar !== undefined
-        ? [prisma.user.update({ where: { id: req.user!.id }, data: { avatar } })]
+        ? [
+            prisma.user.update({
+              where: { id: req.user!.id },
+              data: { avatar }
+            })
+          ]
         : [])
     ]);
     res.json({ ...settings, avatar });
@@ -65,9 +80,9 @@ router.put(
 // GET /api/users/:id — get user by id (public profile)
 router.get(
   '/:id',
+  validateParams(userIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid user id' });
+    const { id } = req.params as unknown as { id: number };
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -93,7 +108,8 @@ router.post(
   ...requirePermission('users_edit'),
   validate(adminCreateUserSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password, userRankId } = req.body as AdminCreateUserInput;
+    const { username, email, password, userRankId } =
+      req.body as AdminCreateUserInput;
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
@@ -107,7 +123,10 @@ router.post(
       (await prisma.userRank.findFirst({ where: { level: 100 } }))?.id;
     if (!rankId) throw new Error('Default rank not found');
 
-    const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
+    const hashedPassword = await bcrypt.hash(
+      password,
+      await bcrypt.genSalt(10)
+    );
 
     const user = await prisma.$transaction(async (tx) => {
       const settings = await tx.userSettings.create({ data: {} });
@@ -126,7 +145,10 @@ router.post(
       });
     });
 
-    await audit(prisma, req.user!.id, 'user.create', 'User', user.id, { username, email });
+    await audit(prisma, req.user!.id, 'user.create', 'User', user.id, {
+      username,
+      email
+    });
 
     // No JWT or cookie — admin-created accounts require explicit login
     res.status(201).json(user);

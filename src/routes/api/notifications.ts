@@ -1,9 +1,14 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { validateParams } from '../../middleware/validate';
 
 const router = express.Router();
+const notificationIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/notifications
 router.get(
@@ -26,9 +31,9 @@ router.get(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(notificationIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user!.id)

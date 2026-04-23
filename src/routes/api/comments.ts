@@ -1,10 +1,15 @@
 import express, { Request, Response } from 'express';
 import { CommentPage } from '@prisma/client';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
-import { validate } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  validateQuery
+} from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
 import {
@@ -17,19 +22,16 @@ import {
 } from '../../schemas/comment';
 
 const router = express.Router();
+const commentIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/comments
 router.get(
   '/',
+  validateQuery(commentQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const parsedQuery = commentQuerySchema.safeParse(req.query);
-    if (!parsedQuery.success) {
-      return res
-        .status(400)
-        .json({ errors: parsedQuery.error.flatten().fieldErrors });
-    }
-
-    const { page, pageId } = parsedQuery.data as CommentQueryInput;
+    const { page, pageId } = req.query as CommentQueryInput;
     const where: Record<string, unknown> = {};
     if (page) where.page = page as CommentPage;
     if (page && pageId) {
@@ -61,9 +63,9 @@ router.get(
 // GET /api/comments/:id
 router.get(
   '/:id',
+  validateParams(commentIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const comment = await prisma.comment.findUnique({
       where: { id },
       include: {
@@ -106,11 +108,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
+  validateParams(commentIdParamsSchema),
   validate(updateCommentSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { body } = req.body as UpdateCommentInput;
-
-    const id = parseInt(req.params.id);
+    const { id } = req.params as unknown as { id: number };
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
     if (comment.authorId !== req.user!.id)
@@ -132,9 +134,9 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(commentIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
 
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
