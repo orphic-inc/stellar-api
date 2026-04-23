@@ -3,7 +3,7 @@ import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
 import { validate } from '../../../../middleware/validate';
-import { lastReadSchema } from '../../../../schemas/install';
+import { lastReadSchema } from '../../../../schemas/poll';
 
 const router = express.Router();
 
