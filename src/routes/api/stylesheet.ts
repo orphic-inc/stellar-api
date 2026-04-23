@@ -4,7 +4,10 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate, validateParams } from '../../middleware/validate';
-import { stylesheetSchema } from '../../schemas/stylesheet';
+import {
+  stylesheetSchema,
+  type StylesheetInput
+} from '../../schemas/stylesheet';
 
 const router = express.Router();
 const stylesheetIdParamsSchema = z.object({
@@ -43,7 +46,7 @@ router.post(
   requireAuth,
   validate(stylesheetSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, cssUrl } = req.body as { name: string; cssUrl: string };
+    const { name, cssUrl } = req.body as StylesheetInput;
     const stylesheet = await prisma.stylesheet.create({
       data: { name, cssUrl }
     });
