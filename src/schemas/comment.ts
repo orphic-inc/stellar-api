@@ -18,12 +18,16 @@ export const createCommentSchema = z
     body: z.string().min(1, 'Body is required'),
     communityId: pageIdSchema.optional(),
     contributionId: pageIdSchema.optional(),
-    artistId: pageIdSchema.optional()
+    artistId: pageIdSchema.optional(),
+    releaseId: pageIdSchema.optional()
   })
   .superRefine((value, ctx) => {
-    const keyCount = [value.communityId, value.contributionId, value.artistId].filter(
-      (entry) => entry !== undefined
-    ).length;
+    const keyCount = [
+      value.communityId,
+      value.contributionId,
+      value.artistId,
+      value.releaseId
+    ].filter((entry) => entry !== undefined).length;
 
     if (keyCount !== 1) {
       ctx.addIssue({
@@ -57,6 +61,14 @@ export const createCommentSchema = z
         code: z.ZodIssueCode.custom,
         message: 'contributionId is required for this comment type',
         path: ['contributionId']
+      });
+    }
+
+    if (value.page === CommentPage.release && value.releaseId === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'releaseId is required for release comments',
+        path: ['releaseId']
       });
     }
   });
