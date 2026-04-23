@@ -16,10 +16,7 @@ const MsgResponse = registry.register(
   z.object({ msg: z.string() })
 );
 
-const ErrorResponse = registry.register(
-  'ErrorResponse',
-  z.object({ error: z.string() })
-);
+registry.register('ErrorResponse', z.object({ error: z.string() }));
 
 const ValidationError = registry.register(
   'ValidationError',
