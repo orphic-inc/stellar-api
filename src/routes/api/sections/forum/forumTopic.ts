@@ -49,10 +49,12 @@ router.get(
 router.get(
   '/:forumTopicId',
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid topic id' });
-    const topic = await prisma.forumTopic.findUnique({
-      where: { id },
+    if (isNaN(forumId) || isNaN(id))
+      return res.status(400).json({ msg: 'Invalid topic id' });
+    const topic = await prisma.forumTopic.findFirst({
+      where: { id, forumId, deletedAt: null },
       include: {
         author: { select: { id: true, username: true, avatar: true } },
         poll: { include: { votes: true } },
@@ -132,12 +134,16 @@ router.put(
   requireAuth,
   validate(updateTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
-    const topic = await prisma.forumTopic.findUnique({ where: { id } });
+    if (isNaN(forumId) || isNaN(id)) return res.status(400).json({ msg: 'Invalid topic id' });
+    const topic = await prisma.forumTopic.findFirst({
+      where: { id, forumId, deletedAt: null }
+    });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
     const isOwner = topic.authorId === req.user!.id;
-    if (!isOwner && !(await isModerator(req.user!.id))) {
+    if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
@@ -161,11 +167,14 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
-    const topic = await prisma.forumTopic.findUnique({ where: { id } });
+    if (isNaN(forumId) || isNaN(id)) return res.status(400).json({ msg: 'Invalid topic id' });
+    const topic = await prisma.forumTopic.findFirst({
+      where: { id, forumId, deletedAt: null }
+    });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
     const isOwner = topic.authorId === req.user!.id;
-    if (!isOwner && !(await isModerator(req.user!.id))) {
+    if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
@@ -177,7 +186,7 @@ router.delete(
         data: { deletedAt: new Date() }
       }),
       prisma.forum.update({
-        where: { id: forumId },
+        where: { id: topic.forumId },
         data: {
           numTopics: { decrement: 1 },
           numPosts: { decrement: topic.numPosts }

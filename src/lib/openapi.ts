@@ -48,14 +48,27 @@ const AuthUser = registry.register(
   z.object({
     id: z.number(),
     username: z.string(),
+    email: z.string().email().optional(),
     avatar: z.string().nullable(),
-    userRank: z.object({ name: z.string(), color: z.string() })
+    inviteCount: z.number().optional(),
+    dateRegistered: z.string().optional(),
+    lastLogin: z.string().nullable().optional(),
+    isArtist: z.boolean().optional(),
+    isDonor: z.boolean().optional(),
+    canDownload: z.boolean().optional(),
+    userRank: z.object({
+      level: z.number(),
+      name: z.string(),
+      color: z.string(),
+      badge: z.string().optional(),
+      permissions: z.record(z.string(), z.boolean()).optional()
+    })
   })
 );
 
 registry.registerPath({
   method: 'post',
-  path: '/auth/login',
+  path: '/auth',
   tags: ['Auth'],
   request: { body: { content: { 'application/json': { schema: LoginBody } } } },
   responses: {
@@ -63,7 +76,7 @@ registry.registerPath({
       description: 'JWT issued, user returned',
       content: {
         'application/json': {
-          schema: z.object({ token: z.string(), user: AuthUser })
+          schema: z.object({ user: AuthUser })
         }
       }
     },
@@ -86,7 +99,7 @@ registry.registerPath({
       description: 'Registered and logged in',
       content: {
         'application/json': {
-          schema: z.object({ token: z.string(), user: AuthUser })
+          schema: z.object({ user: AuthUser })
         }
       }
     },
@@ -111,7 +124,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: '/auth/me',
+  path: '/auth',
   tags: ['Auth'],
   responses: {
     200: {

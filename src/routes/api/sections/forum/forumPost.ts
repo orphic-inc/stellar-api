@@ -7,6 +7,7 @@ import { validate } from '../../../../middleware/validate';
 import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
+import { appendToJsonArray } from '../../../../lib/jsonHelpers';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 import { sanitizeHtml } from '../../../../lib/sanitize';
 
@@ -16,13 +17,18 @@ const router = express.Router({ mergeParams: true });
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
     const forumTopicId = parseInt(req.params.forumTopicId);
-    if (isNaN(forumTopicId))
+    if (isNaN(forumId) || isNaN(forumTopicId))
       return res.status(400).json({ msg: 'Invalid topic id' });
     const pg = parsePage(req);
     const [posts, total] = await Promise.all([
       prisma.forumPost.findMany({
-        where: { forumTopicId, deletedAt: null },
+        where: {
+          forumTopicId,
+          deletedAt: null,
+          forumTopic: { forumId, deletedAt: null }
+        },
         orderBy: { createdAt: 'asc' },
         skip: pg.skip,
         take: pg.limit,
@@ -30,7 +36,13 @@ router.get(
           author: { select: { id: true, username: true, avatar: true } }
         }
       }),
-      prisma.forumPost.count({ where: { forumTopicId, deletedAt: null } })
+      prisma.forumPost.count({
+        where: {
+          forumTopicId,
+          deletedAt: null,
+          forumTopic: { forumId, deletedAt: null }
+        }
+      })
     ]);
     paginatedResponse(res, posts, total, pg);
   })
@@ -40,10 +52,19 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
+    const forumTopicId = parseInt(req.params.forumTopicId);
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const post = await prisma.forumPost.findUnique({
-      where: { id },
+    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
+      return res.status(400).json({ msg: 'Invalid id' });
+    }
+    const post = await prisma.forumPost.findFirst({
+      where: {
+        id,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { forumId, deletedAt: null }
+      },
       include: {
         author: { select: { id: true, username: true, avatar: true } }
       }
@@ -69,6 +90,9 @@ router.post(
     ]);
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
     if (!topic) return res.status(404).json({ msg: 'Forum topic not found' });
+    if (topic.forumId !== forumId) {
+      return res.status(404).json({ msg: 'Forum topic not found' });
+    }
     if (topic.isLocked) return res.status(403).json({ msg: 'Topic is locked' });
 
     const [post] = await prisma.$transaction(async (tx) => {
@@ -100,22 +124,34 @@ router.put(
   requireAuth,
   validate(updatePostSchema),
   asyncHandler(async (req: Request, res: Response) => {
+    const forumId = parseInt(req.params.forumId);
+    const forumTopicId = parseInt(req.params.forumTopicId);
     const id = parseInt(req.params.id);
-    const post = await prisma.forumPost.findUnique({ where: { id } });
+    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
+      return res.status(400).json({ msg: 'Invalid id' });
+    }
+    const post = await prisma.forumPost.findFirst({
+      where: {
+        id,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { forumId, deletedAt: null }
+      }
+    });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.authorId !== req.user!.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const edits = (post.edits as Array<Record<string, unknown>>) ?? [];
-    edits.push({
-      userId: req.user!.id,
-      time: new Date().toISOString(),
-      previousBody: post.body
-    });
-
     const updated = await prisma.forumPost.update({
       where: { id },
-      data: { body: sanitizeHtml(req.body.body), edits: edits as never }
+      data: {
+        body: sanitizeHtml(req.body.body),
+        edits: appendToJsonArray(post.edits, {
+          userId: req.user!.id,
+          time: new Date().toISOString(),
+          previousBody: post.body
+        })
+      }
     });
     res.json(updated);
   })
@@ -127,12 +163,23 @@ router.delete(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
+    const forumTopicId = parseInt(req.params.forumTopicId);
     const id = parseInt(req.params.id);
-    const post = await prisma.forumPost.findUnique({ where: { id } });
+    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
+      return res.status(400).json({ msg: 'Invalid id' });
+    }
+    const post = await prisma.forumPost.findFirst({
+      where: {
+        id,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { forumId, deletedAt: null }
+      }
+    });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
     const isOwner = post.authorId === req.user!.id;
-    if (!isOwner && !(await isModerator(req.user!.id))) {
+    if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
