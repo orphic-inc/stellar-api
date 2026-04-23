@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
@@ -12,16 +13,26 @@ import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import { sanitizeHtml } from '../../../lib/sanitize';
 
 const router = express.Router({ mergeParams: true });
+const forumTopicParamsSchema = z.object({
+  forumId: z.coerce.number().int().positive(),
+  forumTopicId: z.coerce.number().int().positive()
+});
+const forumPostParamsSchema = z.object({
+  forumId: z.coerce.number().int().positive(),
+  forumTopicId: z.coerce.number().int().positive(),
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
   '/',
   requireAuth,
+  validateParams(forumTopicParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const forumTopicId = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(forumTopicId))
-      return res.status(400).json({ msg: 'Invalid topic id' });
+    const { forumId, forumTopicId } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+    };
 
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
@@ -65,13 +76,13 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(forumPostParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const forumTopicId = parseInt(req.params.forumTopicId);
-    const id = parseInt(req.params.id);
-    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
-      return res.status(400).json({ msg: 'Invalid id' });
-    }
+    const { forumId, forumTopicId, id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+      id: number;
+    };
 
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
@@ -105,10 +116,13 @@ router.post(
   '/',
   requireAuth,
   writeLimiter,
+  validateParams(forumTopicParamsSchema),
   validate(createPostSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const forumTopicId = parseInt(req.params.forumTopicId);
+    const { forumId, forumTopicId } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+    };
 
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({ where: { id: forumId } }),
@@ -148,14 +162,14 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
+  validateParams(forumPostParamsSchema),
   validate(updatePostSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const forumTopicId = parseInt(req.params.forumTopicId);
-    const id = parseInt(req.params.id);
-    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
-      return res.status(400).json({ msg: 'Invalid id' });
-    }
+    const { forumId, forumTopicId, id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+      id: number;
+    };
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
@@ -187,13 +201,13 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(forumPostParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const forumTopicId = parseInt(req.params.forumTopicId);
-    const id = parseInt(req.params.id);
-    if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
-      return res.status(400).json({ msg: 'Invalid id' });
-    }
+    const { forumId, forumTopicId, id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+      id: number;
+    };
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
