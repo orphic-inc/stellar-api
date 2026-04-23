@@ -1,13 +1,17 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { createForumSchema, updateForumSchema } from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();
+const forumIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 router.use('/:forumId/topics', forumTopicRouter);
 
@@ -33,9 +37,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(forumIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const forum = await prisma.forum.findUnique({
       where: { id },
       include: {
@@ -55,8 +59,15 @@ router.post(
   validate(createForumSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      forumCategoryId, sort, name, description,
-      minClassRead, minClassWrite, minClassCreate, autoLock, autoLockWeeks
+      forumCategoryId,
+      sort,
+      name,
+      description,
+      minClassRead,
+      minClassWrite,
+      minClassCreate,
+      autoLock,
+      autoLockWeeks
     } = req.body;
 
     const forum = await prisma.forum.create({
@@ -80,14 +91,23 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('forums_manage'),
+  validateParams(forumIdParamsSchema),
   validate(updateForumSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
 
-    const { name, description, sort, minClassRead, minClassWrite, minClassCreate, autoLock, autoLockWeeks } = req.body;
+    const {
+      name,
+      description,
+      sort,
+      minClassRead,
+      minClassWrite,
+      minClassCreate,
+      autoLock,
+      autoLockWeeks
+    } = req.body;
     const forum = await prisma.forum.update({
       where: { id },
       data: {
@@ -109,15 +129,19 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('forums_manage'),
+  validateParams(forumIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
-    if (existing.isTrash) return res.status(400).json({ msg: 'Cannot delete the Trash forum' });
+    if (existing.isTrash)
+      return res.status(400).json({ msg: 'Cannot delete the Trash forum' });
 
     const trash = await prisma.forum.findFirst({ where: { isTrash: true } });
-    if (!trash) return res.status(500).json({ msg: 'Trash forum not found — check install seed' });
+    if (!trash)
+      return res
+        .status(500)
+        .json({ msg: 'Trash forum not found — check install seed' });
 
     const [topicCount, postCount] = await Promise.all([
       prisma.forumTopic.count({ where: { forumId: id } }),
@@ -125,7 +149,10 @@ router.delete(
     ]);
 
     await prisma.$transaction([
-      prisma.forumTopic.updateMany({ where: { forumId: id }, data: { forumId: trash.id } }),
+      prisma.forumTopic.updateMany({
+        where: { forumId: id },
+        data: { forumId: trash.id }
+      }),
       prisma.forum.update({
         where: { id: trash.id },
         data: {
