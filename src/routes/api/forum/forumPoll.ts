@@ -11,15 +11,36 @@ const router = express.Router();
 // GET /api/forums/polls/:topicId
 router.get(
   '/:topicId',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumTopicId = parseInt(req.params.topicId);
     if (isNaN(forumTopicId))
       return res.status(400).json({ msg: 'Invalid topic id' });
+
     const poll = await prisma.forumPoll.findUnique({
       where: { forumTopicId },
-      include: { votes: true }
+      include: {
+        votes: true,
+        forumTopic: {
+          select: {
+            deletedAt: true,
+            forum: { select: { minClassRead: true } }
+          }
+        }
+      }
     });
     if (!poll) return res.status(404).json({ msg: 'Poll not found' });
+
+    if (poll.forumTopic?.deletedAt) {
+      return res.status(404).json({ msg: 'Poll not found' });
+    }
+
+    if (req.user!.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
+
     res.json(poll);
   })
 );

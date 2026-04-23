@@ -101,7 +101,7 @@ router.put(
     });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const [profile] = await prisma.$transaction([
+    await prisma.$transaction([
       prisma.profile.update({
         where: { id: user.profileId },
         data: {
@@ -127,7 +127,21 @@ router.put(
       })
     ]);
 
-    res.json(profile);
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: {
+        id: true,
+        username: true,
+        avatar: true,
+        profile: true,
+        userSettings: true,
+        userRank: { select: { name: true, color: true } }
+      }
+    });
+    if (!updatedUser?.profile)
+      return res.status(404).json({ msg: 'Profile not found' });
+
+    res.json(updatedUser);
   })
 );
 
