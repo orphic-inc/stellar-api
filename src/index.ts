@@ -7,6 +7,7 @@ import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
 
 import installRouter from './routes/api/install';
+import homeRouter from './routes/api/home';
 import { specRouter, uiRouter } from './routes/api/docs';
 import toolsRouter from './routes/api/tools';
 import userRouter from './routes/api/user';
@@ -54,6 +55,7 @@ app.use('/api', async (_req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use('/api/tools', toolsRouter);
+app.use('/api/home', homeRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/profile', profileRouter);
