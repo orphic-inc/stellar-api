@@ -74,6 +74,7 @@ enum CommentPage {
   collages
   requests
   communities
+  release
 }
 
 enum SubscriptionPage {
@@ -571,6 +572,7 @@ model Release {
   isEdition     Boolean          @default(false)
   edition       Json?
   bookmarks     BookmarkRelease[]
+  comments      Comment[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -632,12 +634,15 @@ model Comment {
   community      Community?    @relation(fields: [communityId], references: [id])
   contributionId Int?
   contribution   Contribution? @relation(fields: [contributionId], references: [id])
+  releaseId      Int?
+  release        Release?      @relation(fields: [releaseId], references: [id])
   createdAt      DateTime      @default(now())
   deletedAt      DateTime?
 
   @@index([page, communityId])
   @@index([page, contributionId])
   @@index([page, artistId])
+  @@index([page, releaseId])
   @@map("comments")
 }
 
