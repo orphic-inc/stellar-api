@@ -1,14 +1,21 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
-import { createCommunitySchema, updateCommunitySchema } from '../../../schemas/community';
+import { validate, validateParams } from '../../../middleware/validate';
+import {
+  createCommunitySchema,
+  updateCommunitySchema
+} from '../../../schemas/community';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import releaseGroupRouter from './releaseGroup';
 
 const router = express.Router();
+const communityIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 router.use('/:communityId/groups', releaseGroupRouter);
 
@@ -34,14 +41,16 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const community = await prisma.community.findUnique({
       where: { id },
       include: {
         staff: { select: { id: true, username: true } },
-        _count: { select: { contributors: true, releases: true, consumers: true } }
+        _count: {
+          select: { contributors: true, releases: true, consumers: true }
+        }
       }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
@@ -86,10 +95,10 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('communities_manage'),
+  validateParams(communityIdParamsSchema),
   validate(updateCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
@@ -113,9 +122,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('communities_manage'),
+  validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
     await prisma.community.delete({ where: { id } });

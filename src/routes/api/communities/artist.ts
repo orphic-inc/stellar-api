@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   artistSchema,
@@ -13,6 +14,15 @@ import {
 } from '../../../schemas/artist';
 
 const router = express.Router();
+const artistIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+const artistHistoryParamsSchema = z.object({
+  artistId: z.coerce.number().int().positive()
+});
+const artistRevertParamsSchema = z.object({
+  historyId: z.coerce.number().int().positive()
+});
 
 // GET /api/artists
 router.get(
@@ -39,9 +49,9 @@ router.get(
 router.get(
   '/history/:artistId',
   requireAuth,
+  validateParams(artistHistoryParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const artistId = parseInt(req.params.artistId);
-    if (isNaN(artistId)) return res.status(400).json({ msg: 'Invalid id' });
+    const { artistId } = req.params as unknown as { artistId: number };
     const history = await prisma.artistHistory.findMany({
       where: { artistId },
       orderBy: { editedAt: 'desc' },
@@ -55,9 +65,9 @@ router.get(
 router.post(
   '/revert/:historyId',
   ...requirePermission('communities_manage'),
+  validateParams(artistRevertParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const historyId = parseInt(req.params.historyId);
-    if (isNaN(historyId)) return res.status(400).json({ msg: 'Invalid id' });
+    const { historyId } = req.params as unknown as { historyId: number };
     const entry = await prisma.artistHistory.findUnique({
       where: { id: historyId }
     });
@@ -170,9 +180,9 @@ router.post(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const artist = await prisma.artist.findUnique({
       where: { id },
       include: {
@@ -195,9 +205,9 @@ router.get(
 router.get(
   '/:id/similar',
   requireAuth,
+  validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const artistId = parseInt(req.params.id);
-    if (isNaN(artistId)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id: artistId } = req.params as unknown as { id: number };
     const similar = await prisma.similarArtist.findMany({
       where: { artistId },
       include: { similarArtist: { select: { id: true, name: true } } },
@@ -211,9 +221,9 @@ router.get(
 router.put(
   '/:id',
   requireAuth,
+  validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.artist.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Artist not found' });
 
@@ -245,9 +255,9 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const artist = await prisma.artist.findUnique({ where: { id } });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
     await prisma.artist.delete({ where: { id } });
