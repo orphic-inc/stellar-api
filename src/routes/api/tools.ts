@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import {
   createRankSchema,
@@ -12,6 +13,9 @@ import {
 } from '../../schemas/tools';
 
 const router = express.Router();
+const userRankIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/tools/user-ranks — list all user ranks
 router.get(
@@ -40,9 +44,9 @@ router.get(
 router.get(
   '/user-ranks/:id',
   ...requirePermission('admin'),
+  validateParams(userRankIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
 
     const rank = await prisma.userRank.findUnique({
       where: { id },
@@ -85,10 +89,10 @@ router.post(
 router.put(
   '/user-ranks/:id',
   ...requirePermission('admin'),
+  validateParams(userRankIdParamsSchema),
   validate(updateRankSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
 
     const { name, level, permissions, color, badge } =
       req.body as UpdateRankInput;
@@ -116,9 +120,9 @@ router.put(
 router.delete(
   '/user-ranks/:id',
   ...requirePermission('admin'),
+  validateParams(userRankIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
 
     const userCount = await prisma.user.count({ where: { userRankId: id } });
     if (userCount > 0) {

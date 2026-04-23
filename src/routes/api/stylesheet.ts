@@ -1,11 +1,15 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate } from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { stylesheetSchema } from '../../schemas/stylesheet';
 
 const router = express.Router();
+const stylesheetIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/stylesheet
 router.get(
@@ -23,9 +27,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const stylesheet = await prisma.stylesheet.findUnique({ where: { id } });
     if (!stylesheet)
       return res.status(404).json({ msg: 'Stylesheet not found' });
@@ -51,9 +55,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
+  validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.stylesheet.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Stylesheet not found' });
     await prisma.stylesheet.delete({ where: { id } });
