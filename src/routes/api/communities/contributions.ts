@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import { FileType, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
@@ -70,30 +71,105 @@ router.post(
   validate(createContributionSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      releaseId,
-      contributorId,
-      releaseDescription,
+      communityId,
+      title,
+      year,
       type,
+      fileType,
       sizeInBytes,
-      jsonFile,
-      collaboratorIds
+      tags,
+      image,
+      description,
+      releaseDescription,
+      collaborators,
+      jsonFile
     } = req.body as CreateContributionInput;
 
-    const contribution = await prisma.contribution.create({
-      data: {
-        userId: req.user!.id,
-        releaseId,
-        contributorId,
-        releaseDescription,
-        type,
-        sizeInBytes,
-        jsonFile: jsonFile ?? false,
-        ...(collaboratorIds?.length && {
-          collaborators: { connect: collaboratorIds.map((id) => ({ id })) }
-        })
-      },
-      include: { release: true, collaborators: true }
+    const community = await prisma.community.findUnique({
+      where: { id: communityId }
     });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+
+    const normalizedTags = [
+      ...new Set(
+        (tags ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      )
+    ];
+
+    const contribution = await prisma.$transaction(async (tx) => {
+      const contributor = await tx.contributor.upsert({
+        where: { userId: req.user!.id },
+        update: { communityId },
+        create: { userId: req.user!.id, communityId }
+      });
+
+      const collaboratorRecords = [];
+      for (const collaborator of collaborators) {
+        const existingArtist = await tx.artist.findFirst({
+          where: { name: collaborator.artist }
+        });
+        const artist =
+          existingArtist ??
+          (await tx.artist.create({
+            data: { name: collaborator.artist, vanityHouse: false }
+          }));
+        collaboratorRecords.push(artist);
+      }
+
+      const primaryArtist = collaboratorRecords[0];
+      const release = await tx.release.create({
+        data: {
+          artistId: primaryArtist.id,
+          communityId,
+          title,
+          year,
+          type,
+          releaseType:
+            type === ReleaseType.Music
+              ? ReleaseCategory.Album
+              : ReleaseCategory.Unknown,
+          image: image ?? null,
+          description: description ?? releaseDescription ?? title,
+          contributors: { connect: { id: contributor.id } },
+          ...(normalizedTags.length > 0 && {
+            tags: {
+              connectOrCreate: normalizedTags.map((tagName) => ({
+                where: { name: tagName },
+                create: { name: tagName }
+              }))
+            }
+          })
+        },
+        include: {
+          artist: true,
+          tags: true
+        }
+      });
+
+      return tx.contribution.create({
+        data: {
+          userId: req.user!.id,
+          releaseId: release.id,
+          contributorId: contributor.id,
+          releaseDescription,
+          type: fileType as FileType,
+          sizeInBytes,
+          jsonFile: jsonFile ?? false,
+          collaborators: {
+            connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
+          }
+        },
+        include: {
+          user: { select: { id: true, username: true } },
+          release: { select: { id: true, title: true, communityId: true } },
+          collaborators: { select: { id: true, name: true } }
+        }
+      });
+    });
+
     res.status(201).json(contribution);
   })
 );
