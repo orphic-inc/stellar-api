@@ -172,9 +172,13 @@ registry.registerPath({
     }
   },
   responses: {
-    200: {
+    201: {
       description: 'Installation complete',
-      content: { 'application/json': { schema: MsgResponse } }
+      content: {
+        'application/json': {
+          schema: z.object({ user: AuthUser })
+        }
+      }
     },
     400: {
       description: 'Already installed or validation error',

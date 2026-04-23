@@ -58,6 +58,7 @@ router.get(
 // GET /api/forums/:forumId/topics/:forumTopicId
 router.get(
   '/:forumTopicId',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
