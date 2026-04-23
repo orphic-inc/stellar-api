@@ -21,6 +21,12 @@ import {
   updateForumCategorySchema
 } from '../schemas/forumCategory';
 import { pollSchema, pollVoteSchema } from '../schemas/poll';
+import {
+  artistSchema,
+  similarArtistSchema,
+  artistAliasSchema,
+  artistTagSchema
+} from '../schemas/artist';
 
 extendZodWithOpenApi(z);
 
@@ -1611,7 +1617,77 @@ const Artist = registry.register(
   z.object({
     id: z.number(),
     name: z.string(),
-    vanityHouse: z.boolean()
+    vanityHouse: z.boolean(),
+    _count: z
+      .object({
+        releases: z.number()
+      })
+      .optional(),
+    aliases: z
+      .array(
+        z.object({
+          redirect: z.object({
+            id: z.number(),
+            name: z.string()
+          })
+        })
+      )
+      .optional(),
+    tags: z
+      .array(
+        z.object({
+          tag: z.object({
+            id: z.number(),
+            name: z.string()
+          })
+        })
+      )
+      .optional(),
+    similarTo: z
+      .array(
+        z.object({
+          similarArtist: z.object({
+            id: z.number(),
+            name: z.string()
+          })
+        })
+      )
+      .optional(),
+    releases: z
+      .array(
+        z.object({
+          id: z.number(),
+          title: z.string(),
+          year: z.number().nullable().optional()
+        })
+      )
+      .optional()
+  })
+);
+
+const ArtistHistory = registry.register(
+  'ArtistHistory',
+  z.object({
+    id: z.number(),
+    artistId: z.number(),
+    editedAt: z.string(),
+    description: z.string().nullable().optional(),
+    editedUser: z
+      .object({
+        id: z.number(),
+        username: z.string()
+      })
+      .optional()
+  })
+);
+
+const SimilarArtist = registry.register(
+  'SimilarArtist',
+  z.object({
+    similarArtist: z.object({
+      id: z.number(),
+      name: z.string()
+    })
   })
 );
 
@@ -1621,8 +1697,34 @@ registry.registerPath({
   tags: ['Artists'],
   responses: {
     200: {
-      description: 'All artists',
-      content: { 'application/json': { schema: z.array(Artist) } }
+      description: 'Paginated artists',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(Artist),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists',
+  tags: ['Artists'],
+  request: {
+    body: { content: { 'application/json': { schema: artistSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Artist created',
+      content: { 'application/json': { schema: Artist } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
@@ -1640,6 +1742,146 @@ registry.registerPath({
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/artists/{id}',
+  tags: ['Artists'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: artistSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Artist updated',
+      content: { 'application/json': { schema: Artist } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/artists/{id}',
+  tags: ['Artists'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Artist deleted',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/artists/history/{artistId}',
+  tags: ['Artists'],
+  request: { params: z.object({ artistId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Artist history',
+      content: { 'application/json': { schema: z.array(ArtistHistory) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists/revert/{historyId}',
+  tags: ['Artists'],
+  request: { params: z.object({ historyId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Artist reverted',
+      content: {
+        'application/json': {
+          schema: z.object({
+            msg: z.string(),
+            artist: Artist
+          })
+        }
+      }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/artists/{id}/similar',
+  tags: ['Artists'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Similar artists',
+      content: { 'application/json': { schema: z.array(SimilarArtist) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists/similar',
+  tags: ['Artists'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: similarArtistSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Similar artist link created',
+      content: {
+        'application/json': { schema: z.record(z.string(), z.unknown()) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists/alias',
+  tags: ['Artists'],
+  request: {
+    body: { content: { 'application/json': { schema: artistAliasSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Artist alias created',
+      content: {
+        'application/json': { schema: z.record(z.string(), z.unknown()) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists/tag',
+  tags: ['Artists'],
+  request: {
+    body: { content: { 'application/json': { schema: artistTagSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Artist tagged',
+      content: {
+        'application/json': { schema: z.record(z.string(), z.unknown()) }
+      }
     }
   }
 });
