@@ -28,6 +28,10 @@ import {
   artistTagSchema
 } from '../schemas/artist';
 import { stylesheetSchema } from '../schemas/stylesheet';
+import {
+  subscribeSchema,
+  subscribeCommentsSchema
+} from '../schemas/subscription';
 
 extendZodWithOpenApi(z);
 
@@ -648,6 +652,30 @@ const SiteStats = registry.register(
   })
 );
 
+const Notification = registry.register(
+  'Notification',
+  z.object({
+    id: z.number(),
+    page: z.string(),
+    pageId: z.number(),
+    postId: z.number(),
+    createdAt: z.string(),
+    quoter: z.object({
+      id: z.number(),
+      username: z.string(),
+      avatar: z.string().nullable().optional()
+    })
+  })
+);
+
+const Subscription = registry.register(
+  'Subscription',
+  z.object({
+    id: z.number(),
+    topicId: z.number()
+  })
+);
+
 const Stylesheet = registry.register(
   'Stylesheet',
   z.object({
@@ -746,6 +774,91 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/notifications',
+  tags: ['Notifications'],
+  responses: {
+    200: {
+      description: 'Notifications',
+      content: {
+        'application/json': { schema: z.array(Notification) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/notifications/{id}',
+  tags: ['Notifications'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Notification removed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/subscriptions',
+  tags: ['Subscriptions'],
+  responses: {
+    200: {
+      description: 'Forum subscriptions',
+      content: {
+        'application/json': { schema: z.array(Subscription) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/subscriptions/subscribe',
+  tags: ['Subscriptions'],
+  request: {
+    body: { content: { 'application/json': { schema: subscribeSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Subscription updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    201: {
+      description: 'Subscription created',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/subscriptions/subscribe-comments',
+  tags: ['Subscriptions'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: subscribeCommentsSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Comment subscription updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    201: {
+      description: 'Comment subscription created',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
