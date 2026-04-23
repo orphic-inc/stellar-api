@@ -13,9 +13,9 @@ import {
 
 const router = express.Router();
 
-// GET /api/tools/permissions — list all user ranks
+// GET /api/tools/user-ranks — list all user ranks
 router.get(
-  '/permissions',
+  '/user-ranks',
   ...requirePermission('admin'),
   asyncHandler(async (_req: Request, res: Response) => {
     const ranks = await prisma.userRank.findMany({
@@ -36,9 +36,9 @@ router.get(
   })
 );
 
-// GET /api/tools/permissions/:id — get single rank
+// GET /api/tools/user-ranks/:id — get single rank
 router.get(
-  '/permissions/:id',
+  '/user-ranks/:id',
   ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
@@ -54,13 +54,14 @@ router.get(
   })
 );
 
-// POST /api/tools/permissions — create rank
+// POST /api/tools/user-ranks — create rank
 router.post(
-  '/permissions',
+  '/user-ranks',
   ...requirePermission('admin'),
   validate(createRankSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, level, permissions, color, badge } = req.body as CreateRankInput;
+    const { name, level, permissions, color, badge } =
+      req.body as CreateRankInput;
 
     const rank = await prisma.userRank.create({
       data: {
@@ -72,21 +73,25 @@ router.post(
       }
     });
 
-    await audit(prisma, req.user!.id, 'rank.create', 'UserRank', rank.id, { name, level });
+    await audit(prisma, req.user!.id, 'rank.create', 'UserRank', rank.id, {
+      name,
+      level
+    });
     res.status(201).json(rank);
   })
 );
 
-// PUT /api/tools/permissions/:id — update rank
+// PUT /api/tools/user-ranks/:id — update rank
 router.put(
-  '/permissions/:id',
+  '/user-ranks/:id',
   ...requirePermission('admin'),
   validate(updateRankSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
 
-    const { name, level, permissions, color, badge } = req.body as UpdateRankInput;
+    const { name, level, permissions, color, badge } =
+      req.body as UpdateRankInput;
     const rank = await prisma.userRank.update({
       where: { id },
       data: {
@@ -98,14 +103,18 @@ router.put(
       }
     });
 
-    await audit(prisma, req.user!.id, 'rank.update', 'UserRank', id, { name, level, permissions });
+    await audit(prisma, req.user!.id, 'rank.update', 'UserRank', id, {
+      name,
+      level,
+      permissions
+    });
     res.json(rank);
   })
 );
 
-// DELETE /api/tools/permissions/:id — delete rank (blocks if users are assigned)
+// DELETE /api/tools/user-ranks/:id — delete rank (blocks if users are assigned)
 router.delete(
-  '/permissions/:id',
+  '/user-ranks/:id',
   ...requirePermission('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
@@ -121,7 +130,12 @@ router.delete(
     await prisma.$transaction([
       prisma.userRank.delete({ where: { id } }),
       prisma.auditLog.create({
-        data: { actorId: req.user!.id, action: 'rank.delete', targetType: 'UserRank', targetId: id }
+        data: {
+          actorId: req.user!.id,
+          action: 'rank.delete',
+          targetType: 'UserRank',
+          targetId: id
+        }
       })
     ]);
     res.status(204).send();
