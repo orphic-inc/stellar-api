@@ -6,7 +6,11 @@ import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
-import { createTopicSchema, updateTopicSchema } from '../../../schemas/forum';
+import {
+  createTopicSchema,
+  updateTopicSchema,
+  type CreateTopicInput
+} from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import { sanitizeHtml, sanitizePlain } from '../../../lib/sanitize';
@@ -118,12 +122,7 @@ router.post(
         .json({ msg: 'Insufficient class to create topics in this forum' });
     }
 
-    const { title, body, question, answers } = req.body as {
-      title: string;
-      body: string;
-      question?: string;
-      answers?: string;
-    };
+    const { title, body, question, answers } = req.body as CreateTopicInput;
 
     const topic = await prisma.$transaction(async (tx) => {
       const topic = await tx.forumTopic.create({
