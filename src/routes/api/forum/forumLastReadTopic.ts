@@ -3,7 +3,7 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { validate } from '../../../middleware/validate';
-import { lastReadSchema } from '../../../schemas/forum';
+import { lastReadSchema, type LastReadInput } from '../../../schemas/forum';
 
 const router = express.Router();
 
@@ -25,10 +25,32 @@ router.post(
   requireAuth,
   validate(lastReadSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { forumTopicId, forumPostId } = req.body as {
-      forumTopicId: number; forumPostId: number;
-    };
+    const { forumTopicId, forumPostId } = req.body as LastReadInput;
     const userId = req.user!.id;
+
+    const post = await prisma.forumPost.findFirst({
+      where: {
+        id: forumPostId,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { deletedAt: null }
+      },
+      include: {
+        forumTopic: {
+          select: {
+            forum: { select: { minClassRead: true } }
+          }
+        }
+      }
+    });
+    if (!post) {
+      return res.status(404).json({ msg: 'Forum post not found' });
+    }
+    if (req.user!.userRankLevel < (post.forumTopic?.forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
 
     const record = await prisma.forumLastReadTopic.upsert({
       where: { userId_forumTopicId: { userId, forumTopicId } },

@@ -5,7 +5,7 @@ import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
-import { pollSchema } from '../../../schemas/poll';
+import { pollSchema, type PollInput } from '../../../schemas/poll';
 
 const router = express.Router();
 const topicIdParamsSchema = z.object({
@@ -59,11 +59,7 @@ router.post(
   requireAuth,
   validate(pollSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { forumTopicId, question, answers } = req.body as {
-      forumTopicId: number;
-      question: string;
-      answers: string;
-    };
+    const { forumTopicId, question, answers } = req.body as PollInput;
 
     const topic = await prisma.forumTopic.findUnique({
       where: { id: forumTopicId },

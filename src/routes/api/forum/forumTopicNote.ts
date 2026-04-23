@@ -5,7 +5,7 @@ import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
-import { topicNoteSchema } from '../../../schemas/forum';
+import { topicNoteSchema, type TopicNoteInput } from '../../../schemas/forum';
 
 const router = express.Router();
 const topicIdParamsSchema = z.object({
@@ -49,10 +49,7 @@ router.post(
   requireModerator,
   validate(topicNoteSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { forumTopicId, body } = req.body as {
-      forumTopicId: number;
-      body: string;
-    };
+    const { forumTopicId, body } = req.body as TopicNoteInput;
     const note = await prisma.forumTopicNote.create({
       data: { forumTopicId, authorId: req.user!.id, body }
     });
