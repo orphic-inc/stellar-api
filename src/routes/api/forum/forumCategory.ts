@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import {
   createForumCategorySchema,
   updateForumCategorySchema,
@@ -12,6 +13,9 @@ import {
 } from '../../../schemas/forumCategory';
 
 const router = express.Router();
+const forumCategoryIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/forums/categories — PUBLIC read
 router.get(
@@ -29,9 +33,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(forumCategoryIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const category = await prisma.forumCategory.findUnique({
       where: { id },
       include: { forums: true }
@@ -59,10 +63,10 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('forums_manage'),
+  validateParams(forumCategoryIdParamsSchema),
   validate(updateForumCategorySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     const { name, sort } = req.body as UpdateForumCategoryInput;
@@ -78,9 +82,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('forums_manage'),
+  validateParams(forumCategoryIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     await prisma.forumCategory.delete({ where: { id } });
