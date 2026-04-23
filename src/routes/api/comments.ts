@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
 import { validate } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
+import { parsePage, paginatedResponse } from '../../lib/pagination';
 import {
   commentQuerySchema,
   createCommentSchema,
@@ -23,7 +24,9 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const parsedQuery = commentQuerySchema.safeParse(req.query);
     if (!parsedQuery.success) {
-      return res.status(400).json({ errors: parsedQuery.error.flatten().fieldErrors });
+      return res
+        .status(400)
+        .json({ errors: parsedQuery.error.flatten().fieldErrors });
     }
 
     const { page, pageId } = parsedQuery.data as CommentQueryInput;
@@ -37,15 +40,21 @@ router.get(
       else if (page === CommentPage.release) where.releaseId = pageId;
     }
 
-    const comments = await prisma.comment.findMany({
-      where: { ...where, deletedAt: null },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        author: { select: { id: true, username: true, avatar: true } },
-        editedUser: { select: { id: true, username: true } }
-      }
-    });
-    res.json(comments);
+    const pg = parsePage(req);
+    const [comments, total] = await Promise.all([
+      prisma.comment.findMany({
+        where: { ...where, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        skip: pg.skip,
+        take: pg.limit,
+        include: {
+          author: { select: { id: true, username: true, avatar: true } },
+          editedUser: { select: { id: true, username: true } }
+        }
+      }),
+      prisma.comment.count({ where: { ...where, deletedAt: null } })
+    ]);
+    paginatedResponse(res, comments, total, pg);
   })
 );
 

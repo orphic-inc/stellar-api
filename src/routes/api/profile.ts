@@ -21,13 +21,16 @@ router.get(
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: {
-        id: true, username: true, avatar: true,
+        id: true,
+        username: true,
+        avatar: true,
         profile: true,
         userSettings: true,
         userRank: { select: { name: true, color: true } }
       }
     });
-    if (!user?.profile) return res.status(404).json({ msg: 'Profile not found' });
+    if (!user?.profile)
+      return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
 );
@@ -35,10 +38,14 @@ router.get(
 // GET /api/profile — get all profiles
 router.get(
   '/',
+  requireAuth,
   asyncHandler(async (_req: Request, res: Response) => {
     const users = await prisma.user.findMany({
+      where: { disabled: false },
       select: {
-        id: true, username: true, avatar: true,
+        id: true,
+        username: true,
+        avatar: true,
         profile: { select: { profileTitle: true } }
       }
     });
@@ -56,8 +63,12 @@ router.get(
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true, username: true, avatar: true, dateRegistered: true,
-        isArtist: true, isDonor: true,
+        id: true,
+        username: true,
+        avatar: true,
+        dateRegistered: true,
+        isArtist: true,
+        isDonor: true,
         userRank: { select: { name: true, color: true, badge: true } },
         profile: true,
         userSettings: { select: { siteAppearance: true, styledTooltips: true } }
@@ -75,8 +86,13 @@ router.put(
   validate(profileUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      avatar, avatarMouseoverText, profileTitle, profileInfo,
-      siteAppearance, externalStylesheet, styledTooltips
+      avatar,
+      avatarMouseoverText,
+      profileTitle,
+      profileInfo,
+      siteAppearance,
+      externalStylesheet,
+      styledTooltips
     } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -90,9 +106,15 @@ router.put(
         where: { id: user.profileId },
         data: {
           ...(avatar !== undefined && { avatar: sanitizePlain(avatar) }),
-          ...(avatarMouseoverText !== undefined && { avatarMouseoverText: sanitizePlain(avatarMouseoverText) }),
-          ...(profileTitle !== undefined && { profileTitle: sanitizePlain(profileTitle) }),
-          ...(profileInfo !== undefined && { profileInfo: sanitizeHtml(profileInfo) })
+          ...(avatarMouseoverText !== undefined && {
+            avatarMouseoverText: sanitizePlain(avatarMouseoverText)
+          }),
+          ...(profileTitle !== undefined && {
+            profileTitle: sanitizePlain(profileTitle)
+          }),
+          ...(profileInfo !== undefined && {
+            profileInfo: sanitizeHtml(profileInfo)
+          })
         }
       }),
       prisma.userSettings.update({
@@ -109,14 +131,17 @@ router.put(
   })
 );
 
-// DELETE /api/profile — delete account
+// DELETE /api/profile — disable account (soft-delete; users are never hard-deleted)
 router.delete(
   '/',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    await prisma.user.delete({ where: { id: req.user!.id } });
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { disabled: true }
+    });
     res.clearCookie('token');
-    res.json({ msg: 'User deleted' });
+    res.json({ msg: 'Account disabled' });
   })
 );
 
@@ -137,7 +162,10 @@ router.post(
     }
 
     const existing = await prisma.invite.findUnique({ where: { email } });
-    if (existing) return res.status(409).json({ msg: 'An invite has already been sent to that address' });
+    if (existing)
+      return res
+        .status(409)
+        .json({ msg: 'An invite has already been sent to that address' });
 
     const inviteKey = crypto.randomBytes(20).toString('hex');
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
