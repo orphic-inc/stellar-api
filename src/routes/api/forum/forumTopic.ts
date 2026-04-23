@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
 import { createTopicSchema, updateTopicSchema } from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
@@ -12,6 +13,13 @@ import { sanitizeHtml, sanitizePlain } from '../../../lib/sanitize';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
+const forumIdParamsSchema = z.object({
+  forumId: z.coerce.number().int().positive()
+});
+const forumTopicParamsSchema = z.object({
+  forumId: z.coerce.number().int().positive(),
+  forumTopicId: z.coerce.number().int().positive()
+});
 
 router.use('/:forumTopicId/posts', forumPostRouter);
 
@@ -19,10 +27,9 @@ router.use('/:forumTopicId/posts', forumPostRouter);
 router.get(
   '/',
   requireAuth,
+  validateParams(forumIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    if (isNaN(forumId))
-      return res.status(400).json({ msg: 'Invalid forum id' });
+    const { forumId } = req.params as unknown as { forumId: number };
 
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
@@ -59,11 +66,12 @@ router.get(
 router.get(
   '/:forumTopicId',
   requireAuth,
+  validateParams(forumTopicParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const id = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid topic id' });
+    const { forumId, forumTopicId: id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+    };
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({
         where: { id: forumId },
@@ -95,9 +103,10 @@ router.post(
   '/',
   requireAuth,
   writeLimiter,
+  validateParams(forumIdParamsSchema),
   validate(createTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
+    const { forumId } = req.params as unknown as { forumId: number };
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
       select: { id: true, minClassWrite: true, minClassCreate: true }
@@ -164,12 +173,13 @@ router.post(
 router.put(
   '/:forumTopicId',
   requireAuth,
+  validateParams(forumTopicParamsSchema),
   validate(updateTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const id = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid topic id' });
+    const { forumId, forumTopicId: id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+    };
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });
@@ -197,11 +207,12 @@ router.put(
 router.delete(
   '/:forumTopicId',
   requireAuth,
+  validateParams(forumTopicParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumId = parseInt(req.params.forumId);
-    const id = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid topic id' });
+    const { forumId, forumTopicId: id } = req.params as unknown as {
+      forumId: number;
+      forumTopicId: number;
+    };
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });
