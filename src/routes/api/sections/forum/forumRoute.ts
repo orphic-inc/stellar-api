@@ -40,15 +40,7 @@ router.get(
       where: { id },
       include: {
         forumCategory: true,
-        topics: {
-          orderBy: [{ isSticky: 'desc' }, { updatedAt: 'desc' }],
-          include: {
-            author: { select: { id: true, username: true } },
-            lastPost: {
-              include: { author: { select: { id: true, username: true } } }
-            }
-          }
-        }
+        lastTopic: { select: { id: true, title: true } }
       }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
@@ -121,7 +113,15 @@ router.delete(
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
-    await prisma.forum.delete({ where: { id } });
+    if (existing.isTrash) return res.status(400).json({ msg: 'Cannot delete the Trash forum' });
+
+    const trash = await prisma.forum.findFirst({ where: { isTrash: true } });
+    if (!trash) return res.status(500).json({ msg: 'Trash forum not found — check install seed' });
+
+    await prisma.$transaction([
+      prisma.forumTopic.updateMany({ where: { forumId: id }, data: { forumId: trash.id } }),
+      prisma.forum.delete({ where: { id } })
+    ]);
     res.status(204).send();
   })
 );

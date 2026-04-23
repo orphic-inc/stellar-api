@@ -2,9 +2,13 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { isModerator } from '../../../../middleware/permissions';
 import { validate } from '../../../../middleware/validate';
 import { writeLimiter } from '../../../../middleware/rateLimiter';
-import { createTopicSchema, updateTopicSchema } from '../../../../schemas/forum';
+import {
+  createTopicSchema,
+  updateTopicSchema
+} from '../../../../schemas/forum';
 import { audit } from '../../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
 import { sanitizeHtml, sanitizePlain } from '../../../../lib/sanitize';
@@ -14,34 +18,28 @@ const router = express.Router({ mergeParams: true });
 
 router.use('/:forumTopicId/posts', forumPostRouter);
 
-const isModerator = async (userId: number): Promise<boolean> => {
-  const rank = await prisma.userRank.findFirst({
-    where: { users: { some: { id: userId } } },
-    select: { permissions: true }
-  });
-  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
-  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
-};
-
 // GET /api/forums/:forumId/topics
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
-    if (isNaN(forumId)) return res.status(400).json({ msg: 'Invalid forum id' });
+    if (isNaN(forumId))
+      return res.status(400).json({ msg: 'Invalid forum id' });
     const pg = parsePage(req);
     const [topics, total] = await Promise.all([
       prisma.forumTopic.findMany({
-        where: { forumId },
+        where: { forumId, deletedAt: null },
         orderBy: [{ isSticky: 'desc' }, { updatedAt: 'desc' }],
         skip: pg.skip,
         take: pg.limit,
         include: {
           author: { select: { id: true, username: true } },
-          lastPost: { include: { author: { select: { id: true, username: true } } } }
+          lastPost: {
+            include: { author: { select: { id: true, username: true } } }
+          }
         }
       }),
-      prisma.forumTopic.count({ where: { forumId } })
+      prisma.forumTopic.count({ where: { forumId, deletedAt: null } })
     ]);
     paginatedResponse(res, topics, total, pg);
   })
@@ -78,7 +76,10 @@ router.post(
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
 
     const { title, body, question, answers } = req.body as {
-      title: string; body: string; question?: string; answers?: string;
+      title: string;
+      body: string;
+      question?: string;
+      answers?: string;
     };
 
     const topic = await prisma.$transaction(async (tx) => {
@@ -87,7 +88,11 @@ router.post(
       });
 
       const post = await tx.forumPost.create({
-        data: { forumTopicId: topic.id, authorId: req.user!.id, body: sanitizeHtml(body) }
+        data: {
+          forumTopicId: topic.id,
+          authorId: req.user!.id,
+          body: sanitizeHtml(body)
+        }
       });
 
       await tx.forumTopic.update({
@@ -97,12 +102,20 @@ router.post(
 
       await tx.forum.update({
         where: { id: forumId },
-        data: { lastTopicId: topic.id, numTopics: { increment: 1 }, numPosts: { increment: 1 } }
+        data: {
+          lastTopicId: topic.id,
+          numTopics: { increment: 1 },
+          numPosts: { increment: 1 }
+        }
       });
 
       if (question && answers) {
         await tx.forumPoll.create({
-          data: { forumTopicId: topic.id, question: sanitizePlain(question), answers: sanitizePlain(answers) }
+          data: {
+            forumTopicId: topic.id,
+            question: sanitizePlain(question),
+            answers: sanitizePlain(answers)
+          }
         });
       }
 
@@ -159,7 +172,10 @@ router.delete(
     const isModAction = !isOwner;
 
     await prisma.$transaction([
-      prisma.forumTopic.delete({ where: { id } }),
+      prisma.forumTopic.update({
+        where: { id },
+        data: { deletedAt: new Date() }
+      }),
       prisma.forum.update({
         where: { id: forumId },
         data: {

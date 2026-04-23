@@ -7,6 +7,7 @@ import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
 
 import installRouter from './routes/api/install';
+import { specRouter, uiRouter } from './routes/api/docs';
 import toolsRouter from './routes/api/tools';
 import userRouter from './routes/api/user';
 import authRouter from './routes/api/auth';
@@ -38,13 +39,18 @@ app.use(cookieParser());
 
 app.get('/', (_req: Request, res: Response) => res.send('API Running'));
 
-// Install route is always public — must be mounted before the install guard
+// Always-public routes — mounted before the install guard
 app.use('/api/install', installRouter);
+app.use('/api/docs/json', specRouter);
+app.use('/api/docs', uiRouter);
 
 // Block all other API routes until installation is complete
 app.use('/api', async (_req: Request, res: Response, next: NextFunction) => {
   if (await isInstalled()) return next();
-  res.status(503).json({ installed: false, msg: 'Application not installed. Please complete setup at /install.' });
+  res.status(503).json({
+    installed: false,
+    msg: 'Application not installed. Please complete setup at /install.'
+  });
 });
 
 app.use('/api/tools', toolsRouter);
@@ -68,9 +74,21 @@ app.use('/api/communities', communitiesRouter);
 app.use('/api/contributions', contributionsRouter);
 app.use('/api/artists', artistRouter);
 
-app.use((err: Error & { statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
-  log.error(err.message);
-  res.status(err.statusCode ?? 500).json({ error: err.message ?? 'Server Error' });
-});
+app.use(
+  (
+    err: Error & { statusCode?: number },
+    _req: Request,
+    res: Response,
+    _next: NextFunction
+  ) => {
+    log.error(err.message);
+    const status = err.statusCode ?? 500;
+    const message =
+      process.env.NODE_ENV === 'production' && status === 500
+        ? 'Internal server error'
+        : err.message ?? 'Server Error';
+    res.status(status).json({ error: message });
+  }
+);
 
 app.listen(http.port, () => log.info(`Listening on port ${http.port}`));
