@@ -72,7 +72,7 @@ router.delete(
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.userId !== req.user!.id)
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized' });
     await prisma.post.delete({ where: { id } });
     res.json({ msg: 'Post removed' });
   })
@@ -116,7 +116,7 @@ router.delete(
     if (idx < 0 || idx >= comments.length)
       return res.status(404).json({ msg: 'Comment not found' });
     if (comments[idx]?.userId !== req.user!.id)
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized' });
 
     const updated = await prisma.post.update({
       where: { id },

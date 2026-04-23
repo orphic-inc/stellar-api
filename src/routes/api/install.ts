@@ -1,13 +1,27 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import gravatar from 'gravatar';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { validate } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
+
+const TOKEN_TTL_SECONDS = 3600;
+const issueToken = (userId: number): Promise<string> =>
+  new Promise((resolve, reject) => {
+    jwt.sign(
+      { user: { id: userId } },
+      authConfig.jwtSecret,
+      { expiresIn: TOKEN_TTL_SECONDS },
+      (err, token) => {
+        if (err || !token) return reject(err ?? new Error('Token generation failed'));
+        resolve(token);
+      }
+    );
+  });
 
 const router = express.Router();
 
@@ -154,15 +168,14 @@ router.post(
       });
     });
 
-    const payload = { user: { id: user.id } };
-    jwt.sign(payload, authConfig.jwtSecret, { expiresIn: 3600 }, (err, token) => {
-      if (err) throw err;
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-      });
-      res.status(201).json({ user, token });
+    const token = await issueToken(user.id);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: TOKEN_TTL_SECONDS * 1000
     });
+    res.status(201).json({ user });
   })
 );
 
