@@ -4,7 +4,7 @@ import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import { validate } from '../../../middleware/validate';
-import { createForumSchema } from '../../../schemas/forum';
+import { createForumSchema, updateForumSchema } from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();
@@ -19,7 +19,7 @@ router.get(
     const forums = await prisma.forum.findMany({
       orderBy: { sort: 'asc' },
       include: {
-        forumCategory: true,
+        forumCategory: { select: { id: true, name: true } },
         lastTopic: {
           include: { author: { select: { id: true, username: true } } }
         }
@@ -80,6 +80,7 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('forums_manage'),
+  validate(updateForumSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
@@ -118,8 +119,20 @@ router.delete(
     const trash = await prisma.forum.findFirst({ where: { isTrash: true } });
     if (!trash) return res.status(500).json({ msg: 'Trash forum not found — check install seed' });
 
+    const [topicCount, postCount] = await Promise.all([
+      prisma.forumTopic.count({ where: { forumId: id } }),
+      prisma.forumPost.count({ where: { forumTopic: { forumId: id } } })
+    ]);
+
     await prisma.$transaction([
       prisma.forumTopic.updateMany({ where: { forumId: id }, data: { forumId: trash.id } }),
+      prisma.forum.update({
+        where: { id: trash.id },
+        data: {
+          numTopics: { increment: topicCount },
+          numPosts: { increment: postCount }
+        }
+      }),
       prisma.forum.delete({ where: { id } })
     ]);
     res.status(204).send();

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
+import { isModerator } from '../../../middleware/permissions';
 import { validate } from '../../../middleware/validate';
 import { pollSchema } from '../../../schemas/poll';
 
@@ -23,7 +24,7 @@ router.get(
   })
 );
 
-// POST /api/forums/polls
+// POST /api/forums/polls — topic author or moderator only
 router.post(
   '/',
   requireAuth,
@@ -34,6 +35,19 @@ router.post(
       question: string;
       answers: string;
     };
+
+    const topic = await prisma.forumTopic.findUnique({
+      where: { id: forumTopicId },
+      select: { id: true, authorId: true, deletedAt: true }
+    });
+    if (!topic || topic.deletedAt)
+      return res.status(404).json({ msg: 'Topic not found' });
+
+    const isOwner = topic.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req, res))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
+
     const poll = await prisma.forumPoll.create({
       data: { forumTopicId, question, answers }
     });
@@ -41,18 +55,30 @@ router.post(
   })
 );
 
-// PUT /api/forums/polls/:id/close
+// PUT /api/forums/polls/:id/close — moderator only
 router.put(
   '/:id/close',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const poll = await prisma.forumPoll.update({
+
+    const poll = await prisma.forumPoll.findUnique({
+      where: { id },
+      include: { forumTopic: { select: { authorId: true } } }
+    });
+    if (!poll) return res.status(404).json({ msg: 'Poll not found' });
+
+    const isOwner = poll.forumTopic?.authorId === req.user!.id;
+    if (!isOwner && !(await isModerator(req, res))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
+
+    const updated = await prisma.forumPoll.update({
       where: { id },
       data: { closed: true }
     });
-    res.json(poll);
+    res.json(updated);
   })
 );
 

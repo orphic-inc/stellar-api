@@ -57,11 +57,6 @@ const authUserSelect = {
   }
 } as const;
 
-// GET /api/auth/status
-router.get('/status', requireAuth, (req: Request, res: Response) => {
-  res.json({ isAuthenticated: true, user: req.user });
-});
-
 // POST /api/auth/logout
 router.post('/logout', (_req: Request, res: Response) => {
   res.clearCookie('token', { sameSite: 'lax', httpOnly: true });
@@ -142,15 +137,14 @@ router.post(
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
 
-    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+    const authUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+      select: authUserSelect
+    });
 
     const token = await issueToken(user.id);
     res.cookie('token', token, cookieOptions);
-    const authUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: authUserSelect
-    });
-    if (!authUser) return res.status(401).json({ msg: 'Unauthorized' });
     res.json({ user: authUser });
   })
 );

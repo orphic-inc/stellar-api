@@ -12,6 +12,19 @@ export const createForumSchema = z.object({
   autoLockWeeks: z.number().int().min(1).default(4)
 });
 
+export const updateForumSchema = z
+  .object({
+    name: z.string().min(1).max(128).optional(),
+    description: z.string().max(1024).optional(),
+    sort: z.number().int().optional(),
+    minClassRead: z.number().int().min(0).optional(),
+    minClassWrite: z.number().int().min(0).optional(),
+    minClassCreate: z.number().int().min(0).optional(),
+    autoLock: z.boolean().optional(),
+    autoLockWeeks: z.number().int().min(1).optional()
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
+
 export const createTopicSchema = z.object({
   title: z.string().min(1, 'Title is required').max(256),
   body: z.string().min(1, 'Body is required'),
@@ -31,6 +44,16 @@ export const createPostSchema = z.object({
 
 export const updatePostSchema = z.object({
   body: z.string().min(1, 'Body is required')
+});
+
+export const topicNoteSchema = z.object({
+  forumTopicId: z.number().int().positive(),
+  body: z.string().min(1, 'Body is required')
+});
+
+export const lastReadSchema = z.object({
+  forumTopicId: z.number().int().positive(),
+  forumPostId: z.number().int().positive()
 });
 
 export type CreateForumInput = z.infer<typeof createForumSchema>;

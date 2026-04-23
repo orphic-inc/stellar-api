@@ -21,13 +21,22 @@ export const requireAuth = async (
     const decoded = jwt.verify(token, authConfig.jwtSecret) as JwtPayload;
     const user = await prisma.user.findUnique({
       where: { id: decoded.user.id },
-      select: { id: true, userRankId: true, disabled: true }
+      select: {
+        id: true,
+        userRankId: true,
+        disabled: true,
+        userRank: { select: { level: true } }
+      }
     });
     if (!user || user.disabled) {
       res.status(401).json({ msg: 'Account is not authorized' });
       return;
     }
-    req.user = { id: user.id, userRankId: user.userRankId };
+    req.user = {
+      id: user.id,
+      userRankId: user.userRankId,
+      userRankLevel: user.userRank?.level ?? 0
+    };
     next();
   } catch {
     res.status(401).json({ msg: 'Token is not valid' });

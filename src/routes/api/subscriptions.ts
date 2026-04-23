@@ -41,7 +41,10 @@ router.get(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.id;
-    const subscriptions = await prisma.subscription.findMany({ where: { userId } });
+    const subscriptions = await prisma.subscription.findMany({
+      where: { userId },
+      take: 100
+    });
     res.json(subscriptions);
   })
 );
@@ -63,7 +66,9 @@ router.post(
       });
       res.status(201).json({ msg: 'Subscribed to comments successfully' });
     } else if (action === 'unsubscribe') {
-      await prisma.commentSubscription.deleteMany({ where: { userId, page, pageId } });
+      await prisma.commentSubscription.deleteMany({
+        where: { userId, page, pageId }
+      });
       res.json({ msg: 'Unsubscribed from comments successfully' });
     }
   })

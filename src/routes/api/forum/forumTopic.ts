@@ -5,10 +5,7 @@ import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
-import {
-  createTopicSchema,
-  updateTopicSchema
-} from '../../../schemas/forum';
+import { createTopicSchema, updateTopicSchema } from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import { sanitizeHtml, sanitizePlain } from '../../../lib/sanitize';
@@ -21,10 +18,23 @@ router.use('/:forumTopicId/posts', forumPostRouter);
 // GET /api/forums/:forumId/topics
 router.get(
   '/',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     if (isNaN(forumId))
       return res.status(400).json({ msg: 'Invalid forum id' });
+
+    const forum = await prisma.forum.findUnique({
+      where: { id: forumId },
+      select: { minClassRead: true }
+    });
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
+
     const pg = parsePage(req);
     const [topics, total] = await Promise.all([
       prisma.forumTopic.findMany({
@@ -53,14 +63,27 @@ router.get(
     const id = parseInt(req.params.forumTopicId);
     if (isNaN(forumId) || isNaN(id))
       return res.status(400).json({ msg: 'Invalid topic id' });
-    const topic = await prisma.forumTopic.findFirst({
-      where: { id, forumId, deletedAt: null },
-      include: {
-        author: { select: { id: true, username: true, avatar: true } },
-        poll: { include: { votes: true } },
-        notes: { include: { author: { select: { id: true, username: true } } } }
-      }
-    });
+    const [forum, topic] = await Promise.all([
+      prisma.forum.findUnique({
+        where: { id: forumId },
+        select: { minClassRead: true }
+      }),
+      prisma.forumTopic.findFirst({
+        where: { id, forumId, deletedAt: null },
+        include: {
+          author: { select: { id: true, username: true, avatar: true } },
+          notes: {
+            include: { author: { select: { id: true, username: true } } }
+          }
+        }
+      })
+    ]);
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
     res.json(topic);
   })
@@ -74,8 +97,16 @@ router.post(
   validate(createTopicSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
-    const forum = await prisma.forum.findUnique({ where: { id: forumId } });
+    const forum = await prisma.forum.findUnique({
+      where: { id: forumId },
+      select: { id: true, minClassWrite: true, minClassCreate: true }
+    });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user!.userRankLevel < (forum.minClassCreate ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to create topics in this forum' });
+    }
 
     const { title, body, question, answers } = req.body as {
       title: string;
@@ -136,7 +167,8 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(id)) return res.status(400).json({ msg: 'Invalid topic id' });
+    if (isNaN(forumId) || isNaN(id))
+      return res.status(400).json({ msg: 'Invalid topic id' });
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });
@@ -167,7 +199,8 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const id = parseInt(req.params.forumTopicId);
-    if (isNaN(forumId) || isNaN(id)) return res.status(400).json({ msg: 'Invalid topic id' });
+    if (isNaN(forumId) || isNaN(id))
+      return res.status(400).json({ msg: 'Invalid topic id' });
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });
@@ -180,6 +213,10 @@ router.delete(
 
     const isModAction = !isOwner;
 
+    const livePostCount = await prisma.forumPost.count({
+      where: { forumTopicId: id, deletedAt: null }
+    });
+
     await prisma.$transaction([
       prisma.forumTopic.update({
         where: { id },
@@ -189,7 +226,7 @@ router.delete(
         where: { id: topic.forumId },
         data: {
           numTopics: { decrement: 1 },
-          numPosts: { decrement: topic.numPosts }
+          numPosts: { decrement: livePostCount }
         }
       }),
       prisma.auditLog.create({

@@ -646,18 +646,6 @@ model Comment {
   @@map("comments")
 }
 
-model CommentEdit {
-  id         Int               @id @default(autoincrement())
-  page       SubscriptionPage?
-  postId     Int?
-  editUserId Int?
-  editedAt   DateTime?
-  body       String            @db.Text
-
-  @@index([postId])
-  @@map("comment_edits")
-}
-
 // ─── Donation ─────────────────────────────────────────────────────────────────
 
 model Donation {
@@ -984,15 +972,6 @@ model ApiUser {
   createdAt        DateTime       @default(now())
 
   @@map("api_users")
-}
-
-model Permission {
-  id        Int    @id @default(autoincrement())
-  name      String
-  level     Int
-  userCount Int    @default(0)
-
-  @@map("permissions")
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────

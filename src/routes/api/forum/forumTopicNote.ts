@@ -1,16 +1,23 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
+import { isModerator } from '../../../middleware/permissions';
 import { validate } from '../../../middleware/validate';
-import { topicNoteSchema } from '../../../schemas/poll';
+import { topicNoteSchema } from '../../../schemas/forum';
 
 const router = express.Router();
 
-// GET /api/forums/topic-notes/:topicId
+const requireModerator = async (req: Request, res: Response, next: NextFunction) => {
+  if (await isModerator(req, res)) return next();
+  res.status(403).json({ msg: 'Not authorized' });
+};
+
+// GET /api/forums/topic-notes/:topicId — moderators only
 router.get(
   '/:topicId',
   requireAuth,
+  requireModerator,
   asyncHandler(async (req: Request, res: Response) => {
     const forumTopicId = parseInt(req.params.topicId);
     if (isNaN(forumTopicId)) return res.status(400).json({ msg: 'Invalid topic id' });
@@ -22,10 +29,11 @@ router.get(
   })
 );
 
-// POST /api/forums/topic-notes
+// POST /api/forums/topic-notes — moderators only
 router.post(
   '/',
   requireAuth,
+  requireModerator,
   validate(topicNoteSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { forumTopicId, body } = req.body as { forumTopicId: number; body: string };
@@ -36,7 +44,7 @@ router.post(
   })
 );
 
-// DELETE /api/forums/topic-notes/:id
+// DELETE /api/forums/topic-notes/:id — author only
 router.delete(
   '/:id',
   requireAuth,

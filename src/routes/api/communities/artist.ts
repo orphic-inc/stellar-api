@@ -2,7 +2,9 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
 import { validate } from '../../../middleware/validate';
+import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   artistSchema,
   similarArtistSchema,
@@ -15,102 +17,28 @@ const router = express.Router();
 // GET /api/artists
 router.get(
   '/',
-  asyncHandler(async (_req: Request, res: Response) => {
-    const artists = await prisma.artist.findMany({
-      include: { _count: { select: { releases: true } } }
-    });
-    res.json(artists);
-  })
-);
-
-// GET /api/artists/:id
-router.get(
-  '/:id',
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const artist = await prisma.artist.findUnique({
-      where: { id },
-      include: {
-        aliases: {
-          include: { redirect: { select: { id: true, name: true } } }
-        },
-        tags: { include: { tag: true } },
-        similarTo: {
-          include: { similarArtist: { select: { id: true, name: true } } }
-        },
-        releases: { orderBy: { year: 'desc' }, take: 20 }
-      }
-    });
-    if (!artist) return res.status(404).json({ msg: 'Artist not found' });
-    res.json(artist);
-  })
-);
-
-// POST /api/artists
-router.post(
-  '/',
-  requireAuth,
-  validate(artistSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { name, vanityHouse } = req.body as {
-      name: string;
-      vanityHouse?: boolean;
-    };
-
-    const artist = await prisma.artist.create({
-      data: { name, vanityHouse: vanityHouse ?? false }
-    });
-
-    await prisma.artistHistory.create({
-      data: {
-        artistId: artist.id,
-        editedBy: req.user!.id,
-        data: { name, vanityHouse }
-      }
-    });
-
-    res.status(201).json(artist);
-  })
-);
-
-// PUT /api/artists/:id
-router.put(
-  '/:id',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const existing = await prisma.artist.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ msg: 'Artist not found' });
-
-    const { name, vanityHouse } = req.body;
-
-    const [artist] = await prisma.$transaction([
-      prisma.artist.update({
-        where: { id },
-        data: {
-          ...(name !== undefined && { name }),
-          ...(vanityHouse !== undefined && { vanityHouse })
-        }
+    const pg = parsePage(req);
+    const [artists, total] = await Promise.all([
+      prisma.artist.findMany({
+        skip: pg.skip,
+        take: pg.limit,
+        include: { _count: { select: { releases: true } } },
+        orderBy: { name: 'asc' }
       }),
-      prisma.artistHistory.create({
-        data: {
-          artistId: id,
-          editedBy: req.user!.id,
-          data: req.body,
-          description: req.body.description
-        }
-      })
+      prisma.artist.count()
     ]);
-
-    res.json(artist);
+    paginatedResponse(res, artists, total, pg);
   })
 );
+
+// Static-segment routes MUST come before /:id to avoid being shadowed
 
 // GET /api/artists/history/:artistId
 router.get(
   '/history/:artistId',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const artistId = parseInt(req.params.artistId);
     if (isNaN(artistId)) return res.status(400).json({ msg: 'Invalid id' });
@@ -123,10 +51,10 @@ router.get(
   })
 );
 
-// POST /api/artists/revert/:historyId
+// POST /api/artists/revert/:historyId — requires communities_manage
 router.post(
   '/revert/:historyId',
-  requireAuth,
+  ...requirePermission('communities_manage'),
   asyncHandler(async (req: Request, res: Response) => {
     const historyId = parseInt(req.params.historyId);
     if (isNaN(historyId)) return res.status(400).json({ msg: 'Invalid id' });
@@ -156,21 +84,6 @@ router.post(
     });
 
     res.json({ msg: 'Artist reverted successfully', artist });
-  })
-);
-
-// GET /api/artists/:id/similar
-router.get(
-  '/:id/similar',
-  asyncHandler(async (req: Request, res: Response) => {
-    const artistId = parseInt(req.params.id);
-    if (isNaN(artistId)) return res.status(400).json({ msg: 'Invalid id' });
-    const similar = await prisma.similarArtist.findMany({
-      where: { artistId },
-      include: { similarArtist: { select: { id: true, name: true } } },
-      orderBy: { score: 'desc' }
-    });
-    res.json(similar);
   })
 );
 
@@ -223,6 +136,108 @@ router.post(
       update: { positiveVotes: { increment: 1 } }
     });
     res.json(tag);
+  })
+);
+
+// POST /api/artists
+router.post(
+  '/',
+  requireAuth,
+  validate(artistSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { name, vanityHouse } = req.body as {
+      name: string;
+      vanityHouse?: boolean;
+    };
+
+    const artist = await prisma.artist.create({
+      data: { name, vanityHouse: vanityHouse ?? false }
+    });
+
+    await prisma.artistHistory.create({
+      data: {
+        artistId: artist.id,
+        editedBy: req.user!.id,
+        data: { name, vanityHouse }
+      }
+    });
+
+    res.status(201).json(artist);
+  })
+);
+
+// GET /api/artists/:id
+router.get(
+  '/:id',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const artist = await prisma.artist.findUnique({
+      where: { id },
+      include: {
+        aliases: {
+          include: { redirect: { select: { id: true, name: true } } }
+        },
+        tags: { include: { tag: true } },
+        similarTo: {
+          include: { similarArtist: { select: { id: true, name: true } } }
+        },
+        releases: { orderBy: { year: 'desc' }, take: 20 }
+      }
+    });
+    if (!artist) return res.status(404).json({ msg: 'Artist not found' });
+    res.json(artist);
+  })
+);
+
+// GET /api/artists/:id/similar
+router.get(
+  '/:id/similar',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const artistId = parseInt(req.params.id);
+    if (isNaN(artistId)) return res.status(400).json({ msg: 'Invalid id' });
+    const similar = await prisma.similarArtist.findMany({
+      where: { artistId },
+      include: { similarArtist: { select: { id: true, name: true } } },
+      orderBy: { score: 'desc' }
+    });
+    res.json(similar);
+  })
+);
+
+// PUT /api/artists/:id
+router.put(
+  '/:id',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const existing = await prisma.artist.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ msg: 'Artist not found' });
+
+    const { name, vanityHouse } = req.body;
+
+    const [artist] = await prisma.$transaction([
+      prisma.artist.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(vanityHouse !== undefined && { vanityHouse })
+        }
+      }),
+      prisma.artistHistory.create({
+        data: {
+          artistId: id,
+          editedBy: req.user!.id,
+          data: req.body,
+          description: req.body.description
+        }
+      })
+    ]);
+
+    res.json(artist);
   })
 );
 
