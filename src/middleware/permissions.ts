@@ -33,8 +33,8 @@ export const loadPermissions = async (
   res: Response
 ): Promise<Record<string, boolean>> => {
   if (res.locals.userPerms) return res.locals.userPerms;
-  const rank = await prisma.userRank.findFirst({
-    where: { users: { some: { id: req.user!.id } } },
+  const rank = await prisma.userRank.findUnique({
+    where: { id: req.user!.userRankId },
     select: { permissions: true }
   });
   res.locals.userPerms = (rank?.permissions ?? {}) as Record<string, boolean>;
