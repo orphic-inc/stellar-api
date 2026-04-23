@@ -8,7 +8,12 @@ import { auth as authConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
-import { loginSchema, registerSchema } from '../../schemas/auth';
+import {
+  loginSchema,
+  registerSchema,
+  type LoginInput,
+  type RegisterInput
+} from '../../schemas/auth';
 
 const router = express.Router();
 
@@ -30,6 +35,28 @@ const cookieOptions = {
   maxAge: TOKEN_TTL_MS
 };
 
+const authUserSelect = {
+  id: true,
+  username: true,
+  email: true,
+  avatar: true,
+  isArtist: true,
+  isDonor: true,
+  canDownload: true,
+  inviteCount: true,
+  dateRegistered: true,
+  lastLogin: true,
+  userRank: {
+    select: {
+      level: true,
+      name: true,
+      color: true,
+      badge: true,
+      permissions: true
+    }
+  }
+} as const;
+
 // GET /api/auth/status
 router.get('/status', requireAuth, (req: Request, res: Response) => {
   res.json({ isAuthenticated: true, user: req.user });
@@ -47,11 +74,7 @@ router.post(
   authLimiter,
   validate(registerSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password } = req.body as {
-      username: string;
-      email: string;
-      password: string;
-    };
+    const { username, email, password } = req.body as RegisterInput;
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
@@ -79,13 +102,13 @@ router.post(
           userSettingsId: settings.id,
           profileId: profile.id
         },
-        select: { id: true, username: true, email: true, avatar: true }
+        select: authUserSelect
       });
     });
 
     const token = await issueToken(user.id);
     res.cookie('token', token, cookieOptions);
-    res.status(201).json({ token, user });
+    res.status(201).json({ user });
   })
 );
 
@@ -96,21 +119,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        avatar: true,
-        isArtist: true,
-        isDonor: true,
-        canDownload: true,
-        inviteCount: true,
-        dateRegistered: true,
-        lastLogin: true,
-        userRank: { select: { name: true, color: true, badge: true, permissions: true } },
-        profile: true,
-        userSettings: true
-      }
+      select: authUserSelect
     });
     if (!user) return res.status(401).json({ msg: 'Unauthorized' });
     res.json(user);
@@ -123,7 +132,7 @@ router.post(
   authLimiter,
   validate(loginSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body as { email: string; password: string };
+    const { email, password } = req.body as LoginInput;
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
@@ -137,7 +146,12 @@ router.post(
 
     const token = await issueToken(user.id);
     res.cookie('token', token, cookieOptions);
-    res.json({ token });
+    const authUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: authUserSelect
+    });
+    if (!authUser) return res.status(401).json({ msg: 'Unauthorized' });
+    res.json({ user: authUser });
   })
 );
 

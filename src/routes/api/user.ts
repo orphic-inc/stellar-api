@@ -5,7 +5,11 @@ import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import { validate } from '../../middleware/validate';
-import { adminCreateUserSchema, userSettingsSchema } from '../../schemas/user';
+import {
+  adminCreateUserSchema,
+  userSettingsSchema,
+  type AdminCreateUserInput
+} from '../../schemas/user';
 import { audit } from '../../lib/audit';
 
 const router = express.Router();
@@ -89,12 +93,7 @@ router.post(
   ...requirePermission('users_edit'),
   validate(adminCreateUserSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password, userRankId } = req.body as {
-      username: string;
-      email: string;
-      password: string;
-      userRankId?: number;
-    };
+    const { username, email, password, userRankId } = req.body as AdminCreateUserInput;
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }

@@ -77,11 +77,17 @@ app.use('/api/artists', artistRouter);
 app.use(
   (
     err: Error & { statusCode?: number },
-    _req: Request,
+    req: Request,
     res: Response,
     _next: NextFunction
   ) => {
-    log.error(err.message);
+    log.error('Unhandled error', {
+      message: err.message,
+      stack: err.stack,
+      route: req.path,
+      method: req.method,
+      userId: req.user?.id
+    });
     const status = err.statusCode ?? 500;
     const message =
       process.env.NODE_ENV === 'production' && status === 500

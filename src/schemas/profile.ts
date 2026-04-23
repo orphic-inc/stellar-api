@@ -10,4 +10,10 @@ export const profileUpdateSchema = z.object({
   styledTooltips: z.boolean().optional()
 });
 
+export const inviteSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  reason: z.string().max(1000).optional()
+});
+
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+export type InviteInput = z.infer<typeof inviteSchema>;
