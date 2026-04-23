@@ -3,7 +3,6 @@ lib/
 !src/lib/
 node_modules/
 .env
-package-lock.json
 dist/
 src/**/*.js
 src/**/*.js.map
