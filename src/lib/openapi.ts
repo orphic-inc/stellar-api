@@ -6,6 +6,7 @@ import {
 import { z } from 'zod';
 import { profileUpdateSchema, inviteSchema } from '../schemas/profile';
 import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
+import { createContributionSchema } from '../schemas/contribution';
 
 extendZodWithOpenApi(z);
 
@@ -23,6 +24,16 @@ registry.register('ErrorResponse', z.object({ error: z.string() }));
 const ValidationError = registry.register(
   'ValidationError',
   z.object({ errors: z.record(z.string(), z.array(z.string())) })
+);
+
+const PaginationMeta = registry.register(
+  'PaginationMeta',
+  z.object({
+    total: z.number(),
+    page: z.number(),
+    limit: z.number(),
+    totalPages: z.number()
+  })
 );
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -644,9 +655,7 @@ const PaginatedForumTopics = registry.register(
   'PaginatedForumTopics',
   z.object({
     data: z.array(ForumTopic),
-    total: z.number(),
-    page: z.number(),
-    limit: z.number()
+    meta: PaginationMeta
   })
 );
 
@@ -755,9 +764,7 @@ registry.registerPath({
         'application/json': {
           schema: z.object({
             data: z.array(ForumPost),
-            total: z.number(),
-            page: z.number(),
-            limit: z.number()
+            meta: PaginationMeta
           })
         }
       }
@@ -858,6 +865,30 @@ const ReleaseContribution = registry.register(
   })
 );
 
+const Contribution = registry.register(
+  'Contribution',
+  z.object({
+    id: z.number(),
+    user: z.object({
+      id: z.number(),
+      username: z.string()
+    }),
+    release: z.object({
+      id: z.number(),
+      title: z.string(),
+      communityId: z.number().nullable().optional()
+    }),
+    collaborators: z.array(
+      z.object({
+        id: z.number(),
+        name: z.string()
+      })
+    ),
+    releaseDescription: z.string().nullable().optional(),
+    createdAt: z.string().optional()
+  })
+);
+
 const Release = registry.register(
   'Release',
   z.object({
@@ -899,9 +930,7 @@ registry.registerPath({
         'application/json': {
           schema: z.object({
             data: z.array(Community),
-            total: z.number(),
-            page: z.number(),
-            limit: z.number()
+            meta: PaginationMeta
           })
         }
       }
@@ -938,9 +967,7 @@ registry.registerPath({
         'application/json': {
           schema: z.object({
             data: z.array(Release),
-            total: z.number(),
-            page: z.number(),
-            limit: z.number()
+            meta: PaginationMeta
           })
         }
       }
@@ -965,6 +992,58 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/contributions',
+  tags: ['Contributions'],
+  responses: {
+    200: {
+      description: 'Paginated contributions',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(Contribution),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/contributions',
+  tags: ['Contributions'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: createContributionSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Contribution submitted and release created',
+      content: {
+        'application/json': {
+          schema: Contribution
+        }
+      }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Community not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
