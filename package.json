@@ -10,9 +10,11 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "watch": "tsc -w",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm"
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm",
+    "openapi:export": "ts-node src/scripts/export-openapi.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@prisma/client": "^5.3.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
@@ -25,6 +27,7 @@
     "isomorphic-dompurify": "^3.9.0",
     "jsdom": "^29.0.2",
     "jsonwebtoken": "^9.0.2",
+    "swagger-ui-express": "^5.0.1",
     "winston": "^3.10.0",
     "zod": "^4.3.6"
   },
@@ -39,6 +42,7 @@
     "@types/jsdom": "^28.0.1",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^20.6.0",
+    "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-import-resolver-node": "^0.3.7",

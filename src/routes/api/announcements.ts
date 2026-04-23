@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
+import { validate } from '../../middleware/validate';
+import { announcementSchema } from '../../schemas/install';
 import { sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
@@ -25,9 +27,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('news_manage'),
+  validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { title, body } = req.body as { title: string; body: string };
-    if (!title || !body) return res.status(400).json({ msg: 'title and body are required' });
     const news = await prisma.news.create({
       data: { title: sanitizePlain(title), body: sanitizePlain(body) }
     });
@@ -70,9 +72,9 @@ router.delete(
 router.post(
   '/blog',
   ...requirePermission('news_manage'),
+  validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { title, body } = req.body as { title: string; body: string };
-    if (!title || !body) return res.status(400).json({ msg: 'title and body are required' });
     const post = await prisma.blog.create({
       data: {
         title: sanitizePlain(title),

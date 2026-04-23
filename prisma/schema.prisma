@@ -99,6 +99,12 @@ enum NoteVisibility {
   staff
 }
 
+enum ForumRuleTarget {
+  Forum
+  Thread
+  Topic
+}
+
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
 model UserRank {
@@ -171,6 +177,7 @@ model User {
   artistHistories        ArtistHistory[]       @relation("HistoryEditedBy")
   bookmarkArtists        BookmarkArtist[]
   bookmarkCollages       BookmarkCollage[]
+  bookmarkReleases       BookmarkRelease[]
   bookmarkCommunities    BookmarkCommunity[]
   bookmarkRequests       BookmarkRequest[]
   subscriptions          Subscription[]
@@ -190,6 +197,7 @@ model User {
   editedComments         Comment[]             @relation("CommentEditor")
   auditLogs              AuditLog[]
 
+  @@index([userRankId])
   @@map("users")
 }
 
@@ -203,6 +211,7 @@ model Invite {
   reason    String       @default("")
   status    InviteStatus @default(pending)
 
+  @@index([status])
   @@map("invites")
 }
 
@@ -277,8 +286,9 @@ model Forum {
   numPosts        Int           @default(0)
   autoLock        Boolean       @default(true)
   autoLockWeeks   Int           @default(4)
+  isTrash         Boolean       @default(false)
   lastTopicId     Int?
-  lastTopic       ForumTopic?   @relation("ForumLastTopic", fields: [lastTopicId], references: [id])
+  lastTopic       ForumTopic?   @relation("ForumLastTopic", fields: [lastTopicId], references: [id], onDelete: SetNull)
   topics          ForumTopic[]  @relation("ForumTopics")
   specificRules   ForumSpecificRule[]
   createdAt       DateTime      @default(now())
@@ -290,7 +300,7 @@ model Forum {
 model ForumTopic {
   id          Int                 @id @default(autoincrement())
   forumId     Int
-  forum       Forum               @relation("ForumTopics", fields: [forumId], references: [id])
+  forum       Forum               @relation("ForumTopics", fields: [forumId], references: [id], onDelete: Restrict)
   threadId    Int?
   thread      Thread?             @relation(fields: [threadId], references: [id])
   title       String
@@ -301,7 +311,7 @@ model ForumTopic {
   ranking     Int                 @default(0)
   numPosts    Int                 @default(0)
   lastPostId  Int?
-  lastPost    ForumPost?          @relation("TopicLastPost", fields: [lastPostId], references: [id])
+  lastPost    ForumPost?          @relation("TopicLastPost", fields: [lastPostId], references: [id], onDelete: SetNull)
   posts       ForumPost[]         @relation("TopicPosts")
   lastForumOf Forum[]             @relation("ForumLastTopic")
   notes       ForumTopicNote[]
@@ -311,14 +321,17 @@ model ForumTopic {
   specificRules ForumSpecificRule[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
+  deletedAt   DateTime?
 
+  @@index([forumId])
+  @@index([authorId])
   @@map("forum_topics")
 }
 
 model ForumPost {
   id           Int                 @id @default(autoincrement())
   forumTopicId Int
-  forumTopic   ForumTopic          @relation("TopicPosts", fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic          @relation("TopicPosts", fields: [forumTopicId], references: [id], onDelete: Cascade)
   authorId     Int
   author       User                @relation(fields: [authorId], references: [id])
   body         String              @db.Text
@@ -327,15 +340,17 @@ model ForumPost {
   lastReadOf   ForumLastReadTopic[]
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
 
   @@index([forumTopicId])
+  @@index([authorId])
   @@map("forum_posts")
 }
 
 model ForumPoll {
   id           Int           @id @default(autoincrement())
   forumTopicId Int           @unique
-  forumTopic   ForumTopic    @relation(fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic    @relation(fields: [forumTopicId], references: [id], onDelete: Cascade)
   question     String
   answers      String        @db.Text
   featured     DateTime?
@@ -348,7 +363,7 @@ model ForumPoll {
 model ForumPollVote {
   id          Int       @id @default(autoincrement())
   forumPollId Int
-  forumPoll   ForumPoll @relation(fields: [forumPollId], references: [id])
+  forumPoll   ForumPoll @relation(fields: [forumPollId], references: [id], onDelete: Cascade)
   userId      Int
   vote        Int
 
@@ -360,9 +375,9 @@ model ForumLastReadTopic {
   id           Int        @id @default(autoincrement())
   userId       Int
   forumTopicId Int
-  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id], onDelete: Cascade)
   forumPostId  Int
-  forumPost    ForumPost  @relation(fields: [forumPostId], references: [id])
+  forumPost    ForumPost  @relation(fields: [forumPostId], references: [id], onDelete: Cascade)
 
   @@unique([userId, forumTopicId])
   @@map("forum_last_read_topics")
@@ -371,7 +386,7 @@ model ForumLastReadTopic {
 model ForumTopicNote {
   id           Int        @id @default(autoincrement())
   forumTopicId Int
-  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id], onDelete: Cascade)
   authorId     Int
   author       User       @relation(fields: [authorId], references: [id])
   body         String     @db.Text
@@ -382,13 +397,14 @@ model ForumTopicNote {
 }
 
 model ForumSpecificRule {
-  id           Int        @id @default(autoincrement())
+  id           Int             @id @default(autoincrement())
+  targetType   ForumRuleTarget
   forumId      Int?
-  forum        Forum?     @relation(fields: [forumId], references: [id])
+  forum        Forum?          @relation(fields: [forumId], references: [id], onDelete: SetNull)
   threadId     Int?
-  thread       Thread?    @relation(fields: [threadId], references: [id])
+  thread       Thread?         @relation(fields: [threadId], references: [id])
   forumTopicId Int?
-  forumTopic   ForumTopic? @relation(fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic?     @relation(fields: [forumTopicId], references: [id], onDelete: SetNull)
 
   @@map("forum_specific_rules")
 }
@@ -461,6 +477,7 @@ model ArtistTag {
   userId        Int?
 
   @@unique([artistId, tagId])
+  @@index([artistId])
   @@map("artist_tags")
 }
 
@@ -469,7 +486,7 @@ model Concert {
   artistId     Int
   artist       Artist     @relation(fields: [artistId], references: [id])
   forumTopicId Int        @unique
-  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id])
+  forumTopic   ForumTopic @relation(fields: [forumTopicId], references: [id], onDelete: Cascade)
 
   @@map("concerts")
 }
@@ -502,8 +519,8 @@ model Community {
   staff              User[]             @relation("CommunityStaff")
   doNotUpload        DoNotUpload[]
   bookmarks          BookmarkCommunity[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@map("communities")
 }
@@ -553,9 +570,9 @@ model Release {
   year          Int
   isEdition     Boolean          @default(false)
   edition       Json?
-  bookmarks     BookmarkCommunity[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  bookmarks     BookmarkRelease[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@index([artistId])
   @@index([communityId])
@@ -582,6 +599,7 @@ model Contribution {
 
   @@index([userId])
   @@index([releaseId])
+  @@index([contributorId])
   @@map("contributions")
 }
 
@@ -615,7 +633,11 @@ model Comment {
   contributionId Int?
   contribution   Contribution? @relation(fields: [contributionId], references: [id])
   createdAt      DateTime      @default(now())
+  deletedAt      DateTime?
 
+  @@index([page, communityId])
+  @@index([page, contributionId])
+  @@index([page, artistId])
   @@map("comments")
 }
 
@@ -718,18 +740,29 @@ model BookmarkCollage {
   @@map("bookmark_collages")
 }
 
-model BookmarkCommunity {
-  id          Int        @id @default(autoincrement())
-  userId      Int
-  user        User       @relation(fields: [userId], references: [id])
-  releaseId   Int
-  release     Release    @relation(fields: [releaseId], references: [id])
-  communityId Int?
-  community   Community? @relation(fields: [communityId], references: [id])
-  sort        Int        @default(0)
-  createdAt   DateTime   @default(now())
+model BookmarkRelease {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  releaseId Int
+  release   Release  @relation(fields: [releaseId], references: [id])
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
 
   @@unique([userId, releaseId])
+  @@map("bookmark_releases")
+}
+
+model BookmarkCommunity {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  communityId Int
+  community   Community @relation(fields: [communityId], references: [id])
+  sort        Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, communityId])
   @@map("bookmark_communities")
 }
 

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { isModerator } from '../../../../middleware/permissions';
 import { validate } from '../../../../middleware/validate';
 import { writeLimiter } from '../../../../middleware/rateLimiter';
 import { createPostSchema, updatePostSchema } from '../../../../schemas/forum';
@@ -11,31 +12,25 @@ import { sanitizeHtml } from '../../../../lib/sanitize';
 
 const router = express.Router({ mergeParams: true });
 
-const isModerator = async (userId: number): Promise<boolean> => {
-  const rank = await prisma.userRank.findFirst({
-    where: { users: { some: { id: userId } } },
-    select: { permissions: true }
-  });
-  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
-  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
-};
-
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const forumTopicId = parseInt(req.params.forumTopicId);
-    if (isNaN(forumTopicId)) return res.status(400).json({ msg: 'Invalid topic id' });
+    if (isNaN(forumTopicId))
+      return res.status(400).json({ msg: 'Invalid topic id' });
     const pg = parsePage(req);
     const [posts, total] = await Promise.all([
       prisma.forumPost.findMany({
-        where: { forumTopicId },
+        where: { forumTopicId, deletedAt: null },
         orderBy: { createdAt: 'asc' },
         skip: pg.skip,
         take: pg.limit,
-        include: { author: { select: { id: true, username: true, avatar: true } } }
+        include: {
+          author: { select: { id: true, username: true, avatar: true } }
+        }
       }),
-      prisma.forumPost.count({ where: { forumTopicId } })
+      prisma.forumPost.count({ where: { forumTopicId, deletedAt: null } })
     ]);
     paginatedResponse(res, posts, total, pg);
   })
@@ -49,7 +44,9 @@ router.get(
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
     const post = await prisma.forumPost.findUnique({
       where: { id },
-      include: { author: { select: { id: true, username: true, avatar: true } } }
+      include: {
+        author: { select: { id: true, username: true, avatar: true } }
+      }
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     res.json(post);
@@ -76,7 +73,11 @@ router.post(
 
     const [post] = await prisma.$transaction(async (tx) => {
       const post = await tx.forumPost.create({
-        data: { forumTopicId, authorId: req.user!.id, body: sanitizeHtml(req.body.body) }
+        data: {
+          forumTopicId,
+          authorId: req.user!.id,
+          body: sanitizeHtml(req.body.body)
+        }
       });
       await tx.forumTopic.update({
         where: { id: forumTopicId },
@@ -102,10 +103,15 @@ router.put(
     const id = parseInt(req.params.id);
     const post = await prisma.forumPost.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    if (post.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
+    if (post.authorId !== req.user!.id)
+      return res.status(403).json({ msg: 'Not authorized' });
 
     const edits = (post.edits as Array<Record<string, unknown>>) ?? [];
-    edits.push({ userId: req.user!.id, time: new Date().toISOString(), previousBody: post.body });
+    edits.push({
+      userId: req.user!.id,
+      time: new Date().toISOString(),
+      previousBody: post.body
+    });
 
     const updated = await prisma.forumPost.update({
       where: { id },
@@ -133,7 +139,10 @@ router.delete(
     const isModAction = !isOwner;
 
     await prisma.$transaction([
-      prisma.forumPost.delete({ where: { id } }),
+      prisma.forumPost.update({
+        where: { id },
+        data: { deletedAt: new Date() }
+      }),
       prisma.forumTopic.update({
         where: { id: post.forumTopicId },
         data: { numPosts: { decrement: 1 } }

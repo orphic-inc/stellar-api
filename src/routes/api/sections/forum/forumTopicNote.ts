@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import { topicNoteSchema } from '../../../../schemas/install';
 
 const router = express.Router();
 
@@ -25,14 +26,8 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('forumTopicId', 'Topic id is required').isInt(),
-    check('body', 'Body is required').not().isEmpty()
-  ],
+  validate(topicNoteSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { forumTopicId, body } = req.body as { forumTopicId: number; body: string };
     const note = await prisma.forumTopicNote.create({
       data: { forumTopicId, authorId: req.user!.id, body }

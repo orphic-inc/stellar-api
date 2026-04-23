@@ -16,6 +16,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     req.user = decoded.user;
     next();
   } catch {
-    res.status(401).json({ msg: 'Token is not valid' });
+    return res.status(401).json({ msg: 'Token is not valid' });
   }
 };

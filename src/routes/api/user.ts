@@ -33,23 +33,28 @@ router.put(
   requireAuth,
   validate(userSettingsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { siteAppearance, externalStylesheet, styledTooltips, paranoia } = req.body;
+    const { siteAppearance, externalStylesheet, styledTooltips, paranoia, avatar } = req.body;
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: { userSettingsId: true }
     });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const settings = await prisma.userSettings.update({
-      where: { id: user.userSettingsId },
-      data: {
-        ...(siteAppearance !== undefined && { siteAppearance }),
-        ...(externalStylesheet !== undefined && { externalStylesheet }),
-        ...(styledTooltips !== undefined && { styledTooltips }),
-        ...(paranoia !== undefined && { paranoia })
-      }
-    });
-    res.json(settings);
+    const [settings] = await prisma.$transaction([
+      prisma.userSettings.update({
+        where: { id: user.userSettingsId },
+        data: {
+          ...(siteAppearance !== undefined && { siteAppearance }),
+          ...(externalStylesheet !== undefined && { externalStylesheet }),
+          ...(styledTooltips !== undefined && { styledTooltips }),
+          ...(paranoia !== undefined && { paranoia })
+        }
+      }),
+      ...(avatar !== undefined
+        ? [prisma.user.update({ where: { id: req.user!.id }, data: { avatar } })]
+        : [])
+    ]);
+    res.json({ ...settings, avatar });
   })
 );
 

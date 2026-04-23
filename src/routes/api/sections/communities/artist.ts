@@ -1,8 +1,14 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import {
+  artistSchema,
+  similarArtistSchema,
+  artistAliasSchema,
+  artistTagSchema
+} from '../../../../schemas/install';
 
 const router = express.Router();
 
@@ -26,9 +32,13 @@ router.get(
     const artist = await prisma.artist.findUnique({
       where: { id },
       include: {
-        aliases: { include: { redirect: { select: { id: true, name: true } } } },
+        aliases: {
+          include: { redirect: { select: { id: true, name: true } } }
+        },
         tags: { include: { tag: true } },
-        similarTo: { include: { similarArtist: { select: { id: true, name: true } } } },
+        similarTo: {
+          include: { similarArtist: { select: { id: true, name: true } } }
+        },
         releases: { orderBy: { year: 'desc' }, take: 20 }
       }
     });
@@ -41,22 +51,26 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [check('name', 'Name is required').not().isEmpty()],
+  validate(artistSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-    const { name, vanityHouse } = req.body as { name: string; vanityHouse?: boolean };
+    const { name, vanityHouse } = req.body as {
+      name: string;
+      vanityHouse?: boolean;
+    };
 
     const artist = await prisma.artist.create({
       data: { name, vanityHouse: vanityHouse ?? false }
     });
 
     await prisma.artistHistory.create({
-      data: { artistId: artist.id, editedBy: req.user!.id, data: { name, vanityHouse } }
+      data: {
+        artistId: artist.id,
+        editedBy: req.user!.id,
+        data: { name, vanityHouse }
+      }
     });
 
-    res.json(artist);
+    res.status(201).json(artist);
   })
 );
 
@@ -81,7 +95,12 @@ router.put(
         }
       }),
       prisma.artistHistory.create({
-        data: { artistId: id, editedBy: req.user!.id, data: req.body, description: req.body.description }
+        data: {
+          artistId: id,
+          editedBy: req.user!.id,
+          data: req.body,
+          description: req.body.description
+        }
       })
     ]);
 
@@ -111,7 +130,9 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const historyId = parseInt(req.params.historyId);
     if (isNaN(historyId)) return res.status(400).json({ msg: 'Invalid id' });
-    const entry = await prisma.artistHistory.findUnique({ where: { id: historyId } });
+    const entry = await prisma.artistHistory.findUnique({
+      where: { id: historyId }
+    });
     if (!entry) return res.status(404).json({ msg: 'History entry not found' });
 
     const data = entry.data as Record<string, unknown>;
@@ -119,7 +140,9 @@ router.post(
       where: { id: entry.artistId },
       data: {
         ...(data.name !== undefined && { name: data.name as string }),
-        ...(data.vanityHouse !== undefined && { vanityHouse: data.vanityHouse as boolean })
+        ...(data.vanityHouse !== undefined && {
+          vanityHouse: data.vanityHouse as boolean
+        })
       }
     });
 
@@ -155,15 +178,12 @@ router.get(
 router.post(
   '/similar',
   requireAuth,
-  [
-    check('artistId', 'Artist id is required').isInt(),
-    check('similarArtistId', 'Similar artist id is required').isInt()
-  ],
+  validate(similarArtistSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-    const { artistId, similarArtistId } = req.body as { artistId: number; similarArtistId: number };
+    const { artistId, similarArtistId } = req.body as {
+      artistId: number;
+      similarArtistId: number;
+    };
     const result = await prisma.similarArtist.upsert({
       where: { artistId_similarArtistId: { artistId, similarArtistId } },
       create: { artistId, similarArtistId, votes: [] },
@@ -177,19 +197,16 @@ router.post(
 router.post(
   '/alias',
   requireAuth,
-  [
-    check('artistId', 'Artist id is required').isInt(),
-    check('redirectId', 'Redirect id is required').isInt()
-  ],
+  validate(artistAliasSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-    const { artistId, redirectId } = req.body as { artistId: number; redirectId: number };
+    const { artistId, redirectId } = req.body as {
+      artistId: number;
+      redirectId: number;
+    };
     const alias = await prisma.artistAlias.create({
       data: { artistId, redirectId, userId: req.user!.id }
     });
-    res.json(alias);
+    res.status(201).json(alias);
   })
 );
 
@@ -197,14 +214,8 @@ router.post(
 router.post(
   '/tag',
   requireAuth,
-  [
-    check('artistId', 'Artist id is required').isInt(),
-    check('tagId', 'Tag id is required').isInt()
-  ],
+  validate(artistTagSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { artistId, tagId } = req.body as { artistId: number; tagId: number };
     const tag = await prisma.artistTag.upsert({
       where: { artistId_tagId: { artistId, tagId } },

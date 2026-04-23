@@ -3,16 +3,9 @@ import { CommentPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { isModerator } from '../../middleware/permissions';
 import { sanitizeHtml } from '../../lib/sanitize';
-
-const isModerator = async (userId: number): Promise<boolean> => {
-  const rank = await prisma.userRank.findFirst({
-    where: { users: { some: { id: userId } } },
-    select: { permissions: true }
-  });
-  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
-  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
-};
+import { audit } from '../../lib/audit';
 
 const router = express.Router();
 
@@ -25,7 +18,7 @@ router.get(
     if (page) where.page = page as CommentPage;
     if (pageId) where.communityId = parseInt(pageId as string);
     const comments = await prisma.comment.findMany({
-      where,
+      where: { ...where, deletedAt: null },
       orderBy: { createdAt: 'asc' },
       include: {
         author: { select: { id: true, username: true, avatar: true } },
@@ -44,7 +37,9 @@ router.get(
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
     const comment = await prisma.comment.findUnique({
       where: { id },
-      include: { author: { select: { id: true, username: true, avatar: true } } }
+      include: {
+        author: { select: { id: true, username: true, avatar: true } }
+      }
     });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
     res.json(comment);
@@ -57,8 +52,11 @@ router.post(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const { page, body, communityId, contributionId, artistId } = req.body as {
-      page: CommentPage; body: string;
-      communityId?: number; contributionId?: number; artistId?: number;
+      page: CommentPage;
+      body: string;
+      communityId?: number;
+      contributionId?: number;
+      artistId?: number;
     };
 
     if (!page || !body) {
@@ -74,7 +72,9 @@ router.post(
         ...(contributionId && { contributionId }),
         ...(artistId && { artistId })
       },
-      include: { author: { select: { id: true, username: true, avatar: true } } }
+      include: {
+        author: { select: { id: true, username: true, avatar: true } }
+      }
     });
     res.status(201).json(comment);
   })
@@ -91,11 +91,16 @@ router.put(
     const id = parseInt(req.params.id);
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
-    if (comment.authorId !== req.user!.id) return res.status(403).json({ msg: 'Not authorized' });
+    if (comment.authorId !== req.user!.id)
+      return res.status(403).json({ msg: 'Not authorized' });
 
     const updated = await prisma.comment.update({
       where: { id },
-      data: { body: sanitizeHtml(body), editedUserId: req.user!.id, editedAt: new Date() }
+      data: {
+        body: sanitizeHtml(body),
+        editedUserId: req.user!.id,
+        editedAt: new Date()
+      }
     });
     res.json(updated);
   })
@@ -117,7 +122,18 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    await prisma.comment.delete({ where: { id } });
+    const isModAction = !isOwner;
+    await prisma.$transaction([
+      prisma.comment.update({ where: { id }, data: { deletedAt: new Date() } }),
+      prisma.auditLog.create({
+        data: {
+          actorId: req.user!.id,
+          action: isModAction ? 'comment.mod_delete' : 'comment.delete',
+          targetType: 'Comment',
+          targetId: id
+        }
+      })
+    ]);
     res.json({ msg: 'Comment deleted' });
   })
 );

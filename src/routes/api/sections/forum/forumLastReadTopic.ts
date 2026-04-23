@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import { lastReadSchema } from '../../../../schemas/install';
 
 const router = express.Router();
 
@@ -22,15 +23,11 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('forumTopicId', 'Topic id is required').isInt(),
-    check('forumPostId', 'Post id is required').isInt()
-  ],
+  validate(lastReadSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-    const { forumTopicId, forumPostId } = req.body as { forumTopicId: number; forumPostId: number };
+    const { forumTopicId, forumPostId } = req.body as {
+      forumTopicId: number; forumPostId: number;
+    };
     const userId = req.user!.id;
 
     const record = await prisma.forumLastReadTopic.upsert({

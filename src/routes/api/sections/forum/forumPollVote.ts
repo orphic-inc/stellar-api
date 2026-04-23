@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import { pollVoteSchema } from '../../../../schemas/install';
 
 const router = express.Router();
 
@@ -10,14 +11,8 @@ const router = express.Router();
 router.post(
   '/',
   requireAuth,
-  [
-    check('forumPollId', 'Poll id is required').isInt(),
-    check('vote', 'Vote is required').isInt()
-  ],
+  validate(pollVoteSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { forumPollId, vote } = req.body as { forumPollId: number; vote: number };
     const userId = req.user!.id;
 

@@ -2,12 +2,13 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import gravatar from 'gravatar';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { markInstalled } from '../../modules/installState';
 import { installLimiter } from '../../middleware/rateLimiter';
+import { validate } from '../../middleware/validate';
+import { installSchema } from '../../schemas/install';
 
 const router = express.Router();
 
@@ -84,14 +85,8 @@ router.get('/', asyncHandler(async (_req: Request, res: Response) => {
 router.post(
   '/',
   installLimiter,
-  [
-    check('username', 'Username is required').not().isEmpty(),
-    check('email', 'Please include a valid email').isEmail(),
-    check('password', 'Password must be at least 8 characters').isLength({ min: 8 }),
-  ],
+  validate(installSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const count = await prisma.userRank.count();
     if (count > 0) return res.status(409).json({ msg: 'Application already installed' });
@@ -115,6 +110,20 @@ router.post(
         const created = await tx.userRank.create({ data: rank });
         if (rank.level === 1000) sysopRankId = created.id;
       }
+
+      const systemCategory = await tx.forumCategory.create({ data: { name: 'System', sort: 0 } });
+      await tx.forum.create({
+        data: {
+          forumCategoryId: systemCategory.id,
+          sort: 0,
+          name: 'Trash',
+          description: 'Holds topics from deleted forums.',
+          isTrash: true,
+          minClassRead: 500,
+          minClassWrite: 500,
+          minClassCreate: 500
+        }
+      });
 
       const settings = await tx.userSettings.create({ data: {} });
       const profile = await tx.profile.create({ data: {} });

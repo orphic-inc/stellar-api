@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
-import { check, validationResult } from 'express-validator';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
+import { pollSchema } from '../../../../schemas/install';
 
 const router = express.Router();
 
@@ -11,7 +12,8 @@ router.get(
   '/:topicId',
   asyncHandler(async (req: Request, res: Response) => {
     const forumTopicId = parseInt(req.params.topicId);
-    if (isNaN(forumTopicId)) return res.status(400).json({ msg: 'Invalid topic id' });
+    if (isNaN(forumTopicId))
+      return res.status(400).json({ msg: 'Invalid topic id' });
     const poll = await prisma.forumPoll.findUnique({
       where: { forumTopicId },
       include: { votes: true }
@@ -25,23 +27,17 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  [
-    check('forumTopicId', 'Topic id is required').isInt(),
-    check('question', 'Question is required').not().isEmpty(),
-    check('answers', 'Answers are required').not().isEmpty()
-  ],
+  validate(pollSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { forumTopicId, question, answers } = req.body as {
-      forumTopicId: number; question: string; answers: string;
+      forumTopicId: number;
+      question: string;
+      answers: string;
     };
-
     const poll = await prisma.forumPoll.create({
       data: { forumTopicId, question, answers }
     });
-    res.json(poll);
+    res.status(201).json(poll);
   })
 );
 
@@ -52,7 +48,10 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const poll = await prisma.forumPoll.update({ where: { id }, data: { closed: true } });
+    const poll = await prisma.forumPoll.update({
+      where: { id },
+      data: { closed: true }
+    });
     res.json(poll);
   })
 );
