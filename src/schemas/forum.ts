@@ -61,3 +61,5 @@ export type CreateTopicInput = z.infer<typeof createTopicSchema>;
 export type UpdateTopicInput = z.infer<typeof updateTopicSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
+export type TopicNoteInput = z.infer<typeof topicNoteSchema>;
+export type LastReadInput = z.infer<typeof lastReadSchema>;

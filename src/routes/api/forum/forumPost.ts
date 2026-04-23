@@ -6,7 +6,12 @@ import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
-import { createPostSchema, updatePostSchema } from '../../../schemas/forum';
+import {
+  createPostSchema,
+  updatePostSchema,
+  type CreatePostInput,
+  type UpdatePostInput
+} from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
 import { appendToJsonArray } from '../../../lib/jsonHelpers';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
@@ -124,6 +129,8 @@ router.post(
       forumTopicId: number;
     };
 
+    const { body } = req.body as CreatePostInput;
+
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({ where: { id: forumId } }),
       prisma.forumTopic.findUnique({ where: { id: forumTopicId } })
@@ -140,7 +147,7 @@ router.post(
         data: {
           forumTopicId,
           authorId: req.user!.id,
-          body: sanitizeHtml(req.body.body)
+          body: sanitizeHtml(body)
         }
       });
       await tx.forumTopic.update({
@@ -170,6 +177,8 @@ router.put(
       forumTopicId: number;
       id: number;
     };
+    const { body } = req.body as UpdatePostInput;
+
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
@@ -185,7 +194,7 @@ router.put(
     const updated = await prisma.forumPost.update({
       where: { id },
       data: {
-        body: sanitizeHtml(req.body.body),
+        body: sanitizeHtml(body),
         edits: appendToJsonArray(post.edits, {
           userId: req.user!.id,
           time: new Date().toISOString(),
