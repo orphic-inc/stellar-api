@@ -8,5 +8,7 @@ export const pollSchema = z.object({
 
 export const pollVoteSchema = z.object({
   forumPollId: z.number().int().positive(),
-  vote: z.number().int()
+  vote: z.number().int().min(0)
 });
+
+export type PollVoteInput = z.infer<typeof pollVoteSchema>;
