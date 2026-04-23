@@ -24,10 +24,7 @@ router.get(
         include: { user: { select: { username: true, avatar: true } } }
       })
     ]);
-    res.json({
-      status: 'success',
-      data: { announcements: news, blogPosts: blogs }
-    });
+    res.json({ announcements: news, blogPosts: blogs });
   })
 );
 

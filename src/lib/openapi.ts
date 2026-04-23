@@ -598,6 +598,30 @@ const Announcement = registry.register(
   })
 );
 
+const BlogPost = registry.register(
+  'BlogPost',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    body: z.string().optional(),
+    createdAt: z.string(),
+    user: z
+      .object({
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional()
+  })
+);
+
+const AnnouncementsResponse = registry.register(
+  'AnnouncementsResponse',
+  z.object({
+    announcements: z.array(Announcement),
+    blogPosts: z.array(BlogPost)
+  })
+);
+
 registry.registerPath({
   method: 'get',
   path: '/announcements',
@@ -606,21 +630,7 @@ registry.registerPath({
     200: {
       description: 'News and blog posts',
       content: {
-        'application/json': {
-          schema: z.object({
-            status: z.literal('success'),
-            data: z.object({
-              announcements: z.array(Announcement),
-              blogPosts: z.array(
-                z.object({
-                  id: z.number(),
-                  title: z.string(),
-                  createdAt: z.string()
-                })
-              )
-            })
-          })
-        }
+        'application/json': { schema: AnnouncementsResponse }
       }
     }
   }
