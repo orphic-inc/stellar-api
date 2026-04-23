@@ -13,6 +13,9 @@ module.exports = {
     requireConfigFile: false,
     ecmaVersion: 12
   },
+  rules: {
+    'import/no-unresolved': ['error', { ignore: ['@asteasolutions/zod-to-openapi'] }]
+  },
   settings: {
     'import/resolver': {
       node: {
