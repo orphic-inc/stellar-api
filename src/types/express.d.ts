@@ -2,6 +2,6 @@ import 'express';
 
 declare module 'express' {
   interface Request {
-    user?: { id: number };
+    user?: { id: number; userRankId: number };
   }
 }

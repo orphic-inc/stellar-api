@@ -93,7 +93,7 @@ app.use(
       process.env.NODE_ENV === 'production' && status === 500
         ? 'Internal server error'
         : err.message ?? 'Server Error';
-    res.status(status).json({ error: message });
+    res.status(status).json({ msg: message });
   }
 );
 
