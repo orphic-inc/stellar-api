@@ -1,9 +1,13 @@
 import express, { Request, Response } from 'express';
-import { FileType } from '@prisma/client';
 import { prisma } from '../../../../lib/prisma';
 import { asyncHandler } from '../../../../modules/asyncHandler';
 import { requireAuth } from '../../../../middleware/auth';
+import { validate } from '../../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../../lib/pagination';
+import {
+  createContributionSchema,
+  type CreateContributionInput
+} from '../../../../schemas/contribution';
 
 const router = express.Router();
 
@@ -54,19 +58,17 @@ router.get(
 router.post(
   '/',
   requireAuth,
+  validate(createContributionSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      releaseId, contributorId, releaseDescription,
-      type, sizeInBytes, jsonFile, collaboratorIds
-    } = req.body as {
-      releaseId: number; contributorId: number; releaseDescription?: string;
-      type: FileType; sizeInBytes: number; jsonFile?: boolean;
-      collaboratorIds?: number[];
-    };
-
-    if (!releaseId || !contributorId || !type || !sizeInBytes) {
-      return res.status(400).json({ msg: 'releaseId, contributorId, type, and sizeInBytes are required' });
-    }
+      releaseId,
+      contributorId,
+      releaseDescription,
+      type,
+      sizeInBytes,
+      jsonFile,
+      collaboratorIds
+    } = req.body as CreateContributionInput;
 
     const contribution = await prisma.contribution.create({
       data: {

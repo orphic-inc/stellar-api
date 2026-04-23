@@ -1,8 +1,14 @@
 import express, { Request, Response } from 'express';
-import { SubscriptionPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
+import {
+  subscribeSchema,
+  subscribeCommentsSchema,
+  type SubscribeInput,
+  type SubscribeCommentsInput
+} from '../../schemas/subscription';
 
 const router = express.Router();
 
@@ -10,8 +16,9 @@ const router = express.Router();
 router.post(
   '/subscribe',
   requireAuth,
+  validate(subscribeSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { topicId, action } = req.body as { topicId: number; action: 'subscribe' | 'unsubscribe' };
+    const { topicId, action } = req.body as SubscribeInput;
     const userId = req.user!.id;
 
     if (action === 'subscribe') {
@@ -24,8 +31,6 @@ router.post(
     } else if (action === 'unsubscribe') {
       await prisma.subscription.deleteMany({ where: { userId, topicId } });
       res.json({ msg: 'Unsubscribed successfully' });
-    } else {
-      res.status(400).json({ msg: 'Invalid action' });
     }
   })
 );
@@ -45,11 +50,9 @@ router.get(
 router.post(
   '/subscribe-comments',
   requireAuth,
+  validate(subscribeCommentsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, pageId, action } = req.body as {
-      page: SubscriptionPage; pageId: number;
-      action: 'subscribe' | 'unsubscribe';
-    };
+    const { page, pageId, action } = req.body as SubscribeCommentsInput;
     const userId = req.user!.id;
 
     if (action === 'subscribe') {
@@ -62,8 +65,6 @@ router.post(
     } else if (action === 'unsubscribe') {
       await prisma.commentSubscription.deleteMany({ where: { userId, page, pageId } });
       res.json({ msg: 'Unsubscribed from comments successfully' });
-    } else {
-      res.status(400).json({ msg: 'Invalid action' });
     }
   })
 );

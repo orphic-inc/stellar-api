@@ -41,10 +41,11 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('news_manage'),
+  validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
-    const { title, body } = req.body as { title?: string; body?: string };
+    const { title, body } = req.body as { title: string; body: string };
     const news = await prisma.news.update({
       where: { id },
       data: {

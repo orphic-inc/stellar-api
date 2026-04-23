@@ -2,7 +2,14 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
+import { validate } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
+import {
+  createRankSchema,
+  updateRankSchema,
+  type CreateRankInput,
+  type UpdateRankInput
+} from '../../schemas/tools';
 
 const router = express.Router();
 
@@ -51,18 +58,9 @@ router.get(
 router.post(
   '/permissions',
   ...requirePermission('admin'),
+  validate(createRankSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, level, permissions, color, badge } = req.body as {
-      name: string;
-      level: number;
-      permissions?: Record<string, boolean>;
-      color?: string;
-      badge?: string;
-    };
-
-    if (!name || level === undefined) {
-      return res.status(400).json({ msg: 'name and level are required' });
-    }
+    const { name, level, permissions, color, badge } = req.body as CreateRankInput;
 
     const rank = await prisma.userRank.create({
       data: {
@@ -83,11 +81,12 @@ router.post(
 router.put(
   '/permissions/:id',
   ...requirePermission('admin'),
+  validate(updateRankSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
 
-    const { name, level, permissions, color, badge } = req.body;
+    const { name, level, permissions, color, badge } = req.body as UpdateRankInput;
     const rank = await prisma.userRank.update({
       where: { id },
       data: {
