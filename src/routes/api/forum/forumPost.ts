@@ -16,11 +16,24 @@ const router = express.Router({ mergeParams: true });
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
   '/',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const forumTopicId = parseInt(req.params.forumTopicId);
     if (isNaN(forumId) || isNaN(forumTopicId))
       return res.status(400).json({ msg: 'Invalid topic id' });
+
+    const forum = await prisma.forum.findUnique({
+      where: { id: forumId },
+      select: { minClassRead: true }
+    });
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
+
     const pg = parsePage(req);
     const [posts, total] = await Promise.all([
       prisma.forumPost.findMany({
@@ -51,6 +64,7 @@ router.get(
 // GET /api/forums/:forumId/topics/:forumTopicId/posts/:id
 router.get(
   '/:id',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const forumId = parseInt(req.params.forumId);
     const forumTopicId = parseInt(req.params.forumTopicId);
@@ -58,6 +72,18 @@ router.get(
     if (isNaN(forumId) || isNaN(forumTopicId) || isNaN(id)) {
       return res.status(400).json({ msg: 'Invalid id' });
     }
+
+    const forum = await prisma.forum.findUnique({
+      where: { id: forumId },
+      select: { minClassRead: true }
+    });
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
+
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
