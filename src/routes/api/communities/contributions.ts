@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   createContributionSchema,
@@ -10,6 +11,9 @@ import {
 } from '../../../schemas/contribution';
 
 const router = express.Router();
+const contributionIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/contributions
 router.get(
@@ -37,19 +41,24 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
+  validateParams(contributionIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
     const contribution = await prisma.contribution.findUnique({
       where: { id },
       include: {
         user: { select: { id: true, username: true } },
         release: true,
         collaborators: true,
-        comments: { include: { author: { select: { id: true, username: true, avatar: true } } } }
+        comments: {
+          include: {
+            author: { select: { id: true, username: true, avatar: true } }
+          }
+        }
       }
     });
-    if (!contribution) return res.status(404).json({ msg: 'Contribution not found' });
+    if (!contribution)
+      return res.status(404).json({ msg: 'Contribution not found' });
     res.json(contribution);
   })
 );

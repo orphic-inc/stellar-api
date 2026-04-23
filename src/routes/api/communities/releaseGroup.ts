@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import {
   createGroupSchema,
   updateGroupSchema
@@ -11,15 +12,21 @@ import {
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 
 const router = express.Router({ mergeParams: true });
+const communityIdParamsSchema = z.object({
+  communityId: z.coerce.number().int().positive()
+});
+const releaseGroupParamsSchema = z.object({
+  communityId: z.coerce.number().int().positive(),
+  groupId: z.coerce.number().int().positive()
+});
 
 // GET /api/communities/:communityId/groups
 router.get(
   '/',
   requireAuth,
+  validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const communityId = parseInt(req.params.communityId);
-    if (isNaN(communityId))
-      return res.status(400).json({ msg: 'Invalid community id' });
+    const { communityId } = req.params as unknown as { communityId: number };
     const pg = parsePage(req);
     const [releases, total] = await Promise.all([
       prisma.release.findMany({
@@ -41,11 +48,12 @@ router.get(
 router.get(
   '/:groupId',
   requireAuth,
+  validateParams(releaseGroupParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const communityId = parseInt(req.params.communityId);
-    const id = parseInt(req.params.groupId);
-    if (isNaN(communityId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid id' });
+    const { communityId, groupId: id } = req.params as unknown as {
+      communityId: number;
+      groupId: number;
+    };
     const release = await prisma.release.findFirst({
       where: { id, communityId },
       include: {
@@ -68,11 +76,10 @@ router.get(
 router.post(
   '/',
   ...requirePermission('communities_manage'),
+  validateParams(communityIdParamsSchema),
   validate(createGroupSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const communityId = parseInt(req.params.communityId);
-    if (isNaN(communityId))
-      return res.status(400).json({ msg: 'Invalid community id' });
+    const { communityId } = req.params as unknown as { communityId: number };
     const community = await prisma.community.findUnique({
       where: { id: communityId }
     });
@@ -117,12 +124,13 @@ router.post(
 router.put(
   '/:groupId',
   ...requirePermission('communities_manage'),
+  validateParams(releaseGroupParamsSchema),
   validate(updateGroupSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const communityId = parseInt(req.params.communityId);
-    const id = parseInt(req.params.groupId);
-    if (isNaN(communityId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid id' });
+    const { communityId, groupId: id } = req.params as unknown as {
+      communityId: number;
+      groupId: number;
+    };
 
     const existing = await prisma.release.findFirst({
       where: { id, communityId }
@@ -154,11 +162,12 @@ router.put(
 router.delete(
   '/:groupId',
   ...requirePermission('communities_manage'),
+  validateParams(releaseGroupParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const communityId = parseInt(req.params.communityId);
-    const id = parseInt(req.params.groupId);
-    if (isNaN(communityId) || isNaN(id))
-      return res.status(400).json({ msg: 'Invalid id' });
+    const { communityId, groupId: id } = req.params as unknown as {
+      communityId: number;
+      groupId: number;
+    };
     const existing = await prisma.release.findFirst({
       where: { id, communityId }
     });
