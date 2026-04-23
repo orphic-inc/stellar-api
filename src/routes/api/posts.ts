@@ -3,6 +3,11 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import {
+  appendToJsonArray,
+  jsonObjectArray,
+  removeFromJsonArrayAtIndex
+} from '../../lib/jsonHelpers';
 import { postSchema, postCommentSchema } from '../../schemas/install';
 
 const router = express.Router();
@@ -83,16 +88,15 @@ router.post(
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
-    const comments = (post.comments as Array<Record<string, unknown>>) ?? [];
-    comments.unshift({
-      userId: req.user!.id,
-      text: req.body.text,
-      date: new Date().toISOString()
-    });
-
     const updated = await prisma.post.update({
       where: { id },
-      data: { comments: comments as never }
+      data: {
+        comments: appendToJsonArray(post.comments, {
+          userId: req.user!.id,
+          text: req.body.text,
+          date: new Date().toISOString()
+        })
+      }
     });
     res.json(updated.comments);
   })
@@ -108,16 +112,15 @@ router.delete(
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
-    const comments = (post.comments as Array<Record<string, unknown>>) ?? [];
+    const comments = jsonObjectArray(post.comments);
     if (idx < 0 || idx >= comments.length)
       return res.status(404).json({ msg: 'Comment not found' });
-    if (comments[idx].userId !== req.user!.id)
+    if (comments[idx]?.userId !== req.user!.id)
       return res.status(401).json({ msg: 'Not authorized' });
 
-    comments.splice(idx, 1);
     const updated = await prisma.post.update({
       where: { id },
-      data: { comments: comments as never }
+      data: { comments: removeFromJsonArrayAtIndex(post.comments, idx) }
     });
     res.json(updated.comments);
   })

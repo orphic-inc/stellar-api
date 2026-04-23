@@ -2,15 +2,6 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth } from './auth';
 
-export const isModerator = async (userId: number): Promise<boolean> => {
-  const rank = await prisma.userRank.findFirst({
-    where: { users: { some: { id: userId } } },
-    select: { permissions: true }
-  });
-  const perms = (rank?.permissions ?? {}) as Record<string, boolean>;
-  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
-};
-
 export const VALID_PERMISSIONS = [
   'forums_read',
   'forums_post',
@@ -37,7 +28,7 @@ const hasPermission = (
   return !!perms[permission];
 };
 
-const loadPermissions = async (
+export const loadPermissions = async (
   req: Request,
   res: Response
 ): Promise<Record<string, boolean>> => {
@@ -48,6 +39,11 @@ const loadPermissions = async (
   });
   res.locals.userPerms = (rank?.permissions ?? {}) as Record<string, boolean>;
   return res.locals.userPerms;
+};
+
+export const isModerator = async (req: Request, res: Response): Promise<boolean> => {
+  const perms = await loadPermissions(req, res);
+  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
 };
 
 // Returns [requireAuth, permissionCheck] — spread into route definitions:

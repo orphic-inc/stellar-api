@@ -5,10 +5,9 @@ import gravatar from 'gravatar';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
-import { markInstalled } from '../../modules/installState';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { validate } from '../../middleware/validate';
-import { installSchema } from '../../schemas/install';
+import { installSchema, type InstallInput } from '../../schemas/install';
 
 const router = express.Router();
 
@@ -87,13 +86,10 @@ router.post(
   installLimiter,
   validate(installSchema),
   asyncHandler(async (req: Request, res: Response) => {
-
     const count = await prisma.userRank.count();
     if (count > 0) return res.status(409).json({ msg: 'Application already installed' });
 
-    const { username, email, password } = req.body as {
-      username: string; email: string; password: string;
-    };
+    const { username, email, password } = req.body as InstallInput;
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
@@ -138,11 +134,25 @@ router.post(
           profileId: profile.id,
           inviteCount: 100,
         },
-        select: { id: true, username: true, email: true, avatar: true, createdAt: true },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          avatar: true,
+          inviteCount: true,
+          dateRegistered: true,
+          userRank: {
+            select: {
+              level: true,
+              name: true,
+              color: true,
+              badge: true,
+              permissions: true
+            }
+          }
+        },
       });
     });
-
-    markInstalled();
 
     const payload = { user: { id: user.id } };
     jwt.sign(payload, authConfig.jwtSecret, { expiresIn: 3600 }, (err, token) => {

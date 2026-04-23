@@ -4,7 +4,11 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { profileUpdateSchema } from '../../schemas/profile';
+import {
+  profileUpdateSchema,
+  inviteSchema,
+  type InviteInput
+} from '../../schemas/profile';
 import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
@@ -120,9 +124,9 @@ router.delete(
 router.post(
   '/referral/create-invite',
   requireAuth,
+  validate(inviteSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, reason } = req.body as { email: string; reason?: string };
-    if (!email) return res.status(400).json({ msg: 'Email is required' });
+    const { email, reason } = req.body as InviteInput;
 
     const inviter = await prisma.user.findUnique({
       where: { id: req.user!.id },

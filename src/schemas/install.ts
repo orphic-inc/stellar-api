@@ -67,3 +67,5 @@ export const artistTagSchema = z.object({
   artistId: z.number().int().positive(),
   tagId: z.number().int().positive()
 });
+
+export type InstallInput = z.infer<typeof installSchema>;

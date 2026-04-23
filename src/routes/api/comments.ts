@@ -4,8 +4,16 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
+import { validate } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
-import { audit } from '../../lib/audit';
+import {
+  commentQuerySchema,
+  createCommentSchema,
+  updateCommentSchema,
+  type CommentQueryInput,
+  type CreateCommentInput,
+  type UpdateCommentInput
+} from '../../schemas/comment';
 
 const router = express.Router();
 
@@ -13,10 +21,22 @@ const router = express.Router();
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, pageId } = req.query;
+    const parsedQuery = commentQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      return res.status(400).json({ errors: parsedQuery.error.flatten().fieldErrors });
+    }
+
+    const { page, pageId } = parsedQuery.data as CommentQueryInput;
     const where: Record<string, unknown> = {};
     if (page) where.page = page as CommentPage;
-    if (pageId) where.communityId = parseInt(pageId as string);
+    if (page && pageId) {
+      if (page === CommentPage.communities) where.communityId = pageId;
+      else if (page === CommentPage.artist) where.artistId = pageId;
+      else if (page === CommentPage.collages || page === CommentPage.requests) {
+        where.contributionId = pageId;
+      }
+    }
+
     const comments = await prisma.comment.findMany({
       where: { ...where, deletedAt: null },
       orderBy: { createdAt: 'asc' },
@@ -50,18 +70,10 @@ router.get(
 router.post(
   '/',
   requireAuth,
+  validate(createCommentSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, body, communityId, contributionId, artistId } = req.body as {
-      page: CommentPage;
-      body: string;
-      communityId?: number;
-      contributionId?: number;
-      artistId?: number;
-    };
-
-    if (!page || !body) {
-      return res.status(400).json({ msg: 'page and body are required' });
-    }
+    const { page, body, communityId, contributionId, artistId } =
+      req.body as CreateCommentInput;
 
     const comment = await prisma.comment.create({
       data: {
@@ -84,9 +96,9 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
+  validate(updateCommentSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { body } = req.body as { body: string };
-    if (!body) return res.status(400).json({ msg: 'Body is required' });
+    const { body } = req.body as UpdateCommentInput;
 
     const id = parseInt(req.params.id);
     const comment = await prisma.comment.findUnique({ where: { id } });
@@ -118,7 +130,7 @@ router.delete(
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
 
     const isOwner = comment.authorId === req.user!.id;
-    if (!isOwner && !(await isModerator(req.user!.id))) {
+    if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
