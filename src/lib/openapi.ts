@@ -863,7 +863,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: '/communities/{id}/groups',
+  path: '/communities/{id}/releases',
   tags: ['Communities'],
   request: { params: z.object({ id: z.string() }) },
   responses: {

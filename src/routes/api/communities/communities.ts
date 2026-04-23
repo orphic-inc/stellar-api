@@ -10,14 +10,14 @@ import {
   updateCommunitySchema
 } from '../../../schemas/community';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
-import releaseGroupRouter from './releaseGroup';
+import releaseRouter from './releaseGroup';
 
 const router = express.Router();
 const communityIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-router.use('/:communityId/groups', releaseGroupRouter);
+router.use('/:communityId/releases', releaseRouter);
 
 // GET /api/communities
 router.get(
