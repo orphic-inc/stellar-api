@@ -8,7 +8,7 @@ import {
   similarArtistSchema,
   artistAliasSchema,
   artistTagSchema
-} from '../../../../schemas/install';
+} from '../../../../schemas/artist';
 
 const router = express.Router();
 

@@ -8,7 +8,7 @@ import {
   jsonObjectArray,
   removeFromJsonArrayAtIndex
 } from '../../lib/jsonHelpers';
-import { postSchema, postCommentSchema } from '../../schemas/install';
+import { postSchema, postCommentSchema } from '../../schemas/post';
 
 const router = express.Router();
 
