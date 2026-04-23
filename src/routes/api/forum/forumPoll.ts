@@ -1,21 +1,29 @@
 import express, { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
-import { validate } from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import { pollSchema } from '../../../schemas/poll';
 
 const router = express.Router();
+const topicIdParamsSchema = z.object({
+  topicId: z.coerce.number().int().positive()
+});
+const pollIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
 
 // GET /api/forums/polls/:topicId
 router.get(
   '/:topicId',
   requireAuth,
+  validateParams(topicIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const forumTopicId = parseInt(req.params.topicId);
-    if (isNaN(forumTopicId))
-      return res.status(400).json({ msg: 'Invalid topic id' });
+    const { topicId: forumTopicId } = req.params as unknown as {
+      topicId: number;
+    };
 
     const poll = await prisma.forumPoll.findUnique({
       where: { forumTopicId },
@@ -80,9 +88,9 @@ router.post(
 router.put(
   '/:id/close',
   requireAuth,
+  validateParams(pollIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ msg: 'Invalid id' });
+    const { id } = req.params as unknown as { id: number };
 
     const poll = await prisma.forumPoll.findUnique({
       where: { id },
