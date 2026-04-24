@@ -1,10 +1,14 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import { createForumSchema, updateForumSchema } from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
@@ -19,8 +23,9 @@ router.use('/:forumId/topics', forumTopicRouter);
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (_req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const forums = await prisma.forum.findMany({
+      where: { minClassRead: { lte: req.user.userRankLevel } },
       orderBy: { sort: 'asc' },
       include: {
         forumCategory: { select: { id: true, name: true } },
@@ -38,8 +43,8 @@ router.get(
   '/:id',
   requireAuth,
   validateParams(forumIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
     const forum = await prisma.forum.findUnique({
       where: { id },
       include: {
@@ -48,6 +53,11 @@ router.get(
       }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
     res.json(forum);
   })
 );
@@ -94,7 +104,7 @@ router.put(
   validateParams(forumIdParamsSchema),
   validate(updateForumSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
 
@@ -131,7 +141,7 @@ router.delete(
   ...requirePermission('forums_manage'),
   validateParams(forumIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
     if (existing.isTrash)

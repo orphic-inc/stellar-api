@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate, validateParams } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import {
   appendToJsonArray,
   jsonObjectArray,
@@ -44,7 +48,7 @@ router.get(
   requireAuth,
   validateParams(postIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const post = await prisma.post.findUnique({
       where: { id },
       include: { user: { select: { id: true, username: true, avatar: true } } }
@@ -76,7 +80,7 @@ router.delete(
   requireAuth,
   validateParams(postIdParamsSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.userId !== req.user.id)
@@ -93,7 +97,7 @@ router.post(
   validateParams(postIdParamsSchema),
   validate(postCommentSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const { text } = req.body as PostCommentInput;
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
@@ -118,10 +122,10 @@ router.delete(
   requireAuth,
   validateParams(postCommentParamsSchema),
   authHandler(async (req, res) => {
-    const { id, commentIdx: idx } = req.params as unknown as {
+    const { id, commentIdx: idx } = parsedParams<{
       id: number;
       commentIdx: number;
-    };
+    }>(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 

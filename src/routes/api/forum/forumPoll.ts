@@ -4,7 +4,11 @@ import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import { pollSchema, type PollInput } from '../../../schemas/poll';
 
 const router = express.Router();
@@ -21,9 +25,9 @@ router.get(
   requireAuth,
   validateParams(topicIdParamsSchema),
   authHandler(async (req, res) => {
-    const { topicId: forumTopicId } = req.params as unknown as {
+    const { topicId: forumTopicId } = parsedParams<{
       topicId: number;
-    };
+    }>(res);
 
     const poll = await prisma.forumPoll.findUnique({
       where: { forumTopicId },
@@ -86,7 +90,7 @@ router.put(
   requireAuth,
   validateParams(pollIdParamsSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
 
     const poll = await prisma.forumPoll.findUnique({
       where: { id },

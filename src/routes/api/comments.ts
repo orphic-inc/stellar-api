@@ -8,7 +8,9 @@ import { isModerator } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery
+  validateQuery,
+  parsedParams,
+  parsedQuery
 } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
@@ -31,7 +33,7 @@ router.get(
   '/',
   validateQuery(commentQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, pageId } = req.query as CommentQueryInput;
+    const { page, pageId } = parsedQuery<CommentQueryInput>(res);
     const where: Record<string, unknown> = {};
     if (page) where.page = page as CommentPage;
     if (page && pageId) {
@@ -65,7 +67,7 @@ router.get(
   '/:id',
   validateParams(commentIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const comment = await prisma.comment.findUnique({
       where: { id },
       include: {
@@ -112,7 +114,7 @@ router.put(
   validate(updateCommentSchema),
   authHandler(async (req, res) => {
     const { body } = req.body as UpdateCommentInput;
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
     if (comment.authorId !== req.user.id)
@@ -136,7 +138,7 @@ router.delete(
   requireAuth,
   validateParams(commentIdParamsSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
 
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
