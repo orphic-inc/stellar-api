@@ -12,6 +12,12 @@ jest.mock('./modules/contribution', () => ({
   createContributionSubmission: jest.fn()
 }));
 
+jest.mock('./modules/user', () => ({
+  getUserSettings: jest.fn(),
+  updateUserSettings: jest.fn(),
+  createUser: jest.fn()
+}));
+
 jest.mock('./modules/forum', () => ({
   createTopic: jest.fn(),
   updateTopic: jest.fn(),
@@ -87,7 +93,8 @@ jest.mock('./lib/prisma', () => ({
       findUnique: jest.fn()
     },
     forumTopic: {
-      findFirst: jest.fn()
+      findFirst: jest.fn(),
+      findUnique: jest.fn()
     },
     forumPost: {
       findFirst: jest.fn()
@@ -96,13 +103,38 @@ jest.mock('./lib/prisma', () => ({
       findUnique: jest.fn(),
       delete: jest.fn()
     },
+    post: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn()
+    },
     postComment: {
+      create: jest.fn(),
       findFirst: jest.fn(),
       delete: jest.fn()
     },
     comment: {
+      update: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn()
+    },
+    subscription: {
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+      findMany: jest.fn()
+    },
+    commentSubscription: {
+      upsert: jest.fn(),
+      deleteMany: jest.fn()
+    },
+    notification: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn()
+    },
+    auditLog: {
+      create: jest.fn()
     },
     $transaction: jest.fn()
   }
@@ -120,7 +152,20 @@ import { isInstalled } from './modules/installState';
 import { prisma } from './lib/prisma';
 import { createInvite, updateProfile } from './modules/profile';
 import { createContributionSubmission } from './modules/contribution';
-import { deleteTopic, deletePost, createTopicNote } from './modules/forum';
+import {
+  getUserSettings,
+  updateUserSettings,
+  createUser
+} from './modules/user';
+import {
+  createTopic,
+  updateTopic,
+  createPost,
+  updatePost,
+  deleteTopic,
+  deletePost,
+  createTopicNote
+} from './modules/forum';
 
 let currentUserRankLevel = 1000;
 
@@ -150,6 +195,7 @@ const prismaMock = prisma as unknown as {
   };
   forumTopic: {
     findFirst: jest.Mock;
+    findUnique: jest.Mock;
   };
   forumPost: {
     findFirst: jest.Mock;
@@ -158,13 +204,38 @@ const prismaMock = prisma as unknown as {
     findUnique: jest.Mock;
     delete: jest.Mock;
   };
+  post: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    delete: jest.Mock;
+  };
   postComment: {
+    create: jest.Mock;
     findFirst: jest.Mock;
     delete: jest.Mock;
   };
   comment: {
+    update: jest.Mock;
     create: jest.Mock;
     findUnique: jest.Mock;
+  };
+  subscription: {
+    upsert: jest.Mock;
+    deleteMany: jest.Mock;
+    findMany: jest.Mock;
+  };
+  commentSubscription: {
+    upsert: jest.Mock;
+    deleteMany: jest.Mock;
+  };
+  notification: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    delete: jest.Mock;
+  };
+  auditLog: {
+    create: jest.Mock;
   };
   $transaction: jest.Mock;
 };
@@ -181,6 +252,17 @@ const createContributionSubmissionMock =
   createContributionSubmission as jest.MockedFunction<
     typeof createContributionSubmission
   >;
+const getUserSettingsMock = getUserSettings as jest.MockedFunction<
+  typeof getUserSettings
+>;
+const updateUserSettingsMock = updateUserSettings as jest.MockedFunction<
+  typeof updateUserSettings
+>;
+const createUserMock = createUser as jest.MockedFunction<typeof createUser>;
+const createTopicMock = createTopic as jest.MockedFunction<typeof createTopic>;
+const updateTopicMock = updateTopic as jest.MockedFunction<typeof updateTopic>;
+const createPostMock = createPost as jest.MockedFunction<typeof createPost>;
+const updatePostMock = updatePost as jest.MockedFunction<typeof updatePost>;
 const deleteTopicMock = deleteTopic as jest.MockedFunction<typeof deleteTopic>;
 const deletePostMock = deletePost as jest.MockedFunction<typeof deletePost>;
 const createTopicNoteMock = createTopicNote as jest.MockedFunction<
@@ -227,6 +309,154 @@ describe('API app', () => {
       where: { id: 5, postId: 99 }
     });
     expect(prismaMock.postComment.delete).not.toHaveBeenCalled();
+  });
+
+  it('creates a post for the authenticated user', async () => {
+    prismaMock.post.create.mockResolvedValue({
+      id: 14,
+      userId: 7,
+      title: 'Launch post',
+      text: 'Some text',
+      category: 'news',
+      tags: ['launch'],
+      user: { id: 7, username: 'kai', avatar: null },
+      comments: []
+    });
+
+    const res = await request(app)
+      .post('/api/posts')
+      .send({
+        title: 'Launch post',
+        text: 'Some text',
+        category: 'news',
+        tags: ['launch']
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.post.create).toHaveBeenCalledWith({
+      data: {
+        userId: 7,
+        title: 'Launch post',
+        text: 'Some text',
+        category: 'news',
+        tags: ['launch']
+      },
+      include: {
+        user: { select: { id: true, username: true, avatar: true } },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { id: true, username: true, avatar: true } }
+          }
+        }
+      }
+    });
+    expect(res.body.title).toBe('Launch post');
+  });
+
+  it('creates a post comment for an existing post', async () => {
+    prismaMock.post.findUnique.mockResolvedValue({ id: 14, userId: 7 });
+    prismaMock.postComment.create.mockResolvedValue({
+      id: 5,
+      postId: 14,
+      userId: 7,
+      text: 'Nice post',
+      user: { id: 7, username: 'kai', avatar: null }
+    });
+
+    const res = await request(app).post('/api/posts/14/comments').send({
+      text: 'Nice post'
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.postComment.create).toHaveBeenCalledWith({
+      data: { postId: 14, userId: 7, text: 'Nice post' },
+      include: { user: { select: { id: true, username: true, avatar: true } } }
+    });
+    expect(res.body.text).toBe('Nice post');
+  });
+
+  it('subscribes to a topic with a 204 response', async () => {
+    const res = await request(app).post('/api/subscriptions/subscribe').send({
+      topicId: 44,
+      action: 'subscribe'
+    });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith({
+      where: { userId_topicId: { userId: 7, topicId: 44 } },
+      create: { userId: 7, topicId: 44 },
+      update: {}
+    });
+  });
+
+  it('unsubscribes from comment notifications with a 204 response', async () => {
+    const res = await request(app)
+      .post('/api/subscriptions/subscribe-comments')
+      .send({
+        page: 'communities',
+        pageId: 3,
+        action: 'unsubscribe'
+      });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.commentSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 7, page: 'communities', pageId: 3 }
+    });
+  });
+
+  it('rejects notification deletion for non-owners', async () => {
+    prismaMock.notification.findUnique.mockResolvedValue({
+      id: 8,
+      userId: 99
+    });
+
+    const res = await request(app).delete('/api/notifications/8');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Not authorized' });
+    expect(prismaMock.notification.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes a notification for the owner', async () => {
+    prismaMock.notification.findUnique.mockResolvedValue({
+      id: 8,
+      userId: 7
+    });
+
+    const res = await request(app).delete('/api/notifications/8');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.notification.delete).toHaveBeenCalledWith({
+      where: { id: 8 }
+    });
+  });
+
+  it('rejects post deletion for non-owners', async () => {
+    prismaMock.post.findUnique.mockResolvedValue({
+      id: 14,
+      userId: 99
+    });
+
+    const res = await request(app).delete('/api/posts/14');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Not authorized' });
+    expect(prismaMock.post.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes a post for the owner', async () => {
+    prismaMock.post.findUnique.mockResolvedValue({
+      id: 14,
+      userId: 7
+    });
+
+    const res = await request(app).delete('/api/posts/14');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.post.delete).toHaveBeenCalledWith({
+      where: { id: 14 }
+    });
   });
 
   it('returns a msg response when registration hits an existing user', async () => {
@@ -425,6 +655,115 @@ describe('API app', () => {
     );
   });
 
+  it('returns user settings for the authenticated user', async () => {
+    getUserSettingsMock.mockResolvedValue({
+      id: 4,
+      siteAppearance: 'dark',
+      externalStylesheet: null,
+      styledTooltips: true,
+      paranoia: 1
+    });
+
+    const res = await request(app).get('/api/users/settings');
+
+    expect(res.status).toBe(200);
+    expect(getUserSettingsMock).toHaveBeenCalledWith(7);
+    expect(res.body.siteAppearance).toBe('dark');
+  });
+
+  it('returns the updated settings payload from /api/users/settings', async () => {
+    updateUserSettingsMock.mockResolvedValue({
+      id: 4,
+      siteAppearance: 'light',
+      externalStylesheet: 'https://example.com/style.css',
+      styledTooltips: false,
+      paranoia: 2,
+      avatar: 'https://example.com/avatar.png'
+    });
+
+    const res = await request(app).put('/api/users/settings').send({
+      siteAppearance: 'light',
+      externalStylesheet: 'https://example.com/style.css',
+      styledTooltips: false,
+      paranoia: 2,
+      avatar: 'https://example.com/avatar.png'
+    });
+
+    expect(res.status).toBe(200);
+    expect(updateUserSettingsMock).toHaveBeenCalledWith(7, {
+      siteAppearance: 'light',
+      externalStylesheet: 'https://example.com/style.css',
+      styledTooltips: false,
+      paranoia: 2,
+      avatar: 'https://example.com/avatar.png'
+    });
+    expect(res.body.avatar).toBe('https://example.com/avatar.png');
+  });
+
+  it('rejects admin user creation without users_edit permission', async () => {
+    const res = await request(app).post('/api/users').send({
+      username: 'new-user',
+      email: 'new@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Permission denied' });
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a msg response when admin user creation hits an existing user', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      permissions: { users_edit: true }
+    });
+    prismaMock.user.findFirst.mockResolvedValue({ id: 99 });
+
+    const res = await request(app).post('/api/users').send({
+      username: 'existing-user',
+      email: 'exists@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ msg: 'User already exists' });
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a user for admins with users_edit permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      permissions: { users_edit: true }
+    });
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    createUserMock.mockResolvedValue({
+      id: 18,
+      username: 'new-user',
+      email: 'new@example.com'
+    });
+
+    const res = await request(app).post('/api/users').send({
+      username: 'new-user',
+      email: 'new@example.com',
+      password: 'password123',
+      userRankId: 2
+    });
+
+    expect(res.status).toBe(201);
+    expect(createUserMock).toHaveBeenCalledWith(
+      {
+        username: 'new-user',
+        email: 'new@example.com',
+        password: 'password123',
+        userRankId: 2
+      },
+      7
+    );
+    expect(res.body).toEqual({
+      id: 18,
+      username: 'new-user',
+      email: 'new@example.com'
+    });
+  });
+
   it('returns ValidationError for malformed comment targets', async () => {
     const res = await request(app).post('/api/comments').send({
       page: 'communities',
@@ -434,6 +773,65 @@ describe('API app', () => {
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('errors');
     expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a comment for a valid comment target', async () => {
+    prismaMock.comment.create.mockResolvedValue({
+      id: 12,
+      page: 'communities',
+      body: 'hello',
+      communityId: 3,
+      authorId: 7,
+      author: { id: 7, username: 'kai', avatar: null }
+    });
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'communities',
+      body: 'hello',
+      communityId: 3
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.comment.create).toHaveBeenCalledWith({
+      data: {
+        page: 'communities',
+        body: 'hello',
+        authorId: 7,
+        communityId: 3
+      },
+      include: {
+        author: { select: { id: true, username: true, avatar: true } }
+      }
+    });
+    expect(res.body.communityId).toBe(3);
+  });
+
+  it('updates a comment for the owner', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue({
+      id: 12,
+      authorId: 7,
+      body: 'old body'
+    });
+    prismaMock.comment.update.mockResolvedValue({
+      id: 12,
+      authorId: 7,
+      body: 'new body',
+      editedUserId: 7
+    });
+
+    const res = await request(app).put('/api/comments/12').send({
+      body: 'new body'
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.comment.update).toHaveBeenCalledWith({
+      where: { id: 12 },
+      data: expect.objectContaining({
+        body: 'new body',
+        editedUserId: 7
+      })
+    });
+    expect(res.body.body).toBe('new body');
   });
 
   it('maps missing contribution community to a msg response', async () => {
@@ -489,6 +887,109 @@ describe('API app', () => {
     expect(res.body.release.title).toBe('Test Release');
   });
 
+  it('creates a forum topic when the user meets the create-class requirement', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue({
+      id: 9,
+      minClassCreate: 100
+    });
+    createTopicMock.mockResolvedValue({
+      id: 44,
+      title: 'New Topic',
+      forumId: 9,
+      authorId: 7
+    } as Awaited<ReturnType<typeof createTopic>>);
+
+    const res = await request(app).post('/api/forums/9/topics').send({
+      title: 'New Topic',
+      body: 'Opening post body'
+    });
+
+    expect(res.status).toBe(201);
+    expect(createTopicMock).toHaveBeenCalledWith(9, 7, {
+      title: 'New Topic',
+      body: 'Opening post body',
+      question: undefined,
+      answers: undefined
+    });
+    expect(res.body.title).toBe('New Topic');
+  });
+
+  it('updates a forum topic for the owner', async () => {
+    prismaMock.forumTopic.findFirst.mockResolvedValue({
+      id: 44,
+      forumId: 9,
+      authorId: 7,
+      deletedAt: null
+    });
+    updateTopicMock.mockResolvedValue({
+      id: 44,
+      title: 'Renamed Topic',
+      isLocked: false,
+      isSticky: false
+    } as Awaited<ReturnType<typeof updateTopic>>);
+
+    const res = await request(app).put('/api/forums/9/topics/44').send({
+      title: 'Renamed Topic'
+    });
+
+    expect(res.status).toBe(200);
+    expect(updateTopicMock).toHaveBeenCalledWith(44, {
+      title: 'Renamed Topic',
+      isLocked: undefined,
+      isSticky: undefined
+    });
+    expect(res.body.title).toBe('Renamed Topic');
+  });
+
+  it('creates a forum post when the topic is unlocked and belongs to the forum', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue({ id: 9, minClassRead: 0 });
+    prismaMock.forumTopic.findUnique.mockResolvedValue({
+      id: 44,
+      forumId: 9,
+      isLocked: false
+    });
+    createPostMock.mockResolvedValue({
+      id: 21,
+      forumTopicId: 44,
+      authorId: 7,
+      body: 'Reply body'
+    } as Awaited<ReturnType<typeof createPost>>);
+
+    const res = await request(app).post('/api/forums/9/topics/44/posts').send({
+      body: 'Reply body'
+    });
+
+    expect(res.status).toBe(201);
+    expect(createPostMock).toHaveBeenCalledWith(9, 44, 7, 'Reply body');
+    expect(res.body.body).toBe('Reply body');
+  });
+
+  it('updates a forum post for the owner', async () => {
+    prismaMock.forumPost.findFirst.mockResolvedValue({
+      id: 21,
+      forumTopicId: 44,
+      authorId: 7,
+      body: 'Old body',
+      deletedAt: null
+    });
+    updatePostMock.mockResolvedValue({
+      id: 21,
+      forumTopicId: 44,
+      authorId: 7,
+      body: 'New body'
+    } as Awaited<ReturnType<typeof updatePost>>);
+
+    const res = await request(app)
+      .put('/api/forums/9/topics/44/posts/21')
+      .send({
+        body: 'New body'
+      });
+
+    expect(res.status).toBe(200);
+    expect(updatePostMock).toHaveBeenCalledWith(21, 7, 'Old body', 'New body');
+    expect(res.body.body).toBe('New body');
+  });
+
   it('rejects topic deletion for non-owners without moderator permissions', async () => {
     prismaMock.forumTopic.findFirst.mockResolvedValue({
       id: 44,
@@ -531,6 +1032,33 @@ describe('API app', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ msg: 'Not authorized' });
+  });
+
+  it('allows owners to delete their own comments', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue({
+      id: 12,
+      authorId: 7
+    });
+
+    const res = await request(app).delete('/api/comments/12');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
+  });
+
+  it('allows moderators to delete comments they do not own', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue({
+      id: 12,
+      authorId: 99
+    });
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      permissions: { forums_moderate: true }
+    });
+
+    const res = await request(app).delete('/api/comments/12');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 
   it('rejects topic-note creation for non-moderators', async () => {
