@@ -57,7 +57,6 @@ module.exports = async function globalSetup() {
         }
       );
       console.log(`[integration] Created database: ${dbName}`);
-      return;
     }
   } finally {
     try {
