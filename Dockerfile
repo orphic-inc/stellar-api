@@ -1,11 +1,25 @@
+FROM node:lts-alpine AS build
+
+WORKDIR /usr/src/stellar-api
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
 FROM node:lts-alpine
 
 WORKDIR /usr/src/stellar-api
 
-COPY . .
+COPY package*.json ./
+RUN npm ci --omit=dev
 
-RUN npm ci
+COPY --from=build /usr/src/stellar-api/dist ./dist
+COPY --from=build /usr/src/stellar-api/prisma ./prisma
 
-EXPOSE 4056
+RUN npx prisma generate
 
-CMD ["node", "src/index.js"]
+EXPOSE 8080
+
+CMD ["node", "dist/index.js"]

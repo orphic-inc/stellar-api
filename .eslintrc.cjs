@@ -5,16 +5,20 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
     'plugin:prettier/recommended',
     'plugin:import/recommended'
   ],
-  parser: '@babel/eslint-parser',
+  parser: '@typescript-eslint/parser',
   parserOptions: {
-    requireConfigFile: false,
     ecmaVersion: 12
   },
+  plugins: ['@typescript-eslint'],
   rules: {
-    'import/no-unresolved': ['error', { ignore: ['@asteasolutions/zod-to-openapi'] }]
+    'import/no-unresolved': [
+      'error',
+      { ignore: ['@asteasolutions/zod-to-openapi'] }
+    ]
   },
   settings: {
     'import/resolver': {
