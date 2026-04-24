@@ -5,7 +5,11 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { getCurrentProfile } from '../../modules/profile';
 import { requireAuth } from '../../middleware/auth';
-import { validate, validateParams } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -52,7 +56,7 @@ router.get(
   '/user/:userId',
   validateParams(userIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { userId } = req.params as unknown as { userId: number };
+    const { userId } = parsedParams<{ userId: number }>(res);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

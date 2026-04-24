@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import { validate, validateParams } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import {
   createRankSchema,
@@ -46,7 +50,7 @@ router.get(
   ...requirePermission('admin'),
   validateParams(userRankIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
 
     const rank = await prisma.userRank.findUnique({
       where: { id },
@@ -92,7 +96,7 @@ router.put(
   validateParams(userRankIdParamsSchema),
   validate(updateRankSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
 
     const { name, level, permissions, color, badge } =
       req.body as UpdateRankInput;
@@ -122,7 +126,7 @@ router.delete(
   ...requirePermission('admin'),
   validateParams(userRankIdParamsSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
 
     const userCount = await prisma.user.count({ where: { userRankId: id } });
     if (userCount > 0) {

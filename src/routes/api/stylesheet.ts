@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate, validateParams } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import {
   stylesheetSchema,
   type StylesheetInput
@@ -32,7 +36,7 @@ router.get(
   requireAuth,
   validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const stylesheet = await prisma.stylesheet.findUnique({ where: { id } });
     if (!stylesheet)
       return res.status(404).json({ msg: 'Stylesheet not found' });
@@ -60,7 +64,7 @@ router.delete(
   requireAuth,
   validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.stylesheet.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Stylesheet not found' });
     await prisma.stylesheet.delete({ where: { id } });

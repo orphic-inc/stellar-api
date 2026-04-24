@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   createContributionSchema,
@@ -44,7 +48,7 @@ router.get(
   requireAuth,
   validateParams(contributionIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const contribution = await prisma.contribution.findUnique({
       where: { id },
       include: {

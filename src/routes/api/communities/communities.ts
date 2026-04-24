@@ -4,7 +4,11 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import {
   createCommunitySchema,
   updateCommunitySchema
@@ -43,7 +47,7 @@ router.get(
   requireAuth,
   validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const community = await prisma.community.findUnique({
       where: { id },
       include: {
@@ -98,7 +102,7 @@ router.put(
   validateParams(communityIdParamsSchema),
   validate(updateCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
@@ -124,7 +128,7 @@ router.delete(
   ...requirePermission('communities_manage'),
   validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
     await prisma.community.delete({ where: { id } });

@@ -7,7 +7,6 @@ const validationError = (res: Response, schema: ZodSchema, data: unknown) => {
     res.status(400).json({ errors: result.error.flatten().fieldErrors });
     return null;
   }
-
   return result.data;
 };
 
@@ -26,6 +25,7 @@ export const validateQuery =
     const data = validationError(res, schema, req.query);
     if (!data) return;
     Object.assign(req.query, data);
+    res.locals.parsedQuery = data;
     next();
   };
 
@@ -35,5 +35,14 @@ export const validateParams =
     const data = validationError(res, schema, req.params);
     if (!data) return;
     Object.assign(req.params, data);
+    res.locals.parsedParams = data;
     next();
   };
+
+export function parsedParams<T>(res: Response): T {
+  return res.locals.parsedParams as T;
+}
+
+export function parsedQuery<T>(res: Response): T {
+  return res.locals.parsedQuery as T;
+}

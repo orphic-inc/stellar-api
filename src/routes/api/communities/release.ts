@@ -4,7 +4,11 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import {
   createGroupSchema,
   updateGroupSchema
@@ -26,7 +30,7 @@ router.get(
   requireAuth,
   validateParams(communityIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId } = req.params as unknown as { communityId: number };
+    const { communityId } = parsedParams<{ communityId: number }>(res);
     const pg = parsePage(req);
     const [releases, total] = await Promise.all([
       prisma.release.findMany({
@@ -50,10 +54,10 @@ router.get(
   requireAuth,
   validateParams(releaseParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId, releaseId: id } = req.params as unknown as {
+    const { communityId, releaseId: id } = parsedParams<{
       communityId: number;
       releaseId: number;
-    };
+    }>(res);
     const release = await prisma.release.findFirst({
       where: { id, communityId },
       include: {
@@ -79,7 +83,7 @@ router.post(
   validateParams(communityIdParamsSchema),
   validate(createGroupSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId } = req.params as unknown as { communityId: number };
+    const { communityId } = parsedParams<{ communityId: number }>(res);
     const community = await prisma.community.findUnique({
       where: { id: communityId }
     });
@@ -127,10 +131,10 @@ router.put(
   validateParams(releaseParamsSchema),
   validate(updateGroupSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId, releaseId: id } = req.params as unknown as {
+    const { communityId, releaseId: id } = parsedParams<{
       communityId: number;
       releaseId: number;
-    };
+    }>(res);
 
     const existing = await prisma.release.findFirst({
       where: { id, communityId }
@@ -164,10 +168,10 @@ router.delete(
   ...requirePermission('communities_manage'),
   validateParams(releaseParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId, releaseId: id } = req.params as unknown as {
+    const { communityId, releaseId: id } = parsedParams<{
       communityId: number;
       releaseId: number;
-    };
+    }>(res);
     const existing = await prisma.release.findFirst({
       where: { id, communityId }
     });

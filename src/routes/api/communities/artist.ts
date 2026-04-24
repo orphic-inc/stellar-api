@@ -4,7 +4,11 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   artistSchema,
@@ -57,7 +61,7 @@ router.get(
   requireAuth,
   validateParams(artistHistoryParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId } = req.params as unknown as { artistId: number };
+    const { artistId } = parsedParams<{ artistId: number }>(res);
     const history = await prisma.artistHistory.findMany({
       where: { artistId },
       orderBy: { editedAt: 'desc' },
@@ -73,7 +77,7 @@ router.post(
   ...requirePermission('communities_manage'),
   validateParams(artistRevertParamsSchema),
   authHandler(async (req, res) => {
-    const { historyId } = req.params as unknown as { historyId: number };
+    const { historyId } = parsedParams<{ historyId: number }>(res);
     const entry = await prisma.artistHistory.findUnique({
       where: { id: historyId }
     });
@@ -179,7 +183,7 @@ router.get(
   requireAuth,
   validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const artist = await prisma.artist.findUnique({
       where: { id },
       include: {
@@ -204,7 +208,7 @@ router.get(
   requireAuth,
   validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id: artistId } = req.params as unknown as { id: number };
+    const { id: artistId } = parsedParams<{ id: number }>(res);
     const similar = await prisma.similarArtist.findMany({
       where: { artistId },
       include: { similarArtist: { select: { id: true, name: true } } },
@@ -221,7 +225,7 @@ router.put(
   validateParams(artistIdParamsSchema),
   validate(updateArtistSchema),
   authHandler(async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const { name, vanityHouse, description } = req.body as UpdateArtistInput;
 
     const existing = await prisma.artist.findUnique({ where: { id } });
@@ -255,7 +259,7 @@ router.delete(
   requireAuth,
   validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const artist = await prisma.artist.findUnique({ where: { id } });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
     await prisma.artist.delete({ where: { id } });

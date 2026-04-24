@@ -4,7 +4,11 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
 import {
   createTopicSchema,
@@ -33,7 +37,7 @@ router.get(
   requireAuth,
   validateParams(forumIdParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId } = req.params as unknown as { forumId: number };
+    const { forumId } = parsedParams<{ forumId: number }>(res);
 
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
@@ -72,10 +76,10 @@ router.get(
   requireAuth,
   validateParams(forumTopicParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = req.params as unknown as {
+    const { forumId, forumTopicId: id } = parsedParams<{
       forumId: number;
       forumTopicId: number;
-    };
+    }>(res);
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({
         where: { id: forumId },
@@ -110,7 +114,7 @@ router.post(
   validateParams(forumIdParamsSchema),
   validate(createTopicSchema),
   authHandler(async (req, res) => {
-    const { forumId } = req.params as unknown as { forumId: number };
+    const { forumId } = parsedParams<{ forumId: number }>(res);
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
       select: { id: true, minClassWrite: true, minClassCreate: true }
@@ -175,10 +179,10 @@ router.put(
   validateParams(forumTopicParamsSchema),
   validate(updateTopicSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = req.params as unknown as {
+    const { forumId, forumTopicId: id } = parsedParams<{
       forumId: number;
       forumTopicId: number;
-    };
+    }>(res);
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });
@@ -208,10 +212,10 @@ router.delete(
   requireAuth,
   validateParams(forumTopicParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = req.params as unknown as {
+    const { forumId, forumTopicId: id } = parsedParams<{
       forumId: number;
       forumTopicId: number;
-    };
+    }>(res);
     const topic = await prisma.forumTopic.findFirst({
       where: { id, forumId, deletedAt: null }
     });

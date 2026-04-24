@@ -1,10 +1,14 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import { validate, validateParams } from '../../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../../middleware/validate';
 import {
   createForumCategorySchema,
   updateForumCategorySchema,
@@ -17,15 +21,24 @@ const forumCategoryIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-// GET /api/forums/categories — PUBLIC read
+// GET /api/forums/categories
 router.get(
   '/',
-  asyncHandler(async (_req: Request, res: Response) => {
+  requireAuth,
+  authHandler(async (req, res) => {
     const categories = await prisma.forumCategory.findMany({
       orderBy: { sort: 'asc' },
-      include: { forums: { orderBy: { sort: 'asc' } } }
+      include: {
+        forums: {
+          where: { minClassRead: { lte: req.user.userRankLevel } },
+          orderBy: { sort: 'asc' },
+          include: {
+            lastTopic: { select: { id: true, title: true } }
+          }
+        }
+      }
     });
-    res.json(categories);
+    res.json(categories.filter((category) => category.forums.length > 0));
   })
 );
 
@@ -34,11 +47,19 @@ router.get(
   '/:id',
   requireAuth,
   validateParams(forumCategoryIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
     const category = await prisma.forumCategory.findUnique({
       where: { id },
-      include: { forums: true }
+      include: {
+        forums: {
+          where: { minClassRead: { lte: req.user.userRankLevel } },
+          orderBy: { sort: 'asc' },
+          include: {
+            lastTopic: { select: { id: true, title: true } }
+          }
+        }
+      }
     });
     if (!category) return res.status(404).json({ msg: 'Category not found' });
     res.json(category);
@@ -66,7 +87,7 @@ router.put(
   validateParams(forumCategoryIdParamsSchema),
   validate(updateForumCategorySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     const { name, sort } = req.body as UpdateForumCategoryInput;
@@ -84,7 +105,7 @@ router.delete(
   ...requirePermission('forums_manage'),
   validateParams(forumCategoryIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     await prisma.forumCategory.delete({ where: { id } });

@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import { validate, validateParams } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import {
   announcementSchema,
   type AnnouncementInput
@@ -52,7 +56,7 @@ router.put(
   validateParams(idParamsSchema),
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     const { title, body } = req.body as AnnouncementInput;
     const news = await prisma.news.update({
       where: { id },
@@ -71,7 +75,7 @@ router.delete(
   ...requirePermission('news_manage'),
   validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     await prisma.news.delete({ where: { id } });
     res.json({ msg: 'Deleted' });
   })
@@ -102,7 +106,7 @@ router.delete(
   ...requirePermission('news_manage'),
   validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params as unknown as { id: number };
+    const { id } = parsedParams<{ id: number }>(res);
     await prisma.blog.delete({ where: { id } });
     res.json({ msg: 'Deleted' });
   })
