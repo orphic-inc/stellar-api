@@ -9,11 +9,29 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",
-    "test": "jest --runInBand",
-    "test:integration": "DOTENV_CONFIG_PATH=.env.test node -r dotenv/config ./node_modules/jest/bin/jest.js --runInBand --config jest.integration.cjs",
-    "watch": "tsc -w",
+    "clean": "rm -rf dist",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm",
-    "openapi:export": "ts-node src/scripts/export-openapi.ts"
+    "watch": "tsc -w",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:integration": "DOTENV_CONFIG_PATH=.env.test node -r dotenv/config ./node_modules/jest/bin/jest.js --runInBand --config jest.integration.cjs",
+    "openapi:export": "ts-node src/scripts/export-openapi.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",
@@ -32,6 +50,9 @@
     "winston": "^3.10.0",
     "zod": "^4.3.6"
   },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "devDependencies": {
     "@babel/eslint-parser": "^7.22.9",
     "@types/bcryptjs": "^2.4.4",
@@ -47,6 +68,8 @@
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
     "@types/swagger-ui-express": "^4.1.8",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-import-resolver-node": "^0.3.7",
