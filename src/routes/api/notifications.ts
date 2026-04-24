@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validateParams, parsedParams } from '../../middleware/validate';
+import { validateParams } from '../../middleware/validate';
 
 const router = express.Router();
 const notificationIdParamsSchema = z.object({
@@ -33,7 +33,7 @@ router.delete(
   requireAuth,
   validateParams(notificationIdParamsSchema),
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const id = Number(res.locals.parsedParams.id);
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user.id)
