@@ -6,6 +6,7 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  parsedBody,
   parsedParams
 } from '../../middleware/validate';
 import {
@@ -41,7 +42,7 @@ router.post(
   ...requirePermission('news_manage'),
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { title, body } = req.body as AnnouncementInput;
+    const { title, body } = parsedBody<AnnouncementInput>(res);
     const news = await prisma.news.create({
       data: { title: sanitizePlain(title), body: sanitizePlain(body) }
     });
@@ -57,7 +58,7 @@ router.put(
   validate(announcementSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { title, body } = req.body as AnnouncementInput;
+    const { title, body } = parsedBody<AnnouncementInput>(res);
     const news = await prisma.news.update({
       where: { id },
       data: {
@@ -87,7 +88,7 @@ router.post(
   ...requirePermission('news_manage'),
   validate(announcementSchema),
   authHandler(async (req, res) => {
-    const { title, body } = req.body as AnnouncementInput;
+    const { title, body } = parsedBody<AnnouncementInput>(res);
     const post = await prisma.blog.create({
       data: {
         title: sanitizePlain(title),

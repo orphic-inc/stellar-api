@@ -5,6 +5,7 @@ import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -63,7 +64,7 @@ router.post(
   requireAuth,
   validate(pollSchema),
   authHandler(async (req, res) => {
-    const { forumTopicId, question, answers } = req.body as PollInput;
+    const { forumTopicId, question, answers } = parsedBody<PollInput>(res);
 
     const topic = await prisma.forumTopic.findUnique({
       where: { id: forumTopicId },

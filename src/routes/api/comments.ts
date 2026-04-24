@@ -6,6 +6,7 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   validateQuery,
@@ -86,7 +87,7 @@ router.post(
   validate(createCommentSchema),
   authHandler(async (req, res) => {
     const { page, body, communityId, contributionId, artistId, releaseId } =
-      req.body as CreateCommentInput;
+      parsedBody<CreateCommentInput>(res);
 
     const comment = await prisma.comment.create({
       data: {
@@ -113,7 +114,7 @@ router.put(
   validateParams(commentIdParamsSchema),
   validate(updateCommentSchema),
   authHandler(async (req, res) => {
-    const { body } = req.body as UpdateCommentInput;
+    const { body } = parsedBody<UpdateCommentInput>(res);
     const { id } = parsedParams<{ id: number }>(res);
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });

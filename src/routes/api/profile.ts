@@ -8,6 +8,7 @@ import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateParams,
+  parsedBody,
   parsedParams
 } from '../../middleware/validate';
 import {
@@ -152,7 +153,7 @@ router.post(
   requireAuth,
   validate(inviteSchema),
   authHandler(async (req, res) => {
-    const { email, reason } = req.body as InviteInput;
+    const { email, reason } = parsedBody<InviteInput>(res);
 
     const inviter = await prisma.user.findUnique({
       where: { id: req.user.id },

@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -64,7 +65,7 @@ router.post(
   requireAuth,
   validate(postSchema),
   authHandler(async (req, res) => {
-    const { title, text, category, tags } = req.body as PostInput;
+    const { title, text, category, tags } = parsedBody<PostInput>(res);
 
     const post = await prisma.post.create({
       data: { userId: req.user.id, title, text, category, tags: tags ?? [] },
@@ -98,7 +99,7 @@ router.post(
   validate(postCommentSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { text } = req.body as PostCommentInput;
+    const { text } = parsedBody<PostCommentInput>(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 

@@ -8,6 +8,7 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  parsedBody,
   parsedParams
 } from '../../middleware/validate';
 import {
@@ -113,7 +114,7 @@ router.post(
   validate(adminCreateUserSchema),
   authHandler(async (req, res) => {
     const { username, email, password, userRankId } =
-      req.body as AdminCreateUserInput;
+      parsedBody<AdminCreateUserInput>(res);
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
