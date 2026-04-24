@@ -45,3 +45,17 @@ export const createContributionSchema = z.object({
 });
 
 export type CreateContributionInput = z.infer<typeof createContributionSchema>;
+
+export const addContributionToReleaseSchema = z.object({
+  fileType: fileTypeEnum,
+  downloadUrl: z.string().url('A valid download URL is required'),
+  sizeInBytes: z.number().int().positive().optional(),
+  releaseDescription: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim() || undefined)
+});
+
+export type AddContributionToReleaseInput = z.infer<
+  typeof addContributionToReleaseSchema
+>;
