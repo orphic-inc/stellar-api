@@ -87,7 +87,7 @@ router.delete(
     if (post.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.post.delete({ where: { id } });
-    res.json({ msg: 'Post removed' });
+    res.status(204).send();
   })
 );
 
@@ -113,7 +113,7 @@ router.post(
         })
       }
     });
-    res.json(updated.comments);
+    res.status(201).json(updated.comments);
   })
 );
 
@@ -136,11 +136,11 @@ router.delete(
     if (comments[idx]?.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await prisma.post.update({
+    await prisma.post.update({
       where: { id },
       data: { comments: removeFromJsonArrayAtIndex(post.comments, idx) }
     });
-    res.json(updated.comments);
+    res.status(204).send();
   })
 );
 

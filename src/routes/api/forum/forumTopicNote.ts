@@ -75,7 +75,7 @@ router.delete(
     if (note.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.forumTopicNote.delete({ where: { id } });
-    res.json({ msg: 'Note removed' });
+    res.status(204).send();
   })
 );
 
