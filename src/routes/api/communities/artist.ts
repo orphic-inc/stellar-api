@@ -8,9 +8,15 @@ import { validate, validateParams } from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import {
   artistSchema,
+  updateArtistSchema,
   similarArtistSchema,
   artistAliasSchema,
-  artistTagSchema
+  artistTagSchema,
+  type ArtistInput,
+  type UpdateArtistInput,
+  type SimilarArtistInput,
+  type ArtistAliasInput,
+  type ArtistTagInput
 } from '../../../schemas/artist';
 
 const router = express.Router();
@@ -103,10 +109,7 @@ router.post(
   requireAuth,
   validate(similarArtistSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId, similarArtistId } = req.body as {
-      artistId: number;
-      similarArtistId: number;
-    };
+    const { artistId, similarArtistId } = req.body as SimilarArtistInput;
     const result = await prisma.similarArtist.upsert({
       where: { artistId_similarArtistId: { artistId, similarArtistId } },
       create: { artistId, similarArtistId, votes: [] },
@@ -122,10 +125,7 @@ router.post(
   requireAuth,
   validate(artistAliasSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId, redirectId } = req.body as {
-      artistId: number;
-      redirectId: number;
-    };
+    const { artistId, redirectId } = req.body as ArtistAliasInput;
     const alias = await prisma.artistAlias.create({
       data: { artistId, redirectId, userId: req.user!.id }
     });
@@ -139,7 +139,7 @@ router.post(
   requireAuth,
   validate(artistTagSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId, tagId } = req.body as { artistId: number; tagId: number };
+    const { artistId, tagId } = req.body as ArtistTagInput;
     const tag = await prisma.artistTag.upsert({
       where: { artistId_tagId: { artistId, tagId } },
       create: { artistId, tagId, userId: req.user!.id },
@@ -155,10 +155,7 @@ router.post(
   requireAuth,
   validate(artistSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, vanityHouse } = req.body as {
-      name: string;
-      vanityHouse?: boolean;
-    };
+    const { name, vanityHouse } = req.body as ArtistInput;
 
     const artist = await prisma.artist.create({
       data: { name, vanityHouse: vanityHouse ?? false }
@@ -222,12 +219,13 @@ router.put(
   '/:id',
   requireAuth,
   validateParams(artistIdParamsSchema),
+  validate(updateArtistSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params as unknown as { id: number };
+    const { name, vanityHouse, description } = req.body as UpdateArtistInput;
+
     const existing = await prisma.artist.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Artist not found' });
-
-    const { name, vanityHouse } = req.body;
 
     const [artist] = await prisma.$transaction([
       prisma.artist.update({
@@ -241,8 +239,8 @@ router.put(
         data: {
           artistId: id,
           editedBy: req.user!.id,
-          data: req.body,
-          description: req.body.description
+          data: { name, vanityHouse },
+          description
         }
       })
     ]);
