@@ -14,6 +14,7 @@ import {
   updateTopicSchema,
   createPostSchema,
   updatePostSchema,
+  topicNoteSchema,
   lastReadSchema
 } from '../schemas/forum';
 import {
@@ -33,6 +34,7 @@ import {
   subscribeCommentsSchema
 } from '../schemas/subscription';
 import { announcementSchema } from '../schemas/announcement';
+import { createRankSchema, updateRankSchema } from '../schemas/tools';
 import {
   commentQuerySchema,
   createCommentSchema,
@@ -1029,6 +1031,7 @@ const ForumPost = registry.register(
     forumTopicId: z.number(),
     authorId: z.number(),
     body: z.string(),
+    edits: z.array(z.unknown()),
     author: z
       .object({
         id: z.number(),
@@ -1045,6 +1048,7 @@ const ForumPollVote = registry.register(
   'ForumPollVote',
   z.object({
     id: z.number(),
+    forumPollId: z.number(),
     userId: z.number(),
     vote: z.number()
   })
@@ -1057,7 +1061,7 @@ const ForumPoll = registry.register(
     forumTopicId: z.number(),
     question: z.string(),
     answers: z.string(),
-    featured: z.string().nullable().optional(),
+    featured: z.string().datetime().nullable().optional(),
     closed: z.boolean(),
     votes: z.array(ForumPollVote)
   })
@@ -1832,6 +1836,49 @@ registry.registerPath({
   }
 });
 
+registry.registerPath({
+  method: 'post',
+  path: '/tools/user-ranks',
+  tags: ['Tools'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createRankSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'User rank created',
+      content: { 'application/json': { schema: UserRank } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/tools/user-ranks/{id}',
+  tags: ['Tools'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateRankSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'User rank updated',
+      content: { 'application/json': { schema: UserRank } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 const Comment = registry.register(
@@ -2402,6 +2449,9 @@ registry.registerPath({
   method: 'post',
   path: '/forums/topic-notes',
   tags: ['Forums'],
+  request: {
+    body: { content: { 'application/json': { schema: topicNoteSchema } } }
+  },
   responses: {
     201: {
       description: 'Note created',

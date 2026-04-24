@@ -2,14 +2,21 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { deleteForum } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
 } from '../../../middleware/validate';
-import { createForumSchema, updateForumSchema } from '../../../schemas/forum';
+import {
+  createForumSchema,
+  updateForumSchema,
+  type CreateForumInput,
+  type UpdateForumInput
+} from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();
@@ -78,7 +85,7 @@ router.post(
       minClassCreate,
       autoLock,
       autoLockWeeks
-    } = req.body;
+    } = parsedBody<CreateForumInput>(res);
 
     const forum = await prisma.forum.create({
       data: {
@@ -117,7 +124,7 @@ router.put(
       minClassCreate,
       autoLock,
       autoLockWeeks
-    } = req.body;
+    } = parsedBody<UpdateForumInput>(res);
     const forum = await prisma.forum.update({
       where: { id },
       data: {
@@ -142,36 +149,16 @@ router.delete(
   validateParams(forumIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const existing = await prisma.forum.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ msg: 'Forum not found' });
-    if (existing.isTrash)
-      return res.status(400).json({ msg: 'Cannot delete the Trash forum' });
-
-    const trash = await prisma.forum.findFirst({ where: { isTrash: true } });
-    if (!trash)
+    const result = await deleteForum(id);
+    if (!result.ok) {
+      if (result.reason === 'not_found')
+        return res.status(404).json({ msg: 'Forum not found' });
+      if (result.reason === 'is_trash')
+        return res.status(400).json({ msg: 'Cannot delete the Trash forum' });
       return res
         .status(500)
         .json({ msg: 'Trash forum not found — check install seed' });
-
-    const [topicCount, postCount] = await Promise.all([
-      prisma.forumTopic.count({ where: { forumId: id } }),
-      prisma.forumPost.count({ where: { forumTopic: { forumId: id } } })
-    ]);
-
-    await prisma.$transaction([
-      prisma.forumTopic.updateMany({
-        where: { forumId: id },
-        data: { forumId: trash.id }
-      }),
-      prisma.forum.update({
-        where: { id: trash.id },
-        data: {
-          numTopics: { increment: topicCount },
-          numPosts: { increment: postCount }
-        }
-      }),
-      prisma.forum.delete({ where: { id } })
-    ]);
+    }
     res.status(204).send();
   })
 );

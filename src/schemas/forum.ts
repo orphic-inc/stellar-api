@@ -57,6 +57,7 @@ export const lastReadSchema = z.object({
 });
 
 export type CreateForumInput = z.infer<typeof createForumSchema>;
+export type UpdateForumInput = z.infer<typeof updateForumSchema>;
 export type CreateTopicInput = z.infer<typeof createTopicSchema>;
 export type UpdateTopicInput = z.infer<typeof updateTopicSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
