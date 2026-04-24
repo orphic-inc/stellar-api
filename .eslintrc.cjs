@@ -17,7 +17,7 @@ module.exports = {
   rules: {
     'import/no-unresolved': [
       'error',
-      { ignore: ['@asteasolutions/zod-to-openapi'] }
+      { ignore: ['@asteasolutions/zod-to-openapi', '@prisma/client'] }
     ]
   },
   settings: {
