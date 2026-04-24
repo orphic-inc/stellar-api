@@ -118,9 +118,12 @@ router.delete(
   requireAuth,
   validateParams(postCommentParamsSchema),
   authHandler(async (req, res) => {
-    const { commentId } = parsedParams<{ id: number; commentId: number }>(res);
-    const comment = await prisma.postComment.findUnique({
-      where: { id: commentId }
+    const { id: postId, commentId } = parsedParams<{
+      id: number;
+      commentId: number;
+    }>(res);
+    const comment = await prisma.postComment.findFirst({
+      where: { id: commentId, postId }
     });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
     if (comment.userId !== req.user.id)
