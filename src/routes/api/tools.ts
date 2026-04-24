@@ -32,7 +32,7 @@ router.get(
       include: { _count: { select: { users: true } } }
     });
     res.json(
-      ranks.map((r) => ({
+      ranks.map((r: (typeof ranks)[number]) => ({
         id: r.id,
         name: r.name,
         level: r.level,
