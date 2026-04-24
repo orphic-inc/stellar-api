@@ -7,11 +7,14 @@ import { requirePermission } from '../../../middleware/permissions';
 import {
   validate,
   validateParams,
-  parsedParams
+  parsedParams,
+  parsedBody
 } from '../../../middleware/validate';
 import {
   createGroupSchema,
-  updateGroupSchema
+  updateGroupSchema,
+  type CreateGroupInput,
+  type UpdateGroupInput
 } from '../../../schemas/community';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 
@@ -100,7 +103,7 @@ router.post(
       tagIds,
       isEdition,
       edition
-    } = req.body;
+    } = parsedBody<CreateGroupInput>(res);
 
     const release = await prisma.release.create({
       data: {
@@ -142,7 +145,7 @@ router.put(
     if (!existing) return res.status(404).json({ msg: 'Release not found' });
 
     const { title, description, image, year, isEdition, edition, tagIds } =
-      req.body;
+      parsedBody<UpdateGroupInput>(res);
     const release = await prisma.release.update({
       where: { id },
       data: {
@@ -151,7 +154,7 @@ router.put(
         ...(image !== undefined && { image }),
         ...(year !== undefined && { year }),
         ...(isEdition !== undefined && { isEdition }),
-        ...(edition !== undefined && { edition }),
+        ...(edition !== undefined && { edition: edition as never }),
         ...(tagIds !== undefined && {
           tags: { set: tagIds.map((tid: number) => ({ id: tid })) }
         })

@@ -23,6 +23,7 @@ import {
   type CreateCommentInput,
   type UpdateCommentInput
 } from '../../schemas/comment';
+import { deleteComment } from '../../modules/comment';
 
 const router = express.Router();
 const commentIdParamsSchema = z.object({
@@ -149,18 +150,7 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const isModAction = !isOwner;
-    await prisma.$transaction([
-      prisma.comment.update({ where: { id }, data: { deletedAt: new Date() } }),
-      prisma.auditLog.create({
-        data: {
-          actorId: req.user.id,
-          action: isModAction ? 'comment.mod_delete' : 'comment.delete',
-          targetType: 'Comment',
-          targetId: id
-        }
-      })
-    ]);
+    await deleteComment(id, req.user.id, !isOwner);
     res.status(204).send();
   })
 );
