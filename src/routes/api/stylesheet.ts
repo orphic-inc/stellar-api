@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateParams,
+  parsedBody,
   parsedParams
 } from '../../middleware/validate';
 import {
@@ -50,7 +51,7 @@ router.post(
   requireAuth,
   validate(stylesheetSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, cssUrl } = req.body as StylesheetInput;
+    const { name, cssUrl } = parsedBody<StylesheetInput>(res);
     const stylesheet = await prisma.stylesheet.create({
       data: { name, cssUrl }
     });

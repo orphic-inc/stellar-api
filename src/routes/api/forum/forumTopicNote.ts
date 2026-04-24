@@ -6,6 +6,7 @@ import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import type { AuthenticatedRequest } from '../../../types/auth';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -54,7 +55,7 @@ router.post(
   requireModerator,
   validate(topicNoteSchema),
   authHandler(async (req, res) => {
-    const { forumTopicId, body } = req.body as TopicNoteInput;
+    const { forumTopicId, body } = parsedBody<TopicNoteInput>(res);
     const note = await prisma.forumTopicNote.create({
       data: { forumTopicId, authorId: req.user.id, body }
     });

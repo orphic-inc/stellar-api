@@ -5,6 +5,7 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -133,7 +134,7 @@ router.post(
       forumTopicId: number;
     }>(res);
 
-    const { body } = req.body as CreatePostInput;
+    const { body } = parsedBody<CreatePostInput>(res);
 
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({ where: { id: forumId } }),
@@ -181,7 +182,7 @@ router.put(
       forumTopicId: number;
       id: number;
     }>(res);
-    const { body } = req.body as UpdatePostInput;
+    const { body } = parsedBody<UpdatePostInput>(res);
 
     const post = await prisma.forumPost.findFirst({
       where: {

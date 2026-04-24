@@ -5,6 +5,7 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -72,7 +73,7 @@ router.post(
   ...requirePermission('forums_manage'),
   validate(createForumCategorySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, sort } = req.body as CreateForumCategoryInput;
+    const { name, sort } = parsedBody<CreateForumCategoryInput>(res);
     const category = await prisma.forumCategory.create({
       data: { name, sort: sort ?? 0 }
     });
@@ -90,7 +91,7 @@ router.put(
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
-    const { name, sort } = req.body as UpdateForumCategoryInput;
+    const { name, sort } = parsedBody<UpdateForumCategoryInput>(res);
     const category = await prisma.forumCategory.update({
       where: { id },
       data: { name, ...(sort !== undefined && { sort }) }
