@@ -1,9 +1,12 @@
-import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import { getCurrentProfile } from '../../modules/profile';
+import {
+  getCurrentProfile,
+  updateProfile,
+  createInvite
+} from '../../modules/profile';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -17,7 +20,6 @@ import {
   type ProfileUpdateInput,
   type InviteInput
 } from '../../schemas/profile';
-import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -85,52 +87,10 @@ router.put(
   requireAuth,
   validate(profileUpdateSchema),
   authHandler(async (req, res) => {
-    const {
-      avatar,
-      avatarMouseoverText,
-      profileTitle,
-      profileInfo,
-      siteAppearance,
-      externalStylesheet,
-      styledTooltips
-    } = parsedBody<ProfileUpdateInput>(res);
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { profileId: true, userSettingsId: true }
-    });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    await prisma.$transaction([
-      prisma.profile.update({
-        where: { id: user.profileId },
-        data: {
-          ...(avatar !== undefined && { avatar: sanitizePlain(avatar) }),
-          ...(avatarMouseoverText !== undefined && {
-            avatarMouseoverText: sanitizePlain(avatarMouseoverText)
-          }),
-          ...(profileTitle !== undefined && {
-            profileTitle: sanitizePlain(profileTitle)
-          }),
-          ...(profileInfo !== undefined && {
-            profileInfo: sanitizeHtml(profileInfo)
-          })
-        }
-      }),
-      prisma.userSettings.update({
-        where: { id: user.userSettingsId },
-        data: {
-          ...(siteAppearance !== undefined && { siteAppearance }),
-          ...(externalStylesheet !== undefined && { externalStylesheet }),
-          ...(styledTooltips !== undefined && { styledTooltips })
-        }
-      })
-    ]);
-
-    const updatedUser = await getCurrentProfile(req.user.id);
-    if (!updatedUser) return res.status(404).json({ msg: 'Profile not found' });
-
-    res.json(updatedUser);
+    const data = parsedBody<ProfileUpdateInput>(res);
+    const updated = await updateProfile(req.user.id, data);
+    if (!updated) return res.status(404).json({ msg: 'User not found' });
+    res.json(updated);
   })
 );
 
@@ -155,41 +115,15 @@ router.post(
   validate(inviteSchema),
   authHandler(async (req, res) => {
     const { email, reason } = parsedBody<InviteInput>(res);
-
-    const inviter = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { inviteCount: true }
-    });
-    if (!inviter || inviter.inviteCount <= 0) {
-      return res.status(403).json({ msg: 'No invites remaining' });
-    }
-
-    const existing = await prisma.invite.findUnique({ where: { email } });
-    if (existing)
+    const result = await createInvite(req.user.id, email, reason ?? '');
+    if (!result.ok) {
+      if (result.reason === 'no_invites')
+        return res.status(403).json({ msg: 'No invites remaining' });
       return res
         .status(409)
         .json({ msg: 'An invite has already been sent to that address' });
-
-    const inviteKey = crypto.randomBytes(20).toString('hex');
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.$transaction([
-      prisma.invite.create({
-        data: {
-          inviterId: req.user.id,
-          inviteKey,
-          email: sanitizePlain(email),
-          expires,
-          reason: reason ? sanitizePlain(reason) : ''
-        }
-      }),
-      prisma.user.update({
-        where: { id: req.user.id },
-        data: { inviteCount: { decrement: 1 } }
-      })
-    ]);
-
-    res.status(201).json({ inviteKey });
+    }
+    res.status(201).json({ inviteKey: result.inviteKey });
   })
 );
 
