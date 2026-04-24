@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
@@ -119,61 +120,63 @@ router.post(
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await prisma.$transaction(async (tx) => {
-      let sysopRankId: number | null = null;
-      for (const rank of DEFAULT_RANKS) {
-        const created = await tx.userRank.create({ data: rank });
-        if (rank.level === 1000) sysopRankId = created.id;
-      }
-
-      const systemCategory = await tx.forumCategory.create({
-        data: { name: 'System', sort: 0 }
-      });
-      await tx.forum.create({
-        data: {
-          forumCategoryId: systemCategory.id,
-          sort: 0,
-          name: 'Trash',
-          description: 'Holds topics from deleted forums.',
-          isTrash: true,
-          minClassRead: 500,
-          minClassWrite: 500,
-          minClassCreate: 500
+    const user = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        let sysopRankId: number | null = null;
+        for (const rank of DEFAULT_RANKS) {
+          const created = await tx.userRank.create({ data: rank });
+          if (rank.level === 1000) sysopRankId = created.id;
         }
-      });
 
-      const settings = await tx.userSettings.create({ data: {} });
-      const profile = await tx.profile.create({ data: {} });
-      return tx.user.create({
-        data: {
-          username,
-          email,
-          password: hashedPassword,
-          avatar,
-          userRankId: sysopRankId!,
-          userSettingsId: settings.id,
-          profileId: profile.id,
-          inviteCount: 100
-        },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          avatar: true,
-          inviteCount: true,
-          dateRegistered: true,
-          userRank: {
-            select: {
-              level: true,
-              name: true,
-              color: true,
-              badge: true,
-              permissions: true
+        const systemCategory = await tx.forumCategory.create({
+          data: { name: 'System', sort: 0 }
+        });
+        await tx.forum.create({
+          data: {
+            forumCategoryId: systemCategory.id,
+            sort: 0,
+            name: 'Trash',
+            description: 'Holds topics from deleted forums.',
+            isTrash: true,
+            minClassRead: 500,
+            minClassWrite: 500,
+            minClassCreate: 500
+          }
+        });
+
+        const settings = await tx.userSettings.create({ data: {} });
+        const profile = await tx.profile.create({ data: {} });
+        return tx.user.create({
+          data: {
+            username,
+            email,
+            password: hashedPassword,
+            avatar,
+            userRankId: sysopRankId!,
+            userSettingsId: settings.id,
+            profileId: profile.id,
+            inviteCount: 100
+          },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            avatar: true,
+            inviteCount: true,
+            dateRegistered: true,
+            userRank: {
+              select: {
+                level: true,
+                name: true,
+                color: true,
+                badge: true,
+                permissions: true
+              }
             }
           }
-        }
-      });
-    });
+        });
+      }
+    );
 
     const token = await issueToken(user.id);
     res.cookie('token', token, {
