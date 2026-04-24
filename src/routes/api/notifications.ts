@@ -33,7 +33,7 @@ router.delete(
   requireAuth,
   validateParams(notificationIdParamsSchema),
   authHandler(async (req, res) => {
-    const id = Number(res.locals.parsedParams.id);
+    const { id } = parsedParams<{ id: number }>(res);
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user.id)
