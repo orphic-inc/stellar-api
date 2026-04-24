@@ -1,6 +1,9 @@
 import { FileType, Prisma, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import type { CreateContributionInput } from '../schemas/contribution';
+import type {
+  AddContributionToReleaseInput,
+  CreateContributionInput
+} from '../schemas/contribution';
 
 const normalizeTags = (tags?: string): string[] => [
   ...new Set(
@@ -126,4 +129,46 @@ export const createContributionSubmission = async ({
   });
 
   return contribution;
+};
+
+export const addContributionToRelease = async ({
+  userId,
+  communityId,
+  releaseId,
+  input
+}: {
+  userId: number;
+  communityId: number;
+  releaseId: number;
+  input: AddContributionToReleaseInput;
+}) => {
+  const release = await prisma.release.findFirst({
+    where: { id: releaseId, communityId }
+  });
+  if (!release) return null;
+
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const contributor = await tx.contributor.upsert({
+      where: { userId },
+      update: { communityId },
+      create: { userId, communityId }
+    });
+
+    return tx.contribution.create({
+      data: {
+        userId,
+        releaseId,
+        contributorId: contributor.id,
+        type: input.fileType as FileType,
+        downloadUrl: input.downloadUrl,
+        sizeInBytes: input.sizeInBytes ?? null,
+        releaseDescription: input.releaseDescription
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+        release: { select: { id: true, title: true, communityId: true } },
+        collaborators: { select: { id: true, name: true } }
+      }
+    });
+  });
 };

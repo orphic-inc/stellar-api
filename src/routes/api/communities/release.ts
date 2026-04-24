@@ -16,7 +16,13 @@ import {
   type CreateGroupInput,
   type UpdateGroupInput
 } from '../../../schemas/community';
+import {
+  addContributionToReleaseSchema,
+  type AddContributionToReleaseInput
+} from '../../../schemas/contribution';
+import { addContributionToRelease } from '../../../modules/contribution';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import { authHandler } from '../../../modules/asyncHandler';
 
 const router = express.Router({ mergeParams: true });
 const communityIdParamsSchema = z.object({
@@ -162,6 +168,29 @@ router.put(
       include: { artist: true, tags: true }
     });
     res.json(release);
+  })
+);
+
+// POST /api/communities/:communityId/releases/:releaseId/contributions — any authenticated user
+router.post(
+  '/:releaseId/contributions',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  validate(addContributionToReleaseSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const contribution = await addContributionToRelease({
+      userId: req.user.id,
+      communityId,
+      releaseId,
+      input: parsedBody<AddContributionToReleaseInput>(res)
+    });
+    if (!contribution)
+      return res.status(404).json({ msg: 'Release not found' });
+    res.status(201).json(contribution);
   })
 );
 
