@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
@@ -32,7 +32,7 @@ router.get(
   '/',
   requireAuth,
   validateParams(forumIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumId } = req.params as unknown as { forumId: number };
 
     const forum = await prisma.forum.findUnique({
@@ -40,7 +40,7 @@ router.get(
       select: { minClassRead: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -71,7 +71,7 @@ router.get(
   '/:forumTopicId',
   requireAuth,
   validateParams(forumTopicParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumId, forumTopicId: id } = req.params as unknown as {
       forumId: number;
       forumTopicId: number;
@@ -92,7 +92,7 @@ router.get(
       })
     ]);
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -109,14 +109,14 @@ router.post(
   writeLimiter,
   validateParams(forumIdParamsSchema),
   validate(createTopicSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumId } = req.params as unknown as { forumId: number };
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
       select: { id: true, minClassWrite: true, minClassCreate: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user!.userRankLevel < (forum.minClassCreate ?? 0)) {
+    if (req.user.userRankLevel < (forum.minClassCreate ?? 0)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to create topics in this forum' });
@@ -126,13 +126,13 @@ router.post(
 
     const topic = await prisma.$transaction(async (tx) => {
       const topic = await tx.forumTopic.create({
-        data: { title, forumId, authorId: req.user!.id }
+        data: { title, forumId, authorId: req.user.id }
       });
 
       const post = await tx.forumPost.create({
         data: {
           forumTopicId: topic.id,
-          authorId: req.user!.id,
+          authorId: req.user.id,
           body: sanitizeHtml(body)
         }
       });
@@ -174,7 +174,7 @@ router.put(
   requireAuth,
   validateParams(forumTopicParamsSchema),
   validate(updateTopicSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumId, forumTopicId: id } = req.params as unknown as {
       forumId: number;
       forumTopicId: number;
@@ -184,7 +184,7 @@ router.put(
     });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
-    const isOwner = topic.authorId === req.user!.id;
+    const isOwner = topic.authorId === req.user.id;
     if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
@@ -207,7 +207,7 @@ router.delete(
   '/:forumTopicId',
   requireAuth,
   validateParams(forumTopicParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumId, forumTopicId: id } = req.params as unknown as {
       forumId: number;
       forumTopicId: number;
@@ -217,7 +217,7 @@ router.delete(
     });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
-    const isOwner = topic.authorId === req.user!.id;
+    const isOwner = topic.authorId === req.user.id;
     if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
@@ -242,7 +242,7 @@ router.delete(
       }),
       prisma.auditLog.create({
         data: {
-          actorId: req.user!.id,
+          actorId: req.user.id,
           action: isModAction ? 'topic.mod_delete' : 'topic.delete',
           targetType: 'ForumTopic',
           targetId: id

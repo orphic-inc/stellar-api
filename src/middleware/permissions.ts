@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth } from './auth';
+import type { AuthenticatedRequest } from '../types/auth';
 
 export const VALID_PERMISSIONS = [
   'forums_read',
@@ -29,30 +30,35 @@ const hasPermission = (
 };
 
 export const loadPermissions = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<Record<string, boolean>> => {
   if (res.locals.userPerms) return res.locals.userPerms;
   const rank = await prisma.userRank.findUnique({
-    where: { id: req.user!.userRankId },
+    where: { id: req.user.userRankId },
     select: { permissions: true }
   });
   res.locals.userPerms = (rank?.permissions ?? {}) as Record<string, boolean>;
   return res.locals.userPerms;
 };
 
-export const isModerator = async (req: Request, res: Response): Promise<boolean> => {
+export const isModerator = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<boolean> => {
   const perms = await loadPermissions(req, res);
   return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
 };
 
 // Returns [requireAuth, permissionCheck] — spread into route definitions:
 //   router.post('/', ...requirePermission('admin'), asyncHandler(...))
-export const requirePermission = (...permissions: Permission[]): RequestHandler[] => [
+export const requirePermission = (
+  ...permissions: Permission[]
+): RequestHandler[] => [
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const perms = await loadPermissions(req, res);
+      const perms = await loadPermissions(req as AuthenticatedRequest, res);
       const granted = permissions.some((p) => hasPermission(perms, p));
       if (granted) return next();
       res.status(403).json({ msg: 'Permission denied' });
@@ -71,9 +77,10 @@ export const requireOwnerOrPermission = (
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const authReq = req as AuthenticatedRequest;
       const ownerId = getOwnerId(req);
-      if (ownerId != null && ownerId === req.user!.id) return next();
-      const perms = await loadPermissions(req, res);
+      if (ownerId != null && ownerId === authReq.user.id) return next();
+      const perms = await loadPermissions(authReq, res);
       if (hasPermission(perms, permission)) return next();
       res.status(403).json({ msg: 'Permission denied' });
     } catch (err) {

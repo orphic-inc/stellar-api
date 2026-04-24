@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, validateParams } from '../../middleware/validate';
@@ -22,9 +22,9 @@ const userIdParamsSchema = z.object({
 router.get(
   '/settings',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       select: { userSettingsId: true }
     });
     if (!user) return res.status(404).json({ msg: 'User not found' });
@@ -40,7 +40,7 @@ router.put(
   '/settings',
   requireAuth,
   validate(userSettingsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const {
       siteAppearance,
       externalStylesheet,
@@ -49,7 +49,7 @@ router.put(
       avatar
     } = req.body;
     const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       select: { userSettingsId: true }
     });
     if (!user) return res.status(404).json({ msg: 'User not found' });
@@ -67,7 +67,7 @@ router.put(
       ...(avatar !== undefined
         ? [
             prisma.user.update({
-              where: { id: req.user!.id },
+              where: { id: req.user.id },
               data: { avatar }
             })
           ]
@@ -107,7 +107,7 @@ router.post(
   '/',
   ...requirePermission('users_edit'),
   validate(adminCreateUserSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { username, email, password, userRankId } =
       req.body as AdminCreateUserInput;
 
@@ -145,7 +145,7 @@ router.post(
       });
     });
 
-    await audit(prisma, req.user!.id, 'user.create', 'User', user.id, {
+    await audit(prisma, req.user.id, 'user.create', 'User', user.id, {
       username,
       email
     });

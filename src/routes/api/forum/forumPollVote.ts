@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { validate } from '../../../middleware/validate';
 import { pollVoteSchema, type PollVoteInput } from '../../../schemas/poll';
@@ -12,9 +12,9 @@ router.post(
   '/',
   requireAuth,
   validate(pollVoteSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumPollId, vote } = req.body as PollVoteInput;
-    const userId = req.user!.id;
+    const userId = req.user.id;
 
     const poll = await prisma.forumPoll.findUnique({
       where: { id: forumPollId },
@@ -31,7 +31,7 @@ router.post(
     if (poll.forumTopic?.deletedAt) {
       return res.status(404).json({ msg: 'Poll not found' });
     }
-    if (req.user!.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
+    if (req.user.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });

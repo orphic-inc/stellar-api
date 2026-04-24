@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validateParams } from '../../middleware/validate';
 
@@ -14,9 +14,9 @@ const notificationIdParamsSchema = z.object({
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const notifications = await prisma.notification.findMany({
-      where: { userId: req.user!.id },
+      where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
@@ -32,11 +32,11 @@ router.delete(
   '/:id',
   requireAuth,
   validateParams(notificationIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
-    if (notif.userId !== req.user!.id)
+    if (notif.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.notification.delete({ where: { id } });
     res.json({ msg: 'Notification removed' });

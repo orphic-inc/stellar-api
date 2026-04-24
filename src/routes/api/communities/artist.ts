@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
@@ -72,7 +72,7 @@ router.post(
   '/revert/:historyId',
   ...requirePermission('communities_manage'),
   validateParams(artistRevertParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { historyId } = req.params as unknown as { historyId: number };
     const entry = await prisma.artistHistory.findUnique({
       where: { id: historyId }
@@ -93,7 +93,7 @@ router.post(
     await prisma.artistHistory.create({
       data: {
         artistId: artist.id,
-        editedBy: req.user!.id,
+        editedBy: req.user.id,
         data: { name: artist.name, vanityHouse: artist.vanityHouse },
         description: `Reverted to history #${historyId}`
       }
@@ -124,10 +124,10 @@ router.post(
   '/alias',
   requireAuth,
   validate(artistAliasSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { artistId, redirectId } = req.body as ArtistAliasInput;
     const alias = await prisma.artistAlias.create({
-      data: { artistId, redirectId, userId: req.user!.id }
+      data: { artistId, redirectId, userId: req.user.id }
     });
     res.status(201).json(alias);
   })
@@ -138,11 +138,11 @@ router.post(
   '/tag',
   requireAuth,
   validate(artistTagSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { artistId, tagId } = req.body as ArtistTagInput;
     const tag = await prisma.artistTag.upsert({
       where: { artistId_tagId: { artistId, tagId } },
-      create: { artistId, tagId, userId: req.user!.id },
+      create: { artistId, tagId, userId: req.user.id },
       update: { positiveVotes: { increment: 1 } }
     });
     res.json(tag);
@@ -154,7 +154,7 @@ router.post(
   '/',
   requireAuth,
   validate(artistSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { name, vanityHouse } = req.body as ArtistInput;
 
     const artist = await prisma.artist.create({
@@ -164,7 +164,7 @@ router.post(
     await prisma.artistHistory.create({
       data: {
         artistId: artist.id,
-        editedBy: req.user!.id,
+        editedBy: req.user.id,
         data: { name, vanityHouse }
       }
     });
@@ -220,7 +220,7 @@ router.put(
   requireAuth,
   validateParams(artistIdParamsSchema),
   validate(updateArtistSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const { name, vanityHouse, description } = req.body as UpdateArtistInput;
 
@@ -238,7 +238,7 @@ router.put(
       prisma.artistHistory.create({
         data: {
           artistId: id,
-          editedBy: req.user!.id,
+          editedBy: req.user.id,
           data: { name, vanityHouse },
           description
         }

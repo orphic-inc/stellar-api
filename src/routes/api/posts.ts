@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate, validateParams } from '../../middleware/validate';
 import {
@@ -59,11 +59,11 @@ router.post(
   '/',
   requireAuth,
   validate(postSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { title, text, category, tags } = req.body as PostInput;
 
     const post = await prisma.post.create({
-      data: { userId: req.user!.id, title, text, category, tags: tags ?? [] },
+      data: { userId: req.user.id, title, text, category, tags: tags ?? [] },
       include: { user: { select: { id: true, username: true, avatar: true } } }
     });
     res.status(201).json(post);
@@ -75,11 +75,11 @@ router.delete(
   '/:id',
   requireAuth,
   validateParams(postIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    if (post.userId !== req.user!.id)
+    if (post.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.post.delete({ where: { id } });
     res.json({ msg: 'Post removed' });
@@ -92,7 +92,7 @@ router.post(
   requireAuth,
   validateParams(postIdParamsSchema),
   validate(postCommentSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const { text } = req.body as PostCommentInput;
     const post = await prisma.post.findUnique({ where: { id } });
@@ -102,7 +102,7 @@ router.post(
       where: { id },
       data: {
         comments: appendToJsonArray(post.comments, {
-          userId: req.user!.id,
+          userId: req.user.id,
           text,
           date: new Date().toISOString()
         })
@@ -117,7 +117,7 @@ router.delete(
   '/comment/:id/:commentIdx',
   requireAuth,
   validateParams(postCommentParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id, commentIdx: idx } = req.params as unknown as {
       id: number;
       commentIdx: number;
@@ -128,7 +128,7 @@ router.delete(
     const comments = jsonObjectArray(post.comments);
     if (idx < 0 || idx >= comments.length)
       return res.status(404).json({ msg: 'Comment not found' });
-    if (comments[idx]?.userId !== req.user!.id)
+    if (comments[idx]?.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
     const updated = await prisma.post.update({

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, validateParams } from '../../middleware/validate';
 import {
@@ -82,13 +82,13 @@ router.post(
   '/blog',
   ...requirePermission('news_manage'),
   validate(announcementSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { title, body } = req.body as AnnouncementInput;
     const post = await prisma.blog.create({
       data: {
         title: sanitizePlain(title),
         body: sanitizePlain(body),
-        userId: req.user!.id
+        userId: req.user.id
       },
       include: { user: { select: { id: true, username: true } } }
     });
