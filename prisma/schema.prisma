@@ -196,6 +196,8 @@ model User {
   applicants             Applicant[]
   comments               Comment[]             @relation("CommentAuthor")
   editedComments         Comment[]             @relation("CommentEditor")
+  postComments           PostComment[]
+  forumPostEdits         ForumPostEdit[]
   auditLogs              AuditLog[]
 
   @@index([userRankId])
@@ -336,7 +338,7 @@ model ForumPost {
   authorId     Int
   author       User                @relation(fields: [authorId], references: [id])
   body         String              @db.Text
-  edits        Json                @default("[]")
+  edits        ForumPostEdit[]
   lastPostOf   ForumTopic[]        @relation("TopicLastPost")
   lastReadOf   ForumLastReadTopic[]
   createdAt    DateTime            @default(now())
@@ -346,6 +348,19 @@ model ForumPost {
   @@index([forumTopicId])
   @@index([authorId])
   @@map("forum_posts")
+}
+
+model ForumPostEdit {
+  id           Int       @id @default(autoincrement())
+  forumPostId  Int
+  forumPost    ForumPost @relation(fields: [forumPostId], references: [id], onDelete: Cascade)
+  editorId     Int
+  editor       User      @relation(fields: [editorId], references: [id])
+  previousBody String    @db.Text
+  editedAt     DateTime  @default(now())
+
+  @@index([forumPostId])
+  @@map("forum_post_edits")
 }
 
 model ForumPoll {
@@ -895,17 +910,30 @@ model Tag {
 }
 
 model Post {
-  id        Int      @id @default(autoincrement())
+  id        Int           @id @default(autoincrement())
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
   title     String
-  text      String   @db.Text
+  text      String        @db.Text
   category  String
   tags      String[]
-  comments  Json     @default("[]")
-  createdAt DateTime @default(now())
+  comments  PostComment[]
+  createdAt DateTime      @default(now())
 
   @@map("posts")
+}
+
+model PostComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@map("post_comments")
 }
 
 model News {

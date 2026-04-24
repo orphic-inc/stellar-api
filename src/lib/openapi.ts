@@ -35,6 +35,7 @@ import {
 } from '../schemas/subscription';
 import { announcementSchema } from '../schemas/announcement';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
+import { postSchema, postCommentSchema } from '../schemas/post';
 import {
   commentQuerySchema,
   createCommentSchema,
@@ -1024,6 +1025,18 @@ const ForumTopic = registry.register(
   })
 );
 
+const ForumPostEdit = registry.register(
+  'ForumPostEdit',
+  z.object({
+    id: z.number(),
+    forumPostId: z.number(),
+    editorId: z.number(),
+    previousBody: z.string(),
+    editedAt: z.string(),
+    editor: z.object({ id: z.number(), username: z.string() }).optional()
+  })
+);
+
 const ForumPost = registry.register(
   'ForumPost',
   z.object({
@@ -1031,7 +1044,7 @@ const ForumPost = registry.register(
     forumTopicId: z.number(),
     authorId: z.number(),
     body: z.string(),
-    edits: z.array(z.unknown()),
+    edits: z.array(ForumPostEdit),
     author: z
       .object({
         id: z.number(),
@@ -2288,11 +2301,23 @@ registry.registerPath({
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-const PostComment = z.object({
-  userId: z.number(),
-  text: z.string(),
-  date: z.string()
-});
+const PostComment = registry.register(
+  'PostComment',
+  z.object({
+    id: z.number(),
+    postId: z.number(),
+    userId: z.number(),
+    text: z.string(),
+    createdAt: z.string(),
+    user: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional()
+  })
+);
 
 const Post = registry.register(
   'Post',
@@ -2348,6 +2373,9 @@ registry.registerPath({
   method: 'post',
   path: '/posts',
   tags: ['Posts'],
+  request: {
+    body: { content: { 'application/json': { schema: postSchema } } }
+  },
   responses: {
     201: {
       description: 'Post created',
@@ -2380,13 +2408,18 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: '/posts/comment/{id}',
+  path: '/posts/{id}/comments',
   tags: ['Posts'],
-  request: { params: z.object({ id: z.string() }) },
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: postCommentSchema } }
+    }
+  },
   responses: {
     201: {
-      description: 'Comment added; returns updated comments list',
-      content: { 'application/json': { schema: z.array(PostComment) } }
+      description: 'Comment created',
+      content: { 'application/json': { schema: PostComment } }
     },
     404: {
       description: 'Post not found',
@@ -2397,9 +2430,11 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'delete',
-  path: '/posts/comment/{id}/{commentIdx}',
+  path: '/posts/{id}/comments/{commentId}',
   tags: ['Posts'],
-  request: { params: z.object({ id: z.string(), commentIdx: z.string() }) },
+  request: {
+    params: z.object({ id: z.string(), commentId: z.string() })
+  },
   responses: {
     204: { description: 'Comment deleted' },
     403: {
@@ -2407,7 +2442,7 @@ registry.registerPath({
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
-      description: 'Post or comment not found',
+      description: 'Comment not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
