@@ -57,7 +57,10 @@ registry.register('ErrorResponse', z.object({ error: z.string() }));
 
 const ValidationError = registry.register(
   'ValidationError',
-  z.object({ errors: z.record(z.string(), z.array(z.string())) })
+  z.object({
+    msg: z.string(),
+    errors: z.record(z.string(), z.array(z.string()))
+  })
 );
 
 const PaginationMeta = registry.register(

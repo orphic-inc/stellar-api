@@ -178,7 +178,12 @@ describe('API content and shared flows', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body).toHaveProperty('errors');
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        msg: 'Validation failed',
+        errors: expect.any(Object)
+      })
+    );
     expect(prismaMock.comment.create).not.toHaveBeenCalled();
   });
 

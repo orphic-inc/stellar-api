@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ZodSchema } from 'zod';
 
+const VALIDATION_ERROR_MESSAGE = 'Validation failed';
+
 const validationError = (res: Response, schema: ZodSchema, data: unknown) => {
   const result = schema.safeParse(data);
   if (!result.success) {
-    res.status(400).json({ errors: result.error.flatten().fieldErrors });
+    res.status(400).json({
+      msg: VALIDATION_ERROR_MESSAGE,
+      errors: result.error.flatten().fieldErrors
+    });
     return null;
   }
   return result.data;
