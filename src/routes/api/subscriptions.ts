@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import {
@@ -17,9 +17,9 @@ router.post(
   '/subscribe',
   requireAuth,
   validate(subscribeSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { topicId, action } = req.body as SubscribeInput;
-    const userId = req.user!.id;
+    const userId = req.user.id;
 
     if (action === 'subscribe') {
       await prisma.subscription.upsert({
@@ -39,8 +39,8 @@ router.post(
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user!.id;
+  authHandler(async (req, res) => {
+    const userId = req.user.id;
     const subscriptions = await prisma.subscription.findMany({
       where: { userId },
       take: 100
@@ -54,9 +54,9 @@ router.post(
   '/subscribe-comments',
   requireAuth,
   validate(subscribeCommentsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { page, pageId, action } = req.body as SubscribeCommentsInput;
-    const userId = req.user!.id;
+    const userId = req.user.id;
 
     if (action === 'subscribe') {
       await prisma.commentSubscription.upsert({

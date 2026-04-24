@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { CommentPage } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
 import {
@@ -82,7 +82,7 @@ router.post(
   '/',
   requireAuth,
   validate(createCommentSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { page, body, communityId, contributionId, artistId, releaseId } =
       req.body as CreateCommentInput;
 
@@ -90,7 +90,7 @@ router.post(
       data: {
         page,
         body: sanitizeHtml(body),
-        authorId: req.user!.id,
+        authorId: req.user.id,
         ...(communityId && { communityId }),
         ...(contributionId && { contributionId }),
         ...(artistId && { artistId }),
@@ -110,19 +110,19 @@ router.put(
   requireAuth,
   validateParams(commentIdParamsSchema),
   validate(updateCommentSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { body } = req.body as UpdateCommentInput;
     const { id } = req.params as unknown as { id: number };
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
-    if (comment.authorId !== req.user!.id)
+    if (comment.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
     const updated = await prisma.comment.update({
       where: { id },
       data: {
         body: sanitizeHtml(body),
-        editedUserId: req.user!.id,
+        editedUserId: req.user.id,
         editedAt: new Date()
       }
     });
@@ -135,13 +135,13 @@ router.delete(
   '/:id',
   requireAuth,
   validateParams(commentIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
 
-    const isOwner = comment.authorId === req.user!.id;
+    const isOwner = comment.authorId === req.user.id;
     if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
@@ -151,7 +151,7 @@ router.delete(
       prisma.comment.update({ where: { id }, data: { deletedAt: new Date() } }),
       prisma.auditLog.create({
         data: {
-          actorId: req.user!.id,
+          actorId: req.user.id,
           action: isModAction ? 'comment.mod_delete' : 'comment.delete',
           targetType: 'Comment',
           targetId: id

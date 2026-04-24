@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { getCurrentProfile } from '../../modules/profile';
 import { requireAuth } from '../../middleware/auth';
 import { validate, validateParams } from '../../middleware/validate';
@@ -22,8 +22,8 @@ const userIdParamsSchema = z.object({
 router.get(
   '/me',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
-    const user = await getCurrentProfile(req.user!.id);
+  authHandler(async (req, res) => {
+    const user = await getCurrentProfile(req.user.id);
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
@@ -78,7 +78,7 @@ router.put(
   '/me',
   requireAuth,
   validate(profileUpdateSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const {
       avatar,
       avatarMouseoverText,
@@ -90,7 +90,7 @@ router.put(
     } = req.body;
 
     const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       select: { profileId: true, userSettingsId: true }
     });
     if (!user) return res.status(404).json({ msg: 'User not found' });
@@ -121,7 +121,7 @@ router.put(
       })
     ]);
 
-    const updatedUser = await getCurrentProfile(req.user!.id);
+    const updatedUser = await getCurrentProfile(req.user.id);
     if (!updatedUser) return res.status(404).json({ msg: 'Profile not found' });
 
     res.json(updatedUser);
@@ -132,9 +132,9 @@ router.put(
 router.delete(
   '/',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     await prisma.user.update({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       data: { disabled: true }
     });
     res.clearCookie('token');
@@ -147,11 +147,11 @@ router.post(
   '/referral/create-invite',
   requireAuth,
   validate(inviteSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { email, reason } = req.body as InviteInput;
 
     const inviter = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       select: { inviteCount: true }
     });
     if (!inviter || inviter.inviteCount <= 0) {
@@ -170,7 +170,7 @@ router.post(
     await prisma.$transaction([
       prisma.invite.create({
         data: {
-          inviterId: req.user!.id,
+          inviterId: req.user.id,
           inviteKey,
           email: sanitizePlain(email),
           expires,
@@ -178,7 +178,7 @@ router.post(
         }
       }),
       prisma.user.update({
-        where: { id: req.user!.id },
+        where: { id: req.user.id },
         data: { inviteCount: { decrement: 1 } }
       })
     ]);

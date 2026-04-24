@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, validateParams } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
@@ -63,7 +63,7 @@ router.post(
   '/user-ranks',
   ...requirePermission('admin'),
   validate(createRankSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { name, level, permissions, color, badge } =
       req.body as CreateRankInput;
 
@@ -77,7 +77,7 @@ router.post(
       }
     });
 
-    await audit(prisma, req.user!.id, 'rank.create', 'UserRank', rank.id, {
+    await audit(prisma, req.user.id, 'rank.create', 'UserRank', rank.id, {
       name,
       level
     });
@@ -91,7 +91,7 @@ router.put(
   ...requirePermission('admin'),
   validateParams(userRankIdParamsSchema),
   validate(updateRankSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
     const { name, level, permissions, color, badge } =
@@ -107,7 +107,7 @@ router.put(
       }
     });
 
-    await audit(prisma, req.user!.id, 'rank.update', 'UserRank', id, {
+    await audit(prisma, req.user.id, 'rank.update', 'UserRank', id, {
       name,
       level,
       permissions
@@ -121,7 +121,7 @@ router.delete(
   '/user-ranks/:id',
   ...requirePermission('admin'),
   validateParams(userRankIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
     const userCount = await prisma.user.count({ where: { userRankId: id } });
@@ -135,7 +135,7 @@ router.delete(
       prisma.userRank.delete({ where: { id } }),
       prisma.auditLog.create({
         data: {
-          actorId: req.user!.id,
+          actorId: req.user.id,
           action: 'rank.delete',
           targetType: 'UserRank',
           targetId: id

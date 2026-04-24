@@ -1,9 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
+import type { AuthenticatedRequest } from '../../../types/auth';
 import { validate, validateParams } from '../../../middleware/validate';
 import { topicNoteSchema, type TopicNoteInput } from '../../../schemas/forum';
 
@@ -20,7 +21,7 @@ const requireModerator = async (
   res: Response,
   next: NextFunction
 ) => {
-  if (await isModerator(req, res)) return next();
+  if (await isModerator(req as AuthenticatedRequest, res)) return next();
   res.status(403).json({ msg: 'Not authorized' });
 };
 
@@ -48,10 +49,10 @@ router.post(
   requireAuth,
   requireModerator,
   validate(topicNoteSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumTopicId, body } = req.body as TopicNoteInput;
     const note = await prisma.forumTopicNote.create({
-      data: { forumTopicId, authorId: req.user!.id, body }
+      data: { forumTopicId, authorId: req.user.id, body }
     });
     res.status(201).json(note);
   })
@@ -62,11 +63,11 @@ router.delete(
   '/:id',
   requireAuth,
   validateParams(noteIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const note = await prisma.forumTopicNote.findUnique({ where: { id } });
     if (!note) return res.status(404).json({ msg: 'Note not found' });
-    if (note.authorId !== req.user!.id)
+    if (note.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.forumTopicNote.delete({ where: { id } });
     res.json({ msg: 'Note removed' });

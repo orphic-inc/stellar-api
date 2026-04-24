@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import { validate, validateParams } from '../../../middleware/validate';
@@ -20,7 +20,7 @@ router.get(
   '/:topicId',
   requireAuth,
   validateParams(topicIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { topicId: forumTopicId } = req.params as unknown as {
       topicId: number;
     };
@@ -43,7 +43,7 @@ router.get(
       return res.status(404).json({ msg: 'Poll not found' });
     }
 
-    if (req.user!.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
+    if (req.user.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -58,7 +58,7 @@ router.post(
   '/',
   requireAuth,
   validate(pollSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { forumTopicId, question, answers } = req.body as PollInput;
 
     const topic = await prisma.forumTopic.findUnique({
@@ -68,7 +68,7 @@ router.post(
     if (!topic || topic.deletedAt)
       return res.status(404).json({ msg: 'Topic not found' });
 
-    const isOwner = topic.authorId === req.user!.id;
+    const isOwner = topic.authorId === req.user.id;
     if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
@@ -85,7 +85,7 @@ router.put(
   '/:id/close',
   requireAuth,
   validateParams(pollIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
     const poll = await prisma.forumPoll.findUnique({
@@ -94,7 +94,7 @@ router.put(
     });
     if (!poll) return res.status(404).json({ msg: 'Poll not found' });
 
-    const isOwner = poll.forumTopic?.authorId === req.user!.id;
+    const isOwner = poll.forumTopic?.authorId === req.user.id;
     if (!isOwner && !(await isModerator(req, res))) {
       return res.status(403).json({ msg: 'Not authorized' });
     }

@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { FileType, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { validate, validateParams } from '../../../middleware/validate';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
@@ -69,7 +69,7 @@ router.post(
   '/',
   requireAuth,
   validate(createContributionSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const {
       communityId,
       title,
@@ -101,9 +101,9 @@ router.post(
 
     const contribution = await prisma.$transaction(async (tx) => {
       const contributor = await tx.contributor.upsert({
-        where: { userId: req.user!.id },
+        where: { userId: req.user.id },
         update: { communityId },
-        create: { userId: req.user!.id, communityId }
+        create: { userId: req.user.id, communityId }
       });
 
       const names = collaborators.map((c) => c.artist);
@@ -160,7 +160,7 @@ router.post(
 
       return tx.contribution.create({
         data: {
-          userId: req.user!.id,
+          userId: req.user.id,
           releaseId: release.id,
           contributorId: contributor.id,
           releaseDescription,

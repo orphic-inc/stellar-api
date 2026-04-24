@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
@@ -22,10 +22,16 @@ const TOKEN_TTL_MS = TOKEN_TTL_SECONDS * 1000;
 
 const issueToken = (userId: number): Promise<string> =>
   new Promise((resolve, reject) => {
-    jwt.sign({ user: { id: userId } }, authConfig.jwtSecret, { expiresIn: TOKEN_TTL_SECONDS }, (err, token) => {
-      if (err || !token) return reject(err ?? new Error('Token generation failed'));
-      resolve(token);
-    });
+    jwt.sign(
+      { user: { id: userId } },
+      authConfig.jwtSecret,
+      { expiresIn: TOKEN_TTL_SECONDS },
+      (err, token) => {
+        if (err || !token)
+          return reject(err ?? new Error('Token generation failed'));
+        resolve(token);
+      }
+    );
   });
 
 const cookieOptions = {
@@ -78,11 +84,16 @@ router.post(
       return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
     }
 
-    const defaultRank = await prisma.userRank.findFirst({ where: { level: 100 } });
+    const defaultRank = await prisma.userRank.findFirst({
+      where: { level: 100 }
+    });
     if (!defaultRank) throw new Error('Default rank not found');
 
     const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
-    const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
+    const hashedPassword = await bcrypt.hash(
+      password,
+      await bcrypt.genSalt(10)
+    );
 
     const user = await prisma.$transaction(async (tx) => {
       const settings = await tx.userSettings.create({ data: {} });
@@ -111,9 +122,9 @@ router.post(
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       select: authUserSelect
     });
     if (!user) return res.status(401).json({ msg: 'Unauthorized' });
@@ -129,13 +140,18 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = req.body as LoginInput;
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (!user) return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+    if (!user)
+      return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
 
-    if (user.disabled) return res.status(403).json({ errors: [{ msg: 'Account disabled' }] });
+    if (user.disabled)
+      return res.status(403).json({ errors: [{ msg: 'Account disabled' }] });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
+    if (!isMatch)
+      return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
 
     const authUser = await prisma.user.update({
       where: { id: user.id },
