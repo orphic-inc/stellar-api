@@ -113,8 +113,7 @@ router.post(
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] }
     });
-    if (existing)
-      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+    if (existing) return res.status(400).json({ msg: 'User already exists' });
 
     const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
     const salt = await bcrypt.genSalt(10);
