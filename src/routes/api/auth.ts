@@ -6,7 +6,7 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
-import { validate } from '../../middleware/validate';
+import { validate, parsedBody } from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import {
   loginSchema,
@@ -75,7 +75,7 @@ router.post(
   authLimiter,
   validate(registerSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password } = req.body as RegisterInput;
+    const { username, email, password } = parsedBody<RegisterInput>(res);
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
@@ -138,7 +138,7 @@ router.post(
   authLimiter,
   validate(loginSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body as LoginInput;
+    const { email, password } = parsedBody<LoginInput>(res);
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }

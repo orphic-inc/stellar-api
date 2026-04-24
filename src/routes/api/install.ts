@@ -6,7 +6,7 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
-import { validate } from '../../middleware/validate';
+import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 
 const TOKEN_TTL_SECONDS = 3600;
@@ -17,7 +17,8 @@ const issueToken = (userId: number): Promise<string> =>
       authConfig.jwtSecret,
       { expiresIn: TOKEN_TTL_SECONDS },
       (err, token) => {
-        if (err || !token) return reject(err ?? new Error('Token generation failed'));
+        if (err || !token)
+          return reject(err ?? new Error('Token generation failed'));
         resolve(token);
       }
     );
@@ -34,8 +35,8 @@ const DEFAULT_RANKS = [
     badge: '',
     permissions: {
       forums_read: true,
-      forums_post: true,
-    },
+      forums_post: true
+    }
   },
   {
     level: 200,
@@ -44,8 +45,8 @@ const DEFAULT_RANKS = [
     badge: '',
     permissions: {
       forums_read: true,
-      forums_post: true,
-    },
+      forums_post: true
+    }
   },
   {
     level: 500,
@@ -63,8 +64,8 @@ const DEFAULT_RANKS = [
       users_edit: true,
       users_warn: true,
       users_disable: true,
-      staff: true,
-    },
+      staff: true
+    }
   },
   {
     level: 1000,
@@ -83,16 +84,19 @@ const DEFAULT_RANKS = [
       users_warn: true,
       users_disable: true,
       staff: true,
-      admin: true,
-    },
-  },
+      admin: true
+    }
+  }
 ];
 
 // GET /api/install — returns installation status
-router.get('/', asyncHandler(async (_req: Request, res: Response) => {
-  const count = await prisma.userRank.count();
-  res.json({ installed: count > 0 });
-}));
+router.get(
+  '/',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const count = await prisma.userRank.count();
+    res.json({ installed: count > 0 });
+  })
+);
 
 // POST /api/install — one-time setup: seed ranks and create first SysOp user
 router.post(
@@ -101,14 +105,16 @@ router.post(
   validate(installSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const count = await prisma.userRank.count();
-    if (count > 0) return res.status(409).json({ msg: 'Application already installed' });
+    if (count > 0)
+      return res.status(409).json({ msg: 'Application already installed' });
 
-    const { username, email, password } = req.body as InstallInput;
+    const { username, email, password } = parsedBody<InstallInput>(res);
 
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ email }, { username }] },
+      where: { OR: [{ email }, { username }] }
     });
-    if (existing) return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+    if (existing)
+      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
 
     const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
     const salt = await bcrypt.genSalt(10);
@@ -121,7 +127,9 @@ router.post(
         if (rank.level === 1000) sysopRankId = created.id;
       }
 
-      const systemCategory = await tx.forumCategory.create({ data: { name: 'System', sort: 0 } });
+      const systemCategory = await tx.forumCategory.create({
+        data: { name: 'System', sort: 0 }
+      });
       await tx.forum.create({
         data: {
           forumCategoryId: systemCategory.id,
@@ -146,7 +154,7 @@ router.post(
           userRankId: sysopRankId!,
           userSettingsId: settings.id,
           profileId: profile.id,
-          inviteCount: 100,
+          inviteCount: 100
         },
         select: {
           id: true,
@@ -164,7 +172,7 @@ router.post(
               permissions: true
             }
           }
-        },
+        }
       });
     });
 

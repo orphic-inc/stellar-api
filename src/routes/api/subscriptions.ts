@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate } from '../../middleware/validate';
+import { validate, parsedBody } from '../../middleware/validate';
 import {
   subscribeSchema,
   subscribeCommentsSchema,
@@ -18,7 +18,7 @@ router.post(
   requireAuth,
   validate(subscribeSchema),
   authHandler(async (req, res) => {
-    const { topicId, action } = req.body as SubscribeInput;
+    const { topicId, action } = parsedBody<SubscribeInput>(res);
     const userId = req.user.id;
 
     if (action === 'subscribe') {
@@ -55,7 +55,7 @@ router.post(
   requireAuth,
   validate(subscribeCommentsSchema),
   authHandler(async (req, res) => {
-    const { page, pageId, action } = req.body as SubscribeCommentsInput;
+    const { page, pageId, action } = parsedBody<SubscribeCommentsInput>(res);
     const userId = req.user.id;
 
     if (action === 'subscribe') {
