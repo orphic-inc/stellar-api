@@ -2239,6 +2239,203 @@ registry.registerPath({
   }
 });
 
+// ─── Posts ────────────────────────────────────────────────────────────────────
+
+const PostComment = z.object({
+  userId: z.number(),
+  text: z.string(),
+  date: z.string()
+});
+
+const Post = registry.register(
+  'Post',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    title: z.string(),
+    text: z.string(),
+    category: z.string(),
+    tags: z.array(z.string()),
+    comments: z.array(PostComment),
+    createdAt: z.string(),
+    user: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/posts',
+  tags: ['Posts'],
+  responses: {
+    200: {
+      description: 'All posts',
+      content: { 'application/json': { schema: z.array(Post) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/posts/{id}',
+  tags: ['Posts'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Post',
+      content: { 'application/json': { schema: Post } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/posts',
+  tags: ['Posts'],
+  responses: {
+    201: {
+      description: 'Post created',
+      content: { 'application/json': { schema: Post } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/posts/{id}',
+  tags: ['Posts'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Post deleted' },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/posts/comment/{id}',
+  tags: ['Posts'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    201: {
+      description: 'Comment added; returns updated comments list',
+      content: { 'application/json': { schema: z.array(PostComment) } }
+    },
+    404: {
+      description: 'Post not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/posts/comment/{id}/{commentIdx}',
+  tags: ['Posts'],
+  request: { params: z.object({ id: z.string(), commentIdx: z.string() }) },
+  responses: {
+    204: { description: 'Comment deleted' },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Post or comment not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Forum topic notes ────────────────────────────────────────────────────────
+
+const ForumTopicNote = registry.register(
+  'ForumTopicNote',
+  z.object({
+    id: z.number(),
+    forumTopicId: z.number(),
+    authorId: z.number(),
+    body: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    author: z.object({ id: z.number(), username: z.string() }).optional()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/topic-notes/{topicId}',
+  tags: ['Forums'],
+  request: { params: z.object({ topicId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Topic notes (moderators only)',
+      content: { 'application/json': { schema: z.array(ForumTopicNote) } }
+    },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/topic-notes',
+  tags: ['Forums'],
+  responses: {
+    201: {
+      description: 'Note created',
+      content: { 'application/json': { schema: ForumTopicNote } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/forums/topic-notes/{id}',
+  tags: ['Forums'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Note deleted' },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Document builder ─────────────────────────────────────────────────────────
 
 export function buildOpenApiDocument() {
