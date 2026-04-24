@@ -257,7 +257,7 @@ router.delete(
       })
     ]);
 
-    res.json({ msg: 'Topic removed' });
+    res.status(204).send();
   })
 );
 

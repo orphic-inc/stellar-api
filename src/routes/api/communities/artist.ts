@@ -251,7 +251,7 @@ router.delete(
     const artist = await prisma.artist.findUnique({ where: { id } });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
     await prisma.artist.delete({ where: { id } });
-    res.json({ msg: 'Artist deleted' });
+    res.status(204).send();
   })
 );
 

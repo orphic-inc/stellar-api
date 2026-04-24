@@ -66,7 +66,7 @@ const authUserSelect = {
 // POST /api/auth/logout
 router.post('/logout', (_req: Request, res: Response) => {
   res.clearCookie('token', { sameSite: 'lax', httpOnly: true });
-  res.json({ msg: 'Logged out' });
+  res.status(204).send();
 });
 
 // POST /api/auth/register — public self-registration

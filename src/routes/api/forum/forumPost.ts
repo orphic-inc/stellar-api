@@ -261,7 +261,7 @@ router.delete(
         }
       })
     ]);
-    res.json({ msg: 'Forum post removed' });
+    res.status(204).send();
   })
 );
 

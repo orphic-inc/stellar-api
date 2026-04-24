@@ -32,6 +32,12 @@ import {
   subscribeSchema,
   subscribeCommentsSchema
 } from '../schemas/subscription';
+import { announcementSchema } from '../schemas/announcement';
+import {
+  commentQuerySchema,
+  createCommentSchema,
+  updateCommentSchema
+} from '../schemas/comment';
 
 extendZodWithOpenApi(z);
 
@@ -153,9 +159,8 @@ registry.registerPath({
   path: '/auth/logout',
   tags: ['Auth'],
   responses: {
-    200: {
-      description: 'Logged out',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Logged out'
     }
   }
 });
@@ -507,6 +512,21 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'delete',
+  path: '/profile',
+  tags: ['Profile'],
+  responses: {
+    204: {
+      description: 'Account disabled'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'post',
   path: '/profile/referral/create-invite',
   tags: ['Profile'],
@@ -525,7 +545,6 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            msg: z.string(),
             inviteKey: z.string()
           })
         }
@@ -701,6 +720,80 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'post',
+  path: '/announcements',
+  tags: ['Announcements'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: announcementSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Announcement created',
+      content: { 'application/json': { schema: Announcement } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/announcements/{id}',
+  tags: ['Announcements'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Announcement deleted'
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/announcements/blog',
+  tags: ['Announcements'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: announcementSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Blog post created',
+      content: { 'application/json': { schema: BlogPost } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/announcements/blog/{id}',
+  tags: ['Announcements'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Blog post deleted'
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'get',
   path: '/stats',
   tags: ['Stats'],
@@ -768,9 +861,8 @@ registry.registerPath({
   tags: ['Stylesheets'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    200: {
-      description: 'Stylesheet removed',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Stylesheet removed'
     },
     404: {
       description: 'Not found',
@@ -799,9 +891,8 @@ registry.registerPath({
   tags: ['Notifications'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    200: {
-      description: 'Notification removed',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Notification removed'
     },
     404: {
       description: 'Not found',
@@ -832,13 +923,8 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: subscribeSchema } } }
   },
   responses: {
-    200: {
-      description: 'Subscription updated',
-      content: { 'application/json': { schema: MsgResponse } }
-    },
-    201: {
-      description: 'Subscription created',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Subscription updated'
     }
   }
 });
@@ -853,13 +939,8 @@ registry.registerPath({
     }
   },
   responses: {
-    200: {
-      description: 'Comment subscription updated',
-      content: { 'application/json': { schema: MsgResponse } }
-    },
-    201: {
-      description: 'Comment subscription created',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Comment subscription updated'
     }
   }
 });
@@ -1238,9 +1319,8 @@ registry.registerPath({
     params: z.object({ forumId: z.string(), topicId: z.string() })
   },
   responses: {
-    200: {
-      description: 'Topic removed',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Topic removed'
     },
     404: {
       description: 'Not found',
@@ -1355,9 +1435,8 @@ registry.registerPath({
     })
   },
   responses: {
-    200: {
-      description: 'Post removed',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Post removed'
     },
     404: {
       description: 'Not found',
@@ -1758,24 +1837,56 @@ const Comment = registry.register(
     page: z.string(),
     body: z.string(),
     authorId: z.number(),
-    createdAt: z.string()
+    createdAt: z.string(),
+    author: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .optional()
   })
 );
+
+const PaginatedComments = registry.register(
+  'PaginatedComments',
+  z.object({
+    data: z.array(Comment),
+    meta: PaginationMeta
+  })
+);
+
+registry.registerPath({
+  method: 'delete',
+  path: '/tools/user-ranks/{id}',
+  tags: ['Tools'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'User rank deleted'
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Rank still assigned to users',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',
   path: '/comments',
   tags: ['Comments'],
   request: {
-    query: z.object({
-      page: z.string().optional(),
-      pageId: z.string().optional()
-    })
+    query: commentQuerySchema
   },
   responses: {
     200: {
       description: 'Comments',
-      content: { 'application/json': { schema: z.array(Comment) } }
+      content: { 'application/json': { schema: PaginatedComments } }
     }
   }
 });
@@ -1787,15 +1898,7 @@ registry.registerPath({
   request: {
     body: {
       content: {
-        'application/json': {
-          schema: z.object({
-            page: z.string(),
-            body: z.string().min(1),
-            communityId: z.number().optional(),
-            contributionId: z.number().optional(),
-            artistId: z.number().optional()
-          })
-        }
+        'application/json': { schema: createCommentSchema }
       }
     }
   },
@@ -1812,14 +1915,39 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'put',
+  path: '/comments/{id}',
+  tags: ['Comments'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateCommentSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Comment updated',
+      content: { 'application/json': { schema: Comment } }
+    },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'delete',
   path: '/comments/{id}',
   tags: ['Comments'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    200: {
-      description: 'Comment deleted',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Comment deleted'
     },
     403: {
       description: 'Not authorized',
@@ -1994,9 +2122,8 @@ registry.registerPath({
   tags: ['Artists'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    200: {
-      description: 'Artist deleted',
-      content: { 'application/json': { schema: MsgResponse } }
+    204: {
+      description: 'Artist deleted'
     },
     404: {
       description: 'Not found',

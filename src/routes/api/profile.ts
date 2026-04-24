@@ -144,7 +144,7 @@ router.delete(
       data: { disabled: true }
     });
     res.clearCookie('token');
-    res.json({ msg: 'Account disabled' });
+    res.status(204).send();
   })
 );
 
@@ -189,7 +189,7 @@ router.post(
       })
     ]);
 
-    res.status(201).json({ msg: 'Invite sent', inviteKey });
+    res.status(201).json({ inviteKey });
   })
 );
 
