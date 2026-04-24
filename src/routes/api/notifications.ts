@@ -39,7 +39,7 @@ router.delete(
     if (notif.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     await prisma.notification.delete({ where: { id } });
-    res.json({ msg: 'Notification removed' });
+    res.status(204).send();
   })
 );
 

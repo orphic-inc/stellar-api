@@ -69,7 +69,7 @@ router.delete(
     const existing = await prisma.stylesheet.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Stylesheet not found' });
     await prisma.stylesheet.delete({ where: { id } });
-    res.json({ msg: 'Stylesheet removed' });
+    res.status(204).send();
   })
 );
 

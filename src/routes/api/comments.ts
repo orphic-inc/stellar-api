@@ -161,7 +161,7 @@ router.delete(
         }
       })
     ]);
-    res.json({ msg: 'Comment deleted' });
+    res.status(204).send();
   })
 );
 

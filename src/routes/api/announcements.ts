@@ -78,7 +78,7 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     await prisma.news.delete({ where: { id } });
-    res.json({ msg: 'Deleted' });
+    res.status(204).send();
   })
 );
 
@@ -109,7 +109,7 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     await prisma.blog.delete({ where: { id } });
-    res.json({ msg: 'Deleted' });
+    res.status(204).send();
   })
 );
 

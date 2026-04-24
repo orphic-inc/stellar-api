@@ -27,10 +27,10 @@ router.post(
         create: { userId, topicId },
         update: {}
       });
-      res.status(201).json({ msg: 'Subscribed successfully' });
+      res.status(204).send();
     } else if (action === 'unsubscribe') {
       await prisma.subscription.deleteMany({ where: { userId, topicId } });
-      res.json({ msg: 'Unsubscribed successfully' });
+      res.status(204).send();
     }
   })
 );
@@ -64,12 +64,12 @@ router.post(
         create: { userId, page, pageId },
         update: {}
       });
-      res.status(201).json({ msg: 'Subscribed to comments successfully' });
+      res.status(204).send();
     } else if (action === 'unsubscribe') {
       await prisma.commentSubscription.deleteMany({
         where: { userId, page, pageId }
       });
-      res.json({ msg: 'Unsubscribed from comments successfully' });
+      res.status(204).send();
     }
   })
 );
