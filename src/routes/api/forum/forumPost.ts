@@ -31,6 +31,14 @@ const forumPostParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
+const postInclude = {
+  author: { select: { id: true, username: true, avatar: true } },
+  edits: {
+    orderBy: { editedAt: 'asc' as const },
+    include: { editor: { select: { id: true, username: true } } }
+  }
+};
+
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
   '/',
@@ -64,9 +72,7 @@ router.get(
         orderBy: { createdAt: 'asc' },
         skip: pg.skip,
         take: pg.limit,
-        include: {
-          author: { select: { id: true, username: true, avatar: true } }
-        }
+        include: postInclude
       }),
       prisma.forumPost.count({
         where: {
@@ -110,9 +116,7 @@ router.get(
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       },
-      include: {
-        author: { select: { id: true, username: true, avatar: true } }
-      }
+      include: postInclude
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     res.json(post);
@@ -173,13 +177,7 @@ router.put(
     if (post.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await updatePost(
-      id,
-      req.user.id,
-      post.edits,
-      post.body,
-      body
-    );
+    const updated = await updatePost(id, req.user.id, post.body, body);
     res.json(updated);
   })
 );

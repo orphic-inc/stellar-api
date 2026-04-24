@@ -1,6 +1,5 @@
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
-import { appendToJsonArray } from '../lib/jsonHelpers';
 
 type DeleteForumResult =
   | { ok: true }
@@ -105,20 +104,18 @@ export const createPost = async (
 export const updatePost = async (
   id: number,
   editorId: number,
-  currentEdits: unknown,
   currentBody: string,
   newBody: string
 ) =>
-  prisma.forumPost.update({
-    where: { id },
-    data: {
-      body: sanitizeHtml(newBody),
-      edits: appendToJsonArray(currentEdits, {
-        userId: editorId,
-        time: new Date().toISOString(),
-        previousBody: currentBody
-      })
-    }
+  prisma.$transaction(async (tx) => {
+    const post = await tx.forumPost.update({
+      where: { id },
+      data: { body: sanitizeHtml(newBody) }
+    });
+    await tx.forumPostEdit.create({
+      data: { forumPostId: id, editorId, previousBody: currentBody }
+    });
+    return post;
   });
 
 export const deletePost = async (
