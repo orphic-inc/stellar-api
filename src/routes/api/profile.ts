@@ -14,6 +14,7 @@ import {
 import {
   profileUpdateSchema,
   inviteSchema,
+  type ProfileUpdateInput,
   type InviteInput
 } from '../../schemas/profile';
 import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
@@ -92,7 +93,7 @@ router.put(
       siteAppearance,
       externalStylesheet,
       styledTooltips
-    } = req.body;
+    } = parsedBody<ProfileUpdateInput>(res);
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
