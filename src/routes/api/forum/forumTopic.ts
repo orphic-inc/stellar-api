@@ -5,6 +5,7 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -126,7 +127,8 @@ router.post(
         .json({ msg: 'Insufficient class to create topics in this forum' });
     }
 
-    const { title, body, question, answers } = req.body as CreateTopicInput;
+    const { title, body, question, answers } =
+      parsedBody<CreateTopicInput>(res);
 
     const topic = await prisma.$transaction(async (tx) => {
       const topic = await tx.forumTopic.create({

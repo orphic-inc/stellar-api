@@ -9,6 +9,7 @@ import {
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -99,7 +100,7 @@ router.post(
   requireAuth,
   validate(similarArtistSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId, similarArtistId } = req.body as SimilarArtistInput;
+    const { artistId, similarArtistId } = parsedBody<SimilarArtistInput>(res);
     const result = await prisma.similarArtist.upsert({
       where: { artistId_similarArtistId: { artistId, similarArtistId } },
       create: { artistId, similarArtistId, votes: [] },
@@ -115,7 +116,7 @@ router.post(
   requireAuth,
   validate(artistAliasSchema),
   authHandler(async (req, res) => {
-    const { artistId, redirectId } = req.body as ArtistAliasInput;
+    const { artistId, redirectId } = parsedBody<ArtistAliasInput>(res);
     const alias = await prisma.artistAlias.create({
       data: { artistId, redirectId, userId: req.user.id }
     });
@@ -129,7 +130,7 @@ router.post(
   requireAuth,
   validate(artistTagSchema),
   authHandler(async (req, res) => {
-    const { artistId, tagId } = req.body as ArtistTagInput;
+    const { artistId, tagId } = parsedBody<ArtistTagInput>(res);
     const tag = await prisma.artistTag.upsert({
       where: { artistId_tagId: { artistId, tagId } },
       create: { artistId, tagId, userId: req.user.id },
@@ -145,7 +146,7 @@ router.post(
   requireAuth,
   validate(artistSchema),
   authHandler(async (req, res) => {
-    const { name, vanityHouse } = req.body as ArtistInput;
+    const { name, vanityHouse } = parsedBody<ArtistInput>(res);
 
     const artist = await prisma.artist.create({
       data: { name, vanityHouse: vanityHouse ?? false }
@@ -210,7 +211,8 @@ router.put(
   validate(updateArtistSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { name, vanityHouse, description } = req.body as UpdateArtistInput;
+    const { name, vanityHouse, description } =
+      parsedBody<UpdateArtistInput>(res);
 
     const existing = await prisma.artist.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Artist not found' });

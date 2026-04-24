@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { validate } from '../../../middleware/validate';
+import { validate, parsedBody } from '../../../middleware/validate';
 import { pollVoteSchema, type PollVoteInput } from '../../../schemas/poll';
 
 const router = express.Router();
@@ -13,7 +13,7 @@ router.post(
   requireAuth,
   validate(pollVoteSchema),
   authHandler(async (req, res) => {
-    const { forumPollId, vote } = req.body as PollVoteInput;
+    const { forumPollId, vote } = parsedBody<PollVoteInput>(res);
     const userId = req.user.id;
 
     const poll = await prisma.forumPoll.findUnique({

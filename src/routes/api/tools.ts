@@ -6,6 +6,7 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  parsedBody,
   parsedParams
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
@@ -69,7 +70,7 @@ router.post(
   validate(createRankSchema),
   authHandler(async (req, res) => {
     const { name, level, permissions, color, badge } =
-      req.body as CreateRankInput;
+      parsedBody<CreateRankInput>(res);
 
     const rank = await prisma.userRank.create({
       data: {
@@ -99,7 +100,7 @@ router.put(
     const { id } = parsedParams<{ id: number }>(res);
 
     const { name, level, permissions, color, badge } =
-      req.body as UpdateRankInput;
+      parsedBody<UpdateRankInput>(res);
     const rank = await prisma.userRank.update({
       where: { id },
       data: {

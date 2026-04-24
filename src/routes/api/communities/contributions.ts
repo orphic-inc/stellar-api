@@ -1,10 +1,11 @@
 import express, { Request, Response } from 'express';
-import { FileType, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { createContributionSubmission } from '../../../modules/contribution';
 import { requireAuth } from '../../../middleware/auth';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
@@ -74,114 +75,12 @@ router.post(
   requireAuth,
   validate(createContributionSchema),
   authHandler(async (req, res) => {
-    const {
-      communityId,
-      title,
-      year,
-      type,
-      fileType,
-      sizeInBytes,
-      tags,
-      image,
-      description,
-      releaseDescription,
-      collaborators,
-      jsonFile
-    } = req.body as CreateContributionInput;
-
-    const community = await prisma.community.findUnique({
-      where: { id: communityId }
+    const contribution = await createContributionSubmission({
+      userId: req.user.id,
+      input: parsedBody<CreateContributionInput>(res)
     });
-    if (!community) return res.status(404).json({ msg: 'Community not found' });
-
-    const normalizedTags = [
-      ...new Set(
-        (tags ?? '')
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean)
-      )
-    ];
-
-    const contribution = await prisma.$transaction(async (tx) => {
-      const contributor = await tx.contributor.upsert({
-        where: { userId: req.user.id },
-        update: { communityId },
-        create: { userId: req.user.id, communityId }
-      });
-
-      const names = collaborators.map((c) => c.artist);
-      const existing = await tx.artist.findMany({
-        where: { name: { in: names } }
-      });
-      const artistMap = new Map(existing.map((a) => [a.name, a]));
-
-      const toCreate = collaborators.filter((c) => !artistMap.has(c.artist));
-      if (toCreate.length > 0) {
-        await tx.artist.createMany({
-          data: toCreate.map((c) => ({ name: c.artist, vanityHouse: false })),
-          skipDuplicates: true
-        });
-        const created = await tx.artist.findMany({
-          where: { name: { in: toCreate.map((c) => c.artist) } }
-        });
-        created.forEach((a) => artistMap.set(a.name, a));
-      }
-
-      const collaboratorRecords = collaborators.map(
-        (c) => artistMap.get(c.artist)!
-      );
-
-      const primaryArtist = collaboratorRecords[0];
-      const release = await tx.release.create({
-        data: {
-          artistId: primaryArtist.id,
-          communityId,
-          title,
-          year,
-          type,
-          releaseType:
-            type === ReleaseType.Music
-              ? ReleaseCategory.Album
-              : ReleaseCategory.Unknown,
-          image: image ?? null,
-          description: description ?? releaseDescription ?? title,
-          contributors: { connect: { id: contributor.id } },
-          ...(normalizedTags.length > 0 && {
-            tags: {
-              connectOrCreate: normalizedTags.map((tagName) => ({
-                where: { name: tagName },
-                create: { name: tagName }
-              }))
-            }
-          })
-        },
-        include: {
-          artist: true,
-          tags: true
-        }
-      });
-
-      return tx.contribution.create({
-        data: {
-          userId: req.user.id,
-          releaseId: release.id,
-          contributorId: contributor.id,
-          releaseDescription,
-          type: fileType as FileType,
-          sizeInBytes,
-          jsonFile: jsonFile ?? false,
-          collaborators: {
-            connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
-          }
-        },
-        include: {
-          user: { select: { id: true, username: true } },
-          release: { select: { id: true, title: true, communityId: true } },
-          collaborators: { select: { id: true, name: true } }
-        }
-      });
-    });
+    if (!contribution)
+      return res.status(404).json({ msg: 'Community not found' });
 
     res.status(201).json(contribution);
   })
