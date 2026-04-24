@@ -106,18 +106,27 @@ router.post(
         create: { userId: req.user!.id, communityId }
       });
 
-      const collaboratorRecords = [];
-      for (const collaborator of collaborators) {
-        const existingArtist = await tx.artist.findFirst({
-          where: { name: collaborator.artist }
+      const names = collaborators.map((c) => c.artist);
+      const existing = await tx.artist.findMany({
+        where: { name: { in: names } }
+      });
+      const artistMap = new Map(existing.map((a) => [a.name, a]));
+
+      const toCreate = collaborators.filter((c) => !artistMap.has(c.artist));
+      if (toCreate.length > 0) {
+        await tx.artist.createMany({
+          data: toCreate.map((c) => ({ name: c.artist, vanityHouse: false })),
+          skipDuplicates: true
         });
-        const artist =
-          existingArtist ??
-          (await tx.artist.create({
-            data: { name: collaborator.artist, vanityHouse: false }
-          }));
-        collaboratorRecords.push(artist);
+        const created = await tx.artist.findMany({
+          where: { name: { in: toCreate.map((c) => c.artist) } }
+        });
+        created.forEach((a) => artistMap.set(a.name, a));
       }
+
+      const collaboratorRecords = collaborators.map(
+        (c) => artistMap.get(c.artist)!
+      );
 
       const primaryArtist = collaboratorRecords[0];
       const release = await tx.release.create({
