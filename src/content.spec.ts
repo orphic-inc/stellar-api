@@ -296,6 +296,7 @@ describe('API content and shared flows', () => {
         title: 'Test Release',
         year: 2024,
         fileType: 'wav',
+        downloadUrl: 'https://example.com/download',
         sizeInBytes: 12345,
         collaborators: [{ artist: 'Test Artist', importance: 'primary' }]
       });
@@ -321,6 +322,7 @@ describe('API content and shared flows', () => {
         title: 'Test Release',
         year: 2024,
         fileType: 'wav',
+        downloadUrl: 'https://example.com/download',
         sizeInBytes: 12345,
         releaseDescription: 'A real contribution',
         collaborators: [{ artist: 'Test Artist', importance: 'primary' }]
