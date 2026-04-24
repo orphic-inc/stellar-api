@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
-import { createTopic, deleteTopic } from '../../../modules/forum';
+import { createTopic, updateTopic, deleteTopic } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
@@ -162,14 +162,7 @@ router.put(
     }
 
     const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
-    const updated = await prisma.forumTopic.update({
-      where: { id },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(isLocked !== undefined && { isLocked }),
-        ...(isSticky !== undefined && { isSticky })
-      }
-    });
+    const updated = await updateTopic(id, { title, isLocked, isSticky });
     res.json(updated);
   })
 );

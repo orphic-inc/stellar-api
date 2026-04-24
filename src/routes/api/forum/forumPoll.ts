@@ -1,7 +1,8 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
+import { createPoll, closePoll } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
@@ -78,9 +79,7 @@ router.post(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const poll = await prisma.forumPoll.create({
-      data: { forumTopicId, question, answers }
-    });
+    const poll = await createPoll(forumTopicId, question, answers);
     res.status(201).json(poll);
   })
 );
@@ -104,10 +103,7 @@ router.put(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const updated = await prisma.forumPoll.update({
-      where: { id },
-      data: { closed: true }
-    });
+    const updated = await closePoll(id);
     res.json(updated);
   })
 );

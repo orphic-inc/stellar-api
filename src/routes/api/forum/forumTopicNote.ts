@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { createTopicNote } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import type { AuthenticatedRequest } from '../../../types/auth';
@@ -56,9 +57,7 @@ router.post(
   validate(topicNoteSchema),
   authHandler(async (req, res) => {
     const { forumTopicId, body } = parsedBody<TopicNoteInput>(res);
-    const note = await prisma.forumTopicNote.create({
-      data: { forumTopicId, authorId: req.user.id, body }
-    });
+    const note = await createTopicNote(forumTopicId, req.user.id, body);
     res.status(201).json(note);
   })
 );
