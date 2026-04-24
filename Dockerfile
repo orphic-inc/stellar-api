@@ -20,6 +20,8 @@ COPY --from=build /usr/src/stellar-api/prisma ./prisma
 
 RUN npx prisma generate
 
+USER node
+
 EXPOSE 8080
 
 CMD ["node", "dist/index.js"]
