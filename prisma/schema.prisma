@@ -20,14 +20,30 @@ enum CommunityType {
 }
 
 enum FileType {
-  txt
+  mp3
+  flac
   wav
-  pdf
-  wmv
   ogg
-  lua
+  aac
+  m4a
+  m4b
+  mp4
+  mkv
+  avi
+  mov
+  zip
+  exe
+  dmg
+  apk
+  pdf
+  epub
+  mobi
+  cbz
+  cbr
   jpg
   png
+  gif
+  txt
 }
 
 enum InviteStatus {
@@ -608,9 +624,9 @@ model Contribution {
   consumers          Consumer[]    @relation("ContributionConsumers")
   collaborators      Artist[]      @relation("ContributionCollaborators")
   comments           Comment[]
-  sizeInBytes        Int
+  downloadUrl        String
+  sizeInBytes        Int?
   type               FileType
-  jsonFile           Boolean       @default(false)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

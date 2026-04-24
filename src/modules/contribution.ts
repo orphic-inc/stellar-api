@@ -24,13 +24,13 @@ export const createContributionSubmission = async ({
     year,
     type,
     fileType,
+    downloadUrl,
     sizeInBytes,
     tags,
     image,
     description,
     releaseDescription,
-    collaborators,
-    jsonFile
+    collaborators
   } = input;
 
   const community = await prisma.community.findUnique({
@@ -111,8 +111,8 @@ export const createContributionSubmission = async ({
         contributorId: contributor.id,
         releaseDescription,
         type: fileType as FileType,
-        sizeInBytes,
-        jsonFile: jsonFile ?? false,
+        downloadUrl,
+        sizeInBytes: sizeInBytes ?? null,
         collaborators: {
           connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
         }

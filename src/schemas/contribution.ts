@@ -14,7 +14,8 @@ export const createContributionSchema = z.object({
   title: z.string().min(1, 'Title is required').max(256),
   year: z.number().int().min(1900).max(2100),
   fileType: fileTypeEnum,
-  sizeInBytes: z.number().int().positive(),
+  downloadUrl: z.string().url('A valid download URL is required'),
+  sizeInBytes: z.number().int().positive().optional(),
   tags: z
     .string()
     .optional()
@@ -40,8 +41,7 @@ export const createContributionSchema = z.object({
         importance: z.string().min(1)
       })
     )
-    .min(1, 'At least one artist/creator is required'),
-  jsonFile: z.boolean().optional()
+    .min(1, 'At least one artist/creator is required')
 });
 
 export type CreateContributionInput = z.infer<typeof createContributionSchema>;
