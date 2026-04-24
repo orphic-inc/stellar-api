@@ -1,5 +1,5 @@
 // @ts-check
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { Client } = require('pg');
 
 /**
@@ -19,6 +19,11 @@ module.exports = async function globalSetup() {
   // --- 1. Create the database if it does not exist ---
   const parsed = new URL(testUrl);
   const dbName = parsed.pathname.replace(/^\//, '');
+  if (!/^[A-Za-z0-9_]+$/.test(dbName)) {
+    throw new Error(
+      `STELLAR_PSQL_URI_TEST must use a simple database name, got: ${dbName}`
+    );
+  }
   const adminClient = new Client({
     host: parsed.hostname,
     port: parsed.port ? Number(parsed.port) : 5432,
@@ -34,16 +39,36 @@ module.exports = async function globalSetup() {
       [dbName]
     );
     if (rows.length === 0) {
-      // identifiers can't be parameterised, but dbName comes from our own env var
-      await adminClient.query(`CREATE DATABASE "${dbName}"`);
+      await adminClient.end();
+      execFileSync(
+        'createdb',
+        [
+          '--host',
+          parsed.hostname,
+          '--port',
+          parsed.port || '5432',
+          '--username',
+          parsed.username,
+          dbName
+        ],
+        {
+          env: { ...process.env, PGPASSWORD: parsed.password },
+          stdio: 'inherit'
+        }
+      );
       console.log(`[integration] Created database: ${dbName}`);
+      return;
     }
   } finally {
-    await adminClient.end();
+    try {
+      await adminClient.end();
+    } catch {
+      // ignore double-close after createdb path
+    }
   }
 
   // --- 2. Apply migrations ---
-  execSync('npx prisma migrate deploy', {
+  execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
     env: { ...process.env, STELLAR_PSQL_URI: testUrl },
     stdio: 'inherit'
   });
