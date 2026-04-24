@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
+import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 
 export type InviteTreeNode = {
   id: number;
@@ -105,4 +107,103 @@ export const getCurrentProfile = async (userId: number) => {
     ...user,
     inviteTree: buildInviteTree(inviteRows)
   };
+};
+
+export const updateProfile = async (
+  userId: number,
+  data: {
+    avatar?: string;
+    avatarMouseoverText?: string;
+    profileTitle?: string;
+    profileInfo?: string;
+    siteAppearance?: string;
+    externalStylesheet?: string;
+    styledTooltips?: boolean;
+  }
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profileId: true, userSettingsId: true }
+  });
+  if (!user) return null;
+
+  await prisma.$transaction([
+    prisma.profile.update({
+      where: { id: user.profileId },
+      data: {
+        ...(data.avatar !== undefined && {
+          avatar: sanitizePlain(data.avatar)
+        }),
+        ...(data.avatarMouseoverText !== undefined && {
+          avatarMouseoverText: sanitizePlain(data.avatarMouseoverText)
+        }),
+        ...(data.profileTitle !== undefined && {
+          profileTitle: sanitizePlain(data.profileTitle)
+        }),
+        ...(data.profileInfo !== undefined && {
+          profileInfo: sanitizeHtml(data.profileInfo)
+        })
+      }
+    }),
+    prisma.userSettings.update({
+      where: { id: user.userSettingsId },
+      data: {
+        ...(data.siteAppearance !== undefined && {
+          siteAppearance: data.siteAppearance
+        }),
+        ...(data.externalStylesheet !== undefined && {
+          externalStylesheet: data.externalStylesheet
+        }),
+        ...(data.styledTooltips !== undefined && {
+          styledTooltips: data.styledTooltips
+        })
+      }
+    })
+  ]);
+
+  return getCurrentProfile(userId);
+};
+
+type CreateInviteResult =
+  | { ok: true; inviteKey: string }
+  | { ok: false; reason: 'no_invites' | 'already_invited' };
+
+export const createInvite = async (
+  inviterId: number,
+  email: string,
+  reason: string
+): Promise<CreateInviteResult> => {
+  const inviter = await prisma.user.findUnique({
+    where: { id: inviterId },
+    select: { inviteCount: true }
+  });
+  if (!inviter || inviter.inviteCount <= 0) {
+    return { ok: false, reason: 'no_invites' };
+  }
+
+  const existing = await prisma.invite.findUnique({ where: { email } });
+  if (existing) {
+    return { ok: false, reason: 'already_invited' };
+  }
+
+  const inviteKey = crypto.randomBytes(20).toString('hex');
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.invite.create({
+      data: {
+        inviterId,
+        inviteKey,
+        email: sanitizePlain(email),
+        expires,
+        reason: sanitizePlain(reason)
+      }
+    }),
+    prisma.user.update({
+      where: { id: inviterId },
+      data: { inviteCount: { decrement: 1 } }
+    })
+  ]);
+
+  return { ok: true, inviteKey };
 };

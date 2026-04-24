@@ -1,7 +1,8 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { authHandler } from '../../../modules/asyncHandler';
+import { createPost, updatePost, deletePost } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
@@ -17,10 +18,7 @@ import {
   type CreatePostInput,
   type UpdatePostInput
 } from '../../../schemas/forum';
-import { audit } from '../../../lib/audit';
-import { appendToJsonArray } from '../../../lib/jsonHelpers';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
-import { sanitizeHtml } from '../../../lib/sanitize';
 
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
@@ -133,7 +131,6 @@ router.post(
       forumId: number;
       forumTopicId: number;
     }>(res);
-
     const { body } = parsedBody<CreatePostInput>(res);
 
     const [forum, topic] = await Promise.all([
@@ -141,31 +138,11 @@ router.post(
       prisma.forumTopic.findUnique({ where: { id: forumTopicId } })
     ]);
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!topic) return res.status(404).json({ msg: 'Forum topic not found' });
-    if (topic.forumId !== forumId) {
+    if (!topic || topic.forumId !== forumId)
       return res.status(404).json({ msg: 'Forum topic not found' });
-    }
     if (topic.isLocked) return res.status(403).json({ msg: 'Topic is locked' });
 
-    const [post] = await prisma.$transaction(async (tx) => {
-      const post = await tx.forumPost.create({
-        data: {
-          forumTopicId,
-          authorId: req.user.id,
-          body: sanitizeHtml(body)
-        }
-      });
-      await tx.forumTopic.update({
-        where: { id: forumTopicId },
-        data: { lastPostId: post.id, numPosts: { increment: 1 } }
-      });
-      await tx.forum.update({
-        where: { id: forumId },
-        data: { lastTopicId: forumTopicId, numPosts: { increment: 1 } }
-      });
-      return [post];
-    });
-
+    const post = await createPost(forumId, forumTopicId, req.user.id, body);
     res.status(201).json(post);
   })
 );
@@ -196,17 +173,13 @@ router.put(
     if (post.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await prisma.forumPost.update({
-      where: { id },
-      data: {
-        body: sanitizeHtml(body),
-        edits: appendToJsonArray(post.edits, {
-          userId: req.user.id,
-          time: new Date().toISOString(),
-          previousBody: post.body
-        })
-      }
-    });
+    const updated = await updatePost(
+      id,
+      req.user.id,
+      post.edits,
+      post.body,
+      body
+    );
     res.json(updated);
   })
 );
@@ -237,30 +210,7 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const isModAction = !isOwner;
-
-    await prisma.$transaction([
-      prisma.forumPost.update({
-        where: { id },
-        data: { deletedAt: new Date() }
-      }),
-      prisma.forumTopic.update({
-        where: { id: post.forumTopicId },
-        data: { numPosts: { decrement: 1 } }
-      }),
-      prisma.forum.update({
-        where: { id: forumId },
-        data: { numPosts: { decrement: 1 } }
-      }),
-      prisma.auditLog.create({
-        data: {
-          actorId: req.user.id,
-          action: isModAction ? 'post.mod_delete' : 'post.delete',
-          targetType: 'ForumPost',
-          targetId: id
-        }
-      })
-    ]);
+    await deletePost(id, forumTopicId, forumId, req.user.id, !isOwner);
     res.status(204).send();
   })
 );
