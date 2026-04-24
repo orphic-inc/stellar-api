@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import {
-  createArtistHistoryEntry,
+  createArtist,
+  updateArtist,
   revertArtistFromHistory
 } from '../../../modules/artist';
 import { requireAuth } from '../../../middleware/auth';
@@ -147,17 +148,7 @@ router.post(
   validate(artistSchema),
   authHandler(async (req, res) => {
     const { name, vanityHouse } = parsedBody<ArtistInput>(res);
-
-    const artist = await prisma.artist.create({
-      data: { name, vanityHouse: vanityHouse ?? false }
-    });
-
-    await createArtistHistoryEntry({
-      artistId: artist.id,
-      editedBy: req.user.id,
-      snapshot: { name, vanityHouse }
-    });
-
+    const artist = await createArtist(name, vanityHouse ?? false, req.user.id);
     res.status(201).json(artist);
   })
 );
@@ -217,26 +208,11 @@ router.put(
     const existing = await prisma.artist.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Artist not found' });
 
-    const artist = await prisma.$transaction(async (tx) => {
-      const updatedArtist = await tx.artist.update({
-        where: { id },
-        data: {
-          ...(name !== undefined && { name }),
-          ...(vanityHouse !== undefined && { vanityHouse })
-        }
-      });
-
-      await createArtistHistoryEntry({
-        db: tx,
-        artistId: id,
-        editedBy: req.user.id,
-        snapshot: { name, vanityHouse },
-        description
-      });
-
-      return updatedArtist;
+    const artist = await updateArtist(id, req.user.id, {
+      name,
+      vanityHouse,
+      description
     });
-
     res.json(artist);
   })
 );

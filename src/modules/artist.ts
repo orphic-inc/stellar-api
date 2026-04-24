@@ -5,6 +5,45 @@ type ArtistHistorySnapshot = {
   vanityHouse?: boolean;
 };
 
+export const createArtist = async (
+  name: string,
+  vanityHouse: boolean,
+  editorId: number
+) => {
+  const artist = await prisma.artist.create({
+    data: { name, vanityHouse }
+  });
+  await createArtistHistoryEntry({
+    artistId: artist.id,
+    editedBy: editorId,
+    snapshot: { name, vanityHouse }
+  });
+  return artist;
+};
+
+export const updateArtist = async (
+  id: number,
+  editorId: number,
+  data: { name?: string; vanityHouse?: boolean; description?: string }
+) =>
+  prisma.$transaction(async (tx) => {
+    const artist = await tx.artist.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.vanityHouse !== undefined && { vanityHouse: data.vanityHouse })
+      }
+    });
+    await createArtistHistoryEntry({
+      db: tx,
+      artistId: id,
+      editedBy: editorId,
+      snapshot: { name: data.name, vanityHouse: data.vanityHouse },
+      description: data.description
+    });
+    return artist;
+  });
+
 type ArtistHistoryWriter = {
   artistHistory: {
     create: typeof prisma.artistHistory.create;
