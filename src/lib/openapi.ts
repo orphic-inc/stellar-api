@@ -6,7 +6,10 @@ import {
 import { z } from 'zod';
 import { profileUpdateSchema, inviteSchema } from '../schemas/profile';
 import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
-import { createContributionSchema } from '../schemas/contribution';
+import {
+  createContributionSchema,
+  addContributionToReleaseSchema
+} from '../schemas/contribution';
 import {
   createForumSchema,
   updateForumSchema,
@@ -1628,6 +1631,9 @@ const ReleaseContribution = registry.register(
       id: z.number(),
       username: z.string()
     }),
+    type: z.string(),
+    downloadUrl: z.string(),
+    sizeInBytes: z.number().nullable().optional(),
     collaborators: z.array(
       z.object({
         id: z.number(),
@@ -1652,6 +1658,9 @@ const Contribution = registry.register(
       title: z.string(),
       communityId: z.number().nullable().optional()
     }),
+    type: z.string(),
+    downloadUrl: z.string(),
+    sizeInBytes: z.number().nullable().optional(),
     collaborators: z.array(
       z.object({
         id: z.number(),
@@ -1766,6 +1775,39 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/contributions',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: addContributionToReleaseSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Contribution created',
+      content: { 'application/json': { schema: Contribution } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Release not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
