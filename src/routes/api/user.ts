@@ -121,7 +121,7 @@ router.post(
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
     });
     if (existing) {
-      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+      return res.status(400).json({ msg: 'User already exists' });
     }
 
     const rankId =

@@ -81,7 +81,7 @@ router.post(
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
     });
     if (existing) {
-      return res.status(400).json({ errors: [{ msg: 'User already exists' }] });
+      return res.status(400).json({ msg: 'User already exists' });
     }
 
     const defaultRank = await prisma.userRank.findFirst({
@@ -143,15 +143,12 @@ router.post(
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
     });
-    if (!user)
-      return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
+    if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
 
-    if (user.disabled)
-      return res.status(403).json({ errors: [{ msg: 'Account disabled' }] });
+    if (user.disabled) return res.status(403).json({ msg: 'Account disabled' });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ errors: [{ msg: 'Invalid credentials' }] });
+    if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
 
     const authUser = await prisma.user.update({
       where: { id: user.id },

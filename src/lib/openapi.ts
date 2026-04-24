@@ -127,6 +127,10 @@ registry.registerPath({
     400: {
       description: 'Invalid credentials',
       content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Account disabled',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -148,8 +152,8 @@ registry.registerPath({
       }
     },
     400: {
-      description: 'Validation error or already exists',
-      content: { 'application/json': { schema: ValidationError } }
+      description: 'User already exists',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -437,8 +441,8 @@ registry.registerPath({
       }
     },
     400: {
-      description: 'Validation error or duplicate user',
-      content: { 'application/json': { schema: ValidationError } }
+      description: 'User already exists',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
