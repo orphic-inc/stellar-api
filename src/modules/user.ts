@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
+import { AppError } from '../lib/errors';
 
 export const getUserSettings = async (userId: number) => {
   const user = await prisma.user.findUnique({
@@ -67,7 +68,11 @@ export const createUser = async (
   const rankId =
     data.userRankId ??
     (await prisma.userRank.findFirst({ where: { level: 100 } }))?.id;
-  if (!rankId) throw new Error('Default rank not found');
+  if (!rankId)
+    throw new AppError(
+      503,
+      'Server misconfigured: default rank missing. Run setup.'
+    );
 
   const hashedPassword = await bcrypt.hash(
     data.password,

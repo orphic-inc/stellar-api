@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import gravatar from 'gravatar';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
 
 export const authUserSelect = {
   id: true,
@@ -48,7 +49,11 @@ export const registerUser = async (
   const defaultRank = await prisma.userRank.findFirst({
     where: { level: 100 }
   });
-  if (!defaultRank) throw new Error('Default rank not found');
+  if (!defaultRank)
+    throw new AppError(
+      503,
+      'Server misconfigured: default rank missing. Run setup.'
+    );
 
   const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
   const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));

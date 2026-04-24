@@ -10,6 +10,7 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "test": "jest --runInBand",
+    "test:integration": "node -r dotenv/config ./node_modules/jest/bin/jest.js --runInBand --config jest.integration.cjs dotenv_config_path=.env.test",
     "watch": "tsc -w",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm",
     "openapi:export": "ts-node src/scripts/export-openapi.ts"
@@ -43,6 +44,7 @@
     "@types/jsdom": "^28.0.1",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^20.6.0",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
     "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^8.45.0",
@@ -54,6 +56,7 @@
     "jest": "^30.3.0",
     "lint-staged": "^13.2.3",
     "nodemon": "^3.0.1",
+    "pg": "^8.20.0",
     "prettier": "^3.0.0",
     "prisma": "^5.3.0",
     "supertest": "^7.2.2",

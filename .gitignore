@@ -3,6 +3,7 @@ lib/
 !src/lib/
 node_modules/
 .env
+.env.test
 dist/
 src/**/*.js
 src/**/*.js.map
