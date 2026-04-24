@@ -5,13 +5,16 @@ import { asyncHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
+  parsedBody,
   validate,
   validateParams,
   parsedParams
 } from '../../../middleware/validate';
 import {
   createCommunitySchema,
-  updateCommunitySchema
+  updateCommunitySchema,
+  type CreateCommunityInput,
+  type UpdateCommunityInput
 } from '../../../schemas/community';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import releaseRouter from './release';
@@ -68,7 +71,8 @@ router.post(
   ...requirePermission('communities_manage'),
   validate(createCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, image, type, registrationStatus, staffIds } = req.body;
+    const { name, image, type, registrationStatus, staffIds } =
+      parsedBody<CreateCommunityInput>(res);
 
     const defaultImages: Record<string, string> = {
       Music: '/images/defaults/music.png',
@@ -106,7 +110,8 @@ router.put(
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
-    const { name, image, registrationStatus, staffIds } = req.body;
+    const { name, image, registrationStatus, staffIds } =
+      parsedBody<UpdateCommunityInput>(res);
     const community = await prisma.community.update({
       where: { id },
       data: {

@@ -14,7 +14,8 @@ import {
 import {
   adminCreateUserSchema,
   userSettingsSchema,
-  type AdminCreateUserInput
+  type AdminCreateUserInput,
+  type UserSettingsInput
 } from '../../schemas/user';
 import { audit } from '../../lib/audit';
 
@@ -52,7 +53,7 @@ router.put(
       styledTooltips,
       paranoia,
       avatar
-    } = req.body;
+    } = parsedBody<UserSettingsInput>(res);
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { userSettingsId: true }

@@ -14,7 +14,8 @@ import { writeLimiter } from '../../../middleware/rateLimiter';
 import {
   createTopicSchema,
   updateTopicSchema,
-  type CreateTopicInput
+  type CreateTopicInput,
+  type UpdateTopicInput
 } from '../../../schemas/forum';
 import { audit } from '../../../lib/audit';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
@@ -195,7 +196,7 @@ router.put(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const { title, isLocked, isSticky } = req.body;
+    const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
     const updated = await prisma.forumTopic.update({
       where: { id },
       data: {
