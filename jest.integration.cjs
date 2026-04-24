@@ -8,7 +8,7 @@ module.exports = {
   setupFiles: ['<rootDir>/src/test/integrationSetup.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
   moduleNameMapper: {
-    'isomorphic-dompurify': '<rootDir>/src/test/mocks/dompurify.js'
+    '^isomorphic-dompurify$': '<rootDir>/src/test/mocks/dompurify.js'
   },
   clearMocks: true,
   transform: {
