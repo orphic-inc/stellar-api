@@ -16,6 +16,7 @@ export const validate =
     const data = validationError(res, schema, req.body);
     if (!data) return;
     req.body = data;
+    res.locals.parsedBody = data;
     next();
   };
 
@@ -45,4 +46,8 @@ export function parsedParams<T>(res: Response): T {
 
 export function parsedQuery<T>(res: Response): T {
   return res.locals.parsedQuery as T;
+}
+
+export function parsedBody<T>(res: Response): T {
+  return res.locals.parsedBody as T;
 }
