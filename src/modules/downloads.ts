@@ -1,7 +1,11 @@
 import { DownloadGrantStatus, EconomyTransactionReason } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { getLogger } from './logging';
 import { computeRatio } from './ratio';
+import { evaluateRatioPolicy } from './ratioPolicy';
+
+const log = getLogger('downloads');
 
 const IDEMPOTENCY_WINDOW_MS = 120_000; // 2 minutes
 
@@ -18,7 +22,7 @@ export const grantDownloadAccess = async (
   contributionId: number,
   idempotencyKey?: string
 ): Promise<GrantResult> => {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const contribution = await tx.contribution.findUnique({
       where: { id: contributionId },
       select: {
@@ -151,6 +155,14 @@ export const grantDownloadAccess = async (
       createdAt: grant.createdAt.toISOString()
     };
   });
+
+  // Evaluate ratio policy outside the transaction so a policy error never
+  // rolls back an already-committed grant.
+  evaluateRatioPolicy(consumerId).catch((err) => {
+    log.warn('Ratio policy evaluation failed', { consumerId, err });
+  });
+
+  return result;
 };
 
 export const reverseDownloadAccess = async (
