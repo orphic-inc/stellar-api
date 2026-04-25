@@ -9,7 +9,12 @@ import { DownloadGrantStatus, EconomyTransactionReason } from '@prisma/client';
 
 const mockTx = {
   contribution: { findUnique: jest.fn() },
-  user: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+  user: {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn()
+  },
   downloadAccessGrant: {
     findFirst: jest.fn(),
     findUnique: jest.fn(),
@@ -44,6 +49,8 @@ const makeContribution = (overrides = {}) => ({
 const makeUser = (overrides = {}) => ({
   canDownload: true,
   uploaded: BigInt('1073741824'),
+  downloaded: BigInt('0'),
+  totalEarned: BigInt('0'),
   ...overrides
 });
 
@@ -173,7 +180,8 @@ describe('grantDownloadAccess', () => {
         where: expect.objectContaining({ id: 7, uploaded: { gte: cost } }),
         data: expect.objectContaining({
           uploaded: { decrement: cost },
-          downloaded: { increment: cost }
+          downloaded: { increment: cost },
+          ratio: expect.any(Number)
         })
       })
     );
@@ -224,9 +232,13 @@ describe('reverseDownloadAccess', () => {
     });
   });
 
-  it('reverses ledger, updates balances, marks grant REVERSED', async () => {
+  it('reverses ledger, updates balances with ratio, marks grant REVERSED', async () => {
     const grant = makeGrant();
     mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
+    // findUniqueOrThrow called for consumer then contributor
+    mockTx.user.findUniqueOrThrow
+      .mockResolvedValueOnce({ downloaded: grant.amountBytes, totalEarned: 0n }) // consumer
+      .mockResolvedValueOnce({ downloaded: 0n, totalEarned: grant.amountBytes }); // contributor
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.downloadAccessGrant.update.mockResolvedValue({
@@ -238,24 +250,24 @@ describe('reverseDownloadAccess', () => {
     const result = await reverseDownloadAccess(99, 1, 'Dead link');
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // contributor deducted (balance + gross earnings)
+    // contributor deducted (balance + gross earnings + ratio)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.contributorId },
-        data: {
+        data: expect.objectContaining({
           uploaded: { decrement: grant.amountBytes },
           totalEarned: { decrement: grant.amountBytes }
-        }
+        })
       })
     );
-    // consumer refunded
+    // consumer refunded (balance + downloaded + ratio)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.consumerId },
-        data: {
+        data: expect.objectContaining({
           uploaded: { increment: grant.amountBytes },
           downloaded: { decrement: grant.amountBytes }
-        }
+        })
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);

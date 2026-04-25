@@ -1,6 +1,7 @@
 import { DownloadGrantStatus, EconomyTransactionReason } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { computeRatio } from './ratio';
 
 const IDEMPOTENCY_WINDOW_MS = 120_000; // 2 minutes
 
@@ -32,7 +33,7 @@ export const grantDownloadAccess = async (
 
     const consumer = await tx.user.findUnique({
       where: { id: consumerId },
-      select: { canDownload: true, uploaded: true }
+      select: { canDownload: true, uploaded: true, downloaded: true, totalEarned: true }
     });
     if (!consumer) throw new AppError(404, 'User not found');
     if (!consumer.canDownload)
@@ -73,10 +74,16 @@ export const grantDownloadAccess = async (
     if (consumer.uploaded < cost)
       throw new AppError(400, 'Insufficient upload balance');
 
-    // CAS: atomically debit consumer's balance
+    // CAS: atomically debit consumer's balance and update cached ratio
+    const newDownloaded = consumer.downloaded + cost;
+    const newRatio = computeRatio(consumer.totalEarned, newDownloaded);
     const debited = await tx.user.updateMany({
       where: { id: consumerId, uploaded: { gte: cost } },
-      data: { uploaded: { decrement: cost }, downloaded: { increment: cost } }
+      data: {
+        uploaded: { decrement: cost },
+        downloaded: { increment: cost },
+        ratio: newRatio
+      }
     });
     if (debited.count === 0)
       throw new AppError(409, 'Balance changed concurrently, please retry');
@@ -159,12 +166,35 @@ export const reverseDownloadAccess = async (
     if (grant.status !== DownloadGrantStatus.COMPLETED)
       throw new AppError(409, 'Grant is not in COMPLETED state');
 
+    const [consumer, contributor] = await Promise.all([
+      tx.user.findUniqueOrThrow({
+        where: { id: grant.consumerId },
+        select: { downloaded: true, totalEarned: true }
+      }),
+      tx.user.findUniqueOrThrow({
+        where: { id: grant.contributorId },
+        select: { downloaded: true, totalEarned: true }
+      })
+    ]);
+
+    const consumerNewDownloaded = consumer.downloaded - grant.amountBytes;
+    const consumerNewRatio = computeRatio(
+      consumer.totalEarned,
+      consumerNewDownloaded < 0n ? 0n : consumerNewDownloaded
+    );
+    const contribNewEarned = contributor.totalEarned - grant.amountBytes;
+    const contribNewRatio = computeRatio(
+      contribNewEarned < 0n ? 0n : contribNewEarned,
+      contributor.downloaded
+    );
+
     // Claw back from contributor balance and gross earnings
     await tx.user.update({
       where: { id: grant.contributorId },
       data: {
         uploaded: { decrement: grant.amountBytes },
-        totalEarned: { decrement: grant.amountBytes }
+        totalEarned: { decrement: grant.amountBytes },
+        ratio: contribNewRatio
       }
     });
 
@@ -173,7 +203,8 @@ export const reverseDownloadAccess = async (
       where: { id: grant.consumerId },
       data: {
         uploaded: { increment: grant.amountBytes },
-        downloaded: { decrement: grant.amountBytes }
+        downloaded: { decrement: grant.amountBytes },
+        ratio: consumerNewRatio
       }
     });
 
