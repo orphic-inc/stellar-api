@@ -120,7 +120,17 @@ export const createContributionSubmission = async ({
           connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
         }
       },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        releaseId: true,
+        contributorId: true,
+        releaseDescription: true,
+        sizeInBytes: true,
+        approvedAccountingBytes: true,
+        type: true,
+        createdAt: true,
+        updatedAt: true,
         user: { select: { id: true, username: true } },
         release: { select: { id: true, title: true, communityId: true } },
         collaborators: { select: { id: true, name: true } }
@@ -164,7 +174,17 @@ export const addContributionToRelease = async ({
         sizeInBytes: input.sizeInBytes ?? null,
         releaseDescription: input.releaseDescription
       },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        releaseId: true,
+        contributorId: true,
+        releaseDescription: true,
+        sizeInBytes: true,
+        approvedAccountingBytes: true,
+        type: true,
+        createdAt: true,
+        updatedAt: true,
         user: { select: { id: true, username: true } },
         release: { select: { id: true, title: true, communityId: true } },
         collaborators: { select: { id: true, name: true } }

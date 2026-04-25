@@ -16,7 +16,9 @@ export const updateRankSchema = z
     color: z.string().optional(),
     badge: z.string().optional()
   })
-  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field required' });
+  .refine((v) => Object.keys(v).length > 0, {
+    message: 'At least one field required'
+  });
 
 export type CreateRankInput = z.infer<typeof createRankSchema>;
 export type UpdateRankInput = z.infer<typeof updateRankSchema>;

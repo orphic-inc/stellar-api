@@ -44,6 +44,11 @@ import {
   createCommentSchema,
   updateCommentSchema
 } from '../schemas/comment';
+import {
+  createRequestSchema,
+  addBountySchema,
+  fillRequestSchema
+} from '../schemas/requests';
 
 extendZodWithOpenApi(z);
 
@@ -2563,6 +2568,83 @@ registry.registerPath({
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
+  }
+});
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/requests',
+  summary: 'List requests',
+  tags: ['requests'],
+  responses: {
+    200: { description: 'Success' }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/requests',
+  summary: 'Create a new request',
+  tags: ['requests'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createRequestSchema } }
+    }
+  },
+  responses: {
+    201: { description: 'Created' },
+    400: { description: 'Bad Request' }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/requests/{id}',
+  summary: 'Get request details',
+  tags: ['requests'],
+  request: {
+    params: z.object({ id: z.string() })
+  },
+  responses: {
+    200: { description: 'Success' },
+    404: { description: 'Not Found' }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/requests/{id}/bounty',
+  summary: 'Add bounty to request',
+  tags: ['requests'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: addBountySchema } }
+    }
+  },
+  responses: {
+    200: { description: 'Success' }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/requests/{id}/fill',
+  summary: 'Fill request',
+  tags: ['requests'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: fillRequestSchema } }
+    }
+  },
+  responses: {
+    200: { description: 'Success' }
   }
 });
 

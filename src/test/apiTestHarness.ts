@@ -12,6 +12,11 @@ jest.mock('../modules/contribution', () => ({
   createContributionSubmission: jest.fn()
 }));
 
+jest.mock('../modules/downloads', () => ({
+  grantDownloadAccess: jest.fn(),
+  reverseDownloadAccess: jest.fn()
+}));
+
 jest.mock('../modules/user', () => ({
   getUserSettings: jest.fn(),
   updateUserSettings: jest.fn(),
@@ -35,7 +40,8 @@ jest.mock('../modules/forum', () => ({
 jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
-  logging: { level: 'error', timestampFormat: undefined }
+  logging: { level: 'error', timestampFormat: undefined },
+  economy: { minimumBounty: 104857600 }
 }));
 
 let currentUserRankLevel = 1000;
@@ -138,6 +144,18 @@ jest.mock('../lib/prisma', () => ({
     auditLog: {
       create: jest.fn()
     },
+    request: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn()
+    },
+    contribution: {
+      findUnique: jest.fn()
+    },
+    downloadAccessGrant: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn()
+    },
     $transaction: jest.fn()
   }
 }));
@@ -168,6 +186,10 @@ import {
   deletePost,
   createTopicNote
 } from '../modules/forum';
+import {
+  grantDownloadAccess,
+  reverseDownloadAccess
+} from '../modules/downloads';
 
 export { app, request };
 
@@ -239,6 +261,18 @@ export const prismaMock = prisma as unknown as {
   auditLog: {
     create: jest.Mock;
   };
+  request: {
+    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    count: jest.Mock;
+  };
+  contribution: {
+    findUnique: jest.Mock;
+  };
+  downloadAccessGrant: {
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+  };
   $transaction: jest.Mock;
 };
 export const bcryptMock = bcrypt as unknown as {
@@ -284,6 +318,10 @@ export const deletePostMock = deletePost as jest.MockedFunction<
 export const createTopicNoteMock = createTopicNote as jest.MockedFunction<
   typeof createTopicNote
 >;
+export const grantDownloadAccessMock =
+  grantDownloadAccess as jest.MockedFunction<typeof grantDownloadAccess>;
+export const reverseDownloadAccessMock =
+  reverseDownloadAccess as jest.MockedFunction<typeof reverseDownloadAccess>;
 
 export const setCurrentUserRankLevel = (level: number): void => {
   currentUserRankLevel = level;

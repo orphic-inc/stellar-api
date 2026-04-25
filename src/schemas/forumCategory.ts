@@ -10,5 +10,9 @@ export const updateForumCategorySchema = z.object({
   sort: z.number().int().optional()
 });
 
-export type CreateForumCategoryInput = z.infer<typeof createForumCategorySchema>;
-export type UpdateForumCategoryInput = z.infer<typeof updateForumCategorySchema>;
+export type CreateForumCategoryInput = z.infer<
+  typeof createForumCategorySchema
+>;
+export type UpdateForumCategoryInput = z.infer<
+  typeof updateForumCategorySchema
+>;

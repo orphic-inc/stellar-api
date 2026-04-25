@@ -31,7 +31,17 @@ router.get(
       prisma.contribution.findMany({
         skip: pg.skip,
         take: pg.limit,
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          releaseId: true,
+          contributorId: true,
+          releaseDescription: true,
+          sizeInBytes: true,
+          approvedAccountingBytes: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
           user: { select: { id: true, username: true } },
           release: { select: { id: true, title: true } },
           collaborators: { select: { id: true, name: true } }
@@ -52,7 +62,17 @@ router.get(
     const { id } = parsedParams<{ id: number }>(res);
     const contribution = await prisma.contribution.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        releaseId: true,
+        contributorId: true,
+        releaseDescription: true,
+        sizeInBytes: true,
+        approvedAccountingBytes: true,
+        type: true,
+        createdAt: true,
+        updatedAt: true,
         user: { select: { id: true, username: true } },
         release: true,
         collaborators: true,

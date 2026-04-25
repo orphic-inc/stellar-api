@@ -11,7 +11,10 @@ export interface PageParams {
 
 export const parsePage = (req: Request): PageParams => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(req.query.limit as string) || DEFAULT_PAGE_SIZE));
+  const limit = Math.min(
+    MAX_PAGE_SIZE,
+    Math.max(1, parseInt(req.query.limit as string) || DEFAULT_PAGE_SIZE)
+  );
   return { page, limit, skip: (page - 1) * limit };
 };
 

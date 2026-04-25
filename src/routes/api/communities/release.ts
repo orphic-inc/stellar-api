@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
-import { asyncHandler } from '../../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
@@ -22,7 +22,6 @@ import {
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
-import { authHandler } from '../../../modules/asyncHandler';
 
 const router = express.Router({ mergeParams: true });
 const communityIdParamsSchema = z.object({
@@ -73,7 +72,17 @@ router.get(
         artist: true,
         tags: true,
         contributions: {
-          include: {
+          select: {
+            id: true,
+            userId: true,
+            releaseId: true,
+            contributorId: true,
+            releaseDescription: true,
+            sizeInBytes: true,
+            approvedAccountingBytes: true,
+            type: true,
+            createdAt: true,
+            updatedAt: true,
             user: { select: { id: true, username: true } },
             collaborators: true
           }
