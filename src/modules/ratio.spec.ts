@@ -92,7 +92,9 @@ describe('computeRequiredRatio', () => {
     // 15 GiB downloaded (10–20 GiB bracket: max 0.20, min 0.00)
     // 7.5 GiB eligible: coverage = 0.5
     // required = max(0.00, 0.20 * 0.5) = 0.10
-    expect(computeRequiredRatio(15n * GiB, BigInt(Math.round(7.5 * 1024 ** 3)))).toBeCloseTo(0.1);
+    expect(
+      computeRequiredRatio(15n * GiB, BigInt(Math.round(7.5 * 1024 ** 3)))
+    ).toBeCloseTo(0.1);
   });
 
   it('minRequired clamps the result from going below minimum', () => {

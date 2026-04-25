@@ -37,7 +37,12 @@ export const grantDownloadAccess = async (
 
     const consumer = await tx.user.findUnique({
       where: { id: consumerId },
-      select: { canDownload: true, uploaded: true, downloaded: true, totalEarned: true }
+      select: {
+        canDownload: true,
+        uploaded: true,
+        downloaded: true,
+        totalEarned: true
+      }
     });
     if (!consumer) throw new AppError(404, 'User not found');
     if (!consumer.canDownload)
