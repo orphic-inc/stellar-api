@@ -115,18 +115,9 @@ describe('getEligibleContributionBytes', () => {
     expect(result).toBe(BigInt('700000000'));
   });
 
-  it('falls back to sizeInBytes when approvedAccountingBytes is null', async () => {
-    mockPrismaContribution.findMany.mockResolvedValue([
-      { sizeInBytes: 209715200, approvedAccountingBytes: null }
-    ]);
-    const result = await getEligibleContributionBytes(1);
-    expect(result).toBe(BigInt(209715200));
-  });
-
-  it('skips contributions with neither field set', async () => {
-    mockPrismaContribution.findMany.mockResolvedValue([
-      { sizeInBytes: null, approvedAccountingBytes: null }
-    ]);
+  it('returns 0 when no contributions have approvedAccountingBytes (query already filters them)', async () => {
+    // Prisma filters out null approvedAccountingBytes before returning results
+    mockPrismaContribution.findMany.mockResolvedValue([]);
     const result = await getEligibleContributionBytes(1);
     expect(result).toBe(0n);
   });

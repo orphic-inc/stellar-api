@@ -59,16 +59,19 @@ export const getEligibleContributionBytes = async (
   userId: number
 ): Promise<bigint> => {
   const cutoff = new Date(Date.now() - ELIGIBILITY_WINDOW_MS);
+  // Only count contributions that staff have explicitly approved (approvedAccountingBytes set)
   const contributions = await prisma.contribution.findMany({
-    where: { userId, createdAt: { lt: cutoff } },
-    select: { sizeInBytes: true, approvedAccountingBytes: true }
+    where: {
+      userId,
+      createdAt: { lt: cutoff },
+      approvedAccountingBytes: { not: null }
+    },
+    select: { approvedAccountingBytes: true }
   });
-  return contributions.reduce<bigint>((sum, c) => {
-    const bytes =
-      c.approvedAccountingBytes ??
-      (c.sizeInBytes != null ? BigInt(c.sizeInBytes) : 0n);
-    return sum + bytes;
-  }, 0n);
+  return contributions.reduce<bigint>(
+    (sum, c) => sum + c.approvedAccountingBytes!,
+    0n
+  );
 };
 
 export interface RatioStats {

@@ -9,6 +9,7 @@ import cors from 'cors';
 import { getLogger } from './modules/logging';
 import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
+import { startLinkHealthJob } from './modules/linkHealthJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -108,6 +109,8 @@ export const createApp = () => {
       res.status(status).json({ msg: message });
     }
   );
+
+  startLinkHealthJob();
 
   return app;
 };

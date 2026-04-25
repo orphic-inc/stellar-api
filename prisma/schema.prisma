@@ -150,6 +150,13 @@ enum RatioPolicyStatus {
   LEECH_DISABLED
 }
 
+enum LinkHealthStatus {
+  UNKNOWN
+  PASS
+  WARN
+  FAIL
+}
+
 enum RequestActionType {
   CREATE
   ADD_BOUNTY
@@ -264,6 +271,7 @@ model User {
   downloadGrantsAsContrib   DownloadAccessGrant[] @relation("DownloadContributor")
   downloadGrantsReversed    DownloadAccessGrant[] @relation("DownloadGrantReversedBy")
   ratioPolicyState          RatioPolicyState?
+  contributionReports       ContributionReport[]
 
   @@index([userRankId])
   @@map("users")
@@ -678,12 +686,15 @@ model Contribution {
   downloadUrl              String
   sizeInBytes              Int?
   approvedAccountingBytes  BigInt?
+  linkStatus               LinkHealthStatus @default(UNKNOWN)
+  linkCheckedAt            DateTime?
   type                     FileType
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
   Request                  Request[]
   fills                    RequestFill[]
   downloadAccessGrants     DownloadAccessGrant[]
+  reports                  ContributionReport[]
 
   @@index([userId])
   @@index([releaseId])
@@ -992,6 +1003,19 @@ model RatioPolicyState {
   lastEvaluatedAt        DateTime          @default(now())
 
   @@map("ratio_policy_states")
+}
+
+model ContributionReport {
+  id             Int          @id @default(autoincrement())
+  contributionId Int
+  contribution   Contribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  reporterId     Int
+  reporter       User         @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason         String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([contributionId])
+  @@map("contribution_reports")
 }
 
 // ─── Featured ─────────────────────────────────────────────────────────────────

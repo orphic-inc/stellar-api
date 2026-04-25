@@ -1,9 +1,13 @@
 import { FileType, Prisma, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { getLogger } from './logging';
+import { checkContributionLink } from './linkHealth';
 import type {
   AddContributionToReleaseInput,
   CreateContributionInput
 } from '../schemas/contribution';
+
+const log = getLogger('contribution');
 
 const normalizeTags = (tags?: string): string[] => [
   ...new Set(
@@ -128,6 +132,8 @@ export const createContributionSubmission = async ({
         releaseDescription: true,
         sizeInBytes: true,
         approvedAccountingBytes: true,
+        linkStatus: true,
+        linkCheckedAt: true,
         type: true,
         createdAt: true,
         updatedAt: true,
@@ -137,6 +143,10 @@ export const createContributionSubmission = async ({
       }
     });
   });
+
+  checkContributionLink(contribution.id).catch((err) =>
+    log.warn('Initial link check failed', { contributionId: contribution.id, err })
+  );
 
   return contribution;
 };
@@ -182,6 +192,8 @@ export const addContributionToRelease = async ({
         releaseDescription: true,
         sizeInBytes: true,
         approvedAccountingBytes: true,
+        linkStatus: true,
+        linkCheckedAt: true,
         type: true,
         createdAt: true,
         updatedAt: true,
@@ -190,5 +202,10 @@ export const addContributionToRelease = async ({
         collaborators: { select: { id: true, name: true } }
       }
     });
+  }).then((contribution) => {
+    checkContributionLink(contribution.id).catch((err) =>
+      log.warn('Initial link check failed', { contributionId: contribution.id, err })
+    );
+    return contribution;
   });
 };
