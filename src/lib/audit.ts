@@ -1,6 +1,9 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 
-type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+type TxClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
 export const audit = (
   client: TxClient | PrismaClient,
@@ -11,5 +14,11 @@ export const audit = (
   metadata?: Record<string, unknown>
 ): Promise<unknown> =>
   (client as PrismaClient).auditLog.create({
-    data: { actorId, action, targetType, targetId: targetId ?? null, metadata: metadata as Prisma.InputJsonValue ?? Prisma.JsonNull }
+    data: {
+      actorId,
+      action,
+      targetType,
+      targetId: targetId ?? null,
+      metadata: (metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull
+    }
   });

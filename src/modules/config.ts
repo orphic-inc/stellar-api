@@ -26,3 +26,7 @@ export const http = {
   port: parseInt(process.env.STELLAR_HTTP_PORT || '8080', 10),
   corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN || 'http://localhost:3000'
 };
+
+export const economy = {
+  minimumBounty: parseInt(process.env.STELLAR_MINIMUM_BOUNTY || '104857600', 10)
+};

@@ -9,7 +9,9 @@ export const subscribeSchema = z.object({
 });
 
 export const subscribeCommentsSchema = z.object({
-  page: z.enum(Object.values(SubscriptionPage) as [SubscriptionPage, ...SubscriptionPage[]]),
+  page: z.enum(
+    Object.values(SubscriptionPage) as [SubscriptionPage, ...SubscriptionPage[]]
+  ),
   pageId: z.number().int().positive(),
   action: actionSchema
 });

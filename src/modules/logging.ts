@@ -7,7 +7,10 @@ const { combine, json, label, prettyPrint, printf, timestamp } = format;
 const loggers: { [key: string]: winston.Logger } = {};
 const container = new Container();
 
-const createLogger = (category: string, categoryLabel: string): winston.Logger => {
+const createLogger = (
+  category: string,
+  categoryLabel: string
+): winston.Logger => {
   const isProduction = process.env.NODE_ENV === 'production';
 
   let fmt: winston.Logform.Format;
