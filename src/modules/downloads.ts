@@ -81,10 +81,13 @@ export const grantDownloadAccess = async (
     if (debited.count === 0)
       throw new AppError(409, 'Balance changed concurrently, please retry');
 
-    // Credit contributor
+    // Credit contributor balance and gross earnings
     await tx.user.update({
       where: { id: contribution.userId },
-      data: { uploaded: { increment: cost } }
+      data: {
+        uploaded: { increment: cost },
+        totalEarned: { increment: cost }
+      }
     });
 
     const grant = await tx.downloadAccessGrant.create({
@@ -156,10 +159,13 @@ export const reverseDownloadAccess = async (
     if (grant.status !== DownloadGrantStatus.COMPLETED)
       throw new AppError(409, 'Grant is not in COMPLETED state');
 
-    // Claw back from contributor
+    // Claw back from contributor balance and gross earnings
     await tx.user.update({
       where: { id: grant.contributorId },
-      data: { uploaded: { decrement: grant.amountBytes } }
+      data: {
+        uploaded: { decrement: grant.amountBytes },
+        totalEarned: { decrement: grant.amountBytes }
+      }
     });
 
     // Refund consumer
