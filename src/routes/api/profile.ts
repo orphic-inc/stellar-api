@@ -7,6 +7,7 @@ import {
   updateProfile,
   createInvite
 } from '../../modules/profile';
+import { getRatioStats } from '../../modules/ratio';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -71,6 +72,10 @@ router.get(
         dateRegistered: true,
         isArtist: true,
         isDonor: true,
+        uploaded: true,
+        downloaded: true,
+        totalEarned: true,
+        ratio: true,
         userRank: { select: { name: true, color: true, badge: true } },
         profile: true,
         userSettings: { select: { siteAppearance: true, styledTooltips: true } }
@@ -78,6 +83,16 @@ router.get(
     });
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
+  })
+);
+
+// GET /api/profile/me/ratio — detailed ratio stats for authenticated user
+router.get(
+  '/me/ratio',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const stats = await getRatioStats(req.user.id);
+    res.json(stats);
   })
 );
 
