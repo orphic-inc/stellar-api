@@ -25,6 +25,10 @@ const mockTx = {
   consumer: { upsert: jest.fn(), update: jest.fn() }
 };
 
+jest.mock('./ratioPolicy', () => ({
+  evaluateRatioPolicy: jest.fn().mockResolvedValue(undefined)
+}));
+
 jest.mock('../lib/prisma', () => ({
   prisma: {
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) =>

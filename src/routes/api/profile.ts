@@ -8,6 +8,7 @@ import {
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
+import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -91,8 +92,11 @@ router.get(
   '/me/ratio',
   requireAuth,
   authHandler(async (req, res) => {
-    const stats = await getRatioStats(req.user.id);
-    res.json(stats);
+    const [stats, policy] = await Promise.all([
+      getRatioStats(req.user.id),
+      getPolicyState(req.user.id)
+    ]);
+    res.json({ ...stats, policy });
   })
 );
 
