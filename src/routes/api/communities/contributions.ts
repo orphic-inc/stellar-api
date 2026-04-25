@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createContributionSubmission } from '../../../modules/contribution';
+import { recordContributionReport } from '../../../modules/linkHealth';
 import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -19,6 +21,14 @@ import {
 const router = express.Router();
 const contributionIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
+});
+
+const reportSchema = z.object({
+  reason: z.string().min(1).max(1000)
+});
+
+const approveSchema = z.object({
+  approvedAccountingBytes: z.string().regex(/^\d+$/, 'Must be a positive integer string')
 });
 
 // GET /api/contributions
@@ -39,6 +49,8 @@ router.get(
           releaseDescription: true,
           sizeInBytes: true,
           approvedAccountingBytes: true,
+          linkStatus: true,
+          linkCheckedAt: true,
           type: true,
           createdAt: true,
           updatedAt: true,
@@ -70,6 +82,8 @@ router.get(
         releaseDescription: true,
         sizeInBytes: true,
         approvedAccountingBytes: true,
+        linkStatus: true,
+        linkCheckedAt: true,
         type: true,
         createdAt: true,
         updatedAt: true,
@@ -103,6 +117,48 @@ router.post(
       return res.status(404).json({ msg: 'Community not found' });
 
     res.status(201).json(contribution);
+  })
+);
+
+// POST /api/contributions/:id/report — flag a dead or misleading link
+router.post(
+  '/:id/report',
+  requireAuth,
+  validateParams(contributionIdParamsSchema),
+  validate(reportSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { reason } = parsedBody<{ reason: string }>(res);
+
+    const contribution = await prisma.contribution.findUnique({ where: { id } });
+    if (!contribution) return res.status(404).json({ msg: 'Contribution not found' });
+
+    await recordContributionReport(id, req.user.id, reason);
+    res.status(201).json({ msg: 'Report submitted' });
+  })
+);
+
+// PUT /api/contributions/:id/approve — staff: set approvedAccountingBytes
+router.put(
+  '/:id/approve',
+  ...requirePermission('staff', 'admin'),
+  validateParams(contributionIdParamsSchema),
+  validate(approveSchema),
+  asyncHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { approvedAccountingBytes } = parsedBody<{ approvedAccountingBytes: string }>(res);
+
+    const contribution = await prisma.contribution.update({
+      where: { id },
+      data: { approvedAccountingBytes: BigInt(approvedAccountingBytes) },
+      select: {
+        id: true,
+        userId: true,
+        approvedAccountingBytes: true,
+        linkStatus: true
+      }
+    });
+    res.json(contribution);
   })
 );
 
