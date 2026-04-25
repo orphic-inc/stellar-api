@@ -80,6 +80,8 @@ router.get(
             releaseDescription: true,
             sizeInBytes: true,
             approvedAccountingBytes: true,
+            linkStatus: true,
+            linkCheckedAt: true,
             type: true,
             createdAt: true,
             updatedAt: true,
