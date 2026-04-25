@@ -146,6 +146,11 @@ describe('grantDownloadAccess', () => {
         data: expect.objectContaining({ uploaded: { decrement: cost } })
       })
     );
+    expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ totalEarned: { increment: cost } })
+      })
+    );
   });
 
   it('debits consumer, credits contributor, creates grant and 2 ledger rows on success', async () => {
@@ -175,7 +180,10 @@ describe('grantDownloadAccess', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 99 },
-        data: { uploaded: { increment: cost } }
+        data: {
+          uploaded: { increment: cost },
+          totalEarned: { increment: cost }
+        }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
@@ -230,11 +238,14 @@ describe('reverseDownloadAccess', () => {
     const result = await reverseDownloadAccess(99, 1, 'Dead link');
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // contributor deducted
+    // contributor deducted (balance + gross earnings)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.contributorId },
-        data: { uploaded: { decrement: grant.amountBytes } }
+        data: {
+          uploaded: { decrement: grant.amountBytes },
+          totalEarned: { decrement: grant.amountBytes }
+        }
       })
     );
     // consumer refunded

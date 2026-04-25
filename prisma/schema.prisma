@@ -194,6 +194,7 @@ model User {
   inviteCount        Int          @default(0)
   uploaded           BigInt       @default(0)
   downloaded         BigInt       @default(0)
+  totalEarned        BigInt       @default(0)
   ratio              Float        @default(1)
   ratioWatchDownload Int?
   lastLogin          DateTime?
