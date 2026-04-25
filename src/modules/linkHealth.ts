@@ -73,17 +73,20 @@ export const recordContributionReport = async (
     data: { contributionId, reporterId, reason }
   });
 
-  const reportCount = await prisma.contributionReport.count({
-    where: { contributionId }
+  // Count distinct reporters so one user filing multiple reports can't trigger WARN alone
+  const distinctReporters = await prisma.contributionReport.findMany({
+    where: { contributionId },
+    select: { reporterId: true },
+    distinct: ['reporterId']
   });
-  if (reportCount >= REPORT_WARN_THRESHOLD) {
+  if (distinctReporters.length >= REPORT_WARN_THRESHOLD) {
     await prisma.contribution.update({
       where: { id: contributionId },
       data: { linkStatus: LinkHealthStatus.WARN }
     });
     log.info('Contribution auto-warned by reports', {
       contributionId,
-      reportCount
+      distinctReporters: distinctReporters.length
     });
     // Kick off a recheck so status can be corrected if the link is actually fine
     checkContributionLink(contributionId).catch((err) =>
