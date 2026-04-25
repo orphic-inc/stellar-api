@@ -33,9 +33,7 @@ describe('POST /api/contributions/:id/access', () => {
     // The test harness always injects a user via requireAuth mock, so we test
     // that the module is called and returns its result
     grantDownloadAccessMock.mockResolvedValue(GRANT_RESULT);
-    const res = await request(app)
-      .post('/api/contributions/5/access')
-      .send({});
+    const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(200);
     expect(grantDownloadAccessMock).toHaveBeenCalledWith(7, 5, undefined);
   });
@@ -46,20 +44,14 @@ describe('POST /api/contributions/:id/access', () => {
       .post('/api/contributions/5/access')
       .send({ idempotencyKey: 'session-abc' });
     expect(res.status).toBe(200);
-    expect(grantDownloadAccessMock).toHaveBeenCalledWith(
-      7,
-      5,
-      'session-abc'
-    );
+    expect(grantDownloadAccessMock).toHaveBeenCalledWith(7, 5, 'session-abc');
   });
 
   it('returns 400 on insufficient balance from module', async () => {
     grantDownloadAccessMock.mockRejectedValue(
       new AppError(400, 'Insufficient upload balance')
     );
-    const res = await request(app)
-      .post('/api/contributions/5/access')
-      .send({});
+    const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(400);
     expect(res.body.msg).toBe('Insufficient upload balance');
   });
@@ -68,9 +60,7 @@ describe('POST /api/contributions/:id/access', () => {
     grantDownloadAccessMock.mockRejectedValue(
       new AppError(403, 'Your download access has been disabled')
     );
-    const res = await request(app)
-      .post('/api/contributions/5/access')
-      .send({});
+    const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(403);
   });
 
@@ -78,9 +68,7 @@ describe('POST /api/contributions/:id/access', () => {
     grantDownloadAccessMock.mockRejectedValue(
       new AppError(409, 'Balance changed concurrently, please retry')
     );
-    const res = await request(app)
-      .post('/api/contributions/5/access')
-      .send({});
+    const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(409);
   });
 
@@ -94,9 +82,7 @@ describe('POST /api/contributions/:id/access', () => {
 
   it('returns download URL and grant details on success', async () => {
     grantDownloadAccessMock.mockResolvedValue(GRANT_RESULT);
-    const res = await request(app)
-      .post('/api/contributions/5/access')
-      .send({});
+    const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(200);
     expect(res.body.downloadUrl).toBe('https://example.com/file.zip');
     expect(res.body.grantId).toBe(1);
@@ -142,10 +128,10 @@ describe('POST /api/downloads/:grantId/reverse', () => {
   });
 
   it('propagates 404 when grant not found', async () => {
-    reverseDownloadAccessMock.mockRejectedValue(new AppError(404, 'Grant not found'));
-    const res = await request(app)
-      .post('/api/downloads/1/reverse')
-      .send({});
+    reverseDownloadAccessMock.mockRejectedValue(
+      new AppError(404, 'Grant not found')
+    );
+    const res = await request(app).post('/api/downloads/1/reverse').send({});
     expect(res.status).toBe(404);
   });
 
@@ -153,9 +139,7 @@ describe('POST /api/downloads/:grantId/reverse', () => {
     reverseDownloadAccessMock.mockRejectedValue(
       new AppError(409, 'Grant is not in COMPLETED state')
     );
-    const res = await request(app)
-      .post('/api/downloads/1/reverse')
-      .send({});
+    const res = await request(app).post('/api/downloads/1/reverse').send({});
     expect(res.status).toBe(409);
   });
 });

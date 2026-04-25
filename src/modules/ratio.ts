@@ -22,7 +22,10 @@ const BRACKETS: Bracket[] = [
   { upTo: null, maxRequired: 0.6, minRequired: 0.6, label: '100+ GiB' }
 ];
 
-export const computeRatio = (totalEarned: bigint, downloaded: bigint): number => {
+export const computeRatio = (
+  totalEarned: bigint,
+  downloaded: bigint
+): number => {
   if (downloaded === 0n) return 1.0;
   return Number(totalEarned) / Number(downloaded);
 };
@@ -32,7 +35,11 @@ export const getDownloadBracket = (
 ): { maxRequired: number; minRequired: number; label: string } => {
   for (const b of BRACKETS) {
     if (b.upTo === null || downloadedBytes < b.upTo) {
-      return { maxRequired: b.maxRequired, minRequired: b.minRequired, label: b.label };
+      return {
+        maxRequired: b.maxRequired,
+        minRequired: b.minRequired,
+        label: b.label
+      };
     }
   }
   // Unreachable; last bracket has upTo: null
@@ -48,7 +55,10 @@ export const computeRequiredRatio = (
   const coverage =
     downloadedBytes === 0n
       ? 1.0
-      : Math.min(1, Number(eligibleContributionBytes) / Number(downloadedBytes));
+      : Math.min(
+          1,
+          Number(eligibleContributionBytes) / Number(downloadedBytes)
+        );
   return Math.max(minRequired, maxRequired * (1 - coverage));
 };
 

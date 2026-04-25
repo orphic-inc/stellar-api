@@ -139,13 +139,18 @@ describe('grantDownloadAccess', () => {
   it('uses approvedAccountingBytes over sizeInBytes when both present', async () => {
     const cost = BigInt('524288000'); // 500 MiB
     mockTx.contribution.findUnique.mockResolvedValue(
-      makeContribution({ approvedAccountingBytes: cost, sizeInBytes: 209715200 })
+      makeContribution({
+        approvedAccountingBytes: cost,
+        sizeInBytes: 209715200
+      })
     );
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.update.mockResolvedValue(undefined);
-    mockTx.downloadAccessGrant.create.mockResolvedValue(makeGrant({ amountBytes: cost }));
+    mockTx.downloadAccessGrant.create.mockResolvedValue(
+      makeGrant({ amountBytes: cost })
+    );
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.consumer.upsert.mockResolvedValue({ id: 1 });
     mockTx.consumer.update.mockResolvedValue(undefined);
@@ -199,9 +204,10 @@ describe('grantDownloadAccess', () => {
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
+    type TxCall = [{ data: Record<string, unknown> }];
     const [debitCall, creditCall] = (
-      mockTx.economyTransaction.create.mock.calls as any[]
-    ).map(([arg]: [any]) => arg.data);
+      mockTx.economyTransaction.create.mock.calls as TxCall[]
+    ).map(([arg]) => arg.data);
     expect(debitCall).toMatchObject({
       userId: 7,
       reason: EconomyTransactionReason.DOWNLOAD_DEBIT
@@ -242,7 +248,10 @@ describe('reverseDownloadAccess', () => {
     // findUniqueOrThrow called for consumer then contributor
     mockTx.user.findUniqueOrThrow
       .mockResolvedValueOnce({ downloaded: grant.amountBytes, totalEarned: 0n }) // consumer
-      .mockResolvedValueOnce({ downloaded: 0n, totalEarned: grant.amountBytes }); // contributor
+      .mockResolvedValueOnce({
+        downloaded: 0n,
+        totalEarned: grant.amountBytes
+      }); // contributor
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.downloadAccessGrant.update.mockResolvedValue({
@@ -275,13 +284,12 @@ describe('reverseDownloadAccess', () => {
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
+    type TxCall = [{ data: Record<string, unknown> }];
     const ledgerCalls = (
-      mockTx.economyTransaction.create.mock.calls as any[]
-    ).map(([arg]: [any]) => arg.data);
-    expect(ledgerCalls.every((r: any) => r.reason === 'STAFF_REVERSAL')).toBe(
-      true
-    );
-    expect(ledgerCalls.every((r: any) => r.actorUserId === 99)).toBe(true);
+      mockTx.economyTransaction.create.mock.calls as TxCall[]
+    ).map(([arg]) => arg.data);
+    expect(ledgerCalls.every((r) => r.reason === 'STAFF_REVERSAL')).toBe(true);
+    expect(ledgerCalls.every((r) => r.actorUserId === 99)).toBe(true);
     expect(result.status).toBe(DownloadGrantStatus.REVERSED);
   });
 });

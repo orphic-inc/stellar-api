@@ -7,7 +7,7 @@ import {
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
-import { asyncHandler, authHandler } from '../../modules/asyncHandler';
+import { authHandler } from '../../modules/asyncHandler';
 import {
   grantDownloadAccess,
   reverseDownloadAccess
