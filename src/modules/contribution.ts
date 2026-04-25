@@ -145,7 +145,10 @@ export const createContributionSubmission = async ({
   });
 
   checkContributionLink(contribution.id).catch((err) =>
-    log.warn('Initial link check failed', { contributionId: contribution.id, err })
+    log.warn('Initial link check failed', {
+      contributionId: contribution.id,
+      err
+    })
   );
 
   return contribution;
@@ -167,45 +170,50 @@ export const addContributionToRelease = async ({
   });
   if (!release) return null;
 
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const contributor = await tx.contributor.upsert({
-      where: { userId },
-      update: { communityId },
-      create: { userId, communityId }
-    });
+  return prisma
+    .$transaction(async (tx: Prisma.TransactionClient) => {
+      const contributor = await tx.contributor.upsert({
+        where: { userId },
+        update: { communityId },
+        create: { userId, communityId }
+      });
 
-    return tx.contribution.create({
-      data: {
-        userId,
-        releaseId,
-        contributorId: contributor.id,
-        type: input.fileType as FileType,
-        downloadUrl: input.downloadUrl,
-        sizeInBytes: input.sizeInBytes ?? null,
-        releaseDescription: input.releaseDescription
-      },
-      select: {
-        id: true,
-        userId: true,
-        releaseId: true,
-        contributorId: true,
-        releaseDescription: true,
-        sizeInBytes: true,
-        approvedAccountingBytes: true,
-        linkStatus: true,
-        linkCheckedAt: true,
-        type: true,
-        createdAt: true,
-        updatedAt: true,
-        user: { select: { id: true, username: true } },
-        release: { select: { id: true, title: true, communityId: true } },
-        collaborators: { select: { id: true, name: true } }
-      }
+      return tx.contribution.create({
+        data: {
+          userId,
+          releaseId,
+          contributorId: contributor.id,
+          type: input.fileType as FileType,
+          downloadUrl: input.downloadUrl,
+          sizeInBytes: input.sizeInBytes ?? null,
+          releaseDescription: input.releaseDescription
+        },
+        select: {
+          id: true,
+          userId: true,
+          releaseId: true,
+          contributorId: true,
+          releaseDescription: true,
+          sizeInBytes: true,
+          approvedAccountingBytes: true,
+          linkStatus: true,
+          linkCheckedAt: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
+          user: { select: { id: true, username: true } },
+          release: { select: { id: true, title: true, communityId: true } },
+          collaborators: { select: { id: true, name: true } }
+        }
+      });
+    })
+    .then((contribution) => {
+      checkContributionLink(contribution.id).catch((err) =>
+        log.warn('Initial link check failed', {
+          contributionId: contribution.id,
+          err
+        })
+      );
+      return contribution;
     });
-  }).then((contribution) => {
-    checkContributionLink(contribution.id).catch((err) =>
-      log.warn('Initial link check failed', { contributionId: contribution.id, err })
-    );
-    return contribution;
-  });
 };

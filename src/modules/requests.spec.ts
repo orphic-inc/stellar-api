@@ -5,6 +5,7 @@
  * error paths, and transaction behavior without a real database.
  */
 
+import { ReleaseType, RequestStatus } from '@prisma/client';
 import { AppError } from '../lib/errors';
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
@@ -47,7 +48,6 @@ jest.mock('./config', () => ({
 
 import {
   createRequest,
-  addBounty,
   fillRequest,
   unfillRequest,
   deleteRequest,
@@ -108,7 +108,7 @@ describe('createRequest', () => {
     await expect(
       createRequest(1, {
         communityId: 1,
-        type: 'Music' as any,
+        type: ReleaseType.Music,
         title: 'T',
         description: 'D',
         image: undefined,
@@ -122,7 +122,7 @@ describe('createRequest', () => {
     await expect(
       createRequest(1, {
         communityId: 1,
-        type: 'Music' as any,
+        type: ReleaseType.Music,
         title: 'T',
         description: 'D',
         image: undefined,
@@ -154,7 +154,7 @@ describe('createRequest', () => {
 
     const result = await createRequest(1, {
       communityId: 1,
-      type: 'Music' as any,
+      type: ReleaseType.Music,
       title: 'My Album',
       description: 'Please',
       image: undefined,
@@ -373,9 +373,11 @@ describe('deleteRequest', () => {
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
     expect(
-      (mockTx.economyTransaction.create.mock.calls as any[]).every(
-        ([arg]: [any]) => arg.data.reason === 'REQUEST_REFUND'
-      )
+      (
+        mockTx.economyTransaction.create.mock.calls as [
+          { data: Record<string, unknown> }
+        ][]
+      ).every(([arg]) => arg.data.reason === 'REQUEST_REFUND')
     ).toBe(true);
   });
 
@@ -422,7 +424,7 @@ describe('listRequests', () => {
 
     const result = await listRequests({
       communityId: 1,
-      status: 'open' as any
+      status: RequestStatus.open
     });
 
     expect(result.data[0].totalBounty).toBe('209715200');

@@ -49,11 +49,11 @@ const OPEN_REQUEST = {
   filledAt: null,
   filledContributionId: null,
   totalBounty: '104857600',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
   deletedAt: null,
   bounties: []
-} as any;
+};
 
 describe('GET /api/requests', () => {
   beforeEach(() => resetApiTestState());
@@ -142,7 +142,7 @@ describe('POST /api/requests/:id/fill', () => {
     mod.fillRequest.mockResolvedValue({
       ...OPEN_REQUEST,
       status: 'filled'
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof mod.fillRequest>>);
     const res = await request(app)
       .post('/api/requests/1/fill')
       .send({ contributionId: 5 });

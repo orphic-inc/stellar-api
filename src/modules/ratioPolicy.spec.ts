@@ -4,7 +4,11 @@
 
 import { RatioPolicyStatus } from '@prisma/client';
 
-const mockPrismaUser = { findUniqueOrThrow: jest.fn(), findUnique: jest.fn(), update: jest.fn() };
+const mockPrismaUser = {
+  findUniqueOrThrow: jest.fn(),
+  findUnique: jest.fn(),
+  update: jest.fn()
+};
 const mockPrismaPolicy = {
   findUnique: jest.fn(),
   upsert: jest.fn(),
@@ -27,10 +31,12 @@ jest.mock('./logging', () => ({
   getLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() })
 }));
 
-import { evaluateRatioPolicy, getPolicyState, overridePolicyStatus } from './ratioPolicy';
+import { evaluateRatioPolicy, overridePolicyStatus } from './ratioPolicy';
 import { getRatioStats } from './ratio';
 
-const mockGetRatioStats = getRatioStats as jest.MockedFunction<typeof getRatioStats>;
+const mockGetRatioStats = getRatioStats as jest.MockedFunction<
+  typeof getRatioStats
+>;
 
 const GiB = BigInt(1024 ** 3);
 
@@ -64,13 +70,17 @@ describe('evaluateRatioPolicy', () => {
 
   it('OK + meets requirement: only refreshes lastEvaluatedAt', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 7n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 7n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
     await evaluateRatioPolicy(1);
 
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ lastEvaluatedAt: expect.any(Date) }) })
+      expect.objectContaining({
+        data: expect.objectContaining({ lastEvaluatedAt: expect.any(Date) })
+      })
     );
     expect(mockPrismaUser.update).not.toHaveBeenCalled();
   });
@@ -79,7 +89,9 @@ describe('evaluateRatioPolicy', () => {
     mockGetRatioStats.mockResolvedValue(
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 7n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 7n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
     await evaluateRatioPolicy(1);
@@ -98,7 +110,9 @@ describe('evaluateRatioPolicy', () => {
 
   it('WATCH + ratio restored: transitions to OK, re-enables canDownload', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 9n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 9n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
@@ -143,7 +157,9 @@ describe('evaluateRatioPolicy', () => {
 
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: RatioPolicyStatus.LEECH_DISABLED })
+        data: expect.objectContaining({
+          status: RatioPolicyStatus.LEECH_DISABLED
+        })
       })
     );
     expect(mockPrismaUser.update).toHaveBeenCalledWith(
@@ -155,12 +171,14 @@ describe('evaluateRatioPolicy', () => {
     mockGetRatioStats.mockResolvedValue(
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 6n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 6n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() - 1), // already expired
-        downloadedAtWatchStart: 5n * GiB          // only 1 GiB during watch
+        downloadedAtWatchStart: 5n * GiB // only 1 GiB during watch
       })
     );
     mockPrismaPolicy.update.mockResolvedValue({});
@@ -170,7 +188,9 @@ describe('evaluateRatioPolicy', () => {
 
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: RatioPolicyStatus.LEECH_DISABLED })
+        data: expect.objectContaining({
+          status: RatioPolicyStatus.LEECH_DISABLED
+        })
       })
     );
     expect(mockPrismaUser.update).toHaveBeenCalledWith(
@@ -182,12 +202,14 @@ describe('evaluateRatioPolicy', () => {
     mockGetRatioStats.mockResolvedValue(
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 6n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 6n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() + 86400000),
-        downloadedAtWatchStart: 5n * GiB   // only 1 GiB during watch
+        downloadedAtWatchStart: 5n * GiB // only 1 GiB during watch
       })
     );
 
@@ -203,7 +225,9 @@ describe('evaluateRatioPolicy', () => {
 
   it('LEECH_DISABLED: no status change, only refreshes timestamp', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: false }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ downloaded: 50n * GiB });
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
+      downloaded: 50n * GiB
+    });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({ status: RatioPolicyStatus.LEECH_DISABLED })
     );
@@ -234,7 +258,10 @@ describe('overridePolicyStatus', () => {
   it('sets canDownload=false when overriding to LEECH_DISABLED', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({ id: 1 });
     mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({ status: RatioPolicyStatus.LEECH_DISABLED, leechDisabledAt: new Date() })
+      makeState({
+        status: RatioPolicyStatus.LEECH_DISABLED,
+        leechDisabledAt: new Date()
+      })
     );
     mockPrismaUser.update.mockResolvedValue({});
 

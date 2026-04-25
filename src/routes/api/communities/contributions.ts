@@ -28,7 +28,9 @@ const reportSchema = z.object({
 });
 
 const approveSchema = z.object({
-  approvedAccountingBytes: z.string().regex(/^\d+$/, 'Must be a positive integer string')
+  approvedAccountingBytes: z
+    .string()
+    .regex(/^\d+$/, 'Must be a positive integer string')
 });
 
 // GET /api/contributions
@@ -130,8 +132,11 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { reason } = parsedBody<{ reason: string }>(res);
 
-    const contribution = await prisma.contribution.findUnique({ where: { id } });
-    if (!contribution) return res.status(404).json({ msg: 'Contribution not found' });
+    const contribution = await prisma.contribution.findUnique({
+      where: { id }
+    });
+    if (!contribution)
+      return res.status(404).json({ msg: 'Contribution not found' });
 
     await recordContributionReport(id, req.user.id, reason);
     res.status(201).json({ msg: 'Report submitted' });
@@ -146,7 +151,9 @@ router.put(
   validate(approveSchema),
   asyncHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { approvedAccountingBytes } = parsedBody<{ approvedAccountingBytes: string }>(res);
+    const { approvedAccountingBytes } = parsedBody<{
+      approvedAccountingBytes: string;
+    }>(res);
 
     const contribution = await prisma.contribution.update({
       where: { id },
