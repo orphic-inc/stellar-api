@@ -2,6 +2,10 @@ import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 import { getLogger } from './modules/logging';
 import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
@@ -23,6 +27,8 @@ import postsRouter from './routes/api/posts';
 import forumRouter from './routes/api/forum/forumRoute';
 import forumCategoryRouter from './routes/api/forum/forumCategory';
 import forumPollRouter from './routes/api/forum/forumPoll';
+import requestsRouter from './routes/api/requests';
+import downloadsRouter from './routes/api/downloads';
 import forumPollVoteRouter from './routes/api/forum/forumPollVote';
 import forumLastReadRouter from './routes/api/forum/forumLastReadTopic';
 import forumTopicNoteRouter from './routes/api/forum/forumTopicNote';
@@ -72,6 +78,8 @@ export const createApp = () => {
   app.use('/api/forums/last-read', forumLastReadRouter);
   app.use('/api/forums/topic-notes', forumTopicNoteRouter);
   app.use('/api/forums', forumRouter);
+  app.use('/api/requests', requestsRouter);
+  app.use('/api', downloadsRouter);
   app.use('/api/communities', communitiesRouter);
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/artists', artistRouter);

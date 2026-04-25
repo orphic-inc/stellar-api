@@ -24,8 +24,8 @@ const buildInviteTree = (
       email: string;
       dateRegistered: Date;
       lastLogin: Date | null;
-      uploaded: number;
-      downloaded: number;
+      uploaded: bigint;
+      downloaded: bigint;
       ratio: number;
     };
   }>
@@ -44,8 +44,8 @@ const buildInviteTree = (
       email: row.user.email,
       joinedAt: row.user.dateRegistered.toISOString(),
       lastSeen: row.user.lastLogin?.toISOString() ?? null,
-      uploaded: String(row.user.uploaded),
-      downloaded: String(row.user.downloaded),
+      uploaded: row.user.uploaded.toString(),
+      downloaded: row.user.downloaded.toString(),
       ratio: row.user.ratio.toFixed(2),
       children: []
     };

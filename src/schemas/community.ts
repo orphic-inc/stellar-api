@@ -1,10 +1,26 @@
 import { z } from 'zod';
-import { CommunityType, RegistrationStatus, ReleaseType, ReleaseCategory } from '@prisma/client';
+import {
+  CommunityType,
+  RegistrationStatus,
+  ReleaseType,
+  ReleaseCategory
+} from '@prisma/client';
 
-const communityTypeEnum = z.enum(Object.values(CommunityType) as [CommunityType, ...CommunityType[]]);
-const registrationStatusEnum = z.enum(Object.values(RegistrationStatus) as [RegistrationStatus, ...RegistrationStatus[]]);
-const releaseTypeEnum = z.enum(Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]);
-const releaseCategoryEnum = z.enum(Object.values(ReleaseCategory) as [ReleaseCategory, ...ReleaseCategory[]]);
+const communityTypeEnum = z.enum(
+  Object.values(CommunityType) as [CommunityType, ...CommunityType[]]
+);
+const registrationStatusEnum = z.enum(
+  Object.values(RegistrationStatus) as [
+    RegistrationStatus,
+    ...RegistrationStatus[]
+  ]
+);
+const releaseTypeEnum = z.enum(
+  Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]
+);
+const releaseCategoryEnum = z.enum(
+  Object.values(ReleaseCategory) as [ReleaseCategory, ...ReleaseCategory[]]
+);
 
 export const createCommunitySchema = z.object({
   name: z.string().min(1, 'Name is required').max(128),

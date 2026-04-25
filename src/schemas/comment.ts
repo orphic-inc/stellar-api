@@ -37,7 +37,10 @@ export const createCommentSchema = z
       return;
     }
 
-    if (value.page === CommentPage.communities && value.communityId === undefined) {
+    if (
+      value.page === CommentPage.communities &&
+      value.communityId === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'communityId is required for community comments',
@@ -54,7 +57,8 @@ export const createCommentSchema = z
     }
 
     if (
-      (value.page === CommentPage.collages || value.page === CommentPage.requests) &&
+      (value.page === CommentPage.collages ||
+        value.page === CommentPage.requests) &&
       value.contributionId === undefined
     ) {
       ctx.addIssue({

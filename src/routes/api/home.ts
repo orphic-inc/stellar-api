@@ -32,28 +32,30 @@ router.get(
     ]);
 
     const albumOfTheMonth = featuredAlbum
-      ? await prisma.release.findUnique({
-          where: { id: featuredAlbum.groupId },
-          select: {
-            id: true,
-            title: true,
-            year: true,
-            image: true,
-            communityId: true,
-            artist: { select: { id: true, name: true } }
-          }
-        }).then((release) =>
-          release
-            ? {
-                id: release.id,
-                title: featuredAlbum.title || release.title,
-                started: featuredAlbum.started,
-                ended: featuredAlbum.ended,
-                threadId: featuredAlbum.threadId,
-                release
-              }
-            : null
-        )
+      ? await prisma.release
+          .findUnique({
+            where: { id: featuredAlbum.groupId },
+            select: {
+              id: true,
+              title: true,
+              year: true,
+              image: true,
+              communityId: true,
+              artist: { select: { id: true, name: true } }
+            }
+          })
+          .then((release) =>
+            release
+              ? {
+                  id: release.id,
+                  title: featuredAlbum.title || release.title,
+                  started: featuredAlbum.started,
+                  ended: featuredAlbum.ended,
+                  threadId: featuredAlbum.threadId,
+                  release
+                }
+              : null
+          )
       : null;
 
     res.json({
