@@ -40,6 +40,7 @@ import artistRouter from './routes/api/communities/artist';
 import collagesRouter from './routes/api/collages';
 import messagesRouter from './routes/api/messages';
 import staffInboxRouter from './routes/api/staffInbox';
+import reportsRouter from './routes/api/reports';
 
 const log = getLogger('app');
 
@@ -92,12 +93,14 @@ export const createApp = () => {
   app.use('/api/collages', collagesRouter);
   app.use('/api/messages', messagesRouter);
   app.use('/api/staff-inbox', staffInboxRouter);
+  app.use('/api/reports', reportsRouter);
 
   app.use(
     (
       err: Error & { statusCode?: number },
       req: Request,
       res: Response,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: NextFunction
     ) => {
       log.error('Unhandled error', {
