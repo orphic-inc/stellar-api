@@ -18,7 +18,8 @@ module.exports = {
     'import/no-unresolved': [
       'error',
       { ignore: ['@asteasolutions/zod-to-openapi', '@prisma/client', 'express-rate-limit'] }
-    ]
+    ],
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
   },
   settings: {
     'import/resolver': {
