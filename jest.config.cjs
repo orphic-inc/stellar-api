@@ -11,7 +11,8 @@ module.exports = {
         tsconfig: {
           module: 'commonjs',
           moduleResolution: 'node',
-          esModuleInterop: true
+          esModuleInterop: true,
+          types: ['jest', 'node']
         }
       }
     ]
