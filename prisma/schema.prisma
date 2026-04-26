@@ -166,6 +166,12 @@ enum RequestActionType {
   RESTORE
 }
 
+enum StaffInboxStatus {
+  Unanswered
+  Open
+  Resolved
+}
+
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
 model UserRank {
@@ -222,6 +228,7 @@ model User {
   warned             DateTime?
   warnedTimes        Int          @default(0)
   communityPass      String       @default("")
+  disablePm          Boolean      @default(false)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -275,6 +282,12 @@ model User {
   downloadGrantsReversed    DownloadAccessGrant[] @relation("DownloadGrantReversedBy")
   ratioPolicyState          RatioPolicyState?
   contributionReports       ContributionReport[]
+  pmParticipations          PrivateConversationParticipant[] @relation("PmParticipant")
+  pmMessagesSent            PrivateMessage[]                 @relation("PmSender")
+  staffInboxConversations   StaffInboxConversation[]         @relation("StaffInboxOwner")
+  staffInboxAssigned        StaffInboxConversation[]         @relation("StaffInboxAssignee")
+  staffInboxResolved        StaffInboxConversation[]         @relation("StaffInboxResolver")
+  staffInboxMessages        StaffInboxMessage[]              @relation("StaffInboxMsgSender")
 
   @@index([userRankId])
   @@map("users")
@@ -1363,4 +1376,95 @@ model AuditLog {
   actor User @relation(fields: [actorId], references: [id])
 
   @@map("audit_logs")
+}
+
+// ─── Private Messaging ────────────────────────────────────────────────────────
+
+model PrivateConversation {
+  id           Int                              @id @default(autoincrement())
+  subject      String                           @db.VarChar(255)
+  messages     PrivateMessage[]
+  participants PrivateConversationParticipant[]
+  createdAt    DateTime                          @default(now())
+
+  @@map("private_conversations")
+}
+
+model PrivateConversationParticipant {
+  userId         Int
+  conversationId Int
+  user           User                @relation("PmParticipant", fields: [userId], references: [id])
+  conversation   PrivateConversation @relation(fields: [conversationId], references: [id])
+  inInbox        Boolean             @default(true)
+  inSentbox      Boolean             @default(false)
+  isRead         Boolean             @default(false)
+  isSticky       Boolean             @default(false)
+  // forwardedToId retained as plain Int (forwarding deferred — see deviation notes)
+  forwardedToId  Int?
+  sentAt         DateTime?
+  receivedAt     DateTime?
+
+  @@id([userId, conversationId])
+  @@index([userId])
+  @@index([conversationId])
+  @@map("private_conversation_participants")
+}
+
+model PrivateMessage {
+  id             Int                 @id @default(autoincrement())
+  conversationId Int
+  conversation   PrivateConversation @relation(fields: [conversationId], references: [id])
+  senderId       Int?
+  sender         User?               @relation("PmSender", fields: [senderId], references: [id])
+  body           String              @db.Text
+  createdAt      DateTime            @default(now())
+
+  @@index([conversationId])
+  @@map("private_messages")
+}
+
+// ─── Staff Inbox ──────────────────────────────────────────────────────────────
+
+model StaffInboxConversation {
+  id             Int                 @id @default(autoincrement())
+  subject        String              @db.VarChar(255)
+  userId         Int
+  user           User                @relation("StaffInboxOwner", fields: [userId], references: [id])
+  status         StaffInboxStatus    @default(Unanswered)
+  assignedUserId Int?
+  assignedUser   User?               @relation("StaffInboxAssignee", fields: [assignedUserId], references: [id])
+  resolverId     Int?
+  resolver       User?               @relation("StaffInboxResolver", fields: [resolverId], references: [id])
+  isReadByUser   Boolean             @default(false)
+  messages       StaffInboxMessage[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([assignedUserId])
+  @@map("staff_inbox_conversations")
+}
+
+model StaffInboxMessage {
+  id             Int                    @id @default(autoincrement())
+  conversationId Int
+  conversation   StaffInboxConversation @relation(fields: [conversationId], references: [id])
+  senderId       Int
+  sender         User                   @relation("StaffInboxMsgSender", fields: [senderId], references: [id])
+  body           String                 @db.Text
+  createdAt      DateTime               @default(now())
+
+  @@index([conversationId])
+  @@map("staff_inbox_messages")
+}
+
+model StaffInboxResponse {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("staff_inbox_responses")
 }

@@ -37,6 +37,35 @@ jest.mock('../modules/forum', () => ({
   createTopicNote: jest.fn()
 }));
 
+jest.mock('../modules/pm', () => ({
+  listInbox: jest.fn(),
+  listSentbox: jest.fn(),
+  sendMessage: jest.fn(),
+  replyToConversation: jest.fn(),
+  viewConversation: jest.fn(),
+  updateConversationFlags: jest.fn(),
+  deleteConversation: jest.fn(),
+  bulkUpdateConversations: jest.fn(),
+  getUnreadCount: jest.fn()
+}));
+
+jest.mock('../modules/staffInbox', () => ({
+  listStaffTickets: jest.fn(),
+  listMyTickets: jest.fn(),
+  createTicket: jest.fn(),
+  viewTicket: jest.fn(),
+  replyToTicket: jest.fn(),
+  assignTicket: jest.fn(),
+  resolveTicket: jest.fn(),
+  unresolveTicket: jest.fn(),
+  bulkResolveTickets: jest.fn(),
+  listResponses: jest.fn(),
+  createResponse: jest.fn(),
+  updateResponse: jest.fn(),
+  deleteResponse: jest.fn(),
+  getStaffUnreadCount: jest.fn()
+}));
+
 jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
@@ -188,6 +217,39 @@ jest.mock('../lib/prisma', () => ({
     release: {
       findUnique: jest.fn()
     },
+    privateConversation: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn()
+    },
+    privateConversationParticipant: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn()
+    },
+    privateMessage: {
+      create: jest.fn()
+    },
+    staffInboxConversation: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn()
+    },
+    staffInboxMessage: {
+      create: jest.fn()
+    },
+    staffInboxResponse: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
+    },
     $transaction: jest.fn()
   }
 }));
@@ -222,6 +284,8 @@ import {
   grantDownloadAccess,
   reverseDownloadAccess
 } from '../modules/downloads';
+import * as pmModule from '../modules/pm';
+import * as staffInboxModule from '../modules/staffInbox';
 
 export { app, request };
 
@@ -337,6 +401,39 @@ export const prismaMock = prisma as unknown as {
   release: {
     findUnique: jest.Mock;
   };
+  privateConversation: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    count: jest.Mock;
+    create: jest.Mock;
+  };
+  privateConversationParticipant: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  privateMessage: {
+    create: jest.Mock;
+  };
+  staffInboxConversation: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    count: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  staffInboxMessage: {
+    create: jest.Mock;
+  };
+  staffInboxResponse: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
   $transaction: jest.Mock;
 };
 export const bcryptMock = bcrypt as unknown as {
@@ -386,6 +483,10 @@ export const grantDownloadAccessMock =
   grantDownloadAccess as jest.MockedFunction<typeof grantDownloadAccess>;
 export const reverseDownloadAccessMock =
   reverseDownloadAccess as jest.MockedFunction<typeof reverseDownloadAccess>;
+export const pmMock = pmModule as jest.Mocked<typeof pmModule>;
+export const staffInboxMock = staffInboxModule as jest.Mocked<
+  typeof staffInboxModule
+>;
 
 export const setCurrentUserRankLevel = (level: number): void => {
   currentUserRankLevel = level;
