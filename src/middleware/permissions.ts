@@ -9,6 +9,8 @@ export const VALID_PERMISSIONS = [
   'forums_moderate',
   'forums_manage',
   'communities_manage',
+  'collages_manage',
+  'collages_moderate',
   'news_manage',
   'invites_manage',
   'users_edit',

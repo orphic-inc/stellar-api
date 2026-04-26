@@ -237,6 +237,9 @@ model User {
   forumPosts            ForumPost[]
   forumTopicNotes       ForumTopicNote[]
   artistHistories       ArtistHistory[]       @relation("HistoryEditedBy")
+  collages              Collage[]             @relation("CollageCreator")
+  collageEntries        CollageEntry[]        @relation("CollageEntryAdder")
+  collageSubscriptions  CollageSubscription[] @relation("CollageSubscriber")
   bookmarkArtists       BookmarkArtist[]
   bookmarkCollages      BookmarkCollage[]
   bookmarkReleases      BookmarkRelease[]
@@ -661,10 +664,11 @@ model Release {
   year          Int
   isEdition     Boolean           @default(false)
   edition       Json?
-  bookmarks     BookmarkRelease[]
-  comments      Comment[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  bookmarks       BookmarkRelease[]
+  comments        Comment[]
+  collageEntries  CollageEntry[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([artistId])
   @@index([communityId])
@@ -733,6 +737,8 @@ model Comment {
   contribution   Contribution? @relation(fields: [contributionId], references: [id])
   releaseId      Int?
   release        Release?      @relation(fields: [releaseId], references: [id])
+  collageId      Int?
+  collage        Collage?      @relation(fields: [collageId], references: [id])
   createdAt      DateTime      @default(now())
   deletedAt      DateTime?
 
@@ -740,6 +746,7 @@ model Comment {
   @@index([page, contributionId])
   @@index([page, artistId])
   @@index([page, releaseId])
+  @@index([page, collageId])
   @@map("comments")
 }
 
@@ -805,6 +812,65 @@ model DonorReward {
   @@map("donor_rewards")
 }
 
+// ─── Collage ──────────────────────────────────────────────────────────────────
+
+model Collage {
+  id                Int                  @id @default(autoincrement())
+  name              String               @unique @db.VarChar(100)
+  description       String               @db.Text
+  userId            Int
+  user              User                 @relation("CollageCreator", fields: [userId], references: [id])
+  categoryId        Int                  @default(1)
+  tags              String[]
+  isLocked          Boolean              @default(false)
+  isDeleted         Boolean              @default(false)
+  maxEntries        Int                  @default(0)
+  maxEntriesPerUser Int                  @default(0)
+  isFeatured        Boolean              @default(false)
+  numEntries        Int                  @default(0)
+  numSubscribers    Int                  @default(0)
+  entries           CollageEntry[]
+  subscriptions     CollageSubscription[]
+  bookmarks         BookmarkCollage[]
+  comments          Comment[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([categoryId])
+  @@map("collages")
+}
+
+model CollageEntry {
+  id        Int      @id @default(autoincrement())
+  collageId Int
+  collage   Collage  @relation(fields: [collageId], references: [id], onDelete: Cascade)
+  releaseId Int
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation("CollageEntryAdder", fields: [userId], references: [id])
+  sort      Int      @default(0)
+  addedAt   DateTime @default(now())
+
+  @@unique([collageId, releaseId])
+  @@index([collageId, sort])
+  @@map("collage_entries")
+}
+
+model CollageSubscription {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation("CollageSubscriber", fields: [userId], references: [id])
+  collageId  Int
+  collage    Collage  @relation(fields: [collageId], references: [id], onDelete: Cascade)
+  lastVisit  DateTime @default(now())
+
+  @@unique([userId, collageId])
+  @@index([collageId])
+  @@map("collage_subscriptions")
+}
+
 // ─── Bookmark ─────────────────────────────────────────────────────────────────
 
 model BookmarkArtist {
@@ -824,6 +890,7 @@ model BookmarkCollage {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   collageId Int
+  collage   Collage  @relation(fields: [collageId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([userId, collageId])

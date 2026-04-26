@@ -37,6 +37,7 @@ import forumTopicNoteRouter from './routes/api/forum/forumTopicNote';
 import communitiesRouter from './routes/api/communities/communities';
 import contributionsRouter from './routes/api/communities/contributions';
 import artistRouter from './routes/api/communities/artist';
+import collagesRouter from './routes/api/collages';
 
 const log = getLogger('app');
 
@@ -86,6 +87,7 @@ export const createApp = () => {
   app.use('/api/communities', communitiesRouter);
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/artists', artistRouter);
+  app.use('/api/collages', collagesRouter);
 
   app.use(
     (

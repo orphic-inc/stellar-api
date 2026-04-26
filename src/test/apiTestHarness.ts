@@ -156,6 +156,38 @@ jest.mock('../lib/prisma', () => ({
       findFirst: jest.fn(),
       findUnique: jest.fn()
     },
+    collage: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn()
+    },
+    collageEntry: {
+      findUnique: jest.fn(),
+      count: jest.fn(),
+      aggregate: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
+    },
+    collageSubscription: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
+    },
+    bookmarkCollage: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn()
+    },
+    release: {
+      findUnique: jest.fn()
+    },
     $transaction: jest.fn()
   }
 }));
@@ -271,6 +303,38 @@ export const prismaMock = prisma as unknown as {
   };
   downloadAccessGrant: {
     findFirst: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  collage: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    count: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+    delete: jest.Mock;
+  };
+  collageEntry: {
+    findUnique: jest.Mock;
+    count: jest.Mock;
+    aggregate: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+  collageSubscription: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+  bookmarkCollage: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    delete: jest.Mock;
+  };
+  release: {
     findUnique: jest.Mock;
   };
   $transaction: jest.Mock;

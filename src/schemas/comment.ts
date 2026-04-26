@@ -19,14 +19,16 @@ export const createCommentSchema = z
     communityId: pageIdSchema.optional(),
     contributionId: pageIdSchema.optional(),
     artistId: pageIdSchema.optional(),
-    releaseId: pageIdSchema.optional()
+    releaseId: pageIdSchema.optional(),
+    collageId: pageIdSchema.optional()
   })
   .superRefine((value, ctx) => {
     const keyCount = [
       value.communityId,
       value.contributionId,
       value.artistId,
-      value.releaseId
+      value.releaseId,
+      value.collageId
     ].filter((entry) => entry !== undefined).length;
 
     if (keyCount !== 1) {
@@ -56,14 +58,21 @@ export const createCommentSchema = z
       });
     }
 
+    if (value.page === CommentPage.collages && value.collageId === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'collageId is required for collage comments',
+        path: ['collageId']
+      });
+    }
+
     if (
-      (value.page === CommentPage.collages ||
-        value.page === CommentPage.requests) &&
+      value.page === CommentPage.requests &&
       value.contributionId === undefined
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'contributionId is required for this comment type',
+        message: 'contributionId is required for request comments',
         path: ['contributionId']
       });
     }
