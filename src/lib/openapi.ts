@@ -2652,7 +2652,11 @@ registry.registerPath({
 
 const MessageUser = registry.register(
   'MessageUser',
-  z.object({ id: z.number(), username: z.string(), avatar: z.string().nullable().optional() })
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable().optional()
+  })
 );
 
 const PrivateMessage = registry.register(
@@ -2730,7 +2734,9 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Unread conversation count',
-      content: { 'application/json': { schema: z.object({ count: z.number() }) } }
+      content: {
+        'application/json': { schema: z.object({ count: z.number() }) }
+      }
     }
   }
 });
@@ -2751,7 +2757,11 @@ registry.registerPath({
   method: 'post',
   path: '/messages/bulk',
   tags: ['Messages'],
-  request: { body: { content: { 'application/json': { schema: bulkMessageActionSchema } } } },
+  request: {
+    body: {
+      content: { 'application/json': { schema: bulkMessageActionSchema } }
+    }
+  },
   responses: { 204: { description: 'Bulk action applied' } }
 });
 
@@ -2759,13 +2769,18 @@ registry.registerPath({
   method: 'post',
   path: '/messages',
   tags: ['Messages'],
-  request: { body: { content: { 'application/json': { schema: composeMessageSchema } } } },
+  request: {
+    body: { content: { 'application/json': { schema: composeMessageSchema } } }
+  },
   responses: {
     201: {
       description: 'Conversation created',
       content: { 'application/json': { schema: PrivateConversation } }
     },
-    400: { description: 'Validation error', content: { 'application/json': { schema: MsgResponse } } }
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -2779,7 +2794,10 @@ registry.registerPath({
       description: 'Conversation with messages',
       content: { 'application/json': { schema: PrivateConversation } }
     },
-    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -2796,7 +2814,10 @@ registry.registerPath({
       description: 'Reply sent',
       content: { 'application/json': { schema: PrivateMessage } }
     },
-    403: { description: 'Not a participant', content: { 'application/json': { schema: MsgResponse } } }
+    403: {
+      description: 'Not a participant',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -2806,7 +2827,9 @@ registry.registerPath({
   tags: ['Messages'],
   request: {
     params: z.object({ id: z.string() }),
-    body: { content: { 'application/json': { schema: updateConversationSchema } } }
+    body: {
+      content: { 'application/json': { schema: updateConversationSchema } }
+    }
   },
   responses: { 204: { description: 'Flags updated' } }
 });
@@ -2833,7 +2856,11 @@ import {
 
 const StaffInboxMessageUser = registry.register(
   'StaffInboxMessageUser',
-  z.object({ id: z.number(), username: z.string(), avatar: z.string().nullable().optional() })
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable().optional()
+  })
 );
 
 const StaffInboxMsg = registry.register(
@@ -2890,7 +2917,10 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { query: ticketListQuerySchema },
   responses: {
-    200: { description: 'Staff ticket list', content: { 'application/json': { schema: PaginatedTickets } } }
+    200: {
+      description: 'Staff ticket list',
+      content: { 'application/json': { schema: PaginatedTickets } }
+    }
   }
 });
 
@@ -2901,7 +2931,9 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Open ticket count',
-      content: { 'application/json': { schema: z.object({ count: z.number() }) } }
+      content: {
+        'application/json': { schema: z.object({ count: z.number() }) }
+      }
     }
   }
 });
@@ -2911,7 +2943,10 @@ registry.registerPath({
   path: '/staff-inbox/mine',
   tags: ['StaffInbox'],
   responses: {
-    200: { description: 'My tickets', content: { 'application/json': { schema: PaginatedTickets } } }
+    200: {
+      description: 'My tickets',
+      content: { 'application/json': { schema: PaginatedTickets } }
+    }
   }
 });
 
@@ -2931,9 +2966,14 @@ registry.registerPath({
   method: 'post',
   path: '/staff-inbox/responses',
   tags: ['StaffInbox'],
-  request: { body: { content: { 'application/json': { schema: createResponseSchema } } } },
+  request: {
+    body: { content: { 'application/json': { schema: createResponseSchema } } }
+  },
   responses: {
-    201: { description: 'Response created', content: { 'application/json': { schema: StaffInboxResponse } } }
+    201: {
+      description: 'Response created',
+      content: { 'application/json': { schema: StaffInboxResponse } }
+    }
   }
 });
 
@@ -2946,8 +2986,14 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: updateResponseSchema } } }
   },
   responses: {
-    200: { description: 'Response updated', content: { 'application/json': { schema: StaffInboxResponse } } },
-    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+    200: {
+      description: 'Response updated',
+      content: { 'application/json': { schema: StaffInboxResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -2963,11 +3009,17 @@ registry.registerPath({
   method: 'post',
   path: '/staff-inbox/bulk-resolve',
   tags: ['StaffInbox'],
-  request: { body: { content: { 'application/json': { schema: bulkResolveSchema } } } },
+  request: {
+    body: { content: { 'application/json': { schema: bulkResolveSchema } } }
+  },
   responses: {
     200: {
       description: 'Tickets resolved',
-      content: { 'application/json': { schema: z.object({ ok: z.boolean(), resolved: z.number() }) } }
+      content: {
+        'application/json': {
+          schema: z.object({ ok: z.boolean(), resolved: z.number() })
+        }
+      }
     }
   }
 });
@@ -2976,9 +3028,14 @@ registry.registerPath({
   method: 'post',
   path: '/staff-inbox',
   tags: ['StaffInbox'],
-  request: { body: { content: { 'application/json': { schema: createTicketSchema } } } },
+  request: {
+    body: { content: { 'application/json': { schema: createTicketSchema } } }
+  },
   responses: {
-    201: { description: 'Ticket created', content: { 'application/json': { schema: StaffInboxConversation } } }
+    201: {
+      description: 'Ticket created',
+      content: { 'application/json': { schema: StaffInboxConversation } }
+    }
   }
 });
 
@@ -2988,8 +3045,14 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    200: { description: 'Ticket', content: { 'application/json': { schema: StaffInboxConversation } } },
-    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+    200: {
+      description: 'Ticket',
+      content: { 'application/json': { schema: StaffInboxConversation } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -3002,7 +3065,10 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: replyTicketSchema } } }
   },
   responses: {
-    201: { description: 'Reply sent', content: { 'application/json': { schema: StaffInboxMsg } } }
+    201: {
+      description: 'Reply sent',
+      content: { 'application/json': { schema: StaffInboxMsg } }
+    }
   }
 });
 
