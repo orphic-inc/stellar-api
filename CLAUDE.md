@@ -8,12 +8,22 @@ Node.js / Express / TypeScript REST API with PostgreSQL (Prisma ORM) and JWT coo
 npm run dev              # nodemon + ts-node
 npm run build            # tsc
 npx tsc --noEmit         # type-check only (run before committing)
-npx prettier --write ... # format — always run on edited files before committing
+npm run format           # prettier --write src — run on ALL changed files before committing
+npm run lint             # eslint src --ext .ts — run before committing; must be clean on new/changed files
+npm run test             # jest --runInBand
 npx prisma generate      # regenerate Prisma client after schema changes
-npx prisma migrate dev   # create + apply migration
+npx prisma migrate dev   # create + apply migration (requires interactive TTY)
 ```
 
-No test framework yet. `tsconfig` excludes `*.spec.ts` in preparation.
+## Commit workflow
+
+1. `npx tsc --noEmit` — must be clean
+2. `npm run format` — formats all of src/ including openapi.ts and spec files
+3. `npm run lint` — verify no new ESLint errors in changed files
+4. `npm run test --no-coverage` — must pass
+5. Commit with descriptive message following existing log style
+
+> Note: `npm run lint` has pre-existing errors in unchanged files; only new/changed files must be clean.
 
 ## Environment
 
