@@ -172,6 +172,32 @@ enum StaffInboxStatus {
   Resolved
 }
 
+enum ReportStatus {
+  Open
+  Claimed
+  Resolved
+}
+
+enum ReportTargetType {
+  User
+  Release
+  Artist
+  ForumTopic
+  ForumPost
+  Comment
+  Collage
+  Post
+}
+
+enum ReportResolutionAction {
+  Dismissed
+  ContentRemoved
+  UserWarned
+  UserDisabled
+  MetadataFixed
+  Other
+}
+
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
 model UserRank {
@@ -288,6 +314,10 @@ model User {
   staffInboxAssigned        StaffInboxConversation[]         @relation("StaffInboxAssignee")
   staffInboxResolved        StaffInboxConversation[]         @relation("StaffInboxResolver")
   staffInboxMessages        StaffInboxMessage[]              @relation("StaffInboxMsgSender")
+  reportsFiled              Report[]                         @relation("ReportFiler")
+  reportsClaimed            Report[]                         @relation("ReportClaimer")
+  reportsResolved           Report[]                         @relation("ReportResolver")
+  reportNotes               ReportNote[]                     @relation("ReportNoteAuthor")
 
   @@index([userRankId])
   @@map("users")
@@ -1467,4 +1497,48 @@ model StaffInboxResponse {
   updatedAt DateTime @updatedAt
 
   @@map("staff_inbox_responses")
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+model Report {
+  id               Int                     @id @default(autoincrement())
+  reporterId       Int
+  reporter         User                    @relation("ReportFiler", fields: [reporterId], references: [id])
+  targetType       ReportTargetType
+  targetId         Int
+  category         String                  @db.VarChar(50)
+  reason           String                  @db.Text
+  evidence         String?                 @db.Text
+  status           ReportStatus            @default(Open)
+  claimedById      Int?
+  claimedBy        User?                   @relation("ReportClaimer", fields: [claimedById], references: [id])
+  claimedAt        DateTime?
+  resolvedById     Int?
+  resolvedBy       User?                   @relation("ReportResolver", fields: [resolvedById], references: [id])
+  resolvedAt       DateTime?
+  resolution       String?                 @db.Text
+  resolutionAction ReportResolutionAction?
+  notes            ReportNote[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@index([reporterId])
+  @@index([claimedById])
+  @@map("reports")
+}
+
+model ReportNote {
+  id        Int      @id @default(autoincrement())
+  reportId  Int
+  report    Report   @relation(fields: [reportId], references: [id])
+  authorId  Int
+  author    User     @relation("ReportNoteAuthor", fields: [authorId], references: [id])
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([reportId])
+  @@map("report_notes")
 }

@@ -301,6 +301,7 @@ const UserSettings = registry.register(
   })
 );
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     id: z.number(),
@@ -3097,6 +3098,229 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
   responses: { 204: { description: 'Unresolved' } }
+});
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+const ReportUser = z.object({
+  id: z.number(),
+  username: z.string(),
+  avatar: z.string().nullable()
+});
+
+const ReportNoteObj = z.object({
+  id: z.number(),
+  reportId: z.number(),
+  authorId: z.number(),
+  author: ReportUser,
+  body: z.string(),
+  createdAt: z.string()
+});
+
+const ReportObj = z.object({
+  id: z.number(),
+  reporterId: z.number(),
+  reporter: ReportUser,
+  targetType: z.enum([
+    'User',
+    'Release',
+    'Artist',
+    'ForumTopic',
+    'ForumPost',
+    'Comment',
+    'Collage',
+    'Post'
+  ]),
+  targetId: z.number(),
+  category: z.string(),
+  reason: z.string(),
+  evidence: z.string().nullable(),
+  status: z.enum(['Open', 'Claimed', 'Resolved']),
+  claimedById: z.number().nullable(),
+  claimedBy: ReportUser.nullable(),
+  claimedAt: z.string().nullable(),
+  resolvedById: z.number().nullable(),
+  resolvedBy: ReportUser.nullable(),
+  resolvedAt: z.string().nullable(),
+  resolution: z.string().nullable(),
+  resolutionAction: z
+    .enum([
+      'Dismissed',
+      'ContentRemoved',
+      'UserWarned',
+      'UserDisabled',
+      'MetadataFixed',
+      'Other'
+    ])
+    .nullable(),
+  notes: z.array(ReportNoteObj),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
+const ReportSummary = z.object({
+  id: z.number(),
+  targetType: z.string(),
+  targetId: z.number(),
+  category: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  resolvedAt: z.string().nullable(),
+  resolution: z.string().nullable()
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/reports/counts',
+  tags: ['Reports'],
+  responses: {
+    200: {
+      description: 'Open and claimed report counts',
+      content: {
+        'application/json': {
+          schema: z.object({ open: z.number(), claimed: z.number() })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/reports/mine',
+  tags: ['Reports'],
+  responses: {
+    200: {
+      description: "User's submitted reports",
+      content: {
+        'application/json': {
+          schema: z.object({
+            total: z.number(),
+            page: z.number(),
+            pageSize: z.number(),
+            reports: z.array(ReportSummary)
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/reports',
+  tags: ['Reports'],
+  responses: {
+    200: {
+      description: 'Paginated staff report queue',
+      content: {
+        'application/json': {
+          schema: z.object({
+            total: z.number(),
+            page: z.number(),
+            pageSize: z.number(),
+            reports: z.array(ReportObj)
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/reports',
+  tags: ['Reports'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            targetType: z.string(),
+            targetId: z.number(),
+            category: z.string(),
+            reason: z.string(),
+            evidence: z.string().optional()
+          })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Report created',
+      content: { 'application/json': { schema: ReportObj } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/reports/{id}',
+  tags: ['Reports'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Report detail',
+      content: { 'application/json': { schema: ReportObj } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/reports/{id}/claim',
+  tags: ['Reports'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Claimed' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/reports/{id}/unclaim',
+  tags: ['Reports'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Unclaimed' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/reports/{id}/resolve',
+  tags: ['Reports'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            resolution: z.string(),
+            resolutionAction: z.string()
+          })
+        }
+      }
+    }
+  },
+  responses: { 204: { description: 'Resolved' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/reports/{id}/notes',
+  tags: ['Reports'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': { schema: z.object({ body: z.string() }) }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Note added',
+      content: { 'application/json': { schema: ReportNoteObj } }
+    }
+  }
 });
 
 // ─── Document builder ─────────────────────────────────────────────────────────
