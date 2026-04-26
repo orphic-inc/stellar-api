@@ -41,8 +41,8 @@ router.get(
     if (page && pageId) {
       if (page === CommentPage.communities) where.communityId = pageId;
       else if (page === CommentPage.artist) where.artistId = pageId;
-      else if (page === CommentPage.collages || page === CommentPage.requests)
-        where.contributionId = pageId;
+      else if (page === CommentPage.collages) where.collageId = pageId;
+      else if (page === CommentPage.requests) where.contributionId = pageId;
       else if (page === CommentPage.release) where.releaseId = pageId;
     }
 
@@ -87,8 +87,15 @@ router.post(
   requireAuth,
   validate(createCommentSchema),
   authHandler(async (req, res) => {
-    const { page, body, communityId, contributionId, artistId, releaseId } =
-      parsedBody<CreateCommentInput>(res);
+    const {
+      page,
+      body,
+      communityId,
+      contributionId,
+      artistId,
+      releaseId,
+      collageId
+    } = parsedBody<CreateCommentInput>(res);
 
     const comment = await prisma.comment.create({
       data: {
@@ -98,7 +105,8 @@ router.post(
         ...(communityId && { communityId }),
         ...(contributionId && { contributionId }),
         ...(artistId && { artistId }),
-        ...(releaseId && { releaseId })
+        ...(releaseId && { releaseId }),
+        ...(collageId && { collageId })
       },
       include: {
         author: { select: { id: true, username: true, avatar: true } }
