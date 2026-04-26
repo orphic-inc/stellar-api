@@ -38,6 +38,8 @@ import communitiesRouter from './routes/api/communities/communities';
 import contributionsRouter from './routes/api/communities/contributions';
 import artistRouter from './routes/api/communities/artist';
 import collagesRouter from './routes/api/collages';
+import messagesRouter from './routes/api/messages';
+import staffInboxRouter from './routes/api/staffInbox';
 
 const log = getLogger('app');
 
@@ -88,6 +90,8 @@ export const createApp = () => {
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/artists', artistRouter);
   app.use('/api/collages', collagesRouter);
+  app.use('/api/messages', messagesRouter);
+  app.use('/api/staff-inbox', staffInboxRouter);
 
   app.use(
     (

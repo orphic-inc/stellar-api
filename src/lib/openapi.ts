@@ -2648,6 +2648,391 @@ registry.registerPath({
   }
 });
 
+// ─── Private Messages ────────────────────────────────────────────────────────
+
+const MessageUser = registry.register(
+  'MessageUser',
+  z.object({ id: z.number(), username: z.string(), avatar: z.string().nullable().optional() })
+);
+
+const PrivateMessage = registry.register(
+  'PrivateMessage',
+  z.object({
+    id: z.number(),
+    conversationId: z.number(),
+    body: z.string(),
+    createdAt: z.string(),
+    sender: MessageUser.nullable().optional()
+  })
+);
+
+const PrivateConversationParticipant = registry.register(
+  'PrivateConversationParticipant',
+  z.object({
+    userId: z.number(),
+    conversationId: z.number(),
+    inInbox: z.boolean(),
+    inSentbox: z.boolean(),
+    isRead: z.boolean(),
+    isSticky: z.boolean(),
+    sentAt: z.string().nullable().optional(),
+    receivedAt: z.string().nullable().optional(),
+    user: MessageUser.optional()
+  })
+);
+
+const PrivateConversation = registry.register(
+  'PrivateConversation',
+  z.object({
+    id: z.number(),
+    subject: z.string(),
+    createdAt: z.string(),
+    participants: z.array(PrivateConversationParticipant).optional(),
+    messages: z.array(PrivateMessage).optional()
+  })
+);
+
+const PaginatedConversations = registry.register(
+  'PaginatedConversations',
+  z.object({
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    conversations: z.array(PrivateConversation)
+  })
+);
+
+import {
+  composeMessageSchema,
+  replyMessageSchema,
+  updateConversationSchema,
+  bulkMessageActionSchema,
+  messageListQuerySchema
+} from '../schemas/pm';
+
+registry.registerPath({
+  method: 'get',
+  path: '/messages',
+  tags: ['Messages'],
+  request: { query: messageListQuerySchema },
+  responses: {
+    200: {
+      description: 'Inbox conversations',
+      content: { 'application/json': { schema: PaginatedConversations } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/messages/unread-count',
+  tags: ['Messages'],
+  responses: {
+    200: {
+      description: 'Unread conversation count',
+      content: { 'application/json': { schema: z.object({ count: z.number() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/messages/sent',
+  tags: ['Messages'],
+  responses: {
+    200: {
+      description: 'Sent conversations',
+      content: { 'application/json': { schema: PaginatedConversations } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/messages/bulk',
+  tags: ['Messages'],
+  request: { body: { content: { 'application/json': { schema: bulkMessageActionSchema } } } },
+  responses: { 204: { description: 'Bulk action applied' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/messages',
+  tags: ['Messages'],
+  request: { body: { content: { 'application/json': { schema: composeMessageSchema } } } },
+  responses: {
+    201: {
+      description: 'Conversation created',
+      content: { 'application/json': { schema: PrivateConversation } }
+    },
+    400: { description: 'Validation error', content: { 'application/json': { schema: MsgResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/messages/{id}',
+  tags: ['Messages'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Conversation with messages',
+      content: { 'application/json': { schema: PrivateConversation } }
+    },
+    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/messages/{id}/reply',
+  tags: ['Messages'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: replyMessageSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Reply sent',
+      content: { 'application/json': { schema: PrivateMessage } }
+    },
+    403: { description: 'Not a participant', content: { 'application/json': { schema: MsgResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/messages/{id}',
+  tags: ['Messages'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateConversationSchema } } }
+  },
+  responses: { 204: { description: 'Flags updated' } }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/messages/{id}',
+  tags: ['Messages'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Conversation soft-deleted' } }
+});
+
+// ─── Staff Inbox ──────────────────────────────────────────────────────────────
+
+import {
+  createTicketSchema,
+  replyTicketSchema,
+  assignTicketSchema,
+  bulkResolveSchema,
+  ticketListQuerySchema,
+  createResponseSchema,
+  updateResponseSchema
+} from '../schemas/staffInbox';
+
+const StaffInboxMessageUser = registry.register(
+  'StaffInboxMessageUser',
+  z.object({ id: z.number(), username: z.string(), avatar: z.string().nullable().optional() })
+);
+
+const StaffInboxMsg = registry.register(
+  'StaffInboxMsg',
+  z.object({
+    id: z.number(),
+    conversationId: z.number(),
+    body: z.string(),
+    createdAt: z.string(),
+    sender: StaffInboxMessageUser
+  })
+);
+
+const StaffInboxConversation = registry.register(
+  'StaffInboxConversation',
+  z.object({
+    id: z.number(),
+    subject: z.string(),
+    status: z.enum(['Unanswered', 'Open', 'Resolved']),
+    isReadByUser: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    user: StaffInboxMessageUser,
+    assignedUser: StaffInboxMessageUser.nullable().optional(),
+    resolver: StaffInboxMessageUser.nullable().optional(),
+    messages: z.array(StaffInboxMsg).optional()
+  })
+);
+
+const PaginatedTickets = registry.register(
+  'PaginatedTickets',
+  z.object({
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    conversations: z.array(StaffInboxConversation)
+  })
+);
+
+const StaffInboxResponse = registry.register(
+  'StaffInboxResponse',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    body: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox',
+  tags: ['StaffInbox'],
+  request: { query: ticketListQuerySchema },
+  responses: {
+    200: { description: 'Staff ticket list', content: { 'application/json': { schema: PaginatedTickets } } }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/unread-count',
+  tags: ['StaffInbox'],
+  responses: {
+    200: {
+      description: 'Open ticket count',
+      content: { 'application/json': { schema: z.object({ count: z.number() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/mine',
+  tags: ['StaffInbox'],
+  responses: {
+    200: { description: 'My tickets', content: { 'application/json': { schema: PaginatedTickets } } }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/responses',
+  tags: ['StaffInbox'],
+  responses: {
+    200: {
+      description: 'Canned responses',
+      content: { 'application/json': { schema: z.array(StaffInboxResponse) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/responses',
+  tags: ['StaffInbox'],
+  request: { body: { content: { 'application/json': { schema: createResponseSchema } } } },
+  responses: {
+    201: { description: 'Response created', content: { 'application/json': { schema: StaffInboxResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/staff-inbox/responses/{id}',
+  tags: ['StaffInbox'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateResponseSchema } } }
+  },
+  responses: {
+    200: { description: 'Response updated', content: { 'application/json': { schema: StaffInboxResponse } } },
+    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/staff-inbox/responses/{id}',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Response deleted' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/bulk-resolve',
+  tags: ['StaffInbox'],
+  request: { body: { content: { 'application/json': { schema: bulkResolveSchema } } } },
+  responses: {
+    200: {
+      description: 'Tickets resolved',
+      content: { 'application/json': { schema: z.object({ ok: z.boolean(), resolved: z.number() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox',
+  tags: ['StaffInbox'],
+  request: { body: { content: { 'application/json': { schema: createTicketSchema } } } },
+  responses: {
+    201: { description: 'Ticket created', content: { 'application/json': { schema: StaffInboxConversation } } }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/{id}',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: { description: 'Ticket', content: { 'application/json': { schema: StaffInboxConversation } } },
+    404: { description: 'Not found', content: { 'application/json': { schema: MsgResponse } } }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/{id}/reply',
+  tags: ['StaffInbox'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: replyTicketSchema } } }
+  },
+  responses: {
+    201: { description: 'Reply sent', content: { 'application/json': { schema: StaffInboxMsg } } }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/{id}/assign',
+  tags: ['StaffInbox'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: assignTicketSchema } } }
+  },
+  responses: { 204: { description: 'Assigned' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/{id}/resolve',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Resolved' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/{id}/unresolve',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Unresolved' } }
+});
+
 // ─── Document builder ─────────────────────────────────────────────────────────
 
 export function buildOpenApiDocument() {
