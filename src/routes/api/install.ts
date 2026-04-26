@@ -94,8 +94,11 @@ const DEFAULT_RANKS = [
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
-    const count = await prisma.userRank.count();
-    res.json({ installed: count > 0 });
+    const [rankCount, userCount] = await Promise.all([
+      prisma.userRank.count(),
+      prisma.user.count()
+    ]);
+    res.json({ installed: rankCount > 0 && userCount > 0 });
   })
 );
 
@@ -105,8 +108,8 @@ router.post(
   installLimiter,
   validate(installSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const count = await prisma.userRank.count();
-    if (count > 0)
+    const userCount = await prisma.user.count();
+    if (userCount > 0)
       return res.status(409).json({ msg: 'Application already installed' });
 
     const { username, email, password } = parsedBody<InstallInput>(res);
@@ -122,10 +125,17 @@ router.post(
 
     const user = await prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
+        // Ranks may already exist if the seed ran after a DB reset
         let sysopRankId: number | null = null;
-        for (const rank of DEFAULT_RANKS) {
-          const created = await tx.userRank.create({ data: rank });
-          if (rank.level === 1000) sysopRankId = created.id;
+        const existingRanks = await tx.userRank.count();
+        if (existingRanks === 0) {
+          for (const rank of DEFAULT_RANKS) {
+            const created = await tx.userRank.create({ data: rank });
+            if (rank.level === 1000) sysopRankId = created.id;
+          }
+        } else {
+          const sysop = await tx.userRank.findFirst({ where: { level: 1000 } });
+          sysopRankId = sysop?.id ?? null;
         }
 
         const systemCategory = await tx.forumCategory.create({

@@ -11,8 +11,9 @@ npx tsc --noEmit         # type-check only (run before committing)
 npm run format           # prettier --write src — run on ALL changed files before committing
 npm run lint             # eslint src --ext .ts — run before committing; must be clean on new/changed files
 npm run test             # jest --runInBand
-npx prisma generate      # regenerate Prisma client after schema changes
-npx prisma migrate dev   # create + apply migration (requires interactive TTY)
+npx prisma migrate dev   # create + apply migration + auto-runs generate (requires interactive TTY)
+npx prisma db seed       # recreate default user ranks after a DB reset; then go to /install
+npx prisma generate      # only needed when pulling someone else's schema changes (migration already applied)
 ```
 
 ## Commit workflow
