@@ -301,12 +301,10 @@ describe('POST /api/staff-inbox/responses', () => {
   it('creates response and returns 201', async () => {
     setStaff();
     staffInboxMock.createResponse.mockResolvedValue(makeResponse());
-    const res = await request(app)
-      .post('/api/staff-inbox/responses')
-      .send({
-        name: 'Standard reply',
-        body: 'Thank you for contacting support.'
-      });
+    const res = await request(app).post('/api/staff-inbox/responses').send({
+      name: 'Standard reply',
+      body: 'Thank you for contacting support.'
+    });
     expect(res.status).toBe(201);
   });
 });

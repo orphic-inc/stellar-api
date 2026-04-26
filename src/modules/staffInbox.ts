@@ -164,11 +164,7 @@ export async function replyToTicket(
   return { ok: true as const, message };
 }
 
-export async function assignTicket(
-  id: number,
-  assignedUserId: number | null,
-  staffUserId: number
-) {
+export async function assignTicket(id: number, assignedUserId: number | null) {
   const conversation = await prisma.staffInboxConversation.findUnique({
     where: { id },
     select: { id: true, status: true }
@@ -227,7 +223,7 @@ export async function resolveTicket(
   return { ok: true as const };
 }
 
-export async function unresolveTicket(id: number, staffUserId: number) {
+export async function unresolveTicket(id: number) {
   const conversation = await prisma.staffInboxConversation.findUnique({
     where: { id },
     select: { status: true }

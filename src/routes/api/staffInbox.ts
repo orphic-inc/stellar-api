@@ -221,7 +221,7 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { assignedUserId } = parsedBody<AssignTicketInput>(res);
-    const result = await assignTicket(id, assignedUserId, req.user.id);
+    const result = await assignTicket(id, assignedUserId);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
         not_found: 404,
@@ -266,7 +266,7 @@ router.post(
   validateParams(ticketIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const result = await unresolveTicket(id, req.user.id);
+    const result = await unresolveTicket(id);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
         not_found: 404,
