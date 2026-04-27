@@ -1,5 +1,9 @@
 import { prisma } from '../lib/prisma';
-import { Prisma, type StaffInboxStatus } from '@prisma/client';
+import {
+  Prisma,
+  type StaffInboxStatus,
+  type StaffInboxResponse
+} from '@prisma/client';
 
 const PAGE_SIZE = 25;
 
@@ -23,7 +27,7 @@ export const staffTicketInclude = {
 export type StaffTicket = Prisma.StaffInboxConversationGetPayload<{
   include: typeof staffTicketInclude;
 }>;
-export type StaffResponse = Prisma.StaffInboxResponseGetPayload<{}>;
+export type StaffResponse = StaffInboxResponse;
 export type StaffMessage = Prisma.StaffInboxMessageGetPayload<{
   include: { sender: { select: { id: true; username: true; avatar: true } } };
 }>;
