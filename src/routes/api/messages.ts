@@ -178,12 +178,13 @@ router.get(
   ...requirePermission('staff', 'admin'),
   validateQuery(ticketQueueQuerySchema),
   authHandler(async (req, res) => {
-    const { page, status, assignedToMe } =
+    const { page, status, assignedToMe, unassigned } =
       parsedQuery<TicketQueueQueryInput>(res);
     const result = await listTicketQueue({
       page,
       status: status as Parameters<typeof listTicketQueue>[0]['status'],
       assignedToMe,
+      unassigned,
       staffUserId: req.user.id
     });
     res.json(result);
@@ -291,8 +292,21 @@ router.post(
   validate(assignTicketSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { assignedUserId } = parsedBody<AssignTicketInput>(res);
-    const result = await assignTicket(id, assignedUserId);
+    const { assignedUserId, assignedUsername } =
+      parsedBody<AssignTicketInput>(res);
+
+    let targetId = assignedUserId ?? null;
+    if (targetId === null && assignedUsername) {
+      const normalized = assignedUsername.trim();
+      const target = await prisma.user.findFirst({
+        where: { username: { equals: normalized, mode: 'insensitive' } },
+        select: { id: true }
+      });
+      if (!target) return res.status(404).json({ msg: 'assignee_not_found' });
+      targetId = target.id;
+    }
+
+    const result = await assignTicket(id, targetId);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
         not_found: 404,
