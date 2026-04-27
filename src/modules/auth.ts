@@ -15,6 +15,9 @@ export const authUserSelect = {
   inviteCount: true,
   dateRegistered: true,
   lastLogin: true,
+  uploaded: true,
+  downloaded: true,
+  ratio: true,
   userRank: {
     select: {
       level: true,
@@ -26,7 +29,18 @@ export const authUserSelect = {
   }
 } as const;
 
-type AuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
+type RawAuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
+
+export type AuthUser = Omit<RawAuthUser, 'uploaded' | 'downloaded'> & {
+  uploaded: string;
+  downloaded: string;
+};
+
+export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
+  ...raw,
+  uploaded: raw.uploaded.toString(),
+  downloaded: raw.downloaded.toString()
+});
 
 type RegisterResult =
   | { ok: false; reason: 'user_exists' }
@@ -75,7 +89,7 @@ export const registerUser = async (
     });
   });
 
-  return { ok: true, user };
+  return { ok: true, user: toAuthUser(user) };
 };
 
 export const loginUser = async (
@@ -97,5 +111,5 @@ export const loginUser = async (
     select: authUserSelect
   });
 
-  return { ok: true, user: authUser };
+  return { ok: true, user: toAuthUser(authUser) };
 };
