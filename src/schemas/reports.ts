@@ -41,11 +41,18 @@ export const addNoteSchema = z.object({
   body: z.string().min(1)
 });
 
+// z.coerce.boolean() treats the query-string "false" as true (Boolean("false") === true).
+// z.enum(['true','false']).transform() validates the literal strings and correctly maps them.
+const boolParam = z
+  .enum(['true', 'false'])
+  .transform((v) => v === 'true')
+  .default(false);
+
 export const reportListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   status: z.enum([...REPORT_STATUSES, 'all']).default('Open'),
   targetType: z.enum([...REPORT_TARGET_TYPES, 'all']).default('all'),
-  claimedByMe: z.coerce.boolean().default(false)
+  claimedByMe: boolParam
 });
 
 export type FileReportInput = z.infer<typeof fileReportSchema>;

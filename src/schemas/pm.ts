@@ -45,11 +45,18 @@ export const assignTicketSchema = z.object({
   assignedUsername: z.string().min(1).max(32).optional()
 });
 
+// z.coerce.boolean() treats the query-string "false" as true (Boolean("false") === true).
+// z.enum(['true','false']).transform() validates the literal strings and correctly maps them.
+const boolParam = z
+  .enum(['true', 'false'])
+  .transform((v) => v === 'true')
+  .default(false);
+
 export const ticketQueueQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   status: z.enum(['all', 'Unanswered', 'Open', 'Resolved']).default('all'),
-  assignedToMe: z.coerce.boolean().default(false),
-  unassigned: z.coerce.boolean().default(false)
+  assignedToMe: boolParam,
+  unassigned: boolParam
 });
 
 export type ComposeMessageInput = z.infer<typeof composeMessageSchema>;
