@@ -69,6 +69,9 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       canDownload: true,
       inviteCount: 0,
+      uploaded: '0',
+      downloaded: '0',
+      ratio: 0,
       dateRegistered: '2026-04-24T00:00:00.000Z',
       lastLogin: '2026-04-24T00:00:00.000Z',
       userRank: {
@@ -83,7 +86,9 @@ describe('API auth/profile/user flows', () => {
       makeUser({ password: 'hashed-password', disabled: false })
     );
     bcryptMock.compare.mockResolvedValue(true);
-    prismaMock.user.update.mockResolvedValue(asUserMock(authUser));
+    prismaMock.user.update.mockResolvedValue(
+      asUserMock({ ...authUser, uploaded: BigInt(0), downloaded: BigInt(0) })
+    );
 
     const res = await request(app).post('/api/auth').send({
       email: 'kai@example.com',

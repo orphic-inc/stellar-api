@@ -25,5 +25,5 @@
     "files": true
   },
   "include": ["src/**/*"],
-  "exclude": ["**/*.spec.ts", "dist"]
+  "exclude": ["**/*.spec.ts", "**/*.integration.ts", "src/test", "dist"]
 }
