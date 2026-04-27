@@ -114,6 +114,9 @@ const AuthUser = registry.register(
     isArtist: z.boolean().optional(),
     isDonor: z.boolean().optional(),
     canDownload: z.boolean().optional(),
+    uploaded: z.string().optional(),
+    downloaded: z.string().optional(),
+    ratio: z.number().optional(),
     userRank: z.object({
       level: z.number(),
       name: z.string(),

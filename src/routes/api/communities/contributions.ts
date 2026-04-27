@@ -123,11 +123,9 @@ router.post(
         return res.status(400).json({ msg: 'Invalid download URL' });
       }
       if (!settings.approvedDomains.includes(host)) {
-        return res
-          .status(400)
-          .json({
-            msg: `Domain '${host}' is not in the approved domains list`
-          });
+        return res.status(400).json({
+          msg: `Domain '${host}' is not in the approved domains list`
+        });
       }
     }
 
