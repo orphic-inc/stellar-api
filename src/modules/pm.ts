@@ -81,6 +81,7 @@ export async function listSentbox(userId: number, page: number) {
 export async function getUnreadCount(userId: number): Promise<number> {
   return prisma.privateConversation.count({
     where: {
+      isStaffTicket: false,
       participants: { some: { userId, inInbox: true, isRead: false } }
     }
   });
@@ -356,7 +357,7 @@ export async function createTicket(
         create: {
           userId,
           inInbox: true,
-          inSentbox: false,
+          inSentbox: true,
           isRead: true,
           sentAt: new Date()
         }
@@ -402,14 +403,16 @@ export async function listTicketQueue(opts: {
   page: number;
   status: StaffInboxStatus | 'all';
   assignedToMe: boolean;
+  unassigned: boolean;
   staffUserId: number;
 }) {
-  const { page, status, assignedToMe, staffUserId } = opts;
+  const { page, status, assignedToMe, unassigned, staffUserId } = opts;
 
   const where = {
     isStaffTicket: true,
     ...(status !== 'all' ? { ticketStatus: status as StaffInboxStatus } : {}),
-    ...(assignedToMe ? { assignedStaffId: staffUserId } : {})
+    ...(assignedToMe ? { assignedStaffId: staffUserId } : {}),
+    ...(unassigned ? { assignedStaffId: null } : {})
   };
 
   const [total, conversations] = await Promise.all([

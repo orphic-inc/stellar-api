@@ -41,13 +41,15 @@ export const createTicketSchema = z.object({
 });
 
 export const assignTicketSchema = z.object({
-  assignedUserId: z.number().int().positive().nullable()
+  assignedUserId: z.number().int().positive().nullable().optional(),
+  assignedUsername: z.string().min(1).max(32).optional()
 });
 
 export const ticketQueueQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   status: z.enum(['all', 'Unanswered', 'Open', 'Resolved']).default('all'),
-  assignedToMe: z.coerce.boolean().default(false)
+  assignedToMe: z.coerce.boolean().default(false),
+  unassigned: z.coerce.boolean().default(false)
 });
 
 export type ComposeMessageInput = z.infer<typeof composeMessageSchema>;
