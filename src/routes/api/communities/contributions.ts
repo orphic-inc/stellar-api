@@ -17,6 +17,7 @@ import {
   createContributionSchema,
   type CreateContributionInput
 } from '../../../schemas/contribution';
+import { getSettings } from '../../../modules/settings';
 
 const router = express.Router();
 const contributionIdParamsSchema = z.object({
@@ -111,9 +112,28 @@ router.post(
   requireAuth,
   validate(createContributionSchema),
   authHandler(async (req, res) => {
+    const input = parsedBody<CreateContributionInput>(res);
+
+    const settings = await getSettings();
+    if (settings.approvedDomains.length > 0) {
+      let host: string;
+      try {
+        host = new URL(input.downloadUrl).hostname;
+      } catch {
+        return res.status(400).json({ msg: 'Invalid download URL' });
+      }
+      if (!settings.approvedDomains.includes(host)) {
+        return res
+          .status(400)
+          .json({
+            msg: `Domain '${host}' is not in the approved domains list`
+          });
+      }
+    }
+
     const contribution = await createContributionSubmission({
       userId: req.user.id,
-      input: parsedBody<CreateContributionInput>(res)
+      input
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Community not found' });

@@ -4,6 +4,7 @@ const REPORT_TARGET_TYPES = [
   'User',
   'Release',
   'Artist',
+  'Contribution',
   'ForumTopic',
   'ForumPost',
   'Comment',
@@ -19,6 +20,7 @@ const RESOLUTION_ACTIONS = [
   'UserWarned',
   'UserDisabled',
   'MetadataFixed',
+  'MarkedDuplicate',
   'Other'
 ] as const;
 

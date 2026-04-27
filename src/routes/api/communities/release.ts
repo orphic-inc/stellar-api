@@ -21,6 +21,7 @@ import {
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
+import { FileType } from '@prisma/client';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 
 const router = express.Router({ mergeParams: true });
@@ -193,11 +194,30 @@ router.post(
       communityId: number;
       releaseId: number;
     }>(res);
+    const input = parsedBody<AddContributionToReleaseInput>(res);
+
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+      select: { allowDuplicateFormats: true }
+    });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+
+    if (!community.allowDuplicateFormats) {
+      const existing = await prisma.contribution.findFirst({
+        where: { releaseId, type: input.fileType as FileType }
+      });
+      if (existing) {
+        return res.status(409).json({
+          msg: `A ${input.fileType} contribution already exists for this release`
+        });
+      }
+    }
+
     const contribution = await addContributionToRelease({
       userId: req.user.id,
       communityId,
       releaseId,
-      input: parsedBody<AddContributionToReleaseInput>(res)
+      input
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Release not found' });

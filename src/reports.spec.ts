@@ -2,9 +2,15 @@ import {
   app,
   request,
   prismaMock,
+  makeUserRank,
   resetApiTestState
 } from './test/apiTestHarness';
 import * as reportsModule from './modules/reports';
+import type {
+  ReportRow,
+  ReportSummary,
+  ReportNoteRow
+} from './modules/reports';
 
 jest.mock('./modules/reports', () => ({
   fileReport: jest.fn(),
@@ -20,8 +26,7 @@ jest.mock('./modules/reports', () => ({
 
 const reportsMock = reportsModule as jest.Mocked<typeof reportsModule>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeReportSummary = (): any => ({
+const makeReportSummary = (): ReportSummary => ({
   id: 1,
   targetType: 'ForumPost',
   targetId: 42,
@@ -32,8 +37,7 @@ const makeReportSummary = (): any => ({
   resolution: null
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeNote = (): any => ({
+const makeNote = (): ReportNoteRow => ({
   id: 1,
   reportId: 1,
   authorId: 7,
@@ -42,8 +46,7 @@ const makeNote = (): any => ({
   createdAt: new Date()
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeReport = (): any => ({
+const makeReport = (): ReportRow => ({
   id: 1,
   reporterId: 7,
   reporter: { id: 7, username: 'alice', avatar: null },
@@ -62,14 +65,14 @@ const makeReport = (): any => ({
   resolution: null,
   resolutionAction: null,
   notes: [],
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString()
+  createdAt: new Date(),
+  updatedAt: new Date()
 });
 
 const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue({
-    permissions: { staff: true }
-  });
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ staff: true })
+  );
 
 beforeEach(() => resetApiTestState());
 
@@ -83,7 +86,7 @@ describe('GET /api/reports/counts', () => {
   });
 
   it('rejects non-staff', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app).get('/api/reports/counts');
     expect(res.status).toBe(403);
   });
@@ -118,7 +121,7 @@ describe('GET /api/reports', () => {
   });
 
   it('rejects non-staff', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app).get('/api/reports');
     expect(res.status).toBe(403);
   });
@@ -250,7 +253,7 @@ describe('POST /api/reports/:id/notes', () => {
   });
 
   it('rejects non-staff', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
       .post('/api/reports/1/notes')
       .send({ body: 'note' });

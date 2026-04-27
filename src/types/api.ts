@@ -4,4409 +4,6136 @@
  */
 
 export interface paths {
-  '/auth': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current user */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AuthUser'];
-          };
+    "/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['LoginBody'];
-        };
-      };
-      responses: {
-        /** @description JWT issued, user returned */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              user: components['schemas']['AuthUser'];
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-        /** @description Invalid credentials */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Account disabled */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/auth/register': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['RegisterBody'];
-        };
-      };
-      responses: {
-        /** @description Registered and logged in */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              user: components['schemas']['AuthUser'];
+            requestBody?: never;
+            responses: {
+                /** @description Current user */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthUser"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
             };
-          };
         };
-        /** @description User already exists */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/auth/logout': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Logged out */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/install': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Install status */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              installed: boolean;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            username: string;
-            /** Format: email */
-            email: string;
-            password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Installation complete */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              user: components['schemas']['AuthUser'];
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["LoginBody"];
+                };
             };
-          };
-        };
-        /** @description Already installed or validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/users/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User profile */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['PublicUser'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/users/settings': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current user settings */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserSettings'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            siteAppearance?: string;
-            externalStylesheet?: string | '';
-            styledTooltips?: boolean;
-            paranoia?: number;
-            avatar?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Updated current user settings */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserSettings'] & {
-              avatar?: string;
+            responses: {
+                /** @description JWT issued, user returned */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user: components["schemas"]["AuthUser"];
+                        };
+                    };
+                };
+                /** @description Invalid credentials */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Account disabled */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
             };
-          };
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/users': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            username: string;
-            /** Format: email */
-            email: string;
-            password: string;
-            userRankId?: number;
-          };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Created user */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdminCreatedUser'];
-          };
-        };
-        /** @description User already exists */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/profile/me': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current user profile */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MyProfile'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Profile not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            avatar?: string | '';
-            avatarMouseoverText?: string;
-            profileTitle?: string;
-            profileInfo?: string;
-            siteAppearance?: string;
-            externalStylesheet?: string | '';
-            styledTooltips?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Updated current user profile */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MyProfile'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Profile not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/profile/user/{userId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          userId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Public profile */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['PublicProfile'];
-          };
-        };
-        /** @description Profile not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/profile': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Account disabled */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/profile/referral/create-invite': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-            reason?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Invite created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              inviteKey: string;
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-        /** @description No invites remaining */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Invite already exists */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/home/featured': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Homepage featured content */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              albumOfTheMonth: components['schemas']['HomepageFeaturedAlbum'] &
-                unknown;
-              vanityHouse: components['schemas']['HomepageFeaturedRelease'] &
-                unknown;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RegisterBody"];
+                };
             };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/announcements': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description News and blog posts */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AnnouncementsResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            title: string;
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Announcement created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Announcement'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/announcements/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Announcement deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/announcements/blog': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            title: string;
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Blog post created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BlogPost'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/announcements/blog/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Blog post deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/stats': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Site statistics */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['SiteStats'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/stylesheet': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Available stylesheets */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Stylesheet'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            /** Format: uri */
-            cssUrl: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Stylesheet created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Stylesheet'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/stylesheet/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Stylesheet */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Stylesheet'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Stylesheet removed */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/notifications': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Notifications */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Notification'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/notifications/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Notification removed */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/subscriptions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Forum subscriptions */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Subscription'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/subscriptions/subscribe': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            topicId: number;
-            /** @enum {string} */
-            action: 'subscribe' | 'unsubscribe';
-          };
-        };
-      };
-      responses: {
-        /** @description Subscription updated */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/subscriptions/subscribe-comments': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /** @enum {string} */
-            page: 'forums' | 'artist' | 'collages' | 'requests' | 'communities';
-            pageId: number;
-            /** @enum {string} */
-            action: 'subscribe' | 'unsubscribe';
-          };
-        };
-      };
-      responses: {
-        /** @description Comment subscription updated */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/categories': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description All categories with forums */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumCategory'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            sort?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Category created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumCategory'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/categories/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            sort?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Category updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumCategory'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Category deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Forums */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Forum'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            forumCategoryId: number;
-            /** @default 0 */
-            sort?: number;
-            name: string;
-            description?: string;
-            /** @default 0 */
-            minClassRead?: number;
-            /** @default 0 */
-            minClassWrite?: number;
-            /** @default 0 */
-            minClassCreate?: number;
-            /** @default true */
-            autoLock?: boolean;
-            /** @default 4 */
-            autoLockWeeks?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Forum created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Forum'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Forum */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Forum'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name?: string;
-            description?: string;
-            sort?: number;
-            minClassRead?: number;
-            minClassWrite?: number;
-            minClassCreate?: number;
-            autoLock?: boolean;
-            autoLockWeeks?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Forum updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Forum'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Forum deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/{forumId}/topics': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          page?: string;
-        };
-        header?: never;
-        path: {
-          forumId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Paginated topics */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['PaginatedForumTopics'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            title: string;
-            body: string;
-            question?: string;
-            answers?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Topic created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumTopic'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/{forumId}/topics/{topicId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Topic */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumTopic'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            title?: string;
-            isLocked?: boolean;
-            isSticky?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Topic updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumTopic'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Topic removed */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/{forumId}/topics/{topicId}/posts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          page?: string;
-        };
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Paginated posts */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['ForumPost'][];
-              meta: components['schemas']['PaginationMeta'];
+            responses: {
+                /** @description Registered and logged in */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user: components["schemas"]["AuthUser"];
+                        };
+                    };
+                };
+                /** @description User already exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
             };
-          };
         };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Post created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPost'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Topic locked */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/{forumId}/topics/{topicId}/posts/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Post */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPost'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Post updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPost'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          forumId: string;
-          topicId: string;
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Post removed */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/polls/{topicId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          topicId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Poll */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPoll'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/polls': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            forumTopicId: number;
-            question: string;
-            answers: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Poll created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPoll'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/polls/{id}/close': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Poll closed */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPoll'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/poll-votes': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            forumPollId: number;
-            vote: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Vote recorded */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumPollVote'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/last-read': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Last-read markers */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumLastReadTopic'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            forumTopicId: number;
-            forumPostId: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Last-read marker saved */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumLastReadTopic'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/communities': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Paginated communities */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['Community'][];
-              meta: components['schemas']['PaginationMeta'];
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/communities/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Community */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Community'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/communities/{id}/releases': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Releases for community */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['Release'][];
-              meta: components['schemas']['PaginationMeta'];
+            requestBody?: never;
+            responses: {
+                /** @description Logged out */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
-          };
         };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/communities/{communityId}/releases/{releaseId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          communityId: string;
-          releaseId: string;
+    "/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Release */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Release'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/contributions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Paginated contributions */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['Contribution'][];
-              meta: components['schemas']['PaginationMeta'];
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            communityId: number;
-            /** @enum {string} */
-            type:
-              | 'Music'
-              | 'Applications'
-              | 'EBooks'
-              | 'ELearningVideos'
-              | 'Audiobooks'
-              | 'Comedy'
-              | 'Comics';
-            title: string;
-            year: number;
-            /** @enum {string} */
-            fileType:
-              | 'mp3'
-              | 'flac'
-              | 'wav'
-              | 'ogg'
-              | 'aac'
-              | 'm4a'
-              | 'm4b'
-              | 'mp4'
-              | 'mkv'
-              | 'avi'
-              | 'mov'
-              | 'zip'
-              | 'exe'
-              | 'dmg'
-              | 'apk'
-              | 'pdf'
-              | 'epub'
-              | 'mobi'
-              | 'cbz'
-              | 'cbr'
-              | 'jpg'
-              | 'png'
-              | 'gif'
-              | 'txt';
-            /** Format: uri */
-            downloadUrl: string;
-            sizeInBytes?: number;
-            tags?: string;
-            image?: string | '';
-            description?: string;
-            releaseDescription?: string;
-            collaborators: {
-              artist: string;
-              importance: string;
-            }[];
-          };
-        };
-      };
-      responses: {
-        /** @description Contribution submitted and release created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Contribution'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-        /** @description Community not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/tools/user-ranks': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User ranks */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserRank'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            level: number;
-            permissions?: {
-              [key: string]: boolean;
+            requestBody?: never;
+            responses: {
+                /** @description Install status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            installed: boolean;
+                        };
+                    };
+                };
             };
-            color?: string;
-            badge?: string;
-          };
         };
-      };
-      responses: {
-        /** @description User rank created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserRank'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/tools/user-ranks/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User rank */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserRank'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name?: string;
-            level?: number;
-            permissions?: {
-              [key: string]: boolean;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-            color?: string;
-            badge?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description User rank updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserRank'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User rank deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Rank still assigned to users */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/comments': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          page?: 'artist' | 'collages' | 'requests' | 'communities' | 'release';
-          pageId?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Comments */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['PaginatedComments'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /** @enum {string} */
-            page:
-              | 'artist'
-              | 'collages'
-              | 'requests'
-              | 'communities'
-              | 'release';
-            body: string;
-            communityId?: number;
-            contributionId?: number;
-            artistId?: number;
-            releaseId?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Comment created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Comment'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/comments/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Comment updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Comment'];
-          };
-        };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Comment deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Paginated artists */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['Artist'][];
-              meta: components['schemas']['PaginationMeta'];
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        username: string;
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                    };
+                };
             };
-          };
-        };
-      };
-    };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            vanityHouse?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Artist created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Artist'];
-          };
-        };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Artist with releases and tags */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Artist'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            name: string;
-            vanityHouse?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Artist updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Artist'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Artist deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/history/{artistId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          artistId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Artist history */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ArtistHistory'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/revert/{historyId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          historyId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Artist reverted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              msg: string;
-              artist: components['schemas']['Artist'];
+            responses: {
+                /** @description Installation complete */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user: components["schemas"]["AuthUser"];
+                        };
+                    };
+                };
+                /** @description Already installed or validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
             };
-          };
         };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/{id}/similar': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Similar artists */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['SimilarArtist'][];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/similar': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            artistId: number;
-            similarArtistId: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Similar artist link created */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              [key: string]: unknown;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
             };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/alias': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            artistId: number;
-            redirectId: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Artist alias created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              [key: string]: unknown;
+            requestBody?: never;
+            responses: {
+                /** @description User profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicUser"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
             };
-          };
         };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/artists/tag': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            artistId: number;
-            tagId: number;
-          };
+    "/users/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Artist tagged */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              [key: string]: unknown;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
+            requestBody?: never;
+            responses: {
+                /** @description Current user settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserSettings"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-      };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        siteAppearance?: string;
+                        externalStylesheet?: string | "";
+                        styledTooltips?: boolean;
+                        paranoia?: number;
+                        avatar?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated current user settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserSettings"] & {
+                            avatar?: string;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/posts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        username: string;
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                        userRankId?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created user */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCreatedUser"];
+                    };
+                };
+                /** @description User already exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description All posts */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Post'][];
-          };
+    "/profile/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current user profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyProfile"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Profile not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        avatar?: string | "";
+                        avatarMouseoverText?: string;
+                        profileTitle?: string;
+                        profileInfo?: string;
+                        siteAppearance?: string;
+                        externalStylesheet?: string | "";
+                        styledTooltips?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated current user profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyProfile"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Profile not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            title: string;
-            text: string;
-            category: string;
-            tags?: string[];
-          };
+    "/profile/user/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Post created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Post'];
-          };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Public profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicProfile"];
+                    };
+                };
+                /** @description Profile not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/posts/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Account disabled */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
+    "/profile/referral/create-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Post */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Post'];
-          };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Invite created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            inviteKey: string;
+                        };
+                    };
+                };
+                /** @description No invites remaining */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Invite already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
+    "/home/featured": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Post deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Homepage featured content */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            albumOfTheMonth: components["schemas"]["HomepageFeaturedAlbum"] & unknown;
+                            vanityHouse: components["schemas"]["HomepageFeaturedRelease"] & unknown;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/posts/{id}/comments': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description News and blog posts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnnouncementsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Announcement created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Announcement"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
+    "/announcements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            text: string;
-          };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Announcement deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-      };
-      responses: {
-        /** @description Comment created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['PostComment'];
-          };
-        };
-        /** @description Post not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/posts/{id}/comments/{commentId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/announcements/blog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Blog post created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BlogPost"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-          commentId: string;
+    "/announcements/blog/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Comment deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Blog post deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
         };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Comment not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/topic-notes/{topicId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Site statistics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SiteStats"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          topicId: string;
+    "/stylesheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Topic notes (moderators only) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumTopicNote'][];
-          };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Available stylesheets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Stylesheet"][];
+                    };
+                };
+            };
         };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** Format: uri */
+                        cssUrl: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Stylesheet created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Stylesheet"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
         };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/topic-notes': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/stylesheet/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stylesheet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Stylesheet"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stylesheet removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            forumTopicId: number;
-            body: string;
-          };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Note created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ForumTopicNote'];
-          };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Notifications */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Notification"][];
+                    };
+                };
+            };
         };
-        /** @description Validation error */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/forums/topic-notes/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Notification removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
+    "/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Note deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Forum subscriptions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Subscription"][];
+                    };
+                };
+            };
         };
-        /** @description Not authorized */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
+    "/subscriptions/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        topicId: number;
+                        /** @enum {string} */
+                        action: "subscribe" | "unsubscribe";
+                    };
+                };
+            };
+            responses: {
+                /** @description Subscription updated */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subscriptions/subscribe-comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        page: "forums" | "artist" | "collages" | "requests" | "communities";
+                        pageId: number;
+                        /** @enum {string} */
+                        action: "subscribe" | "unsubscribe";
+                    };
+                };
+            };
+            responses: {
+                /** @description Comment subscription updated */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description All categories with forums */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumCategory"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        sort?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Category created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumCategory"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        sort?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Category updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumCategory"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Category deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Forums */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Forum"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        forumCategoryId: number;
+                        /** @default 0 */
+                        sort?: number;
+                        name: string;
+                        description?: string;
+                        /** @default 0 */
+                        minClassRead?: number;
+                        /** @default 0 */
+                        minClassWrite?: number;
+                        /** @default 0 */
+                        minClassCreate?: number;
+                        /** @default true */
+                        autoLock?: boolean;
+                        /** @default 4 */
+                        autoLockWeeks?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Forum created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Forum"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Forum */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Forum"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        description?: string;
+                        sort?: number;
+                        minClassRead?: number;
+                        minClassWrite?: number;
+                        minClassCreate?: number;
+                        autoLock?: boolean;
+                        autoLockWeeks?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Forum updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Forum"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Forum deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/{forumId}/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: string;
+                };
+                header?: never;
+                path: {
+                    forumId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated topics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedForumTopics"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        body: string;
+                        question?: string;
+                        answers?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Topic created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumTopic"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/{forumId}/topics/{topicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Topic */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumTopic"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                        isLocked?: boolean;
+                        isSticky?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Topic updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumTopic"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Topic removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/{forumId}/topics/{topicId}/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: string;
+                };
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated posts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["ForumPost"][];
+                            meta: components["schemas"]["PaginationMeta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Post created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPost"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Topic locked */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/{forumId}/topics/{topicId}/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Post */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPost"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Post updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPost"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    forumId: string;
+                    topicId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Post removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/polls/{topicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Poll */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPoll"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/polls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        forumTopicId: number;
+                        question: string;
+                        answers: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Poll created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPoll"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/polls/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Poll closed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPoll"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/poll-votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        forumPollId: number;
+                        vote: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Vote recorded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumPollVote"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/last-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Last-read markers */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumLastReadTopic"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        forumTopicId: number;
+                        forumPostId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Last-read marker saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumLastReadTopic"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/communities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated communities */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Community"][];
+                            meta: components["schemas"]["PaginationMeta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/communities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Community */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Community"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/communities/{id}/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Releases for community */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Release"][];
+                            meta: components["schemas"]["PaginationMeta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/communities/{communityId}/releases/{releaseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    communityId: string;
+                    releaseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Release */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Release"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/communities/{communityId}/releases/{releaseId}/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    communityId: string;
+                    releaseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        fileType: "mp3" | "flac" | "wav" | "ogg" | "aac" | "m4a" | "m4b" | "mp4" | "mkv" | "avi" | "mov" | "zip" | "exe" | "dmg" | "apk" | "pdf" | "epub" | "mobi" | "cbz" | "cbr" | "jpg" | "png" | "gif" | "txt";
+                        /** Format: uri */
+                        downloadUrl: string;
+                        sizeInBytes?: number;
+                        releaseDescription?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Contribution created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contribution"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+                /** @description Release not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated contributions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Contribution"][];
+                            meta: components["schemas"]["PaginationMeta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        communityId: number;
+                        /** @enum {string} */
+                        type: "Music" | "Applications" | "EBooks" | "ELearningVideos" | "Audiobooks" | "Comedy" | "Comics";
+                        title: string;
+                        year: number;
+                        /** @enum {string} */
+                        fileType: "mp3" | "flac" | "wav" | "ogg" | "aac" | "m4a" | "m4b" | "mp4" | "mkv" | "avi" | "mov" | "zip" | "exe" | "dmg" | "apk" | "pdf" | "epub" | "mobi" | "cbz" | "cbr" | "jpg" | "png" | "gif" | "txt";
+                        /** Format: uri */
+                        downloadUrl: string;
+                        sizeInBytes?: number;
+                        tags?: string;
+                        image?: string | "";
+                        description?: string;
+                        releaseDescription?: string;
+                        collaborators: {
+                            artist: string;
+                            importance: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Contribution submitted and release created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contribution"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+                /** @description Community not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/user-ranks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User ranks */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserRank"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        level: number;
+                        permissions?: {
+                            [key: string]: boolean;
+                        };
+                        color?: string;
+                        badge?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description User rank created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserRank"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/user-ranks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User rank */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserRank"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        level?: number;
+                        permissions?: {
+                            [key: string]: boolean;
+                        };
+                        color?: string;
+                        badge?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description User rank updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserRank"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User rank deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Rank still assigned to users */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: "artist" | "collages" | "requests" | "communities" | "release";
+                    pageId?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comments */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedComments"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        page: "artist" | "collages" | "requests" | "communities" | "release";
+                        body: string;
+                        communityId?: number;
+                        contributionId?: number;
+                        artistId?: number;
+                        releaseId?: number;
+                        collageId?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Comment created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Comment"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Comment updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Comment"];
+                    };
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comment deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated artists */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Artist"][];
+                            meta: components["schemas"]["PaginationMeta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        vanityHouse?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Artist created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Artist"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artist with releases and tags */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Artist"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        vanityHouse?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Artist updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Artist"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artist deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/history/{artistId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    artistId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artist history */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtistHistory"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/revert/{historyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    historyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artist reverted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            msg: string;
+                            artist: components["schemas"]["Artist"];
+                        };
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/{id}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Similar artists */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SimilarArtist"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        artistId: number;
+                        similarArtistId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Similar artist link created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        artistId: number;
+                        redirectId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Artist alias created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artists/tag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        artistId: number;
+                        tagId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Artist tagged */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description All posts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Post"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        text: string;
+                        category: string;
+                        tags?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Post created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Post"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Post */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Post"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Post deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/posts/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        text: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Comment created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PostComment"];
+                    };
+                };
+                /** @description Post not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/posts/{id}/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    commentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comment deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Comment not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/topic-notes/{topicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topicId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Topic notes (moderators only) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumTopicNote"][];
+                    };
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/topic-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        forumTopicId: number;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Note created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForumTopicNote"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forums/topic-notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Note deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List requests */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create a new request */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        communityId: number;
+                        /** @enum {string} */
+                        type: "Music" | "Applications" | "EBooks" | "ELearningVideos" | "Audiobooks" | "Comedy" | "Comics";
+                        title: string;
+                        year?: number;
+                        image?: string | "";
+                        description: string;
+                        bounty: string;
+                        artists?: number[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get request details */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/{id}/bounty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add bounty to request */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        amount: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/{id}/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fill request */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        contributionId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Inbox conversations */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedConversations"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        toUserId?: number;
+                        toUsername?: string;
+                        subject: string;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Conversation created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PrivateConversation"];
+                    };
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unread conversation count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sent conversations */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedConversations"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        ids: number[];
+                        /** @enum {string} */
+                        action: "delete" | "markRead" | "markUnread";
+                    };
+                };
+            };
+            responses: {
+                /** @description Bulk action applied */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation with messages */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PrivateConversation"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation soft-deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        isSticky?: boolean;
+                        isRead?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Flags updated */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/messages/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reply sent */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PrivateMessage"];
+                    };
+                };
+                /** @description Not a participant */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    status?: "Unanswered" | "Open" | "Resolved" | "all";
+                    assignedToMe?: boolean | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Staff ticket list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedTickets"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        subject: string;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Ticket created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxConversation"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Open ticket count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My tickets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaginatedTickets"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Canned responses */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Response created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/responses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        body?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Response updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Response deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/bulk-resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        ids: number[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Tickets resolved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok: boolean;
+                            resolved: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ticket */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxConversation"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reply sent */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffInboxMsg"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        assignedUserId: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Assigned */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Resolved */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff-inbox/{id}/unresolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unresolved */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Open and claimed report counts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            open: number;
+                            claimed: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User's submitted reports */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                            reports: {
+                                id: number;
+                                targetType: string;
+                                targetId: number;
+                                category: string;
+                                status: string;
+                                createdAt: string;
+                                resolvedAt: string | null;
+                                resolution: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated staff report queue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                            reports: {
+                                id: number;
+                                reporterId: number;
+                                reporter: {
+                                    id: number;
+                                    username: string;
+                                    avatar: string | null;
+                                };
+                                /** @enum {string} */
+                                targetType: "User" | "Release" | "Artist" | "Contribution" | "ForumTopic" | "ForumPost" | "Comment" | "Collage" | "Post";
+                                targetId: number;
+                                category: string;
+                                reason: string;
+                                evidence: string | null;
+                                /** @enum {string} */
+                                status: "Open" | "Claimed" | "Resolved";
+                                claimedById: number | null;
+                                claimedBy: {
+                                    id: number;
+                                    username: string;
+                                    avatar: string | null;
+                                } | null;
+                                claimedAt: string | null;
+                                resolvedById: number | null;
+                                resolvedBy: {
+                                    id: number;
+                                    username: string;
+                                    avatar: string | null;
+                                } | null;
+                                resolvedAt: string | null;
+                                resolution: string | null;
+                                /** @enum {string|null} */
+                                resolutionAction: "Dismissed" | "ContentRemoved" | "UserWarned" | "UserDisabled" | "MetadataFixed" | "MarkedDuplicate" | "Other" | null;
+                                notes: {
+                                    id: number;
+                                    reportId: number;
+                                    authorId: number;
+                                    author: {
+                                        id: number;
+                                        username: string;
+                                        avatar: string | null;
+                                    };
+                                    body: string;
+                                    createdAt: string;
+                                }[];
+                                createdAt: string;
+                                updatedAt: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        targetType: string;
+                        targetId: number;
+                        category: string;
+                        reason: string;
+                        evidence?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Report created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: number;
+                            reporterId: number;
+                            reporter: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            };
+                            /** @enum {string} */
+                            targetType: "User" | "Release" | "Artist" | "Contribution" | "ForumTopic" | "ForumPost" | "Comment" | "Collage" | "Post";
+                            targetId: number;
+                            category: string;
+                            reason: string;
+                            evidence: string | null;
+                            /** @enum {string} */
+                            status: "Open" | "Claimed" | "Resolved";
+                            claimedById: number | null;
+                            claimedBy: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            } | null;
+                            claimedAt: string | null;
+                            resolvedById: number | null;
+                            resolvedBy: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            } | null;
+                            resolvedAt: string | null;
+                            resolution: string | null;
+                            /** @enum {string|null} */
+                            resolutionAction: "Dismissed" | "ContentRemoved" | "UserWarned" | "UserDisabled" | "MetadataFixed" | "MarkedDuplicate" | "Other" | null;
+                            notes: {
+                                id: number;
+                                reportId: number;
+                                authorId: number;
+                                author: {
+                                    id: number;
+                                    username: string;
+                                    avatar: string | null;
+                                };
+                                body: string;
+                                createdAt: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Report detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: number;
+                            reporterId: number;
+                            reporter: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            };
+                            /** @enum {string} */
+                            targetType: "User" | "Release" | "Artist" | "Contribution" | "ForumTopic" | "ForumPost" | "Comment" | "Collage" | "Post";
+                            targetId: number;
+                            category: string;
+                            reason: string;
+                            evidence: string | null;
+                            /** @enum {string} */
+                            status: "Open" | "Claimed" | "Resolved";
+                            claimedById: number | null;
+                            claimedBy: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            } | null;
+                            claimedAt: string | null;
+                            resolvedById: number | null;
+                            resolvedBy: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            } | null;
+                            resolvedAt: string | null;
+                            resolution: string | null;
+                            /** @enum {string|null} */
+                            resolutionAction: "Dismissed" | "ContentRemoved" | "UserWarned" | "UserDisabled" | "MetadataFixed" | "MarkedDuplicate" | "Other" | null;
+                            notes: {
+                                id: number;
+                                reportId: number;
+                                authorId: number;
+                                author: {
+                                    id: number;
+                                    username: string;
+                                    avatar: string | null;
+                                };
+                                body: string;
+                                createdAt: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Claimed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{id}/unclaim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unclaimed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        resolution: string;
+                        resolutionAction: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Resolved */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Note added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: number;
+                            reportId: number;
+                            authorId: number;
+                            author: {
+                                id: number;
+                                username: string;
+                                avatar: string | null;
+                            };
+                            body: string;
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Site settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SiteSettings"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        approvedDomains?: string[];
+                        /** @enum {string} */
+                        registrationStatus?: "open" | "invite" | "closed";
+                        maxUsers?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated site settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SiteSettings"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    MsgResponse: {
-      msg: string;
-    };
-    ErrorResponse: {
-      error: string;
-    };
-    ValidationError: {
-      msg: string;
-      errors: {
-        [key: string]: string[];
-      };
-    };
-    PaginationMeta: {
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    };
-    LoginBody: {
-      /** Format: email */
-      email: string;
-      password: string;
-    };
-    RegisterBody: {
-      username: string;
-      /** Format: email */
-      email: string;
-      password: string;
-      inviteKey?: string;
-    };
-    AuthUser: {
-      id: number;
-      username: string;
-      /** Format: email */
-      email?: string;
-      avatar: string | null;
-      inviteCount?: number;
-      dateRegistered?: string;
-      lastLogin?: string | null;
-      isArtist?: boolean;
-      isDonor?: boolean;
-      canDownload?: boolean;
-      userRank: {
-        level: number;
-        name: string;
-        color: string;
-        badge?: string;
-        permissions?: {
-          [key: string]: boolean;
+    schemas: {
+        MsgResponse: {
+            msg: string;
         };
-      };
-    };
-    PublicUser: {
-      id: number;
-      username: string;
-      avatar: string | null;
-      dateRegistered: string;
-      isArtist: boolean;
-      isDonor: boolean;
-      userRank: {
-        name: string;
-        color: string;
-      };
-      profile: {
-        id: number;
-        avatar?: string | null;
-        avatarMouseoverText?: string | null;
-        profileTitle?: string | null;
-        profileInfo?: string | null;
-      };
-    };
-    ProfileDetails: {
-      id: number;
-      avatar?: string | null;
-      avatarMouseoverText?: string | null;
-      profileTitle?: string | null;
-      profileInfo?: string | null;
-    };
-    UserRankSummary: {
-      name: string;
-      color: string;
-      badge?: string;
-    };
-    UserSettings: {
-      id: number;
-      siteAppearance: string;
-      externalStylesheet?: string | null;
-      styledTooltips: boolean;
-      paranoia: number;
-    };
-    InviteNode: {
-      id: number;
-      username: string;
-      /** Format: email */
-      email: string;
-      joinedAt: string;
-      lastSeen?: string | null;
-      uploaded?: string;
-      downloaded?: string;
-      ratio?: string;
-      children?: components['schemas']['InviteNode'][];
-    };
-    PublicProfile: {
-      id: number;
-      username: string;
-      avatar: string | null;
-      dateRegistered: string;
-      isArtist: boolean;
-      isDonor: boolean;
-      userRank: components['schemas']['UserRankSummary'];
-      profile: components['schemas']['ProfileDetails'];
-      userSettings: {
-        siteAppearance?: string;
-        styledTooltips?: boolean;
-      };
-    };
-    MyProfile: {
-      id: number;
-      username: string;
-      avatar: string | null;
-      profile: components['schemas']['ProfileDetails'];
-      userSettings: components['schemas']['UserSettings'];
-      userRank: {
-        name: string;
-        color: string;
-      };
-      inviteTree: components['schemas']['InviteNode'][];
-    };
-    AdminCreatedUser: {
-      id: number;
-      username: string;
-      /** Format: email */
-      email: string;
-    };
-    HomepageFeaturedRelease: {
-      id: number;
-      title: string;
-      year?: number | null;
-      image?: string | null;
-      communityId: number;
-      artist?: {
-        id: number;
-        name: string;
-      } | null;
-    };
-    HomepageFeaturedAlbum: {
-      id: number;
-      title: string;
-      started: string;
-      ended: string;
-      threadId?: number | null;
-      release: components['schemas']['HomepageFeaturedRelease'];
-    };
-    Announcement: {
-      id: number;
-      title: string;
-      body: string;
-      createdAt: string;
-    };
-    BlogPost: {
-      id: number;
-      title: string;
-      body?: string;
-      createdAt: string;
-      user?: {
-        username: string;
-        avatar?: string | null;
-      };
-    };
-    AnnouncementsResponse: {
-      announcements: components['schemas']['Announcement'][];
-      blogPosts: components['schemas']['BlogPost'][];
-    };
-    SiteStats: {
-      totalUsers: number;
-      enabledUsers: number;
-      activeToday: number;
-      activeThisWeek: number;
-      activeThisMonth: number;
-      communities: number;
-      releases: number;
-      artists: number;
-      blogPosts: number;
-      announcements: number;
-      comments: number;
-      contributedLinks: number;
-      contributedLinkDownloads: number;
-    };
-    Notification: {
-      id: number;
-      page: string;
-      pageId: number;
-      postId: number;
-      createdAt: string;
-      quoter: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-    };
-    Subscription: {
-      id: number;
-      topicId: number;
-    };
-    Stylesheet: {
-      id: number;
-      name: string;
-      cssUrl: string;
-      createdAt: string;
-    };
-    Forum: {
-      id: number;
-      sort: number;
-      name: string;
-      description: string;
-      minClassRead?: number;
-      minClassWrite?: number;
-      minClassCreate?: number;
-      numTopics: number;
-      numPosts: number;
-      forumCategory?: {
-        id: number;
-        name: string;
-      };
-      lastTopic?: {
-        id: number;
-        title: string;
-      };
-    };
-    ForumCategory: {
-      id: number;
-      name: string;
-      sort: number;
-      forums?: components['schemas']['Forum'][];
-    };
-    ForumTopic: {
-      id: number;
-      title: string;
-      forumId: number;
-      authorId: number;
-      isLocked: boolean;
-      isSticky: boolean;
-      numPosts: number;
-      author?: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-      lastPost?: {
-        id: number;
-        createdAt: string;
-        author?: {
-          id: number;
-          username: string;
+        ErrorResponse: {
+            error: string;
         };
-      };
-      createdAt: string;
-      updatedAt: string;
-    };
-    ForumPostEdit: {
-      id: number;
-      forumPostId: number;
-      editorId: number;
-      previousBody: string;
-      editedAt: string;
-      editor?: {
-        id: number;
-        username: string;
-      };
-    };
-    ForumPost: {
-      id: number;
-      forumTopicId: number;
-      authorId: number;
-      body: string;
-      edits: components['schemas']['ForumPostEdit'][];
-      author?: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-      createdAt: string;
-      updatedAt: string;
-    };
-    ForumPollVote: {
-      id: number;
-      forumPollId: number;
-      userId: number;
-      vote: number;
-    };
-    ForumPoll: {
-      id: number;
-      forumTopicId: number;
-      question: string;
-      answers: string;
-      /** Format: date-time */
-      featured?: string | null;
-      closed: boolean;
-      votes: components['schemas']['ForumPollVote'][];
-    };
-    ForumLastReadTopic: {
-      id: number;
-      userId: number;
-      forumTopicId: number;
-      forumPostId: number;
-    };
-    PaginatedForumTopics: {
-      data: components['schemas']['ForumTopic'][];
-      meta: components['schemas']['PaginationMeta'];
-    };
-    CommunityStaffMember: {
-      id: number;
-      username: string;
-    };
-    Community: {
-      id: number;
-      name: string;
-      description?: string | null;
-      type?: string | null;
-      registrationStatus?: string | null;
-      image?: string | null;
-      staff?: components['schemas']['CommunityStaffMember'][];
-      _count?: {
-        releases: number;
-        contributors: number;
-        consumers: number;
-      };
-    };
-    ReleaseTag: {
-      id: number;
-      name: string;
-    };
-    ReleaseArtist: {
-      id: number;
-      name: string;
-    };
-    ReleaseContribution: {
-      id: number;
-      user: {
-        id: number;
-        username: string;
-      };
-      collaborators: {
-        id: number;
-        name: string;
-        vanityHouse?: boolean;
-      }[];
-      releaseDescription?: string | null;
-    };
-    Contribution: {
-      id: number;
-      user: {
-        id: number;
-        username: string;
-      };
-      release: {
-        id: number;
-        title: string;
-        communityId?: number | null;
-      };
-      collaborators: {
-        id: number;
-        name: string;
-      }[];
-      releaseDescription?: string | null;
-      createdAt?: string;
-    };
-    Release: {
-      id: number;
-      title: string;
-      communityId: number | null;
-      year?: number | null;
-      type?: string | null;
-      image?: string | null;
-      description?: string | null;
-      createdAt?: string;
-      artist?: components['schemas']['ReleaseArtist'];
-      tags?: components['schemas']['ReleaseTag'][];
-      contributions?: components['schemas']['ReleaseContribution'][];
-    };
-    UserRank: {
-      id: number;
-      name: string;
-      level: number;
-      permissions?: {
-        [key: string]: boolean;
-      };
-      color?: string;
-      badge?: string;
-      userCount?: number;
-    };
-    Comment: {
-      id: number;
-      page: string;
-      body: string;
-      authorId: number;
-      createdAt: string;
-      author?: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-    };
-    PaginatedComments: {
-      data: components['schemas']['Comment'][];
-      meta: components['schemas']['PaginationMeta'];
-    };
-    Artist: {
-      id: number;
-      name: string;
-      vanityHouse: boolean;
-      _count?: {
-        releases: number;
-      };
-      aliases?: {
-        redirect: {
-          id: number;
-          name: string;
+        ValidationError: {
+            msg: string;
+            errors: {
+                [key: string]: string[];
+            };
         };
-      }[];
-      tags?: {
-        tag: {
-          id: number;
-          name: string;
+        PaginationMeta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
         };
-      }[];
-      similarTo?: {
-        similarArtist: {
-          id: number;
-          name: string;
+        LoginBody: {
+            /** Format: email */
+            email: string;
+            password: string;
         };
-      }[];
-      releases?: {
-        id: number;
-        title: string;
-        year?: number | null;
-      }[];
+        RegisterBody: {
+            username: string;
+            /** Format: email */
+            email: string;
+            password: string;
+            inviteKey?: string;
+        };
+        AuthUser: {
+            id: number;
+            username: string;
+            /** Format: email */
+            email?: string;
+            avatar: string | null;
+            inviteCount?: number;
+            dateRegistered?: string;
+            lastLogin?: string | null;
+            isArtist?: boolean;
+            isDonor?: boolean;
+            canDownload?: boolean;
+            userRank: {
+                level: number;
+                name: string;
+                color: string;
+                badge?: string;
+                permissions?: {
+                    [key: string]: boolean;
+                };
+            };
+        };
+        PublicUser: {
+            id: number;
+            username: string;
+            avatar: string | null;
+            dateRegistered: string;
+            isArtist: boolean;
+            isDonor: boolean;
+            userRank: {
+                name: string;
+                color: string;
+            };
+            profile: {
+                id: number;
+                avatar?: string | null;
+                avatarMouseoverText?: string | null;
+                profileTitle?: string | null;
+                profileInfo?: string | null;
+            };
+        };
+        ProfileDetails: {
+            id: number;
+            avatar?: string | null;
+            avatarMouseoverText?: string | null;
+            profileTitle?: string | null;
+            profileInfo?: string | null;
+        };
+        UserRankSummary: {
+            name: string;
+            color: string;
+            badge?: string;
+        };
+        UserSettings: {
+            id: number;
+            siteAppearance: string;
+            externalStylesheet?: string | null;
+            styledTooltips: boolean;
+            paranoia: number;
+        };
+        InviteNode: {
+            id: number;
+            username: string;
+            /** Format: email */
+            email: string;
+            joinedAt: string;
+            lastSeen?: string | null;
+            uploaded?: string;
+            downloaded?: string;
+            ratio?: string;
+            children?: components["schemas"]["InviteNode"][];
+        };
+        PublicProfile: {
+            id: number;
+            username: string;
+            avatar: string | null;
+            dateRegistered: string;
+            isArtist: boolean;
+            isDonor: boolean;
+            userRank: components["schemas"]["UserRankSummary"];
+            profile: components["schemas"]["ProfileDetails"];
+            userSettings: {
+                siteAppearance?: string;
+                styledTooltips?: boolean;
+            };
+        };
+        MyProfile: {
+            id: number;
+            username: string;
+            avatar: string | null;
+            profile: components["schemas"]["ProfileDetails"];
+            userSettings: components["schemas"]["UserSettings"];
+            userRank: {
+                name: string;
+                color: string;
+            };
+            inviteTree: components["schemas"]["InviteNode"][];
+        };
+        AdminCreatedUser: {
+            id: number;
+            username: string;
+            /** Format: email */
+            email: string;
+        };
+        HomepageFeaturedRelease: {
+            id: number;
+            title: string;
+            year?: number | null;
+            image?: string | null;
+            communityId: number;
+            artist?: {
+                id: number;
+                name: string;
+            } | null;
+        };
+        HomepageFeaturedAlbum: {
+            id: number;
+            title: string;
+            started: string;
+            ended: string;
+            threadId?: number | null;
+            release: components["schemas"]["HomepageFeaturedRelease"];
+        };
+        Announcement: {
+            id: number;
+            title: string;
+            body: string;
+            createdAt: string;
+        };
+        BlogPost: {
+            id: number;
+            title: string;
+            body?: string;
+            createdAt: string;
+            user?: {
+                username: string;
+                avatar?: string | null;
+            };
+        };
+        AnnouncementsResponse: {
+            announcements: components["schemas"]["Announcement"][];
+            blogPosts: components["schemas"]["BlogPost"][];
+        };
+        SiteStats: {
+            totalUsers: number;
+            enabledUsers: number;
+            activeToday: number;
+            activeThisWeek: number;
+            activeThisMonth: number;
+            communities: number;
+            releases: number;
+            artists: number;
+            blogPosts: number;
+            announcements: number;
+            comments: number;
+            contributedLinks: number;
+            contributedLinkDownloads: number;
+        };
+        Notification: {
+            id: number;
+            page: string;
+            pageId: number;
+            postId: number;
+            createdAt: string;
+            quoter: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+        };
+        Subscription: {
+            id: number;
+            topicId: number;
+        };
+        Stylesheet: {
+            id: number;
+            name: string;
+            cssUrl: string;
+            createdAt: string;
+        };
+        Forum: {
+            id: number;
+            sort: number;
+            name: string;
+            description: string;
+            minClassRead?: number;
+            minClassWrite?: number;
+            minClassCreate?: number;
+            numTopics: number;
+            numPosts: number;
+            forumCategory?: {
+                id: number;
+                name: string;
+            };
+            lastTopic?: {
+                id: number;
+                title: string;
+            };
+        };
+        ForumCategory: {
+            id: number;
+            name: string;
+            sort: number;
+            forums?: components["schemas"]["Forum"][];
+        };
+        ForumTopic: {
+            id: number;
+            title: string;
+            forumId: number;
+            authorId: number;
+            isLocked: boolean;
+            isSticky: boolean;
+            numPosts: number;
+            author?: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+            lastPost?: {
+                id: number;
+                createdAt: string;
+                author?: {
+                    id: number;
+                    username: string;
+                };
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+        ForumPostEdit: {
+            id: number;
+            forumPostId: number;
+            editorId: number;
+            previousBody: string;
+            editedAt: string;
+            editor?: {
+                id: number;
+                username: string;
+            };
+        };
+        ForumPost: {
+            id: number;
+            forumTopicId: number;
+            authorId: number;
+            body: string;
+            edits: components["schemas"]["ForumPostEdit"][];
+            author?: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+        ForumPollVote: {
+            id: number;
+            forumPollId: number;
+            userId: number;
+            vote: number;
+        };
+        ForumPoll: {
+            id: number;
+            forumTopicId: number;
+            question: string;
+            answers: string;
+            /** Format: date-time */
+            featured?: string | null;
+            closed: boolean;
+            votes: components["schemas"]["ForumPollVote"][];
+        };
+        ForumLastReadTopic: {
+            id: number;
+            userId: number;
+            forumTopicId: number;
+            forumPostId: number;
+        };
+        PaginatedForumTopics: {
+            data: components["schemas"]["ForumTopic"][];
+            meta: components["schemas"]["PaginationMeta"];
+        };
+        CommunityStaffMember: {
+            id: number;
+            username: string;
+        };
+        Community: {
+            id: number;
+            name: string;
+            description?: string | null;
+            type?: string | null;
+            registrationStatus?: string | null;
+            image?: string | null;
+            allowDuplicateFormats: boolean;
+            staff?: components["schemas"]["CommunityStaffMember"][];
+            _count?: {
+                releases: number;
+                contributors: number;
+                consumers: number;
+            };
+        };
+        ReleaseTag: {
+            id: number;
+            name: string;
+        };
+        ReleaseArtist: {
+            id: number;
+            name: string;
+        };
+        ReleaseContribution: {
+            id: number;
+            user: {
+                id: number;
+                username: string;
+            };
+            type: string;
+            downloadUrl: string;
+            sizeInBytes?: number | null;
+            collaborators: {
+                id: number;
+                name: string;
+                vanityHouse?: boolean;
+            }[];
+            releaseDescription?: string | null;
+        };
+        Contribution: {
+            id: number;
+            user: {
+                id: number;
+                username: string;
+            };
+            release: {
+                id: number;
+                title: string;
+                communityId?: number | null;
+            };
+            type: string;
+            downloadUrl: string;
+            sizeInBytes?: number | null;
+            collaborators: {
+                id: number;
+                name: string;
+            }[];
+            releaseDescription?: string | null;
+            createdAt?: string;
+        };
+        Release: {
+            id: number;
+            title: string;
+            communityId: number | null;
+            year?: number | null;
+            type?: string | null;
+            image?: string | null;
+            description?: string | null;
+            createdAt?: string;
+            artist?: components["schemas"]["ReleaseArtist"];
+            tags?: components["schemas"]["ReleaseTag"][];
+            contributions?: components["schemas"]["ReleaseContribution"][];
+        };
+        UserRank: {
+            id: number;
+            name: string;
+            level: number;
+            permissions?: {
+                [key: string]: boolean;
+            };
+            color?: string;
+            badge?: string;
+            userCount?: number;
+        };
+        Comment: {
+            id: number;
+            page: string;
+            body: string;
+            authorId: number;
+            createdAt: string;
+            author?: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+        };
+        PaginatedComments: {
+            data: components["schemas"]["Comment"][];
+            meta: components["schemas"]["PaginationMeta"];
+        };
+        Artist: {
+            id: number;
+            name: string;
+            vanityHouse: boolean;
+            _count?: {
+                releases: number;
+            };
+            aliases?: {
+                redirect: {
+                    id: number;
+                    name: string;
+                };
+            }[];
+            tags?: {
+                tag: {
+                    id: number;
+                    name: string;
+                };
+            }[];
+            similarTo?: {
+                similarArtist: {
+                    id: number;
+                    name: string;
+                };
+            }[];
+            releases?: {
+                id: number;
+                title: string;
+                year?: number | null;
+            }[];
+        };
+        ArtistHistory: {
+            id: number;
+            artistId: number;
+            editedAt: string;
+            description?: string | null;
+            editedUser?: {
+                id: number;
+                username: string;
+            };
+        };
+        SimilarArtist: {
+            similarArtist: {
+                id: number;
+                name: string;
+            };
+        };
+        PostComment: {
+            id: number;
+            postId: number;
+            userId: number;
+            text: string;
+            createdAt: string;
+            user?: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+        };
+        Post: {
+            id: number;
+            userId: number;
+            title: string;
+            text: string;
+            category: string;
+            tags: string[];
+            comments: components["schemas"]["PostComment"][];
+            createdAt: string;
+            user?: {
+                id: number;
+                username: string;
+                avatar?: string | null;
+            };
+        };
+        ForumTopicNote: {
+            id: number;
+            forumTopicId: number;
+            authorId: number;
+            body: string;
+            createdAt: string;
+            updatedAt: string;
+            author?: {
+                id: number;
+                username: string;
+            };
+        };
+        MessageUser: {
+            id: number;
+            username: string;
+            avatar?: string | null;
+        };
+        PrivateMessage: {
+            id: number;
+            conversationId: number;
+            body: string;
+            createdAt: string;
+            sender?: components["schemas"]["MessageUser"] & unknown;
+        };
+        PrivateConversationParticipant: {
+            userId: number;
+            conversationId: number;
+            inInbox: boolean;
+            inSentbox: boolean;
+            isRead: boolean;
+            isSticky: boolean;
+            sentAt?: string | null;
+            receivedAt?: string | null;
+            user?: components["schemas"]["MessageUser"];
+        };
+        PrivateConversation: {
+            id: number;
+            subject: string;
+            createdAt: string;
+            participants?: components["schemas"]["PrivateConversationParticipant"][];
+            messages?: components["schemas"]["PrivateMessage"][];
+        };
+        PaginatedConversations: {
+            total: number;
+            page: number;
+            pageSize: number;
+            conversations: components["schemas"]["PrivateConversation"][];
+        };
+        StaffInboxMessageUser: {
+            id: number;
+            username: string;
+            avatar?: string | null;
+        };
+        StaffInboxMsg: {
+            id: number;
+            conversationId: number;
+            body: string;
+            createdAt: string;
+            sender: components["schemas"]["StaffInboxMessageUser"];
+        };
+        StaffInboxConversation: {
+            id: number;
+            subject: string;
+            /** @enum {string} */
+            status: "Unanswered" | "Open" | "Resolved";
+            isReadByUser: boolean;
+            createdAt: string;
+            updatedAt: string;
+            user: components["schemas"]["StaffInboxMessageUser"];
+            assignedUser?: components["schemas"]["StaffInboxMessageUser"] & unknown;
+            resolver?: components["schemas"]["StaffInboxMessageUser"] & unknown;
+            messages?: components["schemas"]["StaffInboxMsg"][];
+        };
+        PaginatedTickets: {
+            total: number;
+            page: number;
+            pageSize: number;
+            conversations: components["schemas"]["StaffInboxConversation"][];
+        };
+        StaffInboxResponse: {
+            id: number;
+            name: string;
+            body: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+        SiteSettings: {
+            id: number;
+            approvedDomains: string[];
+            /** @enum {string} */
+            registrationStatus: "open" | "invite" | "closed";
+            maxUsers: number;
+            updatedAt: string;
+        };
     };
-    ArtistHistory: {
-      id: number;
-      artistId: number;
-      editedAt: string;
-      description?: string | null;
-      editedUser?: {
-        id: number;
-        username: string;
-      };
-    };
-    SimilarArtist: {
-      similarArtist: {
-        id: number;
-        name: string;
-      };
-    };
-    PostComment: {
-      id: number;
-      postId: number;
-      userId: number;
-      text: string;
-      createdAt: string;
-      user?: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-    };
-    Post: {
-      id: number;
-      userId: number;
-      title: string;
-      text: string;
-      category: string;
-      tags: string[];
-      comments: components['schemas']['PostComment'][];
-      createdAt: string;
-      user?: {
-        id: number;
-        username: string;
-        avatar?: string | null;
-      };
-    };
-    ForumTopicNote: {
-      id: number;
-      forumTopicId: number;
-      authorId: number;
-      body: string;
-      createdAt: string;
-      updatedAt: string;
-      author?: {
-        id: number;
-        username: string;
-      };
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

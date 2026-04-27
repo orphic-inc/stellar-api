@@ -2,6 +2,7 @@ import {
   request,
   app,
   prismaMock,
+  makeUserRank,
   createTopicMock,
   updateTopicMock,
   createPostMock,
@@ -12,6 +13,13 @@ import {
   setCurrentUserRankLevel,
   resetApiTestState
 } from './test/apiTestHarness';
+import {
+  makeForum,
+  makeForumTopic,
+  makeForumPost,
+  makeForumTopicNote,
+  makeForumList
+} from './test/factories';
 import {
   createTopic,
   updateTopic,
@@ -26,10 +34,9 @@ describe('API forum flows', () => {
   });
 
   it('creates a forum topic when the user meets the create-class requirement', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue({
-      id: 9,
-      minClassCreate: 100
-    });
+    prismaMock.forum.findUnique.mockResolvedValue(
+      makeForum({ id: 9, minClassCreate: 100 })
+    );
     createTopicMock.mockResolvedValue({
       id: 44,
       title: 'New Topic',
@@ -53,12 +60,9 @@ describe('API forum flows', () => {
   });
 
   it('updates a forum topic for the owner', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue({
-      id: 44,
-      forumId: 9,
-      authorId: 7,
-      deletedAt: null
-    });
+    prismaMock.forumTopic.findFirst.mockResolvedValue(
+      makeForumTopic({ id: 44, forumId: 9, authorId: 7 })
+    );
     updateTopicMock.mockResolvedValue({
       id: 44,
       title: 'Renamed Topic',
@@ -80,12 +84,12 @@ describe('API forum flows', () => {
   });
 
   it('creates a forum post when the topic is unlocked and belongs to the forum', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue({ id: 9, minClassRead: 0 });
-    prismaMock.forumTopic.findUnique.mockResolvedValue({
-      id: 44,
-      forumId: 9,
-      isLocked: false
-    });
+    prismaMock.forum.findUnique.mockResolvedValue(
+      makeForum({ id: 9, minClassRead: 0 })
+    );
+    prismaMock.forumTopic.findUnique.mockResolvedValue(
+      makeForumTopic({ id: 44, forumId: 9, isLocked: false })
+    );
     createPostMock.mockResolvedValue({
       id: 21,
       forumTopicId: 44,
@@ -103,13 +107,9 @@ describe('API forum flows', () => {
   });
 
   it('updates a forum post for the owner', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue({
-      id: 21,
-      forumTopicId: 44,
-      authorId: 7,
-      body: 'Old body',
-      deletedAt: null
-    });
+    prismaMock.forumPost.findFirst.mockResolvedValue(
+      makeForumPost({ id: 21, forumTopicId: 44, authorId: 7, body: 'Old body' })
+    );
     updatePostMock.mockResolvedValue({
       id: 21,
       forumTopicId: 44,
@@ -129,12 +129,9 @@ describe('API forum flows', () => {
   });
 
   it('rejects topic deletion for non-owners without moderator permissions', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue({
-      id: 44,
-      forumId: 9,
-      authorId: 99,
-      deletedAt: null
-    });
+    prismaMock.forumTopic.findFirst.mockResolvedValue(
+      makeForumTopic({ id: 44, forumId: 9, authorId: 99 })
+    );
 
     const res = await request(app).delete('/api/forums/9/topics/44');
 
@@ -144,15 +141,12 @@ describe('API forum flows', () => {
   });
 
   it('allows moderators to delete a forum post', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue({
-      id: 21,
-      forumTopicId: 44,
-      authorId: 99,
-      deletedAt: null
-    });
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      permissions: { forums_moderate: true }
-    });
+    prismaMock.forumPost.findFirst.mockResolvedValue(
+      makeForumPost({ id: 21, forumTopicId: 44, authorId: 99 })
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
 
     const res = await request(app).delete('/api/forums/9/topics/44/posts/21');
 
@@ -172,9 +166,9 @@ describe('API forum flows', () => {
   });
 
   it('allows moderators to create topic notes', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      permissions: { forums_moderate: true }
-    });
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
     createTopicNoteMock.mockResolvedValue({
       id: 77,
       forumTopicId: 44,
@@ -193,10 +187,9 @@ describe('API forum flows', () => {
   });
 
   it('allows topic-note authors to delete their own note', async () => {
-    prismaMock.forumTopicNote.findUnique.mockResolvedValue({
-      id: 77,
-      authorId: 7
-    });
+    prismaMock.forumTopicNote.findUnique.mockResolvedValue(
+      makeForumTopicNote({ id: 77, authorId: 7 })
+    );
 
     const res = await request(app).delete('/api/forums/topic-notes/77');
 
@@ -208,9 +201,9 @@ describe('API forum flows', () => {
 
   it('filters forum listings by the current user rank', async () => {
     setCurrentUserRankLevel(100);
-    prismaMock.forum.findMany.mockResolvedValue([
-      { id: 1, name: 'Open Forum', minClassRead: 0 }
-    ]);
+    prismaMock.forum.findMany.mockResolvedValue(
+      makeForumList([{ id: 1, name: 'Open Forum', minClassRead: 0 }])
+    );
 
     const res = await request(app).get('/api/forums');
 
@@ -225,11 +218,9 @@ describe('API forum flows', () => {
 
   it('rejects direct forum access when the user rank is below minClassRead', async () => {
     setCurrentUserRankLevel(100);
-    prismaMock.forum.findUnique.mockResolvedValue({
-      id: 9,
-      name: 'Staff Forum',
-      minClassRead: 500
-    });
+    prismaMock.forum.findUnique.mockResolvedValue(
+      makeForum({ id: 9, name: 'Staff Forum', minClassRead: 500 })
+    );
 
     const res = await request(app).get('/api/forums/9');
 

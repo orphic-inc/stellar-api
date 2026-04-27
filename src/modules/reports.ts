@@ -14,7 +14,7 @@ const userSelect = {
   avatar: true
 } as const;
 
-const reportInclude = {
+export const reportInclude = {
   reporter: { select: userSelect },
   claimedBy: { select: userSelect },
   resolvedBy: { select: userSelect },
@@ -23,6 +23,23 @@ const reportInclude = {
     include: { author: { select: userSelect } }
   }
 } as const;
+
+export type ReportRow = Prisma.ReportGetPayload<{
+  include: typeof reportInclude;
+}>;
+export type ReportNoteRow = Prisma.ReportNoteGetPayload<{
+  include: { author: { select: { id: true; username: true; avatar: true } } };
+}>;
+export type ReportSummary = {
+  id: number;
+  targetType: ReportTargetType;
+  targetId: number;
+  category: string;
+  status: ReportStatus;
+  createdAt: Date;
+  resolvedAt: Date | null;
+  resolution: string | null;
+};
 
 export async function fileReport(
   reporterId: number,

@@ -1602,6 +1602,7 @@ const Community = registry.register(
     type: z.string().nullable().optional(),
     registrationStatus: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
+    allowDuplicateFormats: z.boolean(),
     staff: z.array(CommunityStaffMember).optional(),
     _count: z
       .object({
@@ -3125,6 +3126,7 @@ const ReportObj = z.object({
     'User',
     'Release',
     'Artist',
+    'Contribution',
     'ForumTopic',
     'ForumPost',
     'Comment',
@@ -3150,6 +3152,7 @@ const ReportObj = z.object({
       'UserWarned',
       'UserDisabled',
       'MetadataFixed',
+      'MarkedDuplicate',
       'Other'
     ])
     .nullable(),
@@ -3319,6 +3322,56 @@ registry.registerPath({
     201: {
       description: 'Note added',
       content: { 'application/json': { schema: ReportNoteObj } }
+    }
+  }
+});
+
+// ─── Site Settings ────────────────────────────────────────────────────────────
+
+const SiteSettings = registry.register(
+  'SiteSettings',
+  z.object({
+    id: z.number(),
+    approvedDomains: z.array(z.string()),
+    registrationStatus: z.enum(['open', 'invite', 'closed']),
+    maxUsers: z.number(),
+    updatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/settings',
+  tags: ['Settings'],
+  responses: {
+    200: {
+      description: 'Site settings',
+      content: { 'application/json': { schema: SiteSettings } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/settings',
+  tags: ['Settings'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            approvedDomains: z.array(z.string()).optional(),
+            registrationStatus: z.enum(['open', 'invite', 'closed']).optional(),
+            maxUsers: z.number().optional()
+          })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated site settings',
+      content: { 'application/json': { schema: SiteSettings } }
     }
   }
 });

@@ -41,6 +41,7 @@ import collagesRouter from './routes/api/collages';
 import messagesRouter from './routes/api/messages';
 import staffInboxRouter from './routes/api/staffInbox';
 import reportsRouter from './routes/api/reports';
+import settingsRouter from './routes/api/settings';
 
 const log = getLogger('app');
 
@@ -94,6 +95,7 @@ export const createApp = () => {
   app.use('/api/messages', messagesRouter);
   app.use('/api/staff-inbox', staffInboxRouter);
   app.use('/api/reports', reportsRouter);
+  app.use('/api/settings', settingsRouter);
 
   app.use(
     (

@@ -108,161 +108,7 @@ jest.mock('jsonwebtoken', () => ({
 }));
 
 jest.mock('../lib/prisma', () => ({
-  prisma: {
-    user: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn()
-    },
-    userRank: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn()
-    },
-    userSettings: {
-      create: jest.fn()
-    },
-    profile: {
-      create: jest.fn()
-    },
-    forum: {
-      findMany: jest.fn(),
-      findUnique: jest.fn()
-    },
-    forumTopic: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn()
-    },
-    forumPost: {
-      findFirst: jest.fn()
-    },
-    forumTopicNote: {
-      findUnique: jest.fn(),
-      delete: jest.fn()
-    },
-    post: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      delete: jest.fn()
-    },
-    postComment: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      delete: jest.fn()
-    },
-    comment: {
-      update: jest.fn(),
-      create: jest.fn(),
-      findUnique: jest.fn()
-    },
-    subscription: {
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-      findMany: jest.fn()
-    },
-    commentSubscription: {
-      upsert: jest.fn(),
-      deleteMany: jest.fn()
-    },
-    notification: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      delete: jest.fn()
-    },
-    auditLog: {
-      create: jest.fn()
-    },
-    request: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn()
-    },
-    contribution: {
-      findUnique: jest.fn()
-    },
-    downloadAccessGrant: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn()
-    },
-    collage: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      findFirst: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-      delete: jest.fn()
-    },
-    collageEntry: {
-      findUnique: jest.fn(),
-      count: jest.fn(),
-      aggregate: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
-    },
-    collageSubscription: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
-    },
-    bookmarkCollage: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      delete: jest.fn()
-    },
-    release: {
-      findUnique: jest.fn()
-    },
-    privateConversation: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn()
-    },
-    privateConversationParticipant: {
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn()
-    },
-    privateMessage: {
-      create: jest.fn()
-    },
-    staffInboxConversation: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn()
-    },
-    staffInboxMessage: {
-      create: jest.fn()
-    },
-    staffInboxResponse: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
-    },
-    report: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn()
-    },
-    reportNote: {
-      create: jest.fn()
-    },
-    $transaction: jest.fn()
-  }
+  prisma: jest.requireActual('jest-mock-extended').mockDeep()
 }));
 
 jest.mock('../lib/sanitize', () => ({
@@ -272,6 +118,8 @@ jest.mock('../lib/sanitize', () => ({
 
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
+import { type DeepMockProxy } from 'jest-mock-extended';
+import { type PrismaClient } from '@prisma/client';
 import app from '../app';
 import { isInstalled } from '../modules/installState';
 import { prisma } from '../lib/prisma';
@@ -297,170 +145,19 @@ import {
 } from '../modules/downloads';
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
+import { makeUserRank } from './factories';
+export { makeUserRank } from './factories';
 
 export { app, request };
 
 export const mockedIsInstalled = isInstalled as jest.MockedFunction<
   typeof isInstalled
 >;
-export const prismaMock = prisma as unknown as {
-  user: {
-    findFirst: jest.Mock;
-    findUnique: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-  };
-  userRank: {
-    findFirst: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  userSettings: {
-    create: jest.Mock;
-  };
-  profile: {
-    create: jest.Mock;
-  };
-  forum: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  forumTopic: {
-    findFirst: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  forumPost: {
-    findFirst: jest.Mock;
-  };
-  forumTopicNote: {
-    findUnique: jest.Mock;
-    delete: jest.Mock;
-  };
-  post: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    create: jest.Mock;
-    delete: jest.Mock;
-  };
-  postComment: {
-    create: jest.Mock;
-    findFirst: jest.Mock;
-    delete: jest.Mock;
-  };
-  comment: {
-    update: jest.Mock;
-    create: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  subscription: {
-    upsert: jest.Mock;
-    deleteMany: jest.Mock;
-    findMany: jest.Mock;
-  };
-  commentSubscription: {
-    upsert: jest.Mock;
-    deleteMany: jest.Mock;
-  };
-  notification: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    delete: jest.Mock;
-  };
-  auditLog: {
-    create: jest.Mock;
-  };
-  request: {
-    findUnique: jest.Mock;
-    findMany: jest.Mock;
-    count: jest.Mock;
-  };
-  contribution: {
-    findUnique: jest.Mock;
-  };
-  downloadAccessGrant: {
-    findFirst: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  collage: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    findFirst: jest.Mock;
-    count: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    updateMany: jest.Mock;
-    delete: jest.Mock;
-  };
-  collageEntry: {
-    findUnique: jest.Mock;
-    count: jest.Mock;
-    aggregate: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-  };
-  collageSubscription: {
-    findUnique: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-  };
-  bookmarkCollage: {
-    findUnique: jest.Mock;
-    create: jest.Mock;
-    delete: jest.Mock;
-  };
-  release: {
-    findUnique: jest.Mock;
-  };
-  privateConversation: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    count: jest.Mock;
-    create: jest.Mock;
-  };
-  privateConversationParticipant: {
-    findFirst: jest.Mock;
-    findMany: jest.Mock;
-    update: jest.Mock;
-    updateMany: jest.Mock;
-  };
-  privateMessage: {
-    create: jest.Mock;
-  };
-  staffInboxConversation: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    count: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    updateMany: jest.Mock;
-  };
-  staffInboxMessage: {
-    create: jest.Mock;
-  };
-  staffInboxResponse: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-  };
-  report: {
-    findMany: jest.Mock;
-    findUnique: jest.Mock;
-    count: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    updateMany: jest.Mock;
-  };
-  reportNote: {
-    create: jest.Mock;
-  };
-  $transaction: jest.Mock;
-};
+export const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>;
 export const bcryptMock = bcrypt as unknown as {
   compare: jest.Mock;
 };
+
 export const createInviteMock = createInvite as jest.MockedFunction<
   typeof createInvite
 >;
@@ -518,7 +215,14 @@ export const resetApiTestState = (): void => {
   jest.clearAllMocks();
   mockedIsInstalled.mockResolvedValue(true);
   currentUserRankLevel = 1000;
-  prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+  prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  prismaMock.siteSettings.upsert.mockResolvedValue({
+    id: 1,
+    approvedDomains: [],
+    registrationStatus: 'open',
+    maxUsers: 7000,
+    updatedAt: new Date()
+  });
   prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
     if (typeof arg === 'function') {
       return arg({
