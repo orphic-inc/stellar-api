@@ -5479,6 +5479,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ratio-policy/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User's ratio policy state */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RatioPolicyState"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ratio-policy/{userId}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "OK" | "WATCH" | "LEECH_DISABLED";
+                    };
+                };
+            };
+            responses: {
+                /** @description Override applied */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RatioPolicyState"];
+                    };
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MsgResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings": {
         parameters: {
             query?: never;
@@ -6119,6 +6209,14 @@ export interface components {
             body: string;
             createdAt: string;
             updatedAt: string;
+        };
+        RatioPolicyState: {
+            /** @enum {string} */
+            status: "OK" | "WATCH" | "LEECH_DISABLED";
+            watchStartedAt: string | null;
+            watchExpiresAt: string | null;
+            leechDisabledAt: string | null;
+            lastEvaluatedAt: string;
         };
         SiteSettings: {
             id: number;

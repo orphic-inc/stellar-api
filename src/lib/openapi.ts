@@ -3326,6 +3326,60 @@ registry.registerPath({
   }
 });
 
+// ─── Ratio Policy ─────────────────────────────────────────────────────────────
+
+const RatioPolicyState = registry.register(
+  'RatioPolicyState',
+  z.object({
+    status: z.enum(['OK', 'WATCH', 'LEECH_DISABLED']),
+    watchStartedAt: z.string().nullable(),
+    watchExpiresAt: z.string().nullable(),
+    leechDisabledAt: z.string().nullable(),
+    lastEvaluatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/ratio-policy/{userId}',
+  tags: ['RatioPolicy'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: "User's ratio policy state",
+      content: { 'application/json': { schema: RatioPolicyState } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/ratio-policy/{userId}/override',
+  tags: ['RatioPolicy'],
+  request: {
+    params: z.object({ userId: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            status: z.enum(['OK', 'WATCH', 'LEECH_DISABLED'])
+          })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Override applied',
+      content: { 'application/json': { schema: RatioPolicyState } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Site Settings ────────────────────────────────────────────────────────────
 
 const SiteSettings = registry.register(
