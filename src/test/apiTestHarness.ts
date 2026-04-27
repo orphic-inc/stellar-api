@@ -46,7 +46,15 @@ jest.mock('../modules/pm', () => ({
   updateConversationFlags: jest.fn(),
   deleteConversation: jest.fn(),
   bulkUpdateConversations: jest.fn(),
-  getUnreadCount: jest.fn()
+  getUnreadCount: jest.fn(),
+  createTicket: jest.fn(),
+  listMyTickets: jest.fn(),
+  listTicketQueue: jest.fn(),
+  getTicketUnreadCount: jest.fn(),
+  resolveTicket: jest.fn(),
+  unresolveTicket: jest.fn(),
+  assignTicket: jest.fn(),
+  bulkResolveTickets: jest.fn()
 }));
 
 jest.mock('../modules/staffInbox', () => ({

@@ -35,8 +35,26 @@ export const messageListQuerySchema = z.object({
   search: z.string().optional()
 });
 
+export const createTicketSchema = z.object({
+  subject: z.string().min(1, 'Subject is required').max(255),
+  body: z.string().min(1, 'Body is required')
+});
+
+export const assignTicketSchema = z.object({
+  assignedUserId: z.number().int().positive().nullable()
+});
+
+export const ticketQueueQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  status: z.enum(['all', 'Unanswered', 'Open', 'Resolved']).default('all'),
+  assignedToMe: z.coerce.boolean().default(false)
+});
+
 export type ComposeMessageInput = z.infer<typeof composeMessageSchema>;
 export type ReplyMessageInput = z.infer<typeof replyMessageSchema>;
 export type UpdateConversationInput = z.infer<typeof updateConversationSchema>;
 export type BulkMessageActionInput = z.infer<typeof bulkMessageActionSchema>;
 export type MessageListQueryInput = z.infer<typeof messageListQuerySchema>;
+export type CreateTicketInput = z.infer<typeof createTicketSchema>;
+export type AssignTicketInput = z.infer<typeof assignTicketSchema>;
+export type TicketQueueQueryInput = z.infer<typeof ticketQueueQuerySchema>;
