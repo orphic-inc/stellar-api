@@ -1,3 +1,8 @@
+jest.mock(
+  'express-rate-limit',
+  () => () => (_req: unknown, _res: unknown, next: () => void) => next()
+);
+
 jest.mock('../modules/installState', () => ({
   isInstalled: jest.fn()
 }));

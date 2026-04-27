@@ -1,5 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
+  maxWorkers: '50%',
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
