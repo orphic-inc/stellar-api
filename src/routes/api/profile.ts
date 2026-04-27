@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
@@ -10,12 +9,7 @@ import {
 import { getRatioStats } from '../../modules/ratio';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, parsedBody } from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -24,9 +18,22 @@ import {
 } from '../../schemas/profile';
 
 const router = express.Router();
-const userIdParamsSchema = z.object({
-  userId: z.coerce.number().int().positive()
-});
+
+const PROFILE_SELECT = {
+  id: true,
+  username: true,
+  avatar: true,
+  dateRegistered: true,
+  isArtist: true,
+  isDonor: true,
+  uploaded: true,
+  downloaded: true,
+  totalEarned: true,
+  ratio: true,
+  userRank: { select: { name: true, color: true, badge: true } },
+  profile: true,
+  userSettings: { select: { siteAppearance: true, styledTooltips: true } }
+} as const;
 
 // GET /api/profile/me
 router.get(
@@ -57,31 +64,26 @@ router.get(
   })
 );
 
-// GET /api/profile/user/:userId
+// GET /api/profile/user/:userId — accepts numeric ID or username (case-insensitive)
 router.get(
   '/user/:userId',
-  validateParams(userIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { userId } = parsedParams<{ userId: number }>(res);
+    const { userId } = req.params;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        avatar: true,
-        dateRegistered: true,
-        isArtist: true,
-        isDonor: true,
-        uploaded: true,
-        downloaded: true,
-        totalEarned: true,
-        ratio: true,
-        userRank: { select: { name: true, color: true, badge: true } },
-        profile: true,
-        userSettings: { select: { siteAppearance: true, styledTooltips: true } }
-      }
-    });
+    const numericId = Number(userId);
+    const isNumeric =
+      !isNaN(numericId) && Number.isInteger(numericId) && numericId > 0;
+
+    const user = isNumeric
+      ? await prisma.user.findUnique({
+          where: { id: numericId },
+          select: PROFILE_SELECT
+        })
+      : await prisma.user.findFirst({
+          where: { username: { equals: userId.trim(), mode: 'insensitive' } },
+          select: PROFILE_SELECT
+        });
+
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
