@@ -65,22 +65,31 @@ src/
     install.ts              # GET / (status), POST / (one-time setup)
     user.ts                 # GET|PUT /settings, GET /:id, POST / (admin create)
     tools.ts                # /user-ranks CRUD — requires admin permission
+    settings.ts             # GET|PUT /settings — site-wide settings (admin)
     profile.ts              # /me, /user/:id, PUT /me, DELETE /, POST /referral/create-invite
     notifications.ts        # GET /, DELETE /:id
     subscriptions.ts        # POST /subscribe, GET /, POST /subscribe-comments
     comments.ts             # GET /, GET /:id, POST /, PUT /:id, DELETE /:id
     posts.ts                # Blog posts + comments
+    messages.ts             # Private messages (conversations, inbox, sent)
+    staffInbox.ts           # Support tickets + staff inbox + canned responses
+    reports.ts              # File report, my reports, staff queue, claim/resolve
+    ratioPolicy.ts          # GET /:userId, POST /:userId/override (staff)
+    requests.ts             # Release requests + bounties
+    downloads.ts            # Download grant + access
+    collages.ts             # Collage CRUD
+    announcements.ts        # Announcements
+    stats.ts                # Site stats
     communities/
-      communityRoute.ts     # Community CRUD
-      releaseGroup.ts       # Release CRUD under /:communityId/groups
+      communities.ts        # Community CRUD
+      release.ts            # Release CRUD under /:communityId/releases
       artist.ts             # Artist CRUD + history/similar/alias/tag
-      contribution.ts       # Contribution CRUD
+      contributions.ts      # Contribution CRUD + domain gate + approve
     forum/
       forumRoute.ts         # Forum CRUD
       forumCategory.ts      # ForumCategory CRUD
-      forumTopic.ts         # Topic CRUD under /:forumId/topics
-      forumPost.ts          # Post CRUD under /:forumTopicId/posts
-      forumPoll.ts          # Poll CRUD + voting
+      forumPoll.ts          # Poll CRUD
+      forumPollVote.ts      # Poll voting
       forumTopicNote.ts     # Moderator notes on topics
       forumLastReadTopic.ts # Read-position tracking
 ```
@@ -158,9 +167,23 @@ Five rounds of audit remediation have been applied to this codebase. Key items c
 - `Permission` and `CommentEdit` Prisma models dropped (unused — migration applied)
 - `installState.ts` in-memory cache for repeated install-check calls
 
+## Stub models (no routes implemented)
+
+These Prisma models exist in `schema.prisma` but have no API routes:
+
+| Model | Status |
+|---|---|
+| `DoNotUpload` | Planned — per-community blocklist |
+| `TopTenLeaderboard` | Planned — community leaderboard |
+| `CoverArt`, `FeaturedAlbum` | Planned — release art management |
+| `Donation`, `BitcoinDonation`, `DonorReward` | Planned — donor system |
+| `Applicant`, `Thread` | Planned — application/thread system |
+| `Friend`, `Bookmark*` | Planned — social features |
+| `ApiApplication`, `ApiUser` | Deferred indefinitely |
+
 ## Commit workflow
 
 1. `npx tsc --noEmit` — must be clean
 2. `npx prettier --write <changed files>`
 3. Commit with descriptive message following existing log style
-4. Push to current feature branch (`phase-3-misc`)
+4. Push to current branch
