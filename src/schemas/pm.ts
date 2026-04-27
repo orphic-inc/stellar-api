@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
-export const composeMessageSchema = z.object({
-  toUserId: z.number().int().positive('toUserId is required'),
-  subject: z.string().min(1, 'Subject is required').max(255),
-  body: z.string().min(1, 'Body is required')
-});
+export const composeMessageSchema = z
+  .object({
+    toUserId: z.number().int().positive().optional(),
+    toUsername: z.string().min(1).max(32).optional(),
+    subject: z.string().min(1, 'Subject is required').max(255),
+    body: z.string().min(1, 'Body is required')
+  })
+  .refine(
+    (data) =>
+      data.toUserId !== undefined ||
+      (data.toUsername !== undefined && data.toUsername.trim().length > 0),
+    { message: 'recipient_required' }
+  );
 
 export const replyMessageSchema = z.object({
   body: z.string().min(1, 'Body is required')

@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
@@ -102,8 +103,21 @@ router.post(
   sendLimiter,
   validate(composeMessageSchema),
   authHandler(async (req, res) => {
-    const { toUserId, subject, body } = parsedBody<ComposeMessageInput>(res);
-    const result = await sendMessage(req.user.id, toUserId, subject, body);
+    const { toUserId, toUsername, subject, body } =
+      parsedBody<ComposeMessageInput>(res);
+
+    let targetId = toUserId;
+    if (!targetId && toUsername) {
+      const normalized = toUsername.trim();
+      const target = await prisma.user.findFirst({
+        where: { username: { equals: normalized, mode: 'insensitive' } },
+        select: { id: true }
+      });
+      if (!target) return res.status(404).json({ msg: 'recipient_not_found' });
+      targetId = target.id;
+    }
+
+    const result = await sendMessage(req.user.id, targetId!, subject, body);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
         self_message: 400,
