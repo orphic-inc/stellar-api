@@ -3,18 +3,23 @@ import {
   app,
   resetApiTestState,
   prismaMock,
+  makeUserRank,
   staffInboxMock
 } from './test/apiTestHarness';
+import type {
+  StaffTicket,
+  StaffResponse,
+  StaffMessage
+} from './modules/staffInbox';
 
 const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue({
-    permissions: { staff: true }
-  });
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ staff: true })
+  );
 
 const PAGED_EMPTY = { total: 0, page: 1, pageSize: 25, conversations: [] };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeTicket = (overrides: Record<string, unknown> = {}): any => ({
+const makeTicket = (overrides: Partial<StaffTicket> = {}): StaffTicket => ({
   id: 1,
   userId: 7,
   subject: 'Help please',
@@ -31,8 +36,9 @@ const makeTicket = (overrides: Record<string, unknown> = {}): any => ({
   ...overrides
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeResponse = (overrides: Record<string, unknown> = {}): any => ({
+const makeResponse = (
+  overrides: Partial<StaffResponse> = {}
+): StaffResponse => ({
   id: 1,
   name: 'Standard reply',
   body: 'Thank you for contacting support.',
@@ -41,8 +47,7 @@ const makeResponse = (overrides: Record<string, unknown> = {}): any => ({
   ...overrides
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeMessage = (): any => ({
+const makeMessage = (): StaffMessage => ({
   id: 10,
   conversationId: 1,
   senderId: 7,
@@ -99,14 +104,25 @@ describe('GET /api/staff-inbox/unread-count', () => {
 describe('GET /api/staff-inbox/mine', () => {
   beforeEach(() => resetApiTestState());
 
-  it('returns paginated list for authenticated user', async () => {
+  it('returns submitted tickets for regular user (isStaff=false)', async () => {
     staffInboxMock.listMyTickets.mockResolvedValue({
       ...PAGED_EMPTY,
       conversations: [makeTicket()]
     });
     const res = await request(app).get('/api/staff-inbox/mine');
     expect(res.status).toBe(200);
-    expect(staffInboxMock.listMyTickets).toHaveBeenCalledWith(7, 1);
+    expect(staffInboxMock.listMyTickets).toHaveBeenCalledWith(7, 1, false);
+  });
+
+  it('returns assigned tickets for staff user (isStaff=true)', async () => {
+    setStaff();
+    staffInboxMock.listMyTickets.mockResolvedValue({
+      ...PAGED_EMPTY,
+      conversations: [makeTicket({ assignedUserId: 7 })]
+    });
+    const res = await request(app).get('/api/staff-inbox/mine');
+    expect(res.status).toBe(200);
+    expect(staffInboxMock.listMyTickets).toHaveBeenCalledWith(7, 1, true);
   });
 });
 

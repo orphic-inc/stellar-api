@@ -2,56 +2,27 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock
+  prismaMock,
+  makeUserRank
 } from './test/apiTestHarness';
+import {
+  makeCollage,
+  makeCollageDetail,
+  makeCollageEntry,
+  makeCollageEntryDetail,
+  makeRelease,
+  makeCollageSubscription,
+  makeBookmarkCollage,
+  makeEntryAggregateResult,
+  TEST_USER_ID
+} from './test/factories';
 
 const setStaffPerms = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue({
-    permissions: { collages_moderate: true }
-  });
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ collages_moderate: true })
+  );
 
-const COLLAGE_USER_ID = 7; // matches harness injected user
-
-const makeCollage = (overrides: Record<string, unknown> = {}) => ({
-  id: 1,
-  name: 'Test Collage',
-  description: 'A sufficiently long description for testing purposes.',
-  userId: COLLAGE_USER_ID,
-  categoryId: 1,
-  tags: ['jazz'],
-  isLocked: false,
-  isDeleted: false,
-  maxEntries: 0,
-  maxEntriesPerUser: 0,
-  isFeatured: false,
-  numEntries: 2,
-  numSubscribers: 3,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  deletedAt: null,
-  user: { id: COLLAGE_USER_ID, username: 'testuser', avatar: null },
-  _count: { entries: 2, subscriptions: 3, bookmarks: 1 },
-  ...overrides
-});
-
-const makeEntry = (overrides: Record<string, unknown> = {}) => ({
-  id: 10,
-  collageId: 1,
-  releaseId: 42,
-  userId: COLLAGE_USER_ID,
-  sort: 10,
-  addedAt: new Date(),
-  release: {
-    id: 42,
-    title: 'Kind of Blue',
-    image: null,
-    year: 1959,
-    releaseType: 'Album',
-    artist: { id: 5, name: 'Miles Davis' }
-  },
-  user: { id: COLLAGE_USER_ID, username: 'testuser' },
-  ...overrides
-});
+const COLLAGE_USER_ID = TEST_USER_ID; // matches harness injected user
 
 describe('GET /api/collages', () => {
   beforeEach(() => resetApiTestState());
@@ -114,10 +85,11 @@ describe('GET /api/collages/:id', () => {
   beforeEach(() => resetApiTestState());
 
   it('returns 200 with subscription and bookmark state', async () => {
-    prismaMock.collage.findUnique.mockResolvedValue({
-      ...makeCollage(),
-      entries: [makeEntry()]
-    });
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        entries: [makeCollageEntryDetail()]
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
     prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
     prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
 
@@ -130,10 +102,12 @@ describe('GET /api/collages/:id', () => {
   });
 
   it('returns 404 for soft-deleted collage to non-staff', async () => {
-    prismaMock.collage.findUnique.mockResolvedValue({
-      ...makeCollage({ isDeleted: true }),
-      entries: []
-    });
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        isDeleted: true,
+        entries: []
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
 
     const res = await request(app).get('/api/collages/1');
     expect(res.status).toBe(404);
@@ -141,10 +115,12 @@ describe('GET /api/collages/:id', () => {
 
   it('staff can view soft-deleted collage', async () => {
     setStaffPerms();
-    prismaMock.collage.findUnique.mockResolvedValue({
-      ...makeCollage({ isDeleted: true }),
-      entries: []
-    });
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        isDeleted: true,
+        entries: []
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
     prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
     prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
 
@@ -153,10 +129,13 @@ describe('GET /api/collages/:id', () => {
   });
 
   it('returns 403 for personal collage owned by another user', async () => {
-    prismaMock.collage.findUnique.mockResolvedValue({
-      ...makeCollage({ categoryId: 0, userId: 99 }),
-      entries: []
-    });
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        categoryId: 0,
+        userId: 99,
+        entries: []
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
 
     const res = await request(app).get('/api/collages/1');
     expect(res.status).toBe(403);
@@ -229,7 +208,7 @@ describe('DELETE /api/collages/:id', () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollage({ categoryId: 0 })
     );
-    prismaMock.collage.delete.mockResolvedValue({});
+    prismaMock.collage.delete.mockResolvedValue(makeCollage());
 
     const res = await request(app).delete('/api/collages/1');
 
@@ -254,7 +233,7 @@ describe('DELETE /api/collages/:id', () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollage({ userId: 99, categoryId: 1 })
     );
-    prismaMock.collage.update.mockResolvedValue({});
+    prismaMock.collage.update.mockResolvedValue(makeCollage());
 
     const res = await request(app).delete('/api/collages/1');
 
@@ -300,10 +279,12 @@ describe('POST /api/collages/:id/entries', () => {
 
   it('returns 201 on successful add and uses aggregate sort', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.release.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
-    prismaMock.collageEntry.aggregate.mockResolvedValue({ _max: { sort: 10 } });
-    prismaMock.$transaction.mockResolvedValue([makeEntry(), {}]);
+    prismaMock.collageEntry.aggregate.mockResolvedValue(
+      makeEntryAggregateResult(10)
+    );
+    prismaMock.$transaction.mockResolvedValue([makeCollageEntryDetail(), {}]);
 
     const res = await request(app)
       .post('/api/collages/1/entries')
@@ -317,8 +298,8 @@ describe('POST /api/collages/:id/entries', () => {
 
   it('returns 409 when release is already in collage', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.release.findUnique.mockResolvedValue({ id: 42 });
-    prismaMock.collageEntry.findUnique.mockResolvedValue(makeEntry());
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(makeCollageEntry());
 
     const res = await request(app)
       .post('/api/collages/1/entries')
@@ -343,7 +324,7 @@ describe('POST /api/collages/:id/entries', () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollage({ maxEntries: 2, numEntries: 2 })
     );
-    prismaMock.release.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
@@ -362,7 +343,7 @@ describe('DELETE /api/collages/:id/entries/:releaseId', () => {
       makeCollage({ userId: COLLAGE_USER_ID })
     );
     prismaMock.collageEntry.findUnique.mockResolvedValue(
-      makeEntry({ userId: 99 })
+      makeCollageEntry({ userId: 99 })
     );
     prismaMock.$transaction.mockResolvedValue([{}, {}]);
 
@@ -376,7 +357,7 @@ describe('DELETE /api/collages/:id/entries/:releaseId', () => {
       makeCollage({ userId: 99 })
     );
     prismaMock.collageEntry.findUnique.mockResolvedValue(
-      makeEntry({ userId: 88 })
+      makeCollageEntry({ userId: 88 })
     );
 
     const res = await request(app).delete('/api/collages/1/entries/42');
@@ -401,11 +382,9 @@ describe('POST /api/collages/:id/subscribe', () => {
 
   it('unsubscribes when already subscribed', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.collageSubscription.findUnique.mockResolvedValue({
-      id: 1,
-      userId: COLLAGE_USER_ID,
-      collageId: 1
-    });
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(
+      makeCollageSubscription({ userId: COLLAGE_USER_ID, collageId: 1 })
+    );
     prismaMock.$transaction.mockResolvedValue([{}, {}]);
 
     const res = await request(app).post('/api/collages/1/subscribe');
@@ -421,7 +400,7 @@ describe('POST /api/collages/:id/bookmark', () => {
   it('bookmarks when not already bookmarked', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
     prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
-    prismaMock.bookmarkCollage.create.mockResolvedValue({});
+    prismaMock.bookmarkCollage.create.mockResolvedValue(makeBookmarkCollage());
 
     const res = await request(app).post('/api/collages/1/bookmark');
 
@@ -431,12 +410,10 @@ describe('POST /api/collages/:id/bookmark', () => {
 
   it('removes bookmark when already bookmarked', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.bookmarkCollage.findUnique.mockResolvedValue({
-      id: 1,
-      userId: COLLAGE_USER_ID,
-      collageId: 1
-    });
-    prismaMock.bookmarkCollage.delete.mockResolvedValue({});
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(
+      makeBookmarkCollage({ userId: COLLAGE_USER_ID, collageId: 1 })
+    );
+    prismaMock.bookmarkCollage.delete.mockResolvedValue(makeBookmarkCollage());
 
     const res = await request(app).post('/api/collages/1/bookmark');
 
@@ -469,5 +446,65 @@ describe('GET /api/collages/:id/subscriptions', () => {
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+  });
+});
+
+// ─── Prisma contract tests ────────────────────────────────────────────────────
+// These assert the exact Prisma call shapes the route makes, not real DB state.
+
+describe('collages Prisma contract', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('GET /:id calls collage.findUnique with the expected nested include shape', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({ entries: [] }) as unknown as ReturnType<
+        typeof makeCollage
+      >
+    );
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
+
+    await request(app).get('/api/collages/1');
+
+    expect(prismaMock.collage.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 1 },
+        include: expect.objectContaining({
+          user: { select: { id: true, username: true, avatar: true } },
+          _count: {
+            select: { entries: true, subscriptions: true, bookmarks: true }
+          },
+          entries: expect.objectContaining({
+            orderBy: { sort: 'asc' },
+            include: expect.objectContaining({
+              release: expect.objectContaining({
+                select: expect.objectContaining({
+                  id: true,
+                  title: true,
+                  artist: { select: { id: true, name: true } }
+                })
+              }),
+              user: { select: { id: true, username: true } }
+            })
+          })
+        })
+      })
+    );
+  });
+
+  it('POST /:id/entries wraps create + numEntries increment in one transaction', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(null);
+    prismaMock.collageEntry.aggregate.mockResolvedValue(
+      makeEntryAggregateResult(10)
+    );
+    prismaMock.$transaction.mockResolvedValue([makeCollageEntryDetail(), {}]);
+
+    await request(app).post('/api/collages/1/entries').send({ releaseId: 42 });
+
+    const txArgs = (prismaMock.$transaction as jest.Mock).mock
+      .calls[0][0] as unknown[];
+    expect(txArgs).toHaveLength(2);
   });
 });

@@ -2,9 +2,19 @@ import {
   request,
   app,
   prismaMock,
+  makeUserRank,
   createContributionSubmissionMock,
   resetApiTestState
 } from './test/apiTestHarness';
+import {
+  makePost,
+  makePostWithIncludes,
+  makePostComment,
+  makePostCommentWithUser,
+  makeComment,
+  makeCommentWithAuthor,
+  makeNotification
+} from './test/factories';
 
 describe('API content and shared flows', () => {
   beforeEach(() => {
@@ -24,16 +34,16 @@ describe('API content and shared flows', () => {
   });
 
   it('creates a post for the authenticated user', async () => {
-    prismaMock.post.create.mockResolvedValue({
-      id: 14,
-      userId: 7,
-      title: 'Launch post',
-      text: 'Some text',
-      category: 'news',
-      tags: ['launch'],
-      user: { id: 7, username: 'kai', avatar: null },
-      comments: []
-    });
+    prismaMock.post.create.mockResolvedValue(
+      makePostWithIncludes({
+        id: 14,
+        title: 'Launch post',
+        text: 'Some text',
+        category: 'news',
+        tags: ['launch'],
+        user: { id: 7, username: 'kai', avatar: null }
+      }) as unknown as ReturnType<typeof makePost>
+    );
 
     const res = await request(app)
       .post('/api/posts')
@@ -67,14 +77,18 @@ describe('API content and shared flows', () => {
   });
 
   it('creates a post comment for an existing post', async () => {
-    prismaMock.post.findUnique.mockResolvedValue({ id: 14, userId: 7 });
-    prismaMock.postComment.create.mockResolvedValue({
-      id: 5,
-      postId: 14,
-      userId: 7,
-      text: 'Nice post',
-      user: { id: 7, username: 'kai', avatar: null }
-    });
+    prismaMock.post.findUnique.mockResolvedValue(
+      makePost({ id: 14, userId: 7 })
+    );
+    prismaMock.postComment.create.mockResolvedValue(
+      makePostCommentWithUser({
+        id: 5,
+        postId: 14,
+        userId: 7,
+        text: 'Nice post',
+        user: { id: 7, username: 'kai', avatar: null }
+      }) as unknown as ReturnType<typeof makePostComment>
+    );
 
     const res = await request(app).post('/api/posts/14/comments').send({
       text: 'Nice post'
@@ -118,10 +132,9 @@ describe('API content and shared flows', () => {
   });
 
   it('rejects notification deletion for non-owners', async () => {
-    prismaMock.notification.findUnique.mockResolvedValue({
-      id: 8,
-      userId: 99
-    });
+    prismaMock.notification.findUnique.mockResolvedValue(
+      makeNotification({ id: 8, userId: 99 })
+    );
 
     const res = await request(app).delete('/api/notifications/8');
 
@@ -131,10 +144,9 @@ describe('API content and shared flows', () => {
   });
 
   it('deletes a notification for the owner', async () => {
-    prismaMock.notification.findUnique.mockResolvedValue({
-      id: 8,
-      userId: 7
-    });
+    prismaMock.notification.findUnique.mockResolvedValue(
+      makeNotification({ id: 8, userId: 7 })
+    );
 
     const res = await request(app).delete('/api/notifications/8');
 
@@ -145,10 +157,9 @@ describe('API content and shared flows', () => {
   });
 
   it('rejects post deletion for non-owners', async () => {
-    prismaMock.post.findUnique.mockResolvedValue({
-      id: 14,
-      userId: 99
-    });
+    prismaMock.post.findUnique.mockResolvedValue(
+      makePost({ id: 14, userId: 99 })
+    );
 
     const res = await request(app).delete('/api/posts/14');
 
@@ -158,10 +169,9 @@ describe('API content and shared flows', () => {
   });
 
   it('deletes a post for the owner', async () => {
-    prismaMock.post.findUnique.mockResolvedValue({
-      id: 14,
-      userId: 7
-    });
+    prismaMock.post.findUnique.mockResolvedValue(
+      makePost({ id: 14, userId: 7 })
+    );
 
     const res = await request(app).delete('/api/posts/14');
 
@@ -188,14 +198,15 @@ describe('API content and shared flows', () => {
   });
 
   it('creates a comment for a valid comment target', async () => {
-    prismaMock.comment.create.mockResolvedValue({
-      id: 12,
-      page: 'communities',
-      body: 'hello',
-      communityId: 3,
-      authorId: 7,
-      author: { id: 7, username: 'kai', avatar: null }
-    });
+    prismaMock.comment.create.mockResolvedValue(
+      makeCommentWithAuthor({
+        id: 12,
+        body: 'hello',
+        communityId: 3,
+        authorId: 7,
+        author: { id: 7, username: 'kai', avatar: null }
+      }) as unknown as ReturnType<typeof makeComment>
+    );
 
     const res = await request(app).post('/api/comments').send({
       page: 'communities',
@@ -219,17 +230,12 @@ describe('API content and shared flows', () => {
   });
 
   it('updates a comment for the owner', async () => {
-    prismaMock.comment.findUnique.mockResolvedValue({
-      id: 12,
-      authorId: 7,
-      body: 'old body'
-    });
-    prismaMock.comment.update.mockResolvedValue({
-      id: 12,
-      authorId: 7,
-      body: 'new body',
-      editedUserId: 7
-    });
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 7, body: 'old body' })
+    );
+    prismaMock.comment.update.mockResolvedValue(
+      makeComment({ id: 12, authorId: 7, body: 'new body', editedUserId: 7 })
+    );
 
     const res = await request(app).put('/api/comments/12').send({
       body: 'new body'
@@ -247,10 +253,9 @@ describe('API content and shared flows', () => {
   });
 
   it('rejects comment deletion for non-owners without moderator permissions', async () => {
-    prismaMock.comment.findUnique.mockResolvedValue({
-      id: 12,
-      authorId: 99
-    });
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 99 })
+    );
 
     const res = await request(app).delete('/api/comments/12');
 
@@ -259,10 +264,9 @@ describe('API content and shared flows', () => {
   });
 
   it('allows owners to delete their own comments', async () => {
-    prismaMock.comment.findUnique.mockResolvedValue({
-      id: 12,
-      authorId: 7
-    });
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 7 })
+    );
 
     const res = await request(app).delete('/api/comments/12');
 
@@ -271,13 +275,12 @@ describe('API content and shared flows', () => {
   });
 
   it('allows moderators to delete comments they do not own', async () => {
-    prismaMock.comment.findUnique.mockResolvedValue({
-      id: 12,
-      authorId: 99
-    });
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      permissions: { forums_moderate: true }
-    });
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 99 })
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
 
     const res = await request(app).delete('/api/comments/12');
 

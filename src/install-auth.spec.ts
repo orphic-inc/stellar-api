@@ -3,6 +3,7 @@ import {
   app,
   mockedIsInstalled,
   prismaMock,
+  makeUserRank,
   bcryptMock,
   createInviteMock,
   updateProfileMock,
@@ -11,6 +12,7 @@ import {
   createUserMock,
   resetApiTestState
 } from './test/apiTestHarness';
+import { makeUser, asUserMock } from './test/factories';
 import { updateProfile } from './modules/profile';
 
 describe('API auth/profile/user flows', () => {
@@ -31,7 +33,7 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('returns a msg response when registration hits an existing user', async () => {
-    prismaMock.user.findFirst.mockResolvedValue({ id: 1 });
+    prismaMock.user.findFirst.mockResolvedValue(makeUser({ id: 1 }));
 
     const res = await request(app).post('/api/auth/register').send({
       username: 'existing-user',
@@ -44,11 +46,9 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('returns a msg response when login is attempted on a disabled account', async () => {
-    prismaMock.user.findUnique.mockResolvedValue({
-      id: 7,
-      password: 'hashed-password',
-      disabled: true
-    });
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ password: 'hashed-password', disabled: true })
+    );
 
     const res = await request(app).post('/api/auth').send({
       email: 'disabled@example.com',
@@ -79,13 +79,11 @@ describe('API auth/profile/user flows', () => {
         permissions: {}
       }
     };
-    prismaMock.user.findUnique.mockResolvedValue({
-      id: 7,
-      password: 'hashed-password',
-      disabled: false
-    });
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ password: 'hashed-password', disabled: false })
+    );
     bcryptMock.compare.mockResolvedValue(true);
-    prismaMock.user.update.mockResolvedValue(authUser);
+    prismaMock.user.update.mockResolvedValue(asUserMock(authUser));
 
     const res = await request(app).post('/api/auth').send({
       email: 'kai@example.com',
@@ -100,25 +98,27 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('returns the current authenticated user from /api/auth', async () => {
-    prismaMock.user.findUnique.mockResolvedValue({
-      id: 7,
-      username: 'kai',
-      email: 'kai@example.com',
-      avatar: null,
-      isArtist: false,
-      isDonor: false,
-      canDownload: true,
-      inviteCount: 0,
-      dateRegistered: '2026-04-24T00:00:00.000Z',
-      lastLogin: '2026-04-24T00:00:00.000Z',
-      userRank: {
-        level: 100,
-        name: 'User',
-        color: '',
-        badge: '',
-        permissions: {}
-      }
-    });
+    prismaMock.user.findUnique.mockResolvedValue(
+      asUserMock({
+        id: 7,
+        username: 'kai',
+        email: 'kai@example.com',
+        avatar: null,
+        isArtist: false,
+        isDonor: false,
+        canDownload: true,
+        inviteCount: 0,
+        dateRegistered: '2026-04-24T00:00:00.000Z',
+        lastLogin: '2026-04-24T00:00:00.000Z',
+        userRank: {
+          level: 100,
+          name: 'User',
+          color: '',
+          badge: '',
+          permissions: {}
+        }
+      })
+    );
 
     const res = await request(app).get('/api/auth');
 
@@ -212,7 +212,9 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('disables the current account and clears the auth cookie', async () => {
-    prismaMock.user.update.mockResolvedValue({ id: 7, disabled: true });
+    prismaMock.user.update.mockResolvedValue(
+      asUserMock({ id: 7, disabled: true })
+    );
 
     const res = await request(app).delete('/api/profile');
 
@@ -284,10 +286,10 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('returns a msg response when admin user creation hits an existing user', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      permissions: { users_edit: true }
-    });
-    prismaMock.user.findFirst.mockResolvedValue({ id: 99 });
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ users_edit: true })
+    );
+    prismaMock.user.findFirst.mockResolvedValue(makeUser({ id: 99 }));
 
     const res = await request(app).post('/api/users').send({
       username: 'existing-user',
@@ -301,9 +303,9 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('creates a user for admins with users_edit permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      permissions: { users_edit: true }
-    });
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ users_edit: true })
+    );
     prismaMock.user.findFirst.mockResolvedValue(null);
     createUserMock.mockResolvedValue({
       id: 18,

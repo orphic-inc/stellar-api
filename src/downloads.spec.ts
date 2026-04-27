@@ -7,6 +7,7 @@ import {
   app,
   resetApiTestState,
   prismaMock,
+  makeUserRank,
   grantDownloadAccessMock,
   reverseDownloadAccessMock
 } from './test/apiTestHarness';
@@ -14,9 +15,9 @@ import { DownloadGrantStatus } from '@prisma/client';
 import { AppError } from './lib/errors';
 
 const setStaffPerms = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue({
-    permissions: { staff: true, admin: true }
-  });
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ staff: true, admin: true })
+  );
 
 const GRANT_RESULT = {
   grantId: 1,
@@ -119,7 +120,7 @@ describe('POST /api/downloads/:grantId/reverse', () => {
   });
 
   it('returns 403 when user lacks staff/admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
       .post('/api/downloads/1/reverse')
       .send({ reason: 'test' });

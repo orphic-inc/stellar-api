@@ -2,8 +2,7 @@ import { request, app, resetApiTestState, pmMock } from './test/apiTestHarness';
 
 const PAGED_EMPTY = { total: 0, page: 1, pageSize: 25, conversations: [] };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeConversation = (): any => ({
+const makeConversation = () => ({
   id: 1,
   subject: 'Hello',
   createdAt: new Date(),
@@ -12,8 +11,7 @@ const makeConversation = (): any => ({
   messages: []
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeMessage = (): any => ({
+const makeMessage = () => ({
   id: 10,
   conversationId: 1,
   senderId: 7,

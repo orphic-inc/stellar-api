@@ -27,6 +27,7 @@ export const createCommunitySchema = z.object({
   image: z.string().url().optional(),
   type: communityTypeEnum,
   registrationStatus: registrationStatusEnum,
+  allowDuplicateFormats: z.boolean().optional(),
   staffIds: z.array(z.number().int().positive()).optional()
 });
 
@@ -34,6 +35,7 @@ export const updateCommunitySchema = z.object({
   name: z.string().min(1).max(128).optional(),
   image: z.string().url().optional(),
   registrationStatus: registrationStatusEnum.optional(),
+  allowDuplicateFormats: z.boolean().optional(),
   staffIds: z.array(z.number().int().positive()).optional()
 });
 

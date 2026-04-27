@@ -71,8 +71,14 @@ router.post(
   ...requirePermission('communities_manage'),
   validate(createCommunitySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, image, type, registrationStatus, staffIds } =
-      parsedBody<CreateCommunityInput>(res);
+    const {
+      name,
+      image,
+      type,
+      registrationStatus,
+      allowDuplicateFormats,
+      staffIds
+    } = parsedBody<CreateCommunityInput>(res);
 
     const defaultImages: Record<string, string> = {
       Music: '/images/defaults/music.png',
@@ -90,6 +96,7 @@ router.post(
         type,
         registrationStatus,
         image: image ?? defaultImages[type],
+        ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(staffIds?.length && {
           staff: { connect: staffIds.map((sid: number) => ({ id: sid })) }
         })
@@ -110,7 +117,7 @@ router.put(
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
-    const { name, image, registrationStatus, staffIds } =
+    const { name, image, registrationStatus, allowDuplicateFormats, staffIds } =
       parsedBody<UpdateCommunityInput>(res);
     const community = await prisma.community.update({
       where: { id },
@@ -118,6 +125,7 @@ router.put(
         ...(name !== undefined && { name }),
         ...(image !== undefined && { image }),
         ...(registrationStatus !== undefined && { registrationStatus }),
+        ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(staffIds !== undefined && {
           staff: { set: staffIds.map((sid: number) => ({ id: sid })) }
         })

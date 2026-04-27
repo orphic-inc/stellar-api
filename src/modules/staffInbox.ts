@@ -9,6 +9,25 @@ const userSelect = {
   avatar: true
 } as const;
 
+export const staffTicketInclude = {
+  user: { select: userSelect },
+  assignedUser: { select: userSelect },
+  resolver: { select: userSelect },
+  messages: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    include: { sender: { select: userSelect } }
+  }
+} as const;
+
+export type StaffTicket = Prisma.StaffInboxConversationGetPayload<{
+  include: typeof staffTicketInclude;
+}>;
+export type StaffResponse = Prisma.StaffInboxResponseGetPayload<{}>;
+export type StaffMessage = Prisma.StaffInboxMessageGetPayload<{
+  include: { sender: { select: { id: true; username: true; avatar: true } } };
+}>;
+
 export async function listStaffTickets(opts: {
   page: number;
   status: StaffInboxStatus | 'all';
@@ -28,24 +47,20 @@ export async function listStaffTickets(opts: {
       orderBy: { updatedAt: 'desc' },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: {
-        user: { select: userSelect },
-        assignedUser: { select: userSelect },
-        resolver: { select: userSelect },
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { sender: { select: userSelect } }
-        }
-      }
+      include: staffTicketInclude
     })
   ]);
 
   return { total, page, pageSize: PAGE_SIZE, conversations };
 }
 
-export async function listMyTickets(userId: number, page: number) {
-  const where = { userId };
+export async function listMyTickets(
+  userId: number,
+  page: number,
+  isStaff: boolean
+) {
+  // Staff see tickets assigned to them; regular users see tickets they submitted.
+  const where = isStaff ? { assignedUserId: userId } : { userId };
   const [total, conversations] = await Promise.all([
     prisma.staffInboxConversation.count({ where }),
     prisma.staffInboxConversation.findMany({

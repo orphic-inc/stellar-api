@@ -12,8 +12,10 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock
+  prismaMock,
+  makeUserRank
 } from './test/apiTestHarness';
+import { makeRequest } from './test/factories';
 import * as requestModule from './modules/requests';
 
 jest.mock('./modules/requests');
@@ -22,18 +24,12 @@ const mod = requestModule as jest.Mocked<typeof requestModule>;
 
 // Grant staff+admin permissions so permission-gated routes pass in most tests
 const setStaffPerms = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue({
-    permissions: { staff: true, admin: true }
-  });
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ staff: true, admin: true })
+  );
 
-const setDefaultRequest = (overrides = {}) =>
-  prismaMock.request.findUnique.mockResolvedValue({
-    id: 1,
-    userId: 7,
-    status: 'open',
-    deletedAt: null,
-    ...overrides
-  });
+const setDefaultRequest = (overrides: Parameters<typeof makeRequest>[0] = {}) =>
+  prismaMock.request.findUnique.mockResolvedValue(makeRequest(overrides));
 
 const OPEN_REQUEST = {
   id: 1,
@@ -205,7 +201,7 @@ describe('POST /api/requests/:id/unfill', () => {
   });
 
   it('returns 403 when user lacks staff/admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
       .post('/api/requests/1/unfill')
       .send({ reason: 'test' });
@@ -229,13 +225,10 @@ describe('DELETE /api/requests/:id', () => {
   });
 
   it('returns 403 when non-owner non-staff tries to delete', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({ permissions: {} });
-    prismaMock.request.findUnique.mockResolvedValue({
-      id: 1,
-      userId: 99, // different owner
-      status: 'open',
-      deletedAt: null
-    });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ userId: 99 })
+    );
     const res = await request(app).delete('/api/requests/1');
     expect(res.status).toBe(403);
     expect(mod.deleteRequest).not.toHaveBeenCalled();

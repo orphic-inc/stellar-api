@@ -145,14 +145,15 @@ router.post(
   })
 );
 
-// GET /api/staff-inbox/mine — user's own submitted tickets
+// GET /api/staff-inbox/mine — submitted tickets (users) or assigned tickets (staff)
 router.get(
   '/mine',
   requireAuth,
   validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
   authHandler(async (req, res) => {
     const { page } = parsedQuery<{ page: number }>(res);
-    const result = await listMyTickets(req.user.id, page);
+    const staffAccess = await isModerator(req, res);
+    const result = await listMyTickets(req.user.id, page, staffAccess);
     res.json(result);
   })
 );

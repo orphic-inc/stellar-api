@@ -182,6 +182,7 @@ enum ReportTargetType {
   User
   Release
   Artist
+  Contribution
   ForumTopic
   ForumPost
   Comment
@@ -195,6 +196,7 @@ enum ReportResolutionAction {
   UserWarned
   UserDisabled
   MetadataFixed
+  MarkedDuplicate
   Other
 }
 
@@ -643,11 +645,12 @@ model SimilarArtist {
 // ─── Community ────────────────────────────────────────────────────────────────
 
 model Community {
-  id                 Int                 @id @default(autoincrement())
-  name               String              @unique
-  image              String
-  registrationStatus RegistrationStatus
-  type               CommunityType
+  id                     Int                 @id @default(autoincrement())
+  name                   String              @unique
+  image                  String
+  registrationStatus     RegistrationStatus
+  type                   CommunityType
+  allowDuplicateFormats  Boolean             @default(true)
   consumers          Consumer[]          @relation("CommunityConsumers")
   contributors       Contributor[]
   releases           Release[]
@@ -1144,7 +1147,7 @@ model Blog {
   @@map("blogs")
 }
 
-model ContestLeaderboard {
+model TopTenLeaderboard {
   id              Int      @id @default(autoincrement())
   contestId       Int
   userId          Int
@@ -1158,7 +1161,7 @@ model ContestLeaderboard {
   @@index([flacCount])
   @@index([lastUpload])
   @@index([userId])
-  @@map("contest_leaderboards")
+  @@map("top_ten_leaderboards")
 }
 
 model ContestType {
@@ -1541,4 +1544,16 @@ model ReportNote {
 
   @@index([reportId])
   @@map("report_notes")
+}
+
+// ─── Site Settings ────────────────────────────────────────────────────────────
+
+model SiteSettings {
+  id                 Int                @id
+  approvedDomains    String[]
+  registrationStatus RegistrationStatus @default(open)
+  maxUsers           Int                @default(7000)
+  updatedAt          DateTime           @updatedAt
+
+  @@map("site_settings")
 }
