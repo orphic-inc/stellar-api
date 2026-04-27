@@ -312,6 +312,7 @@ model User {
   contributionReports       ContributionReport[]
   pmParticipations          PrivateConversationParticipant[] @relation("PmParticipant")
   pmMessagesSent            PrivateMessage[]                 @relation("PmSender")
+  pmTicketsAssigned         PrivateConversation[]            @relation("PmTicketAssignee")
   staffInboxConversations   StaffInboxConversation[]         @relation("StaffInboxOwner")
   staffInboxAssigned        StaffInboxConversation[]         @relation("StaffInboxAssignee")
   staffInboxResolved        StaffInboxConversation[]         @relation("StaffInboxResolver")
@@ -1414,12 +1415,18 @@ model AuditLog {
 // ─── Private Messaging ────────────────────────────────────────────────────────
 
 model PrivateConversation {
-  id           Int                              @id @default(autoincrement())
-  subject      String                           @db.VarChar(255)
-  messages     PrivateMessage[]
-  participants PrivateConversationParticipant[]
-  createdAt    DateTime                          @default(now())
+  id              Int                              @id @default(autoincrement())
+  subject         String                           @db.VarChar(255)
+  isStaffTicket   Boolean                          @default(false)
+  ticketStatus    StaffInboxStatus?
+  assignedStaffId Int?
+  assignedStaff   User?                            @relation("PmTicketAssignee", fields: [assignedStaffId], references: [id])
+  messages        PrivateMessage[]
+  participants    PrivateConversationParticipant[]
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
 
+  @@index([isStaffTicket, ticketStatus])
   @@map("private_conversations")
 }
 

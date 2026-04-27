@@ -18,11 +18,17 @@ import {
   updateConversationSchema,
   bulkMessageActionSchema,
   messageListQuerySchema,
+  createTicketSchema,
+  assignTicketSchema,
+  ticketQueueQuerySchema,
   type ComposeMessageInput,
   type ReplyMessageInput,
   type UpdateConversationInput,
   type BulkMessageActionInput,
-  type MessageListQueryInput
+  type MessageListQueryInput,
+  type CreateTicketInput,
+  type AssignTicketInput,
+  type TicketQueueQueryInput
 } from '../../schemas/pm';
 import {
   listInbox,
@@ -33,8 +39,17 @@ import {
   updateConversationFlags,
   deleteConversation,
   bulkUpdateConversations,
-  getUnreadCount
+  getUnreadCount,
+  createTicket,
+  listMyTickets,
+  listTicketQueue,
+  getTicketUnreadCount,
+  resolveTicket,
+  unresolveTicket,
+  assignTicket,
+  bulkResolveTickets
 } from '../../modules/pm';
+import { isModerator, requirePermission } from '../../middleware/permissions';
 
 const router = express.Router();
 
@@ -133,21 +148,74 @@ router.post(
   })
 );
 
-// GET /api/messages/:id — view conversation
+// GET /api/messages/tickets — list my support tickets
+router.get(
+  '/tickets',
+  requireAuth,
+  validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
+  authHandler(async (req, res) => {
+    const { page } = parsedQuery<{ page: number }>(res);
+    const result = await listMyTickets(req.user.id, page);
+    res.json(result);
+  })
+);
+
+// POST /api/messages/tickets — create support ticket
+router.post(
+  '/tickets',
+  requireAuth,
+  validate(createTicketSchema),
+  authHandler(async (req, res) => {
+    const { subject, body } = parsedBody<CreateTicketInput>(res);
+    const conversation = await createTicket(req.user.id, subject, body);
+    res.status(201).json(conversation);
+  })
+);
+
+// GET /api/messages/ticket-queue — staff view of all tickets
+router.get(
+  '/ticket-queue',
+  ...requirePermission('staff', 'admin'),
+  validateQuery(ticketQueueQuerySchema),
+  authHandler(async (req, res) => {
+    const { page, status, assignedToMe } =
+      parsedQuery<TicketQueueQueryInput>(res);
+    const result = await listTicketQueue({
+      page,
+      status: status as Parameters<typeof listTicketQueue>[0]['status'],
+      assignedToMe,
+      staffUserId: req.user.id
+    });
+    res.json(result);
+  })
+);
+
+// GET /api/messages/ticket-unread-count — count of open tickets (staff)
+router.get(
+  '/ticket-unread-count',
+  ...requirePermission('staff', 'admin'),
+  authHandler(async (_req, res) => {
+    const count = await getTicketUnreadCount();
+    res.json({ count });
+  })
+);
+
+// GET /api/messages/:id — view conversation (or ticket with staff access)
 router.get(
   '/:id',
   requireAuth,
   validateParams(conversationIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const result = await viewConversation(id, req.user.id);
+    const isStaff = await isModerator(req, res);
+    const result = await viewConversation(id, req.user.id, isStaff);
     if (!result.ok)
       return res.status(404).json({ msg: 'Conversation not found' });
     res.json(result.conversation);
   })
 );
 
-// POST /api/messages/:id/reply — reply to conversation
+// POST /api/messages/:id/reply — reply to conversation or ticket
 router.post(
   '/:id/reply',
   requireAuth,
@@ -157,7 +225,8 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { body } = parsedBody<ReplyMessageInput>(res);
-    const result = await replyToConversation(id, req.user.id, body);
+    const isStaff = await isModerator(req, res);
+    const result = await replyToConversation(id, req.user.id, body, isStaff);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
         not_participant: 403
@@ -167,6 +236,86 @@ router.post(
         .json({ msg: result.reason });
     }
     res.status(201).json(result.message);
+  })
+);
+
+// POST /api/messages/:id/resolve — resolve ticket
+router.post(
+  '/:id/resolve',
+  requireAuth,
+  validateParams(conversationIdSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const isStaff = await isModerator(req, res);
+    const result = await resolveTicket(id, req.user.id, isStaff);
+    if (!result.ok) {
+      const statusMap: Record<string, number> = {
+        not_found: 404,
+        forbidden: 403,
+        already_resolved: 422
+      };
+      return res
+        .status(statusMap[result.reason] ?? 400)
+        .json({ msg: result.reason });
+    }
+    res.status(204).send();
+  })
+);
+
+// POST /api/messages/:id/unresolve — unresolve ticket (staff only)
+router.post(
+  '/:id/unresolve',
+  ...requirePermission('staff', 'admin'),
+  validateParams(conversationIdSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const result = await unresolveTicket(id);
+    if (!result.ok) {
+      const statusMap: Record<string, number> = {
+        not_found: 404,
+        not_resolved: 422
+      };
+      return res
+        .status(statusMap[result.reason] ?? 400)
+        .json({ msg: result.reason });
+    }
+    res.status(204).send();
+  })
+);
+
+// POST /api/messages/:id/assign — assign ticket (staff only)
+router.post(
+  '/:id/assign',
+  ...requirePermission('staff', 'admin'),
+  validateParams(conversationIdSchema),
+  validate(assignTicketSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { assignedUserId } = parsedBody<AssignTicketInput>(res);
+    const result = await assignTicket(id, assignedUserId);
+    if (!result.ok) {
+      const statusMap: Record<string, number> = {
+        not_found: 404,
+        assignee_not_found: 404,
+        assignee_not_staff: 422
+      };
+      return res
+        .status(statusMap[result.reason] ?? 400)
+        .json({ msg: result.reason });
+    }
+    res.status(204).send();
+  })
+);
+
+// POST /api/messages/bulk-resolve — bulk resolve tickets (staff)
+router.post(
+  '/bulk-resolve',
+  ...requirePermission('staff', 'admin'),
+  validate(z.object({ ids: z.array(z.number().int().positive()).min(1) })),
+  authHandler(async (req, res) => {
+    const { ids } = parsedBody<{ ids: number[] }>(res);
+    const result = await bulkResolveTickets(ids);
+    res.json(result);
   })
 );
 
