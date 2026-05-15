@@ -132,6 +132,7 @@ router.get(
                 title: true,
                 image: true,
                 year: true,
+                communityId: true,
                 releaseType: true,
                 artist: { select: { id: true, name: true } }
               }

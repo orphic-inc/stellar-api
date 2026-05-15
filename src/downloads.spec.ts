@@ -30,9 +30,7 @@ const GRANT_RESULT = {
 describe('POST /api/contributions/:id/access', () => {
   beforeEach(() => resetApiTestState());
 
-  it('requires auth (401 without session)', async () => {
-    // The test harness always injects a user via requireAuth mock, so we test
-    // that the module is called and returns its result
+  it('calls grantDownloadAccess and returns result for authenticated user', async () => {
     grantDownloadAccessMock.mockResolvedValue(GRANT_RESULT);
     const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(200);

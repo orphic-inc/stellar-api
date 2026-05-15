@@ -63,20 +63,10 @@ jest.mock('../modules/pm', () => ({
 }));
 
 jest.mock('../modules/staffInbox', () => ({
-  listStaffTickets: jest.fn(),
-  listMyTickets: jest.fn(),
-  createTicket: jest.fn(),
-  viewTicket: jest.fn(),
-  replyToTicket: jest.fn(),
-  assignTicket: jest.fn(),
-  resolveTicket: jest.fn(),
-  unresolveTicket: jest.fn(),
-  bulkResolveTickets: jest.fn(),
   listResponses: jest.fn(),
   createResponse: jest.fn(),
   updateResponse: jest.fn(),
-  deleteResponse: jest.fn(),
-  getStaffUnreadCount: jest.fn()
+  deleteResponse: jest.fn()
 }));
 
 jest.mock('../modules/config', () => ({

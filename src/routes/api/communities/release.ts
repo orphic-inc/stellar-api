@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
+import { isCommunityMember } from './communities';
 import {
   validate,
   validateParams,
@@ -21,6 +22,7 @@ import {
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
+import { getSettings } from '../../../modules/settings';
 import { FileType } from '@prisma/client';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 
@@ -38,8 +40,22 @@ router.get(
   '/',
   requireAuth,
   validateParams(communityIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { communityId } = parsedParams<{ communityId: number }>(res);
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+      select: { registrationStatus: true }
+    });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (
+      !(await isCommunityMember(
+        communityId,
+        req.user.id,
+        community.registrationStatus
+      ))
+    ) {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
     const pg = parsePage(req);
     const [releases, total] = await Promise.all([
       prisma.release.findMany({
@@ -48,7 +64,18 @@ router.get(
         take: pg.limit,
         include: {
           artist: { select: { id: true, name: true } },
-          tags: true
+          tags: true,
+          _count: { select: { contributions: true } },
+          contributions: {
+            select: {
+              id: true,
+              type: true,
+              sizeInBytes: true,
+              linkStatus: true,
+              user: { select: { id: true, username: true } },
+              _count: { select: { consumers: true } }
+            }
+          }
         }
       }),
       prisma.release.count({ where: { communityId } })
@@ -62,11 +89,25 @@ router.get(
   '/:releaseId',
   requireAuth,
   validateParams(releaseParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { communityId, releaseId: id } = parsedParams<{
       communityId: number;
       releaseId: number;
     }>(res);
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+      select: { registrationStatus: true }
+    });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (
+      !(await isCommunityMember(
+        communityId,
+        req.user.id,
+        community.registrationStatus
+      ))
+    ) {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
     const release = await prisma.release.findFirst({
       where: { id, communityId },
       include: {
@@ -195,6 +236,21 @@ router.post(
       releaseId: number;
     }>(res);
     const input = parsedBody<AddContributionToReleaseInput>(res);
+
+    const settings = await getSettings();
+    if (settings.approvedDomains.length > 0) {
+      let host: string;
+      try {
+        host = new URL(input.downloadUrl).hostname;
+      } catch {
+        return res.status(400).json({ msg: 'Invalid download URL' });
+      }
+      if (!settings.approvedDomains.includes(host)) {
+        return res.status(400).json({
+          msg: `Domain '${host}' is not in the approved domains list`
+        });
+      }
+    }
 
     const community = await prisma.community.findUnique({
       where: { id: communityId },

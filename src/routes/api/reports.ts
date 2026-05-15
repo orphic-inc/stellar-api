@@ -30,9 +30,14 @@ import {
   resolveReport,
   addNote,
   listMyReports,
-  getReportCounts
+  getReportCounts,
+  getReportStats
 } from '../../modules/reports';
-import type { ReportTargetType, ReportStatus } from '@prisma/client';
+import type {
+  ReleaseReportCategory,
+  ReportTargetType,
+  ReportStatus
+} from '@prisma/client';
 
 const router = express.Router();
 
@@ -47,6 +52,16 @@ router.get(
   authHandler(async (_req, res) => {
     const counts = await getReportCounts();
     res.json(counts);
+  })
+);
+
+// GET /api/reports/stats — resolution statistics (staff)
+router.get(
+  '/stats',
+  ...requirePermission('staff', 'admin'),
+  authHandler(async (_req, res) => {
+    const stats = await getReportStats();
+    res.json(stats);
   })
 );
 
@@ -68,14 +83,15 @@ router.get(
   ...requirePermission('staff', 'admin'),
   validateQuery(reportListQuerySchema),
   authHandler(async (req, res) => {
-    const { page, status, targetType, claimedByMe } =
+    const { page, status, targetType, claimedByMe, reporterUsername } =
       parsedQuery<ReportListQueryInput>(res);
     const result = await listReports({
       page,
       status: status as ReportStatus | 'all',
       targetType: targetType as ReportTargetType | 'all',
       claimedByMe,
-      staffUserId: req.user.id
+      staffUserId: req.user.id,
+      reporterUsername
     });
     res.json(result);
   })
@@ -87,16 +103,21 @@ router.post(
   requireAuth,
   validate(fileReportSchema),
   authHandler(async (req, res) => {
-    const { targetType, targetId, category, reason, evidence } =
-      parsedBody<FileReportInput>(res);
-    const result = await fileReport(
-      req.user.id,
-      targetType as ReportTargetType,
-      targetId,
+    const input = parsedBody<FileReportInput>(res);
+    const category =
+      input.targetType === 'Release' ? input.releaseCategory : input.category;
+    const releaseCategory =
+      input.targetType === 'Release'
+        ? (input.releaseCategory as ReleaseReportCategory)
+        : undefined;
+    const result = await fileReport(req.user.id, {
+      targetType: input.targetType as ReportTargetType,
+      targetId: input.targetId,
       category,
-      reason,
-      evidence
-    );
+      releaseCategory,
+      reason: input.reason,
+      evidence: input.evidence
+    });
     res.status(201).json(result.report);
   })
 );

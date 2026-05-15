@@ -22,17 +22,31 @@ const releaseCategoryEnum = z.enum(
   Object.values(ReleaseCategory) as [ReleaseCategory, ...ReleaseCategory[]]
 );
 
-export const createCommunitySchema = z.object({
-  name: z.string().min(1, 'Name is required').max(128),
-  image: z.string().url().optional(),
-  type: communityTypeEnum,
-  registrationStatus: registrationStatusEnum,
-  allowDuplicateFormats: z.boolean().optional(),
-  staffIds: z.array(z.number().int().positive()).optional()
-});
+export const createCommunitySchema = z
+  .object({
+    name: z.string().min(1, 'Name is required').max(128),
+    description: z.string().max(2000).optional(),
+    image: z.string().url().optional(),
+    type: communityTypeEnum,
+    registrationStatus: registrationStatusEnum,
+    allowDuplicateFormats: z.boolean().optional(),
+    staffIds: z.array(z.number().int().positive()).optional(),
+    ownerId: z.number().int().positive().optional()
+  })
+  .refine(
+    (data) =>
+      data.registrationStatus === RegistrationStatus.open ||
+      data.ownerId !== undefined,
+    {
+      message:
+        'Owner user ID is required for invite-only and closed communities',
+      path: ['ownerId']
+    }
+  );
 
 export const updateCommunitySchema = z.object({
   name: z.string().min(1).max(128).optional(),
+  description: z.string().max(2000).optional(),
   image: z.string().url().optional(),
   registrationStatus: registrationStatusEnum.optional(),
   allowDuplicateFormats: z.boolean().optional(),

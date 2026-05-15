@@ -21,7 +21,8 @@ jest.mock('./modules/reports', () => ({
   resolveReport: jest.fn(),
   addNote: jest.fn(),
   listMyReports: jest.fn(),
-  getReportCounts: jest.fn()
+  getReportCounts: jest.fn(),
+  getReportStats: jest.fn()
 }));
 
 const reportsMock = reportsModule as jest.Mocked<typeof reportsModule>;
@@ -31,10 +32,12 @@ const makeReportSummary = (): ReportSummary => ({
   targetType: 'ForumPost',
   targetId: 42,
   category: 'spam',
+  releaseCategory: null,
   status: 'Open',
   createdAt: new Date(),
   resolvedAt: null,
-  resolution: null
+  resolution: null,
+  sourceUrl: null
 });
 
 const makeNote = (): ReportNoteRow => ({
@@ -53,6 +56,7 @@ const makeReport = (): ReportRow => ({
   targetType: 'ForumPost',
   targetId: 42,
   category: 'spam',
+  releaseCategory: null,
   reason: 'This is spam',
   evidence: null,
   status: 'Open',
@@ -66,7 +70,8 @@ const makeReport = (): ReportRow => ({
   resolutionAction: null,
   notes: [],
   createdAt: new Date(),
-  updatedAt: new Date()
+  updatedAt: new Date(),
+  sourceUrl: null
 });
 
 const setStaff = () =>

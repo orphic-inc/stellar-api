@@ -200,6 +200,43 @@ enum ReportResolutionAction {
   Other
 }
 
+enum ReleaseReportCategory {
+  Dupe
+  Trump
+  BadFileNamesTrump
+  BadFolderNameTrump
+  TagTrump
+  VinylTrump
+  AudienceRecording
+  BadFileNames
+  BadFolderNames
+  BadTagNoTag
+  BonusTracksOnly
+  DisallowedFormat
+  DiscsMissing
+  Discography
+  MqaBanned
+  EditedLog
+  InaccurateBitrate
+  LogRescoreRequest
+  LossyMasterApprovalRequest
+  ContributionContestApprovalRequest
+  LowBitrate
+  MuttRip
+  NoLineageInfo
+  Other
+  RadioTvFmWebRip
+  SkipsEncodeErrors
+  SpecificallyBanned
+  TracksMissing
+  Transcode
+  UnsplitAlbumRip
+  Urgent
+  UserCompilation
+  WrongSpecifiedFormat
+  WrongSpecifiedMedia
+}
+
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
 model UserRank {
@@ -648,6 +685,7 @@ model SimilarArtist {
 model Community {
   id                     Int                 @id @default(autoincrement())
   name                   String              @unique
+  description            String?             @db.Text
   image                  String
   registrationStatus     RegistrationStatus
   type                   CommunityType
@@ -1518,6 +1556,7 @@ model Report {
   targetType       ReportTargetType
   targetId         Int
   category         String                  @db.VarChar(50)
+  releaseCategory  ReleaseReportCategory?
   reason           String                  @db.Text
   evidence         String?                 @db.Text
   status           ReportStatus            @default(Open)

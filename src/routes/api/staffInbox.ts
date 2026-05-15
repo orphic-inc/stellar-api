@@ -1,11 +1,15 @@
 import express from 'express';
 import { z } from 'zod';
 import { authHandler } from '../../modules/asyncHandler';
-import { requirePermission } from '../../middleware/permissions';
+import { requirePermission, isModerator } from '../../middleware/permissions';
+import { requireAuth } from '../../middleware/auth';
+import { prisma } from '../../lib/prisma';
 import {
   validate,
+  validateQuery,
   validateParams,
   parsedBody,
+  parsedQuery,
   parsedParams
 } from '../../middleware/validate';
 import {
@@ -15,17 +19,47 @@ import {
   type UpdateResponseInput
 } from '../../schemas/staffInbox';
 import {
+  createTicketSchema,
+  replySchema,
+  assignSchema,
+  queueQuerySchema,
+  bulkResolveSchema,
+  type CreateTicketInput,
+  type ReplyInput,
+  type AssignInput,
+  type QueueQueryInput,
+  type BulkResolveInput
+} from '../../schemas/staffPm';
+import {
   listResponses,
   createResponse,
   updateResponse,
   deleteResponse
 } from '../../modules/staffInbox';
+import {
+  createTicket,
+  listMyTickets,
+  listQueue,
+  getQueueCount,
+  viewTicket,
+  replyToTicket,
+  resolveTicket,
+  unresolveTicket,
+  assignTicket,
+  bulkResolve
+} from '../../modules/staffPm';
 
 const router = express.Router();
 
 const responseIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+
+const ticketIdSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+
+// ─── Canned Responses ─────────────────────────────────────────────────────────
 
 // GET /api/staff-inbox/responses — list canned responses (staff)
 router.get(
@@ -73,6 +107,172 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const result = await deleteResponse(id);
     if (!result.ok) return res.status(404).json({ msg: 'Response not found' });
+    res.status(204).send();
+  })
+);
+
+// ─── Staff Inbox Tickets ───────────────────────────────────────────────────────
+
+// GET /api/staff-inbox/tickets — user's own tickets
+router.get(
+  '/tickets',
+  requireAuth,
+  validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
+  authHandler(async (req, res) => {
+    const { page } = parsedQuery<{ page: number }>(res);
+    const result = await listMyTickets(req.user.id, page);
+    res.json(result);
+  })
+);
+
+// POST /api/staff-inbox/tickets — create new ticket
+router.post(
+  '/tickets',
+  requireAuth,
+  validate(createTicketSchema),
+  authHandler(async (req, res) => {
+    const { subject, body } = parsedBody<CreateTicketInput>(res);
+    const ticket = await createTicket(req.user.id, subject, body);
+    res.status(201).json(ticket);
+  })
+);
+
+// GET /api/staff-inbox/queue — staff ticket queue
+router.get(
+  '/queue',
+  ...requirePermission('staff', 'admin'),
+  validateQuery(queueQuerySchema),
+  authHandler(async (req, res) => {
+    const { page, status, assignedToMe, unassigned } =
+      parsedQuery<QueueQueryInput>(res);
+    const result = await listQueue({
+      page,
+      status,
+      assignedToMe,
+      unassigned,
+      staffUserId: req.user.id
+    });
+    res.json(result);
+  })
+);
+
+// GET /api/staff-inbox/queue/count — unresolved ticket count for badge
+router.get(
+  '/queue/count',
+  ...requirePermission('staff', 'admin'),
+  authHandler(async (_req, res) => {
+    const count = await getQueueCount();
+    res.json({ count });
+  })
+);
+
+// POST /api/staff-inbox/bulk-resolve — batch resolve tickets (staff)
+router.post(
+  '/bulk-resolve',
+  ...requirePermission('staff', 'admin'),
+  validate(bulkResolveSchema),
+  authHandler(async (_req, res) => {
+    const { ids } = parsedBody<BulkResolveInput>(res);
+    const result = await bulkResolve(ids);
+    res.json(result);
+  })
+);
+
+// GET /api/staff-inbox/tickets/:id — view single ticket
+router.get(
+  '/tickets/:id',
+  requireAuth,
+  validateParams(ticketIdSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const isStaff = await isModerator(req, res);
+    const result = await viewTicket(id, req.user.id, isStaff);
+    if (!result.ok) return res.status(404).json({ msg: 'Ticket not found' });
+    res.json(result.ticket);
+  })
+);
+
+// POST /api/staff-inbox/tickets/:id/reply
+router.post(
+  '/tickets/:id/reply',
+  requireAuth,
+  validateParams(ticketIdSchema),
+  validate(replySchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { body } = parsedBody<ReplyInput>(res);
+    const isStaff = await isModerator(req, res);
+    const result = await replyToTicket(id, req.user.id, body, isStaff);
+    if (!result.ok) {
+      let status = 404;
+      if (result.reason === 'resolved') status = 422;
+      else if (result.reason === 'forbidden') status = 403;
+      return res.status(status).json({ msg: result.reason });
+    }
+    res.status(201).json(result.message);
+  })
+);
+
+// POST /api/staff-inbox/tickets/:id/resolve
+router.post(
+  '/tickets/:id/resolve',
+  requireAuth,
+  validateParams(ticketIdSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const isStaff = await isModerator(req, res);
+    const result = await resolveTicket(id, req.user.id, isStaff);
+    if (!result.ok) {
+      let status = 404;
+      if (result.reason === 'already_resolved') status = 422;
+      else if (result.reason === 'forbidden') status = 403;
+      return res.status(status).json({ msg: result.reason });
+    }
+    res.status(204).send();
+  })
+);
+
+// POST /api/staff-inbox/tickets/:id/unresolve (staff only)
+router.post(
+  '/tickets/:id/unresolve',
+  ...requirePermission('staff', 'admin'),
+  validateParams(ticketIdSchema),
+  authHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const result = await unresolveTicket(id);
+    if (!result.ok) {
+      const status = result.reason === 'not_resolved' ? 422 : 404;
+      return res.status(status).json({ msg: result.reason });
+    }
+    res.status(204).send();
+  })
+);
+
+// POST /api/staff-inbox/tickets/:id/assign (staff only)
+router.post(
+  '/tickets/:id/assign',
+  ...requirePermission('staff', 'admin'),
+  validateParams(ticketIdSchema),
+  validate(assignSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { assignedUserId, assignedUsername } = parsedBody<AssignInput>(res);
+
+    let resolvedId: number | null = assignedUserId ?? null;
+    if (assignedUsername && resolvedId === undefined) {
+      const user = await prisma.user.findFirst({
+        where: { username: { equals: assignedUsername, mode: 'insensitive' } },
+        select: { id: true }
+      });
+      if (!user) return res.status(404).json({ msg: 'User not found' });
+      resolvedId = user.id;
+    }
+
+    const result = await assignTicket(id, resolvedId);
+    if (!result.ok) {
+      const status = result.reason === 'assignee_not_staff' ? 422 : 404;
+      return res.status(status).json({ msg: result.reason });
+    }
     res.status(204).send();
   })
 );

@@ -2122,12 +2122,23 @@ const Artist = registry.register(
         })
       )
       .optional(),
+    description: z.string().nullable().optional(),
     releases: z
       .array(
         z.object({
           id: z.number(),
           title: z.string(),
-          year: z.number().nullable().optional()
+          year: z.number().nullable().optional(),
+          type: z.string().optional(),
+          releaseType: z.string().optional(),
+          communityId: z.number().nullable().optional(),
+          community: z
+            .object({
+              id: z.number(),
+              name: z.string()
+            })
+            .nullable()
+            .optional()
         })
       )
       .optional()
@@ -2695,15 +2706,9 @@ const PrivateConversation = registry.register(
   z.object({
     id: z.number(),
     subject: z.string(),
-    isStaffTicket: z.boolean(),
-    ticketStatus: z
-      .enum(['Unanswered', 'Open', 'Resolved'])
-      .nullable()
-      .optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
     participants: z.array(PrivateConversationParticipant).optional(),
-    assignedStaff: MessageUser.nullable().optional(),
     messages: z.array(PrivateMessage).optional()
   })
 );
@@ -2723,10 +2728,7 @@ import {
   replyMessageSchema,
   updateConversationSchema,
   bulkMessageActionSchema,
-  messageListQuerySchema,
-  createTicketSchema as createTicketPmSchema,
-  assignTicketSchema as assignTicketPmSchema,
-  ticketQueueQuerySchema
+  messageListQuerySchema
 } from '../schemas/pm';
 
 registry.registerPath({
@@ -2857,53 +2859,102 @@ registry.registerPath({
   responses: { 204: { description: 'Conversation soft-deleted' } }
 });
 
+// ─── Staff Inbox ──────────────────────────────────────────────────────────────
+
+import {
+  createResponseSchema,
+  updateResponseSchema
+} from '../schemas/staffInbox';
+import {
+  createTicketSchema,
+  replySchema as staffReplySchema,
+  assignSchema,
+  queueQuerySchema,
+  bulkResolveSchema
+} from '../schemas/staffPm';
+
+const StaffInboxTicket = registry.register(
+  'StaffInboxTicket',
+  z.object({
+    id: z.number(),
+    subject: z.string(),
+    status: z.enum(['Unanswered', 'Open', 'Resolved']),
+    isReadByUser: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    user: MessageUser,
+    assignedUser: MessageUser.nullable().optional(),
+    resolver: MessageUser.nullable().optional(),
+    messages: z
+      .array(
+        z.object({
+          id: z.number(),
+          body: z.string(),
+          createdAt: z.string(),
+          sender: MessageUser.nullable()
+        })
+      )
+      .optional()
+  })
+);
+
+const PaginatedTickets = registry.register(
+  'PaginatedTickets',
+  z.object({
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    conversations: z.array(StaffInboxTicket)
+  })
+);
+
 registry.registerPath({
   method: 'get',
-  path: '/messages/tickets',
-  tags: ['Messages'],
+  path: '/staff-inbox/tickets',
+  tags: ['StaffInbox'],
   responses: {
     200: {
       description: 'My support tickets',
-      content: { 'application/json': { schema: PaginatedConversations } }
+      content: { 'application/json': { schema: PaginatedTickets } }
     }
   }
 });
 
 registry.registerPath({
   method: 'post',
-  path: '/messages/tickets',
-  tags: ['Messages'],
+  path: '/staff-inbox/tickets',
+  tags: ['StaffInbox'],
   request: {
-    body: { content: { 'application/json': { schema: createTicketPmSchema } } }
+    body: { content: { 'application/json': { schema: createTicketSchema } } }
   },
   responses: {
     201: {
       description: 'Ticket created',
-      content: { 'application/json': { schema: PrivateConversation } }
+      content: { 'application/json': { schema: StaffInboxTicket } }
     }
   }
 });
 
 registry.registerPath({
   method: 'get',
-  path: '/messages/ticket-queue',
-  tags: ['Messages'],
-  request: { query: ticketQueueQuerySchema },
+  path: '/staff-inbox/queue',
+  tags: ['StaffInbox'],
+  request: { query: queueQuerySchema },
   responses: {
     200: {
       description: 'Staff ticket queue',
-      content: { 'application/json': { schema: PaginatedConversations } }
+      content: { 'application/json': { schema: PaginatedTickets } }
     }
   }
 });
 
 registry.registerPath({
   method: 'get',
-  path: '/messages/ticket-unread-count',
-  tags: ['Messages'],
+  path: '/staff-inbox/queue/count',
+  tags: ['StaffInbox'],
   responses: {
     200: {
-      description: 'Open ticket count',
+      description: 'Unresolved ticket count',
       content: {
         'application/json': { schema: z.object({ count: z.number() }) }
       }
@@ -2913,47 +2964,16 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: '/messages/{id}/resolve',
-  tags: ['Messages'],
-  request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Ticket resolved' } }
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/messages/{id}/unresolve',
-  tags: ['Messages'],
-  request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Ticket unresolved' } }
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/messages/{id}/assign',
-  tags: ['Messages'],
-  request: {
-    params: z.object({ id: z.string() }),
-    body: { content: { 'application/json': { schema: assignTicketPmSchema } } }
-  },
-  responses: { 204: { description: 'Ticket assigned' } }
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/messages/bulk-resolve',
-  tags: ['Messages'],
+  path: '/staff-inbox/bulk-resolve',
+  tags: ['StaffInbox'],
   request: {
     body: {
-      content: {
-        'application/json': {
-          schema: z.object({ ids: z.array(z.number()).min(1) })
-        }
-      }
+      content: { 'application/json': { schema: bulkResolveSchema } }
     }
   },
   responses: {
     200: {
-      description: 'Tickets resolved',
+      description: 'Tickets bulk resolved',
       content: {
         'application/json': {
           schema: z.object({ ok: z.boolean(), resolved: z.number() })
@@ -2963,12 +2983,70 @@ registry.registerPath({
   }
 });
 
-// ─── Staff Inbox ──────────────────────────────────────────────────────────────
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/tickets/{id}',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Ticket with messages',
+      content: { 'application/json': { schema: StaffInboxTicket } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
-import {
-  createResponseSchema,
-  updateResponseSchema
-} from '../schemas/staffInbox';
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/tickets/{id}/reply',
+  tags: ['StaffInbox'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: staffReplySchema } } }
+  },
+  responses: {
+    201: { description: 'Reply sent' },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Ticket resolved',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/tickets/{id}/resolve',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Resolved' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/tickets/{id}/unresolve',
+  tags: ['StaffInbox'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 204: { description: 'Unresolved' } }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/staff-inbox/tickets/{id}/assign',
+  tags: ['StaffInbox'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: assignSchema } } }
+  },
+  responses: { 204: { description: 'Assigned' } }
+});
 
 const StaffInboxResponse = registry.register(
   'StaffInboxResponse',
@@ -3093,7 +3171,8 @@ const ReportObj = z.object({
     .nullable(),
   notes: z.array(ReportNoteObj),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
+  sourceUrl: z.string().nullable()
 });
 
 const ReportSummary = z.object({
@@ -3104,7 +3183,8 @@ const ReportSummary = z.object({
   status: z.string(),
   createdAt: z.string(),
   resolvedAt: z.string().nullable(),
-  resolution: z.string().nullable()
+  resolution: z.string().nullable(),
+  sourceUrl: z.string().nullable()
 });
 
 registry.registerPath({

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import {
   Prisma,
+  type ReleaseReportCategory,
   type ReportStatus,
   type ReportTargetType
 } from '@prisma/client';
@@ -26,34 +27,177 @@ export const reportInclude = {
 
 export type ReportRow = Prisma.ReportGetPayload<{
   include: typeof reportInclude;
-}>;
+}> & { sourceUrl: string | null };
+
 export type ReportNoteRow = Prisma.ReportNoteGetPayload<{
   include: { author: { select: { id: true; username: true; avatar: true } } };
 }>;
+
 export type ReportSummary = {
   id: number;
   targetType: ReportTargetType;
   targetId: number;
   category: string;
+  releaseCategory: ReleaseReportCategory | null;
   status: ReportStatus;
   createdAt: Date;
   resolvedAt: Date | null;
   resolution: string | null;
+  sourceUrl: string | null;
 };
+
+// ─── Source URL resolution ────────────────────────────────────────────────────
+
+async function resolveSourceUrls(
+  items: Array<{ id: number; targetType: ReportTargetType; targetId: number }>
+): Promise<Map<number, string | null>> {
+  const urlMap = new Map<number, string | null>();
+
+  const byType = new Map<
+    ReportTargetType,
+    Array<{ reportId: number; targetId: number }>
+  >();
+  for (const r of items) {
+    const existing = byType.get(r.targetType) ?? [];
+    existing.push({ reportId: r.id, targetId: r.targetId });
+    byType.set(r.targetType, existing);
+  }
+
+  for (const [type, entries] of byType) {
+    const targetIds = entries.map((e) => e.targetId);
+
+    switch (type) {
+      case 'User': {
+        const users = await prisma.user.findMany({
+          where: { id: { in: targetIds } },
+          select: { id: true, username: true }
+        });
+        const usernameById = new Map(users.map((u) => [u.id, u.username]));
+        for (const { reportId, targetId } of entries) {
+          const username = usernameById.get(targetId);
+          urlMap.set(reportId, username ? `/private/user/${username}` : null);
+        }
+        break;
+      }
+      case 'Release': {
+        const releases = await prisma.release.findMany({
+          where: { id: { in: targetIds } },
+          select: { id: true, communityId: true }
+        });
+        const byId = new Map(releases.map((r) => [r.id, r]));
+        for (const { reportId, targetId } of entries) {
+          const rel = byId.get(targetId);
+          urlMap.set(
+            reportId,
+            rel?.communityId
+              ? `/private/communities/${rel.communityId}/releases/${targetId}`
+              : null
+          );
+        }
+        break;
+      }
+      case 'Contribution': {
+        const contribs = await prisma.contribution.findMany({
+          where: { id: { in: targetIds } },
+          select: {
+            id: true,
+            releaseId: true,
+            release: { select: { communityId: true } }
+          }
+        });
+        const byId = new Map(contribs.map((c) => [c.id, c]));
+        for (const { reportId, targetId } of entries) {
+          const c = byId.get(targetId);
+          urlMap.set(
+            reportId,
+            c?.release?.communityId
+              ? `/private/communities/${c.release.communityId}/releases/${c.releaseId}`
+              : null
+          );
+        }
+        break;
+      }
+      case 'ForumTopic': {
+        const topics = await prisma.forumTopic.findMany({
+          where: { id: { in: targetIds } },
+          select: { id: true, forumId: true }
+        });
+        const byId = new Map(topics.map((t) => [t.id, t]));
+        for (const { reportId, targetId } of entries) {
+          const t = byId.get(targetId);
+          urlMap.set(
+            reportId,
+            t ? `/private/forums/${t.forumId}/topics/${targetId}` : null
+          );
+        }
+        break;
+      }
+      case 'ForumPost': {
+        const posts = await prisma.forumPost.findMany({
+          where: { id: { in: targetIds } },
+          select: {
+            id: true,
+            forumTopicId: true,
+            forumTopic: { select: { forumId: true } }
+          }
+        });
+        const byId = new Map(posts.map((p) => [p.id, p]));
+        for (const { reportId, targetId } of entries) {
+          const p = byId.get(targetId);
+          urlMap.set(
+            reportId,
+            p
+              ? `/private/forums/${p.forumTopic.forumId}/topics/${p.forumTopicId}`
+              : null
+          );
+        }
+        break;
+      }
+      case 'Collage': {
+        for (const { reportId, targetId } of entries) {
+          urlMap.set(reportId, `/private/collages/${targetId}`);
+        }
+        break;
+      }
+      default: {
+        for (const { reportId } of entries) {
+          urlMap.set(reportId, null);
+        }
+      }
+    }
+  }
+
+  return urlMap;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function fileReport(
   reporterId: number,
-  targetType: ReportTargetType,
-  targetId: number,
-  category: string,
-  reason: string,
-  evidence?: string
-) {
+  opts: {
+    targetType: ReportTargetType;
+    targetId: number;
+    category: string;
+    releaseCategory?: ReleaseReportCategory;
+    reason: string;
+    evidence?: string;
+  }
+): Promise<{ ok: true; report: ReportRow }> {
+  const { targetType, targetId, category, releaseCategory, reason, evidence } =
+    opts;
   const report = await prisma.report.create({
-    data: { reporterId, targetType, targetId, category, reason, evidence },
+    data: {
+      reporterId,
+      targetType,
+      targetId,
+      category,
+      releaseCategory,
+      reason,
+      evidence
+    },
     include: reportInclude
   });
-  return { ok: true as const, report };
+  return { ok: true as const, report: { ...report, sourceUrl: null } };
 }
 
 export async function listReports(opts: {
@@ -62,15 +206,32 @@ export async function listReports(opts: {
   targetType: ReportTargetType | 'all';
   claimedByMe: boolean;
   staffUserId: number;
+  reporterUsername?: string;
 }) {
-  const { page, status, targetType, claimedByMe, staffUserId } = opts;
+  const {
+    page,
+    status,
+    targetType,
+    claimedByMe,
+    staffUserId,
+    reporterUsername
+  } = opts;
 
   const where: Prisma.ReportWhereInput = {};
   if (status !== 'all') where.status = status;
   if (targetType !== 'all') where.targetType = targetType;
   if (claimedByMe) where.claimedById = staffUserId;
 
-  const [total, reports] = await Promise.all([
+  if (reporterUsername) {
+    const reporter = await prisma.user.findFirst({
+      where: { username: { equals: reporterUsername, mode: 'insensitive' } },
+      select: { id: true }
+    });
+    if (!reporter) return { total: 0, page, pageSize: PAGE_SIZE, reports: [] };
+    where.reporterId = reporter.id;
+  }
+
+  const [total, rawReports] = await Promise.all([
     prisma.report.count({ where }),
     prisma.report.findMany({
       where,
@@ -80,6 +241,18 @@ export async function listReports(opts: {
       include: reportInclude
     })
   ]);
+
+  const urlMap = await resolveSourceUrls(
+    rawReports.map((r) => ({
+      id: r.id,
+      targetType: r.targetType,
+      targetId: r.targetId
+    }))
+  );
+  const reports: ReportRow[] = rawReports.map((r) => ({
+    ...r,
+    sourceUrl: urlMap.get(r.id) ?? null
+  }));
 
   return { total, page, pageSize: PAGE_SIZE, reports };
 }
@@ -97,7 +270,13 @@ export async function getReport(
   if (!isStaff && report.reporterId !== requesterId) {
     return { ok: false as const, reason: 'forbidden' };
   }
-  return { ok: true as const, report };
+  const urlMap = await resolveSourceUrls([
+    { id: report.id, targetType: report.targetType, targetId: report.targetId }
+  ]);
+  return {
+    ok: true as const,
+    report: { ...report, sourceUrl: urlMap.get(report.id) ?? null }
+  };
 }
 
 export async function claimReport(id: number, staffUserId: number) {
@@ -158,7 +337,9 @@ export async function resolveReport(
       resolvedById: staffUserId,
       resolvedAt: new Date(),
       resolution,
-      resolutionAction
+      resolutionAction,
+      claimedById: null,
+      claimedAt: null
     }
   });
   return { ok: true as const };
@@ -180,7 +361,7 @@ export async function addNote(id: number, authorId: number, body: string) {
 
 export async function listMyReports(userId: number, page: number) {
   const where = { reporterId: userId };
-  const [total, reports] = await Promise.all([
+  const [total, rawReports] = await Promise.all([
     prisma.report.count({ where }),
     prisma.report.findMany({
       where,
@@ -192,6 +373,7 @@ export async function listMyReports(userId: number, page: number) {
         targetType: true,
         targetId: true,
         category: true,
+        releaseCategory: true,
         status: true,
         createdAt: true,
         resolvedAt: true,
@@ -199,6 +381,19 @@ export async function listMyReports(userId: number, page: number) {
       }
     })
   ]);
+
+  const urlMap = await resolveSourceUrls(
+    rawReports.map((r) => ({
+      id: r.id,
+      targetType: r.targetType,
+      targetId: r.targetId
+    }))
+  );
+  const reports: ReportSummary[] = rawReports.map((r) => ({
+    ...r,
+    sourceUrl: urlMap.get(r.id) ?? null
+  }));
+
   return { total, page, pageSize: PAGE_SIZE, reports };
 }
 
@@ -208,4 +403,55 @@ export async function getReportCounts() {
     prisma.report.count({ where: { status: 'Claimed' } })
   ]);
   return { open, claimed };
+}
+
+export async function getReportStats() {
+  const now = new Date();
+  const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const agoWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const agoMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const resolvedWhere = { status: 'Resolved' as const };
+
+  const [last24h, lastWeek, lastMonth, allTime, byStaffRaw] = await Promise.all(
+    [
+      prisma.report.count({
+        where: { ...resolvedWhere, resolvedAt: { gte: ago24h } }
+      }),
+      prisma.report.count({
+        where: { ...resolvedWhere, resolvedAt: { gte: agoWeek } }
+      }),
+      prisma.report.count({
+        where: { ...resolvedWhere, resolvedAt: { gte: agoMonth } }
+      }),
+      prisma.report.count({ where: resolvedWhere }),
+      prisma.report.groupBy({
+        by: ['resolvedById'],
+        where: { ...resolvedWhere, resolvedById: { not: null } },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 20
+      })
+    ]
+  );
+
+  const resolverIds = byStaffRaw
+    .map((r) => r.resolvedById)
+    .filter((id): id is number => id !== null);
+
+  const resolvers = await prisma.user.findMany({
+    where: { id: { in: resolverIds } },
+    select: { id: true, username: true }
+  });
+  const usernameById = new Map(resolvers.map((u) => [u.id, u.username]));
+
+  const byStaff = byStaffRaw
+    .filter((r) => r.resolvedById !== null)
+    .map((r) => ({
+      userId: r.resolvedById!,
+      username: usernameById.get(r.resolvedById!) ?? 'Unknown',
+      count: r._count.id
+    }));
+
+  return { last24h, lastWeek, lastMonth, allTime, byStaff };
 }

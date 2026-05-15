@@ -83,7 +83,8 @@ export const registerUser = async (
         avatar,
         userRankId: defaultRank.id,
         userSettingsId: settings.id,
-        profileId: profile.id
+        profileId: profile.id,
+        uploaded: 5_368_709_120n
       },
       select: authUserSelect
     });

@@ -125,25 +125,42 @@ export const deletePost = async (
   actorId: number,
   isModAction: boolean
 ) => {
-  await prisma.$transaction([
-    prisma.forumPost.update({ where: { id }, data: { deletedAt: new Date() } }),
-    prisma.forumTopic.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.forumPost.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
+    await tx.forumTopic.update({
       where: { id: forumTopicId },
       data: { numPosts: { decrement: 1 } }
-    }),
-    prisma.forum.update({
+    });
+    await tx.forum.update({
       where: { id: forumId },
       data: { numPosts: { decrement: 1 } }
-    }),
-    prisma.auditLog.create({
+    });
+    await tx.auditLog.create({
       data: {
         actorId,
         action: isModAction ? 'post.mod_delete' : 'post.delete',
         targetType: 'ForumPost',
         targetId: id
       }
-    })
-  ]);
+    });
+
+    const remainingPosts = await tx.forumPost.count({
+      where: { forumTopicId, deletedAt: null }
+    });
+    if (remainingPosts === 0) {
+      await tx.forumTopic.update({
+        where: { id: forumTopicId },
+        data: { deletedAt: new Date() }
+      });
+      await tx.forum.update({
+        where: { id: forumId },
+        data: { numTopics: { decrement: 1 } }
+      });
+    }
+  });
 };
 
 export const updateTopic = async (

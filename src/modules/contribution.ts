@@ -50,7 +50,7 @@ export const createContributionSubmission = async ({
   const contribution = await prisma.$transaction(async (tx) => {
     const contributor = await tx.contributor.upsert({
       where: { userId },
-      update: { communityId },
+      update: {},
       create: { userId, communityId }
     });
 

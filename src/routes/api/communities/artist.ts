@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
+import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import {
@@ -158,8 +159,32 @@ router.get(
   '/:id',
   requireAuth,
   validateParams(artistIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
+
+    // Determine communities the requesting user can access
+    const [consumer, contributor, openCommunities] = await Promise.all([
+      prisma.consumer.findUnique({
+        where: { userId: req.user.id },
+        select: { communities: { select: { id: true } } }
+      }),
+      prisma.contributor.findUnique({
+        where: { userId: req.user.id },
+        select: { communityId: true }
+      }),
+      prisma.community.findMany({
+        where: { registrationStatus: RegistrationStatus.open },
+        select: { id: true }
+      })
+    ]);
+
+    const accessibleIds = [
+      ...(consumer?.communities.map((c) => c.id) ?? []),
+      ...(contributor ? [contributor.communityId] : []),
+      ...openCommunities.map((c) => c.id)
+    ];
+    const accessibleCommunityIds = [...new Set(accessibleIds)];
+
     const artist = await prisma.artist.findUnique({
       where: { id },
       include: {
@@ -170,7 +195,11 @@ router.get(
         similarTo: {
           include: { similarArtist: { select: { id: true, name: true } } }
         },
-        releases: { orderBy: { year: 'desc' }, take: 20 }
+        releases: {
+          where: { communityId: { in: accessibleCommunityIds } },
+          include: { community: { select: { id: true, name: true } } },
+          orderBy: [{ year: 'desc' }, { title: 'asc' }]
+        }
       }
     });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });

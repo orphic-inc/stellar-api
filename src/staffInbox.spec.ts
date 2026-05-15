@@ -29,11 +29,12 @@ const makeResponse = (
 describe('GET /api/staff-inbox/responses', () => {
   beforeEach(() => resetApiTestState());
 
-  it('returns 403 without staff permission and list for staff', async () => {
-    expect((await request(app).get('/api/staff-inbox/responses')).status).toBe(
-      403
-    );
+  it('returns 403 without staff permission', async () => {
+    const res = await request(app).get('/api/staff-inbox/responses');
+    expect(res.status).toBe(403);
+  });
 
+  it('returns list for staff', async () => {
     setStaff();
     staffInboxMock.listResponses.mockResolvedValue([makeResponse()]);
     const res = await request(app).get('/api/staff-inbox/responses');
