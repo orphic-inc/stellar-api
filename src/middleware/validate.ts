@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { ZodSchema } from 'zod';
+import { type ZodTypeAny as ZodSchema } from 'zod';
 
 const VALIDATION_ERROR_MESSAGE = 'Validation failed';
 

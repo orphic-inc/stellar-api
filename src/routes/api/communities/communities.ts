@@ -286,7 +286,7 @@ router.post(
         ...(description !== undefined && { description }),
         type,
         registrationStatus,
-        image: image ?? defaultImages[type],
+        image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(allStaffIds.length && {
           staff: {

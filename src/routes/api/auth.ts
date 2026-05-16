@@ -13,6 +13,7 @@ import {
   type RegisterInput
 } from '../../schemas/auth';
 import { authUserSelect, registerUser, loginUser } from '../../modules/auth';
+import { getSettings } from '../../modules/settings';
 
 const router = express.Router();
 
@@ -52,11 +53,44 @@ router.post(
   authLimiter,
   validate(registerSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password } = parsedBody<RegisterInput>(res);
+    const { username, email, password, inviteKey } =
+      parsedBody<RegisterInput>(res);
+
+    const settings = await getSettings();
+
+    if (settings.registrationStatus === 'closed') {
+      return res.status(403).json({ msg: 'Registration is currently closed' });
+    }
+
+    if (settings.registrationStatus === 'invite') {
+      if (!inviteKey) {
+        return res
+          .status(403)
+          .json({ msg: 'An invite key is required to register' });
+      }
+      const invite = await prisma.invite.findUnique({ where: { inviteKey } });
+      if (!invite || invite.status !== 'pending') {
+        return res
+          .status(403)
+          .json({ msg: 'Invalid or already-used invite key' });
+      }
+      if (invite.email.toLowerCase() !== email.toLowerCase()) {
+        return res
+          .status(403)
+          .json({ msg: 'Invite key is not valid for this email address' });
+      }
+    }
 
     const result = await registerUser(username, email, password);
     if (!result.ok) {
       return res.status(400).json({ msg: 'User already exists' });
+    }
+
+    if (settings.registrationStatus === 'invite' && inviteKey) {
+      await prisma.invite.update({
+        where: { inviteKey },
+        data: { status: 'accepted' }
+      });
     }
 
     const token = await issueToken(result.user.id);

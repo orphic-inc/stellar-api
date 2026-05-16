@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';

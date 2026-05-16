@@ -9,6 +9,7 @@ import { auth as authConfig } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
+import { getSettings } from '../../modules/settings';
 
 const TOKEN_TTL_SECONDS = 3600;
 const issueToken = (userId: number): Promise<string> =>
@@ -90,15 +91,19 @@ const DEFAULT_RANKS = [
   }
 ];
 
-// GET /api/install — returns installation status
+// GET /api/install — returns installation status and public site config
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
-    const [rankCount, userCount] = await Promise.all([
+    const [rankCount, userCount, settings] = await Promise.all([
       prisma.userRank.count(),
-      prisma.user.count()
+      prisma.user.count(),
+      getSettings()
     ]);
-    res.json({ installed: rankCount > 0 && userCount > 0 });
+    res.json({
+      installed: rankCount > 0 && userCount > 0,
+      registrationStatus: settings.registrationStatus
+    });
   })
 );
 

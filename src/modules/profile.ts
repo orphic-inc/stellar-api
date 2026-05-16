@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
+import { sendInviteEmail } from '../lib/mailer';
+import { getLogger } from './logging';
+
+const log = getLogger('profile');
 
 export type InviteTreeNode = {
   id: number;
@@ -165,7 +169,7 @@ export const updateProfile = async (
 };
 
 type CreateInviteResult =
-  | { ok: true; inviteKey: string }
+  | { ok: true; inviteKey: string; emailSent: boolean }
   | { ok: false; reason: 'no_invites' | 'already_invited' };
 
 export const createInvite = async (
@@ -205,5 +209,12 @@ export const createInvite = async (
     })
   ]);
 
-  return { ok: true, inviteKey };
+  let emailSent = false;
+  try {
+    emailSent = await sendInviteEmail(email, inviteKey);
+  } catch (err) {
+    log.error('Failed to send invite email', { to: email, err });
+  }
+
+  return { ok: true, inviteKey, emailSent };
 };

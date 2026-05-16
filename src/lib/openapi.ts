@@ -212,7 +212,12 @@ registry.registerPath({
     200: {
       description: 'Install status',
       content: {
-        'application/json': { schema: z.object({ installed: z.boolean() }) }
+        'application/json': {
+          schema: z.object({
+            installed: z.boolean(),
+            registrationStatus: z.enum(['open', 'invite', 'closed'])
+          })
+        }
       }
     }
   }
@@ -567,7 +572,8 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            inviteKey: z.string()
+            inviteKey: z.string(),
+            emailSent: z.boolean()
           })
         }
       }
@@ -1596,6 +1602,11 @@ const CommunityStaffMember = registry.register(
   })
 );
 
+const CommunityConsumer = registry.register(
+  'CommunityConsumer',
+  z.object({ user: z.object({ id: z.number(), username: z.string() }) })
+);
+
 const Community = registry.register(
   'Community',
   z.object({
@@ -1607,6 +1618,7 @@ const Community = registry.register(
     image: z.string().nullable().optional(),
     allowDuplicateFormats: z.boolean(),
     staff: z.array(CommunityStaffMember).optional(),
+    consumers: z.array(CommunityConsumer).optional(),
     _count: z
       .object({
         releases: z.number(),
@@ -3189,6 +3201,34 @@ const ReportSummary = z.object({
 
 registry.registerPath({
   method: 'get',
+  path: '/reports/stats',
+  tags: ['Reports'],
+  responses: {
+    200: {
+      description: 'Report resolution statistics',
+      content: {
+        'application/json': {
+          schema: z.object({
+            last24h: z.number(),
+            lastWeek: z.number(),
+            lastMonth: z.number(),
+            allTime: z.number(),
+            byStaff: z.array(
+              z.object({
+                userId: z.number(),
+                username: z.string(),
+                count: z.number()
+              })
+            )
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/reports/counts',
   tags: ['Reports'],
   responses: {
@@ -3256,7 +3296,8 @@ registry.registerPath({
           schema: z.object({
             targetType: z.string(),
             targetId: z.number(),
-            category: z.string(),
+            category: z.string().optional(),
+            releaseCategory: z.string().optional(),
             reason: z.string(),
             evidence: z.string().optional()
           })
