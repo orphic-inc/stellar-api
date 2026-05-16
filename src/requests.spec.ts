@@ -264,3 +264,74 @@ describe('POST /api/requests/:id/bounty', () => {
     expect(mod.addBounty).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /api/requests/:id/vote', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('adds a vote when none exists and returns voted: true', async () => {
+    prismaMock.request.findUnique.mockResolvedValue({ id: 1 } as never);
+    prismaMock.requestVote.findUnique.mockResolvedValue(null);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+
+    const res = await request(app).post('/api/requests/1/vote');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ voted: true });
+  });
+
+  it('removes a vote when one exists and returns voted: false', async () => {
+    prismaMock.request.findUnique.mockResolvedValue({ id: 1 } as never);
+    prismaMock.requestVote.findUnique.mockResolvedValue({
+      requestId: 1,
+      userId: 7
+    } as never);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+
+    const res = await request(app).post('/api/requests/1/vote');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ voted: false });
+  });
+
+  it('returns 404 when the request does not exist', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/requests/999/vote');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/requests/:id/bounty-history', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('returns bounties and actions for the request', async () => {
+    prismaMock.request.findUnique.mockResolvedValue({ id: 1 } as never);
+    prismaMock.requestBounty.findMany.mockResolvedValue([
+      {
+        id: 1,
+        requestId: 1,
+        userId: 7,
+        amount: BigInt('104857600'),
+        createdAt: new Date(),
+        user: { id: 7, username: 'testuser' }
+      } as never
+    ]);
+    prismaMock.requestAction.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/requests/1/bounty-history');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('bounties');
+    expect(res.body).toHaveProperty('actions');
+    expect(res.body.bounties).toHaveLength(1);
+  });
+
+  it('returns 404 when the request does not exist or is deleted', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/requests/999/bounty-history');
+
+    expect(res.status).toBe(404);
+  });
+});

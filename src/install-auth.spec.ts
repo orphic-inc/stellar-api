@@ -89,6 +89,15 @@ describe('API auth/profile/user flows', () => {
     prismaMock.user.update.mockResolvedValue(
       asUserMock({ ...authUser, uploaded: BigInt(0), downloaded: BigInt(0) })
     );
+    prismaMock.userSession.create.mockResolvedValue({
+      id: 'test-session-id',
+      userId: 7,
+      ipAddress: '',
+      userAgent: '',
+      createdAt: new Date(),
+      lastActiveAt: new Date(),
+      revokedAt: null
+    });
 
     const res = await request(app).post('/api/auth').send({
       email: 'kai@example.com',
@@ -198,7 +207,8 @@ describe('API auth/profile/user flows', () => {
         siteAppearance: 'dark',
         externalStylesheet: null,
         styledTooltips: true,
-        paranoia: 0
+        paranoia: 0,
+        notificationMethod: 'Popup' as const
       },
       userRank: { name: 'User', color: '' },
       inviteTree: []
@@ -240,7 +250,8 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'dark',
       externalStylesheet: null,
       styledTooltips: true,
-      paranoia: 1
+      paranoia: 1,
+      notificationMethod: 'Popup' as const
     });
 
     const res = await request(app).get('/api/users/settings');
@@ -257,7 +268,8 @@ describe('API auth/profile/user flows', () => {
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
       paranoia: 2,
-      avatar: 'https://example.com/avatar.png'
+      avatar: 'https://example.com/avatar.png',
+      notificationMethod: 'Popup' as const
     });
 
     const res = await request(app).put('/api/users/settings').send({

@@ -5955,6 +5955,10 @@ export interface components {
         username: string;
         avatar?: string | null;
       };
+      source?: {
+        title: string;
+        forumId?: number;
+      } | null;
     };
     Subscription: {
       id: number;

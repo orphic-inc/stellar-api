@@ -4,7 +4,7 @@ import { auth as authConfig } from '../modules/config';
 import { prisma } from '../lib/prisma';
 
 interface JwtPayload {
-  user: { id: number };
+  user: { id: number; sessionId?: string };
 }
 
 export const requireAuth = async (
@@ -32,6 +32,34 @@ export const requireAuth = async (
       res.status(401).json({ msg: 'Account is not authorized' });
       return;
     }
+
+    const sessionId = decoded.user.sessionId;
+    if (sessionId) {
+      const session = await prisma.userSession.findFirst({
+        where: { id: sessionId, revokedAt: null }
+      });
+      if (!session) {
+        res.status(401).json({ msg: 'Session has been revoked' });
+        return;
+      }
+      prisma.userSession
+        .update({
+          where: { id: sessionId },
+          data: { lastActiveAt: new Date() }
+        })
+        .catch(() => undefined);
+    }
+
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ?? req.ip;
+    if (ip) {
+      prisma.user
+        .update({ where: { id: user.id }, data: { lastIp: ip } })
+        .catch(() => undefined);
+    }
+
     req.user = {
       id: user.id,
       userRankId: user.userRankId,

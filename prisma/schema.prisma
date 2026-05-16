@@ -128,6 +128,14 @@ enum RequestStatus {
   deleted
 }
 
+enum NotificationMethod {
+  Disabled
+  Popup
+  Traditional
+  Push
+  Combined
+}
+
 enum EconomyTransactionReason {
   REQUEST_CREATE
   REQUEST_VOTE
@@ -253,12 +261,13 @@ model UserRank {
 }
 
 model UserSettings {
-  id                 Int     @id @default(autoincrement())
-  siteAppearance     String  @default("cayer_make")
-  externalStylesheet String?
-  styledTooltips     Boolean @default(true)
-  paranoia           Int     @default(0)
-  user               User?
+  id                   Int                @id @default(autoincrement())
+  siteAppearance       String             @default("cayer_make")
+  externalStylesheet   String?
+  styledTooltips       Boolean            @default(true)
+  paranoia             Int                @default(0)
+  notificationMethod   NotificationMethod @default(Popup)
+  user                 User?
 
   @@map("user_settings")
 }
@@ -292,6 +301,7 @@ model User {
   banReason          String?
   warned             DateTime?
   warnedTimes        Int          @default(0)
+  lastIp             String?
   communityPass      String       @default("")
   disablePm          Boolean      @default(false)
   createdAt          DateTime     @default(now())
@@ -358,6 +368,18 @@ model User {
   reportsClaimed            Report[]                         @relation("ReportClaimer")
   reportsResolved           Report[]                         @relation("ReportResolver")
   reportNotes               ReportNote[]                     @relation("ReportNoteAuthor")
+  sessions                  UserSession[]
+  accountRecoveries         AccountRecovery[]
+  emailHistories            UserEmailHistory[]
+  warnings                  UserWarning[]                    @relation("UserWarnings")
+  warningsIssued            UserWarning[]                    @relation("UserWarnedBy")
+  moderationNotes           UserModerationNote[]             @relation("UserModerationNotes")
+  moderationNotesAuthored   UserModerationNote[]             @relation("ModerationNoteAuthor")
+  pmDrafts                  PmDraft[]
+  massMessagesSent          MassMessage[]                    @relation("MassMessageSender")
+  siteHistoryEntries        SiteHistory[]
+  requestVotes              RequestVote[]
+  donorRank                 UserDonorRank?
 
   @@index([userRankId])
   @@map("users")
@@ -1013,6 +1035,7 @@ model BookmarkRequest {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   requestId Int
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([userId, requestId])
@@ -1039,10 +1062,13 @@ model Request {
   filledContributionId Int?
   filledContribution   Contribution? @relation(fields: [filledContributionId], references: [id])
 
-  bounties RequestBounty[]
-  artists  RequestArtist[]
-  actions  RequestAction[]
-  fills    RequestFill[]
+  bounties  RequestBounty[]
+  artists   RequestArtist[]
+  actions   RequestAction[]
+  fills     RequestFill[]
+  votes     RequestVote[]
+  bookmarks BookmarkRequest[]
+  voteCount Int              @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1602,4 +1628,161 @@ model SiteSettings {
   updatedAt          DateTime           @updatedAt
 
   @@map("site_settings")
+}
+
+// ─── Sessions & Account Recovery ─────────────────────────────────────────────
+
+model UserSession {
+  id           String    @id @default(cuid())
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id])
+  ipAddress    String
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+  lastActiveAt DateTime  @default(now())
+  revokedAt    DateTime?
+
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("user_sessions")
+}
+
+model AccountRecovery {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("account_recoveries")
+}
+
+model UserEmailHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  oldEmail  String
+  newEmail  String
+  changedAt DateTime @default(now())
+  ipAddress String?
+
+  @@index([userId])
+  @@map("user_email_histories")
+}
+
+// ─── User Moderation ──────────────────────────────────────────────────────────
+
+model UserWarning {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation("UserWarnings", fields: [userId], references: [id])
+  warnedById Int
+  warnedBy   User      @relation("UserWarnedBy", fields: [warnedById], references: [id])
+  reason     String    @db.Text
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("user_warnings")
+}
+
+model UserModerationNote {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation("UserModerationNotes", fields: [userId], references: [id])
+  authorId  Int
+  author    User     @relation("ModerationNoteAuthor", fields: [authorId], references: [id])
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_moderation_notes")
+}
+
+// ─── Donor System ─────────────────────────────────────────────────────────────
+
+model DonorRank {
+  id               Int           @id @default(autoincrement())
+  name             String        @unique
+  minDonation      Float
+  expiresAfterDays Int?
+  perks            Json          @default("{}")
+  color            String        @default("")
+  badge            String        @default("♥")
+  userDonorRanks   UserDonorRank[]
+
+  @@map("donor_ranks")
+}
+
+model UserDonorRank {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  user        User      @relation(fields: [userId], references: [id])
+  donorRankId Int
+  donorRank   DonorRank @relation(fields: [donorRankId], references: [id])
+  grantedAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  grantedById Int?
+
+  @@map("user_donor_ranks")
+}
+
+// ─── Requests: Votes ─────────────────────────────────────────────────────────
+
+model RequestVote {
+  id        Int      @id @default(autoincrement())
+  requestId Int
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([requestId, userId])
+  @@index([requestId])
+  @@map("request_votes")
+}
+
+// ─── Messages: Drafts & Mass PM ──────────────────────────────────────────────
+
+model PmDraft {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  toUserId  Int?
+  subject   String   @db.VarChar(255)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("pm_drafts")
+}
+
+model MassMessage {
+  id        Int      @id @default(autoincrement())
+  senderId  Int
+  sender    User     @relation("MassMessageSender", fields: [senderId], references: [id])
+  subject   String   @db.VarChar(255)
+  body      String   @db.Text
+  sentCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("mass_messages")
+}
+
+// ─── Site History ─────────────────────────────────────────────────────────────
+
+model SiteHistory {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  title     String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("site_history")
 }

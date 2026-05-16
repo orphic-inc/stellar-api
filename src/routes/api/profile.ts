@@ -26,6 +26,8 @@ const PROFILE_SELECT = {
   dateRegistered: true,
   isArtist: true,
   isDonor: true,
+  disabled: true,
+  warned: true,
   uploaded: true,
   downloaded: true,
   totalEarned: true,

@@ -83,11 +83,93 @@ router.get(
             release: { select: { id: true, title: true } },
             user: { select: { id: true, username: true } }
           }
-        }
+        },
+        votes: { select: { userId: true } }
       }
     });
     if (!request) throw new AppError(404, 'Request not found');
-    res.json(requestModule.serializeRequest(request));
+    const serialized = requestModule.serializeRequest(request);
+    res.json({
+      ...serialized,
+      voteCount: request.voteCount,
+      votes: request.votes
+    });
+  })
+);
+
+// ─── POST /requests/:id/vote — toggle vote ─────────────────────────────────────
+
+router.post(
+  '/:id/vote',
+  requireAuth,
+  validateParams(requestIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+
+    const request = await prisma.request.findUnique({
+      where: { id, deletedAt: null },
+      select: { id: true }
+    });
+    if (!request) throw new AppError(404, 'Request not found');
+
+    const existing = await prisma.requestVote.findUnique({
+      where: { requestId_userId: { requestId: id, userId: req.user.id } }
+    });
+
+    if (existing) {
+      await prisma.$transaction([
+        prisma.requestVote.delete({
+          where: { requestId_userId: { requestId: id, userId: req.user.id } }
+        }),
+        prisma.request.update({
+          where: { id },
+          data: { voteCount: { decrement: 1 } }
+        })
+      ]);
+      return res.json({ voted: false });
+    }
+
+    await prisma.$transaction([
+      prisma.requestVote.create({
+        data: { requestId: id, userId: req.user.id }
+      }),
+      prisma.request.update({
+        where: { id },
+        data: { voteCount: { increment: 1 } }
+      })
+    ]);
+    res.json({ voted: true });
+  })
+);
+
+// ─── GET /requests/:id/bounty-history ──────────────────────────────────────────
+
+router.get(
+  '/:id/bounty-history',
+  requireAuth,
+  validateParams(requestIdParamsSchema),
+  authHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+
+    const request = await prisma.request.findUnique({
+      where: { id, deletedAt: null },
+      select: { id: true }
+    });
+    if (!request) throw new AppError(404, 'Request not found');
+
+    const [bounties, actions] = await Promise.all([
+      prisma.requestBounty.findMany({
+        where: { requestId: id },
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.requestAction.findMany({
+        where: { requestId: id },
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+
+    res.json({ bounties, actions });
   })
 );
 
@@ -141,7 +223,6 @@ router.post(
 );
 
 // ─── DELETE /requests/:id — owner or staff delete ──────────────────────────────
-// Owners may delete their own open requests; staff may delete any (including filled).
 
 router.delete(
   '/:id',

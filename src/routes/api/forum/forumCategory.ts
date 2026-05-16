@@ -22,16 +22,19 @@ const forumCategoryIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-// GET /api/forums/categories
+// GET /api/forums/categories — pass ?all=true to skip the empty-category filter (admin)
 router.get(
   '/',
   requireAuth,
   authHandler(async (req, res) => {
+    const showAll = req.query.all === 'true';
     const categories = await prisma.forumCategory.findMany({
       orderBy: { sort: 'asc' },
       include: {
         forums: {
-          where: { minClassRead: { lte: req.user.userRankLevel } },
+          where: showAll
+            ? {}
+            : { minClassRead: { lte: req.user.userRankLevel } },
           orderBy: { sort: 'asc' },
           include: {
             lastTopic: { select: { id: true, title: true } }
@@ -39,7 +42,9 @@ router.get(
         }
       }
     });
-    res.json(categories.filter((category) => category.forums.length > 0));
+    res.json(
+      showAll ? categories : categories.filter((c) => c.forums.length > 0)
+    );
   })
 );
 

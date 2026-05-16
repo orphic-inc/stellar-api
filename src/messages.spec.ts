@@ -1,4 +1,11 @@
-import { request, app, resetApiTestState, pmMock } from './test/apiTestHarness';
+import {
+  request,
+  app,
+  resetApiTestState,
+  prismaMock,
+  makeUserRank,
+  pmMock
+} from './test/apiTestHarness';
 
 const PAGED_EMPTY = { total: 0, page: 1, pageSize: 25, conversations: [] };
 
@@ -181,5 +188,158 @@ describe('POST /api/messages/bulk', () => {
       [1, 2],
       'markRead'
     );
+  });
+});
+
+// ─── PM drafts ────────────────────────────────────────────────────────────────
+
+const makeDraft = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  userId: 7,
+  toUserId: null,
+  subject: 'Draft subject',
+  body: 'Draft body',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  ...overrides
+});
+
+describe('GET /api/messages/drafts', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('returns the list of drafts for the current user', async () => {
+    prismaMock.pmDraft.findMany.mockResolvedValue([makeDraft()] as never);
+
+    const res = await request(app).get('/api/messages/drafts');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].subject).toBe('Draft subject');
+  });
+});
+
+describe('POST /api/messages/drafts', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('creates a draft and returns 201', async () => {
+    const draft = makeDraft({ subject: 'Hello', body: 'World' });
+    prismaMock.pmDraft.create.mockResolvedValue(draft as never);
+
+    const res = await request(app)
+      .post('/api/messages/drafts')
+      .send({ subject: 'Hello', body: 'World' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.subject).toBe('Hello');
+  });
+
+  it('returns 400 when subject or body is missing', async () => {
+    const res = await request(app)
+      .post('/api/messages/drafts')
+      .send({ subject: 'Only subject' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.pmDraft.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/messages/drafts/:id', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('updates the draft and returns it', async () => {
+    const updated = makeDraft({ subject: 'Updated', body: 'New body' });
+    prismaMock.pmDraft.findFirst.mockResolvedValue(makeDraft() as never);
+    prismaMock.pmDraft.update.mockResolvedValue(updated as never);
+
+    const res = await request(app)
+      .put('/api/messages/drafts/1')
+      .send({ subject: 'Updated', body: 'New body' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.subject).toBe('Updated');
+  });
+
+  it('returns 404 when the draft does not belong to the current user', async () => {
+    prismaMock.pmDraft.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/messages/drafts/1')
+      .send({ subject: 'S', body: 'B' });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('DELETE /api/messages/drafts/:id', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('deletes the draft and returns 204', async () => {
+    prismaMock.pmDraft.findFirst.mockResolvedValue(makeDraft() as never);
+    prismaMock.pmDraft.delete.mockResolvedValue(makeDraft() as never);
+
+    const res = await request(app).delete('/api/messages/drafts/1');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.pmDraft.delete).toHaveBeenCalledWith({
+      where: { id: 1 }
+    });
+  });
+
+  it('returns 404 when the draft does not belong to the current user', async () => {
+    prismaMock.pmDraft.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/messages/drafts/99');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Mass PM ──────────────────────────────────────────────────────────────────
+
+describe('POST /api/messages/mass', () => {
+  beforeEach(() => {
+    resetApiTestState();
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ staff: true })
+    );
+  });
+
+  it('sends mass PM to all non-disabled users and records the send count', async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 8 } as never,
+      { id: 9 } as never
+    ]);
+    prismaMock.privateConversation.create.mockResolvedValue({} as never);
+    prismaMock.massMessage.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .post('/api/messages/mass')
+      .send({ subject: 'Announcement', body: 'Site maintenance tonight.' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sentCount).toBe(2);
+    expect(prismaMock.massMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ sentCount: 2 })
+      })
+    );
+  });
+
+  it('returns 403 without staff permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app)
+      .post('/api/messages/mass')
+      .send({ subject: 'S', body: 'B' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 when subject or body is missing', async () => {
+    const res = await request(app)
+      .post('/api/messages/mass')
+      .send({ subject: 'Missing body' });
+
+    expect(res.status).toBe(400);
   });
 });
