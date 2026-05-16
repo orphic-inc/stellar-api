@@ -98,6 +98,27 @@ export const createPost = async (
       where: { id: forumId },
       data: { lastTopicId: forumTopicId, numPosts: { increment: 1 } }
     });
+
+    const subs = await tx.subscription.findMany({
+      where: { topicId: forumTopicId },
+      select: { userId: true }
+    });
+    const notifyUserIds = subs
+      .map((s) => s.userId)
+      .filter((uid) => uid !== authorId);
+    if (notifyUserIds.length > 0) {
+      await tx.notification.createMany({
+        data: notifyUserIds.map((uid) => ({
+          userId: uid,
+          quoterId: authorId,
+          page: 'forums' as const,
+          pageId: forumTopicId,
+          postId: post.id
+        })),
+        skipDuplicates: true
+      });
+    }
+
     return post;
   });
 

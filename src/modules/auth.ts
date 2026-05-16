@@ -4,6 +4,11 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 
+export const isPasswordBanned = async (password: string): Promise<boolean> => {
+  const found = await prisma.badPassword.findFirst({ where: { password } });
+  return !!found;
+};
+
 export const authUserSelect = {
   id: true,
   username: true,
@@ -43,7 +48,7 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
 });
 
 type RegisterResult =
-  | { ok: false; reason: 'user_exists' }
+  | { ok: false; reason: 'user_exists' | 'bad_password' }
   | { ok: true; user: AuthUser };
 
 type LoginResult =
@@ -59,6 +64,10 @@ export const registerUser = async (
     where: { OR: [{ email: email.toLowerCase() }, { username }] }
   });
   if (existing) return { ok: false, reason: 'user_exists' };
+
+  if (await isPasswordBanned(password)) {
+    return { ok: false, reason: 'bad_password' };
+  }
 
   const defaultRank = await prisma.userRank.findFirst({
     where: { level: 100 }
@@ -95,7 +104,8 @@ export const registerUser = async (
 
 export const loginUser = async (
   email: string,
-  password: string
+  password: string,
+  ipAddress?: string
 ): Promise<LoginResult> => {
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() }
@@ -108,7 +118,10 @@ export const loginUser = async (
 
   const authUser = await prisma.user.update({
     where: { id: user.id },
-    data: { lastLogin: new Date() },
+    data: {
+      lastLogin: new Date(),
+      ...(ipAddress ? { lastIp: ipAddress } : {})
+    },
     select: authUserSelect
   });
 

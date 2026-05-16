@@ -711,7 +711,11 @@ const Notification = registry.register(
       id: z.number(),
       username: z.string(),
       avatar: z.string().nullable().optional()
-    })
+    }),
+    source: z
+      .object({ title: z.string(), forumId: z.number().optional() })
+      .nullable()
+      .optional()
   })
 );
 

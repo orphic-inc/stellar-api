@@ -74,6 +74,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     warnedTimes: 0,
     communityPass: '',
     disablePm: false,
+    lastIp: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
@@ -480,6 +481,7 @@ export function makeRequest(overrides: Partial<Request> = {}): Request {
     fillerId: null,
     filledAt: null,
     filledContributionId: null,
+    voteCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,

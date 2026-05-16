@@ -1,29 +1,50 @@
+import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { auth as authConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
-import { validate, parsedBody } from '../../middleware/validate';
+import {
+  validate,
+  validateParams,
+  parsedBody,
+  parsedParams
+} from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import {
   loginSchema,
   registerSchema,
+  changePasswordSchema,
+  changeEmailSchema,
+  recoveryRequestSchema,
+  recoveryResetSchema,
   type LoginInput,
-  type RegisterInput
+  type RegisterInput,
+  type ChangePasswordInput,
+  type ChangeEmailInput,
+  type RecoveryRequestInput,
+  type RecoveryResetInput
 } from '../../schemas/auth';
-import { authUserSelect, registerUser, loginUser } from '../../modules/auth';
+import {
+  authUserSelect,
+  registerUser,
+  loginUser,
+  isPasswordBanned
+} from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
+import { z } from 'zod';
 
 const router = express.Router();
 
 const TOKEN_TTL_SECONDS = 3600; // 1 hour
 const TOKEN_TTL_MS = TOKEN_TTL_SECONDS * 1000;
 
-const issueToken = (userId: number): Promise<string> =>
+const issueToken = (userId: number, sessionId?: string): Promise<string> =>
   new Promise((resolve, reject) => {
     jwt.sign(
-      { user: { id: userId } },
+      { user: { id: userId, ...(sessionId ? { sessionId } : {}) } },
       authConfig.jwtSecret,
       { expiresIn: TOKEN_TTL_SECONDS },
       (err, token) => {
@@ -41,11 +62,34 @@ const cookieOptions = {
   maxAge: TOKEN_TTL_MS
 };
 
-// POST /api/auth/logout
-router.post('/logout', (_req: Request, res: Response) => {
-  res.clearCookie('token', { sameSite: 'lax', httpOnly: true });
-  res.status(204).send();
+const sessionIdParamsSchema = z.object({
+  id: z.string().min(1)
 });
+
+// POST /api/auth/logout
+router.post(
+  '/logout',
+  asyncHandler(async (req: Request, res: Response) => {
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, authConfig.jwtSecret) as {
+          user: { id: number; sessionId?: string };
+        };
+        if (decoded.user.sessionId) {
+          await prisma.userSession.updateMany({
+            where: { id: decoded.user.sessionId, revokedAt: null },
+            data: { revokedAt: new Date() }
+          });
+        }
+      } catch {
+        // ignore invalid token on logout
+      }
+    }
+    res.clearCookie('token', { sameSite: 'lax', httpOnly: true });
+    res.status(204).send();
+  })
+);
 
 // POST /api/auth/register — public self-registration
 router.post(
@@ -83,6 +127,9 @@ router.post(
 
     const result = await registerUser(username, email, password);
     if (!result.ok) {
+      if (result.reason === 'bad_password') {
+        return res.status(400).json({ msg: 'Password is not allowed' });
+      }
       return res.status(400).json({ msg: 'User already exists' });
     }
 
@@ -113,6 +160,192 @@ router.get(
   })
 );
 
+// POST /api/auth/password — change password
+router.post(
+  '/password',
+  requireAuth,
+  validate(changePasswordSchema),
+  authHandler(async (req, res) => {
+    const { currentPassword, newPassword } =
+      parsedBody<ChangePasswordInput>(res);
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, password: true }
+    });
+    if (!user) return res.status(401).json({ msg: 'Unauthorized' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch)
+      return res.status(400).json({ msg: 'Current password is incorrect' });
+
+    if (await isPasswordBanned(newPassword)) {
+      return res.status(400).json({ msg: 'Password is not allowed' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { password: hashed }
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: req.user.id, revokedAt: null },
+        data: { revokedAt: new Date() }
+      })
+    ]);
+
+    res.status(204).send();
+  })
+);
+
+// PUT /api/auth/email — change email
+router.put(
+  '/email',
+  requireAuth,
+  validate(changeEmailSchema),
+  authHandler(async (req, res) => {
+    const { newEmail, password } = parsedBody<ChangeEmailInput>(res);
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true, password: true }
+    });
+    if (!user) return res.status(401).json({ msg: 'Unauthorized' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ msg: 'Password is incorrect' });
+
+    const taken = await prisma.user.findUnique({
+      where: { email: newEmail.toLowerCase() }
+    });
+    if (taken) return res.status(400).json({ msg: 'Email already in use' });
+
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
+
+    await prisma.$transaction([
+      prisma.userEmailHistory.create({
+        data: {
+          userId: req.user.id,
+          oldEmail: user.email,
+          newEmail: newEmail.toLowerCase(),
+          ipAddress: ip
+        }
+      }),
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { email: newEmail.toLowerCase() }
+      })
+    ]);
+
+    res.json({ msg: 'Email updated' });
+  })
+);
+
+// POST /api/auth/recovery/request — request account recovery
+router.post(
+  '/recovery/request',
+  authLimiter,
+  validate(recoveryRequestSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email } = parsedBody<RecoveryRequestInput>(res);
+
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true }
+    });
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      await prisma.accountRecovery.create({
+        data: { userId: user.id, token, expiresAt }
+      });
+      console.log(`[recovery] token for user ${user.id}: ${token}`);
+    }
+
+    res.json({ msg: 'If that email exists, a recovery link has been sent' });
+  })
+);
+
+// POST /api/auth/recovery/reset — reset password with recovery token
+router.post(
+  '/recovery/reset',
+  authLimiter,
+  validate(recoveryResetSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { token, newPassword } = parsedBody<RecoveryResetInput>(res);
+
+    const recovery = await prisma.accountRecovery.findFirst({
+      where: { token, usedAt: null, expiresAt: { gt: new Date() } }
+    });
+    if (!recovery) {
+      return res.status(400).json({ msg: 'Invalid or expired recovery token' });
+    }
+
+    if (await isPasswordBanned(newPassword)) {
+      return res.status(400).json({ msg: 'Password is not allowed' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: recovery.userId },
+        data: { password: hashed }
+      }),
+      prisma.accountRecovery.update({
+        where: { id: recovery.id },
+        data: { usedAt: new Date() }
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: recovery.userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      })
+    ]);
+
+    res.json({ msg: 'Password reset successfully' });
+  })
+);
+
+// GET /api/auth/sessions — list active sessions
+router.get(
+  '/sessions',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const sessions = await prisma.userSession.findMany({
+      where: { userId: req.user.id, revokedAt: null },
+      orderBy: { lastActiveAt: 'desc' }
+    });
+    res.json(sessions);
+  })
+);
+
+// DELETE /api/auth/sessions/:id — revoke a session
+router.delete(
+  '/sessions/:id',
+  requireAuth,
+  validateParams(sessionIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: string }>(res);
+
+    const session = await prisma.userSession.findFirst({
+      where: { id, userId: req.user.id }
+    });
+    if (!session) return res.status(404).json({ msg: 'Session not found' });
+
+    await prisma.userSession.update({
+      where: { id },
+      data: { revokedAt: new Date() }
+    });
+    res.status(204).send();
+  })
+);
+
 // POST /api/auth — login
 router.post(
   '/',
@@ -121,14 +354,29 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = parsedBody<LoginInput>(res);
 
-    const result = await loginUser(email, password);
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
+
+    const result = await loginUser(email, password, ip);
     if (!result.ok) {
       if (result.reason === 'disabled')
         return res.status(403).json({ msg: 'Account disabled' });
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
-    const token = await issueToken(result.user.id);
+    const session = await prisma.userSession.create({
+      data: {
+        userId: result.user.id,
+        ipAddress: ip,
+        userAgent: req.headers['user-agent'] ?? ''
+      }
+    });
+
+    const token = await issueToken(result.user.id, session.id);
     res.cookie('token', token, cookieOptions);
     res.json({ user: result.user });
   })

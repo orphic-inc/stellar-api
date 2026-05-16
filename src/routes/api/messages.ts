@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -24,6 +25,12 @@ import {
   type BulkMessageActionInput,
   type MessageListQueryInput
 } from '../../schemas/pm';
+import {
+  pmDraftSchema,
+  massPmSchema,
+  type PmDraftInput,
+  type MassPmInput
+} from '../../schemas/user';
 import {
   listInbox,
   listSentbox,
@@ -47,6 +54,10 @@ const sendLimiter = rateLimit({
 });
 
 const conversationIdSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+
+const draftIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
@@ -81,6 +92,136 @@ router.get(
     const { page } = parsedQuery<MessageListQueryInput>(res);
     const result = await listSentbox(req.user.id, page);
     res.json(result);
+  })
+);
+
+// GET /api/messages/drafts — list drafts
+router.get(
+  '/drafts',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const drafts = await prisma.pmDraft.findMany({
+      where: { userId: req.user.id },
+      orderBy: { updatedAt: 'desc' }
+    });
+    res.json(drafts);
+  })
+);
+
+// POST /api/messages/drafts — create draft
+router.post(
+  '/drafts',
+  requireAuth,
+  validate(pmDraftSchema),
+  authHandler(async (req, res) => {
+    const { toUserId, subject, body } = parsedBody<PmDraftInput>(res);
+    const draft = await prisma.pmDraft.create({
+      data: {
+        userId: req.user.id,
+        ...(toUserId !== undefined && { toUserId }),
+        subject,
+        body
+      }
+    });
+    res.status(201).json(draft);
+  })
+);
+
+// PUT /api/messages/drafts/:id — update draft
+router.put(
+  '/drafts/:id',
+  requireAuth,
+  validateParams(draftIdSchema),
+  validate(pmDraftSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { toUserId, subject, body } = parsedBody<PmDraftInput>(res);
+
+    const draft = await prisma.pmDraft.findFirst({
+      where: { id, userId: req.user.id }
+    });
+    if (!draft) return res.status(404).json({ msg: 'Draft not found' });
+
+    const updated = await prisma.pmDraft.update({
+      where: { id },
+      data: {
+        ...(toUserId !== undefined ? { toUserId } : { toUserId: null }),
+        subject,
+        body
+      }
+    });
+    res.json(updated);
+  })
+);
+
+// DELETE /api/messages/drafts/:id — delete draft
+router.delete(
+  '/drafts/:id',
+  requireAuth,
+  validateParams(draftIdSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const draft = await prisma.pmDraft.findFirst({
+      where: { id, userId: req.user.id }
+    });
+    if (!draft) return res.status(404).json({ msg: 'Draft not found' });
+    await prisma.pmDraft.delete({ where: { id } });
+    res.status(204).send();
+  })
+);
+
+// POST /api/messages/mass — send mass PM
+router.post(
+  '/mass',
+  ...requirePermission('staff'),
+  validate(massPmSchema),
+  authHandler(async (req, res) => {
+    const { subject, body, targetRankId } = parsedBody<MassPmInput>(res);
+
+    const users = await prisma.user.findMany({
+      where: {
+        disabled: false,
+        ...(targetRankId !== undefined ? { userRankId: targetRankId } : {})
+      },
+      select: { id: true },
+      take: 1000
+    });
+
+    let sentCount = 0;
+    for (const target of users) {
+      if (target.id === req.user.id) continue;
+      await prisma.privateConversation.create({
+        data: {
+          subject,
+          messages: { create: { senderId: req.user.id, body } },
+          participants: {
+            create: [
+              {
+                userId: target.id,
+                inInbox: true,
+                inSentbox: false,
+                isRead: false,
+                receivedAt: new Date()
+              },
+              {
+                userId: req.user.id,
+                inInbox: false,
+                inSentbox: true,
+                isRead: true,
+                sentAt: new Date()
+              }
+            ]
+          }
+        }
+      });
+      sentCount++;
+    }
+
+    await prisma.massMessage.create({
+      data: { senderId: req.user.id, subject, body, sentCount }
+    });
+
+    res.json({ sentCount });
   })
 );
 

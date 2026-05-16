@@ -42,6 +42,9 @@ import messagesRouter from './routes/api/messages';
 import staffInboxRouter from './routes/api/staffInbox';
 import reportsRouter from './routes/api/reports';
 import settingsRouter from './routes/api/settings';
+import bookmarksRouter from './routes/api/bookmarks';
+import siteHistoryRouter from './routes/api/siteHistory';
+import dnuRouter from './routes/api/communities/dnu';
 
 const log = getLogger('app');
 
@@ -96,6 +99,9 @@ export const createApp = () => {
   app.use('/api/staff-inbox', staffInboxRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/bookmarks', bookmarksRouter);
+  app.use('/api/site-history', siteHistoryRouter);
+  app.use('/api/communities/:communityId/dnu', dnuRouter);
 
   app.use(
     (

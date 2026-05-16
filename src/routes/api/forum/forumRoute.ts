@@ -69,6 +69,49 @@ router.get(
   })
 );
 
+// POST /api/forums/:id/catchup — mark all topics in forum as read
+router.post(
+  '/:id/catchup',
+  requireAuth,
+  validateParams(forumIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const forum = await prisma.forum.findUnique({ where: { id } });
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res.status(403).json({ msg: 'Insufficient class' });
+    }
+
+    const topics = await prisma.forumTopic.findMany({
+      where: { forumId: id, deletedAt: null, lastPostId: { not: null } },
+      select: { id: true, lastPostId: true }
+    });
+
+    if (topics.length > 0) {
+      await prisma.$transaction(
+        topics.map((t) =>
+          prisma.forumLastReadTopic.upsert({
+            where: {
+              userId_forumTopicId: {
+                userId: req.user.id,
+                forumTopicId: t.id
+              }
+            },
+            create: {
+              userId: req.user.id,
+              forumTopicId: t.id,
+              forumPostId: t.lastPostId!
+            },
+            update: { forumPostId: t.lastPostId! }
+          })
+        )
+      );
+    }
+
+    res.json({ markedRead: topics.length });
+  })
+);
+
 // POST /api/forums — requires forums_manage permission
 router.post(
   '/',
