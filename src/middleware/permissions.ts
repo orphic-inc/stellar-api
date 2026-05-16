@@ -16,6 +16,8 @@ export const VALID_PERMISSIONS = [
   'users_edit',
   'users_warn',
   'users_disable',
+  'wiki_edit',
+  'wiki_manage',
   'staff',
   'admin'
 ] as const;
