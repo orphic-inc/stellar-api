@@ -380,6 +380,9 @@ model User {
   siteHistoryEntries        SiteHistory[]
   requestVotes              RequestVote[]
   donorRank                 UserDonorRank?
+  wikiPagesAuthored         WikiPage[]     @relation("WikiPageAuthor")
+  wikiRevisionsAuthored     WikiRevision[] @relation("WikiRevisionAuthor")
+  wikiAliasesCreated        WikiAlias[]    @relation("WikiAliasCreator")
 
   @@index([userRankId])
   @@map("users")
@@ -1785,4 +1788,54 @@ model SiteHistory {
   updatedAt DateTime @updatedAt
 
   @@map("site_history")
+}
+
+// ─── Wiki ─────────────────────────────────────────────────────────────────────
+
+model WikiPage {
+  id           Int            @id @default(autoincrement())
+  title        String         @db.VarChar(100)
+  body         String         @db.Text
+  slug         String         @unique @db.VarChar(50)
+  revision     Int            @default(1)
+  minReadLevel Int            @default(0)
+  minEditLevel Int            @default(0)
+  authorId     Int
+  author       User           @relation("WikiPageAuthor", fields: [authorId], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+  aliases      WikiAlias[]
+  revisions    WikiRevision[]
+
+  @@index([deletedAt])
+  @@map("wiki_pages")
+}
+
+model WikiRevision {
+  id        Int      @id @default(autoincrement())
+  pageId    Int
+  page      WikiPage @relation(fields: [pageId], references: [id])
+  revision  Int
+  title     String   @db.VarChar(100)
+  body      String   @db.Text
+  authorId  Int
+  author    User     @relation("WikiRevisionAuthor", fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([pageId, revision])
+  @@index([pageId])
+  @@map("wiki_revisions")
+}
+
+model WikiAlias {
+  alias     String   @id @db.VarChar(50)
+  pageId    Int
+  page      WikiPage @relation(fields: [pageId], references: [id])
+  userId    Int
+  user      User     @relation("WikiAliasCreator", fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([pageId])
+  @@map("wiki_aliases")
 }
