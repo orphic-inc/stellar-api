@@ -21,8 +21,10 @@ module.exports = {
         ignore: [
           '@asteasolutions/zod-to-openapi',
           '@prisma/client',
+          'bcryptjs',
           'express-rate-limit',
-          'jest-mock-extended'
+          'jest-mock-extended',
+          'nodemailer'
         ]
       }
     ],
