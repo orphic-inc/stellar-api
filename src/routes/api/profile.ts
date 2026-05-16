@@ -144,7 +144,9 @@ router.post(
         .status(409)
         .json({ msg: 'An invite has already been sent to that address' });
     }
-    res.status(201).json({ inviteKey: result.inviteKey });
+    res
+      .status(201)
+      .json({ inviteKey: result.inviteKey, emailSent: result.emailSent });
   })
 );
 

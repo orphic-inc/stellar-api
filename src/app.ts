@@ -104,14 +104,19 @@ export const createApp = () => {
       res: Response,
       _next: NextFunction
     ) => {
-      log.error('Unhandled error', {
+      const status = err.statusCode ?? 500;
+      const logMeta = {
         message: err.message,
         stack: err.stack,
         route: req.path,
         method: req.method,
         userId: req.user?.id
-      });
-      const status = err.statusCode ?? 500;
+      };
+      if (status >= 500) {
+        log.error('Unhandled error', logMeta);
+      } else {
+        log.warn('Request error', logMeta);
+      }
       const message =
         process.env.NODE_ENV === 'production' && status === 500
           ? 'Internal server error'

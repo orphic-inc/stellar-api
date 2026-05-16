@@ -218,7 +218,10 @@ export async function listReports(opts: {
   } = opts;
 
   const where: Prisma.ReportWhereInput = {};
-  if (status !== 'all') where.status = status;
+  if (status !== 'all') {
+    where.status =
+      claimedByMe && status === 'Open' ? { in: ['Open', 'Claimed'] } : status;
+  }
   if (targetType !== 'all') where.targetType = targetType;
   if (claimedByMe) where.claimedById = staffUserId;
 

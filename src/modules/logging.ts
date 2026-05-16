@@ -21,18 +21,18 @@ const createLogger = (
     let formatter = (info: winston.Logform.TransformableInfo) =>
       `[${info.level}][${info.label}] ${info.message}`;
 
-    const formatters: Array<typeof winston.format> = [
-      label({ label: categoryLabel }) as any
+    const formatters: winston.Logform.Format[] = [
+      label({ label: categoryLabel })
     ];
 
     if (config.timestampFormat) {
-      formatters.push(timestamp({ format: config.timestampFormat }) as any);
+      formatters.push(timestamp({ format: config.timestampFormat }));
       formatter = (info) =>
         `${info.timestamp} [${info.level}][${info.label}] ${info.message}`;
     }
 
-    formatters.push(prettyPrint() as any, printf(formatter) as any);
-    fmt = combine(...(formatters as any));
+    formatters.push(prettyPrint(), printf(formatter));
+    fmt = combine(...formatters);
   }
 
   container.add(category, {

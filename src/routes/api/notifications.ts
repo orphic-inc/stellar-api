@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';

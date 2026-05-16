@@ -166,7 +166,8 @@ describe('API auth/profile/user flows', () => {
   it('returns the invite key on successful invite creation', async () => {
     createInviteMock.mockResolvedValue({
       ok: true,
-      inviteKey: 'invite-key-123'
+      inviteKey: 'invite-key-123',
+      emailSent: true
     });
 
     const res = await request(app)
@@ -177,7 +178,7 @@ describe('API auth/profile/user flows', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body).toEqual({ inviteKey: 'invite-key-123' });
+    expect(res.body).toEqual({ inviteKey: 'invite-key-123', emailSent: true });
   });
 
   it('returns the refreshed profile payload after updating /profile/me', async () => {
