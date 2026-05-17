@@ -15,7 +15,7 @@ jest.mock('../lib/prisma', () => ({
 
 import {
   computeRatio,
-  getDownloadBracket,
+  getConsumptionBracket,
   computeRequiredRatio,
   getEligibleContributionBytes,
   getRatioStats
@@ -38,30 +38,30 @@ describe('computeRatio', () => {
   });
 });
 
-// ─── getDownloadBracket ───────────────────────────────────────────────────────
+// ─── getConsumptionBracket ───────────────────────────────────────────────────────
 
-describe('getDownloadBracket', () => {
+describe('getConsumptionBracket', () => {
   it('0 downloaded → 0–5 GiB bracket (no requirement)', () => {
-    const b = getDownloadBracket(0n);
+    const b = getConsumptionBracket(0n);
     expect(b.maxRequired).toBe(0);
     expect(b.minRequired).toBe(0);
     expect(b.label).toBe('0–5 GiB');
   });
 
   it('exactly 5 GiB → 5–10 GiB bracket', () => {
-    const b = getDownloadBracket(5n * GiB);
+    const b = getConsumptionBracket(5n * GiB);
     expect(b.maxRequired).toBe(0.15);
     expect(b.label).toBe('5–10 GiB');
   });
 
   it('25 GiB → 20–30 GiB bracket', () => {
-    const b = getDownloadBracket(25n * GiB);
+    const b = getConsumptionBracket(25n * GiB);
     expect(b.maxRequired).toBe(0.3);
     expect(b.minRequired).toBe(0.05);
   });
 
   it('200 GiB → 100+ GiB bracket (max requirement)', () => {
-    const b = getDownloadBracket(200n * GiB);
+    const b = getConsumptionBracket(200n * GiB);
     expect(b.maxRequired).toBe(0.6);
     expect(b.minRequired).toBe(0.6);
     expect(b.label).toBe('100+ GiB');
@@ -139,7 +139,7 @@ describe('getRatioStats', () => {
   it('returns correct stats for a user with no downloads', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
       totalEarned: 0n,
-      downloaded: 0n
+      consumed: 0n
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
 
@@ -155,7 +155,7 @@ describe('getRatioStats', () => {
     // 7 GiB downloaded (5–10 GiB bracket), 0 earned, 0 eligible contributions
     mockPrismaUser.findUnique.mockResolvedValue({
       totalEarned: 0n,
-      downloaded: 7n * GiB
+      consumed: 7n * GiB
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
 
@@ -169,14 +169,14 @@ describe('getRatioStats', () => {
   it('serializes BigInts as strings', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
       totalEarned: 5n * GiB,
-      downloaded: 10n * GiB
+      consumed: 10n * GiB
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
 
     const stats = await getRatioStats(1);
 
     expect(typeof stats.totalEarned).toBe('string');
-    expect(typeof stats.downloaded).toBe('string');
+    expect(typeof stats.consumed).toBe('string');
     expect(typeof stats.eligibleContributionBytes).toBe('string');
   });
 });

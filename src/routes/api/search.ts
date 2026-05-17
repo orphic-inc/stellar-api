@@ -425,8 +425,8 @@ const USER_SELECT_STAFF = {
   lastLogin: true,
   disabled: true,
   ratio: true,
-  uploaded: true,
-  downloaded: true
+  contributed: true,
+  consumed: true
 } as const;
 
 router.get(

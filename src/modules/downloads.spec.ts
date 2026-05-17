@@ -52,8 +52,8 @@ const makeContribution = (overrides = {}) => ({
 
 const makeUser = (overrides = {}) => ({
   canDownload: true,
-  uploaded: BigInt('1073741824'),
-  downloaded: BigInt('0'),
+  contributed: BigInt('1073741824'),
+  consumed: BigInt('0'),
   totalEarned: BigInt('0'),
   ...overrides
 });
@@ -104,7 +104,7 @@ describe('grantDownloadAccess', () => {
   it('throws 400 when balance is insufficient', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(
-      makeUser({ uploaded: BigInt(1000) })
+      makeUser({ contributed: BigInt(1000) })
     );
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     await expect(grantDownloadAccess(7, 5)).rejects.toMatchObject({
@@ -159,7 +159,7 @@ describe('grantDownloadAccess', () => {
 
     expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ uploaded: { decrement: cost } })
+        data: expect.objectContaining({ contributed: { decrement: cost } })
       })
     );
     expect(mockTx.user.update).toHaveBeenCalledWith(
@@ -186,10 +186,10 @@ describe('grantDownloadAccess', () => {
 
     expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: 7, uploaded: { gte: cost } }),
+        where: expect.objectContaining({ id: 7, contributed: { gte: cost } }),
         data: expect.objectContaining({
-          uploaded: { decrement: cost },
-          downloaded: { increment: cost },
+          contributed: { decrement: cost },
+          consumed: { increment: cost },
           ratio: expect.any(Number)
         })
       })
@@ -198,7 +198,7 @@ describe('grantDownloadAccess', () => {
       expect.objectContaining({
         where: { id: 99 },
         data: {
-          uploaded: { increment: cost },
+          contributed: { increment: cost },
           totalEarned: { increment: cost }
         }
       })
@@ -247,9 +247,9 @@ describe('reverseDownloadAccess', () => {
     mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
     // findUniqueOrThrow called for consumer then contributor
     mockTx.user.findUniqueOrThrow
-      .mockResolvedValueOnce({ downloaded: grant.amountBytes, totalEarned: 0n }) // consumer
+      .mockResolvedValueOnce({ consumed: grant.amountBytes, totalEarned: 0n }) // consumer
       .mockResolvedValueOnce({
-        downloaded: 0n,
+        consumed: 0n,
         totalEarned: grant.amountBytes
       }); // contributor
     mockTx.user.update.mockResolvedValue(undefined);
@@ -268,7 +268,7 @@ describe('reverseDownloadAccess', () => {
       expect.objectContaining({
         where: { id: grant.contributorId },
         data: expect.objectContaining({
-          uploaded: { decrement: grant.amountBytes },
+          contributed: { decrement: grant.amountBytes },
           totalEarned: { decrement: grant.amountBytes }
         })
       })
@@ -278,8 +278,8 @@ describe('reverseDownloadAccess', () => {
       expect.objectContaining({
         where: { id: grant.consumerId },
         data: expect.objectContaining({
-          uploaded: { increment: grant.amountBytes },
-          downloaded: { decrement: grant.amountBytes }
+          contributed: { increment: grant.amountBytes },
+          consumed: { decrement: grant.amountBytes }
         })
       })
     );

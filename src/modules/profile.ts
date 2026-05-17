@@ -26,8 +26,8 @@ type UserSettingsView = {
   notificationMethod: NotificationMethod;
   showEmail: boolean;
   showLastSeen: boolean;
-  showUploadedStats: boolean;
-  showDownloadedStats: boolean;
+  showContributedStats: boolean;
+  showConsumedStats: boolean;
   showRatioStats: boolean;
 };
 
@@ -37,8 +37,8 @@ type InviteTreeNode = {
   email?: string;
   joinedAt: string;
   lastSeen: string | null;
-  uploaded: string;
-  downloaded: string;
+  contributed: string;
+  consumed: string;
   ratio: string;
   children: InviteTreeNode[];
 };
@@ -98,8 +98,8 @@ type ProfilePercentile = {
 };
 
 type ProfilePercentileSummary = {
-  uploaded: ProfilePercentile;
-  downloaded: ProfilePercentile;
+  contributed: ProfilePercentile;
+  consumed: ProfilePercentile;
   contributions: ProfilePercentile;
   forumPosts: ProfilePercentile;
   requestsFilled: ProfilePercentile;
@@ -146,8 +146,8 @@ const PROFILE_BASE_SELECT = {
   disabled: true,
   warned: true,
   inviteCount: true,
-  uploaded: true,
-  downloaded: true,
+  contributed: true,
+  consumed: true,
   totalEarned: true,
   ratio: true,
   userRank: { select: { id: true, name: true, color: true, badge: true } },
@@ -190,8 +190,8 @@ const PROFILE_BASE_SELECT = {
       notificationMethod: true,
       showEmail: true,
       showLastSeen: true,
-      showUploadedStats: true,
-      showDownloadedStats: true,
+      showContributedStats: true,
+      showConsumedStats: true,
       showRatioStats: true
     }
   }
@@ -211,8 +211,8 @@ const buildInviteTree = (
       email: string;
       dateRegistered: Date;
       lastLogin: Date | null;
-      uploaded: bigint;
-      downloaded: bigint;
+      contributed: bigint;
+      consumed: bigint;
       ratio: number;
     };
   }>,
@@ -232,8 +232,8 @@ const buildInviteTree = (
       ...(includeEmail ? { email: row.user.email } : {}),
       joinedAt: row.user.dateRegistered.toISOString(),
       lastSeen: row.user.lastLogin?.toISOString() ?? null,
-      uploaded: row.user.uploaded.toString(),
-      downloaded: row.user.downloaded.toString(),
+      contributed: row.user.contributed.toString(),
+      consumed: row.user.consumed.toString(),
       ratio: row.user.ratio.toFixed(2),
       children: []
     };
@@ -564,13 +564,13 @@ const getPercentileSummary = async (
       SELECT COUNT(*)::bigint AS count
       FROM "users"
       WHERE "disabled" = false
-        AND "uploaded" > ${user.uploaded}
+        AND "contributed" > ${user.contributed}
     `,
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
       FROM "users"
       WHERE "disabled" = false
-        AND "downloaded" > ${user.downloaded}
+        AND "consumed" > ${user.consumed}
     `,
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
@@ -610,7 +610,7 @@ const getPercentileSummary = async (
 
   const totalUsers = Number(totalRow[0]?.count ?? BigInt(0));
 
-  const [uploaded, downloaded, contributions, forumPosts, requestsFilled] =
+  const [contributed, consumed, contributions, forumPosts, requestsFilled] =
     await Promise.all([
       buildPercentile(totalUsers, Number(uploadedRows[0]?.count ?? BigInt(0))),
       buildPercentile(
@@ -626,8 +626,8 @@ const getPercentileSummary = async (
     ]);
 
   return {
-    uploaded,
-    downloaded,
+    contributed,
+    consumed,
     contributions,
     forumPosts,
     requestsFilled
@@ -691,9 +691,9 @@ const buildProfileView = async (
   const canSeeLastSeen =
     viewer.isOwner || viewer.isStaff || settings.showLastSeen;
   const canSeeUploaded =
-    viewer.isOwner || viewer.isStaff || settings.showUploadedStats;
+    viewer.isOwner || viewer.isStaff || settings.showContributedStats;
   const canSeeDownloaded =
-    viewer.isOwner || viewer.isStaff || settings.showDownloadedStats;
+    viewer.isOwner || viewer.isStaff || settings.showConsumedStats;
   const canSeeRatio =
     viewer.isOwner || viewer.isStaff || settings.showRatioStats;
   const canSeeSnatches = viewer.isOwner || viewer.isStaff;
@@ -723,8 +723,8 @@ const buildProfileView = async (
                 email: true,
                 dateRegistered: true,
                 lastLogin: true,
-                uploaded: true,
-                downloaded: true,
+                contributed: true,
+                consumed: true,
                 ratio: true
               }
             }
@@ -751,13 +751,13 @@ const buildProfileView = async (
     warned: user.warned?.toISOString() ?? null,
     inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
     stats: {
-      uploaded: canSeeUploaded ? user.uploaded.toString() : null,
-      downloaded: canSeeDownloaded ? user.downloaded.toString() : null,
+      contributed: canSeeUploaded ? user.contributed.toString() : null,
+      consumed: canSeeDownloaded ? user.consumed.toString() : null,
       totalEarned: canSeeRatio ? user.totalEarned.toString() : null,
       ratio: canSeeRatio ? user.ratio.toFixed(2) : null,
       buffer:
         canSeeUploaded || canSeeDownloaded
-          ? (user.uploaded - user.downloaded).toString()
+          ? (user.contributed - user.consumed).toString()
           : null
     },
     userRank: user.userRank
@@ -784,8 +784,8 @@ const buildProfileView = async (
           notificationMethod: settings.notificationMethod,
           showEmail: settings.showEmail,
           showLastSeen: settings.showLastSeen,
-          showUploadedStats: settings.showUploadedStats,
-          showDownloadedStats: settings.showDownloadedStats,
+          showContributedStats: settings.showContributedStats,
+          showConsumedStats: settings.showConsumedStats,
           showRatioStats: settings.showRatioStats
         }
       : undefined,
@@ -865,8 +865,8 @@ export const updateProfile = async (
     notificationMethod?: NotificationMethod;
     showEmail?: boolean;
     showLastSeen?: boolean;
-    showUploadedStats?: boolean;
-    showDownloadedStats?: boolean;
+    showContributedStats?: boolean;
+    showConsumedStats?: boolean;
     showRatioStats?: boolean;
   }
 ) => {
@@ -920,11 +920,11 @@ export const updateProfile = async (
         ...(data.showLastSeen !== undefined && {
           showLastSeen: data.showLastSeen
         }),
-        ...(data.showUploadedStats !== undefined && {
-          showUploadedStats: data.showUploadedStats
+        ...(data.showContributedStats !== undefined && {
+          showContributedStats: data.showContributedStats
         }),
-        ...(data.showDownloadedStats !== undefined && {
-          showDownloadedStats: data.showDownloadedStats
+        ...(data.showConsumedStats !== undefined && {
+          showConsumedStats: data.showConsumedStats
         }),
         ...(data.showRatioStats !== undefined && {
           showRatioStats: data.showRatioStats

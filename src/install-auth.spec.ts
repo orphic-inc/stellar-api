@@ -71,8 +71,8 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       canDownload: true,
       inviteCount: 0,
-      uploaded: '0',
-      downloaded: '0',
+      contributed: '0',
+      consumed: '0',
       ratio: 0,
       dateRegistered: '2026-04-24T00:00:00.000Z',
       lastLogin: '2026-04-24T00:00:00.000Z',
@@ -89,7 +89,7 @@ describe('API auth/profile/user flows', () => {
     );
     bcryptMock.compare.mockResolvedValue(true);
     prismaMock.user.update.mockResolvedValue(
-      asUserMock({ ...authUser, uploaded: BigInt(0), downloaded: BigInt(0) })
+      asUserMock({ ...authUser, contributed: BigInt(0), consumed: BigInt(0) })
     );
     prismaMock.userSession.create.mockResolvedValue({
       id: 'test-session-id',
@@ -213,8 +213,8 @@ describe('API auth/profile/user flows', () => {
         notificationMethod: 'Popup' as const,
         showEmail: false,
         showLastSeen: false,
-        showUploadedStats: true,
-        showDownloadedStats: true,
+        showContributedStats: true,
+        showConsumedStats: true,
         showRatioStats: true
       },
       userRank: { id: 1, name: 'User', color: '', badge: '' },
@@ -228,8 +228,8 @@ describe('API auth/profile/user flows', () => {
       warned: null,
       inviteCount: 0,
       stats: {
-        uploaded: '0',
-        downloaded: '0',
+        contributed: '0',
+        consumed: '0',
         totalEarned: '0',
         ratio: '1.00',
         buffer: '0'
@@ -245,8 +245,8 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 0
       },
       percentiles: {
-        uploaded: { percentile: 100, rank: 1, total: 1 },
-        downloaded: { percentile: 100, rank: 1, total: 1 },
+        contributed: { percentile: 100, rank: 1, total: 1 },
+        consumed: { percentile: 100, rank: 1, total: 1 },
         contributions: { percentile: 100, rank: 1, total: 1 },
         forumPosts: { percentile: 100, rank: 1, total: 1 },
         requestsFilled: { percentile: 100, rank: 1, total: 1 }
@@ -288,8 +288,8 @@ describe('API auth/profile/user flows', () => {
       warned: null,
       inviteCount: 1,
       stats: {
-        uploaded: '100',
-        downloaded: '50',
+        contributed: '100',
+        consumed: '50',
         totalEarned: '100',
         ratio: '2.00',
         buffer: '50'
@@ -311,8 +311,8 @@ describe('API auth/profile/user flows', () => {
         notificationMethod: 'Popup',
         showEmail: true,
         showLastSeen: true,
-        showUploadedStats: true,
-        showDownloadedStats: true,
+        showContributedStats: true,
+        showConsumedStats: true,
         showRatioStats: true
       },
       activitySummary: {
@@ -326,8 +326,8 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 8
       },
       percentiles: {
-        uploaded: { percentile: 90, rank: 2, total: 10 },
-        downloaded: { percentile: 80, rank: 3, total: 10 },
+        contributed: { percentile: 90, rank: 2, total: 10 },
+        consumed: { percentile: 80, rank: 3, total: 10 },
         contributions: { percentile: 70, rank: 4, total: 10 },
         forumPosts: { percentile: 60, rank: 5, total: 10 },
         requestsFilled: { percentile: 50, rank: 6, total: 10 }
@@ -364,8 +364,8 @@ describe('API auth/profile/user flows', () => {
       warned: null,
       inviteCount: null,
       stats: {
-        uploaded: null,
-        downloaded: null,
+        contributed: null,
+        consumed: null,
         totalEarned: null,
         ratio: null,
         buffer: null
@@ -389,8 +389,8 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 0
       },
       percentiles: {
-        uploaded: { percentile: 10, rank: 9, total: 10 },
-        downloaded: { percentile: 10, rank: 9, total: 10 },
+        contributed: { percentile: 10, rank: 9, total: 10 },
+        consumed: { percentile: 10, rank: 9, total: 10 },
         contributions: { percentile: 10, rank: 9, total: 10 },
         forumPosts: { percentile: 10, rank: 9, total: 10 },
         requestsFilled: { percentile: 10, rank: 9, total: 10 }
@@ -441,8 +441,8 @@ describe('API auth/profile/user flows', () => {
       notificationMethod: 'Popup' as const,
       showEmail: false,
       showLastSeen: false,
-      showUploadedStats: true,
-      showDownloadedStats: true,
+      showContributedStats: true,
+      showConsumedStats: true,
       showRatioStats: true
     });
 
@@ -464,8 +464,8 @@ describe('API auth/profile/user flows', () => {
       notificationMethod: 'Popup' as const,
       showEmail: true,
       showLastSeen: true,
-      showUploadedStats: false,
-      showDownloadedStats: false,
+      showContributedStats: false,
+      showConsumedStats: false,
       showRatioStats: false
     });
 
@@ -477,8 +477,8 @@ describe('API auth/profile/user flows', () => {
       avatar: 'https://example.com/avatar.png',
       showEmail: true,
       showLastSeen: true,
-      showUploadedStats: false,
-      showDownloadedStats: false,
+      showContributedStats: false,
+      showConsumedStats: false,
       showRatioStats: false
     });
 
@@ -491,8 +491,8 @@ describe('API auth/profile/user flows', () => {
       avatar: 'https://example.com/avatar.png',
       showEmail: true,
       showLastSeen: true,
-      showUploadedStats: false,
-      showDownloadedStats: false,
+      showContributedStats: false,
+      showConsumedStats: false,
       showRatioStats: false
     });
     expect(res.body.avatar).toBe('https://example.com/avatar.png');

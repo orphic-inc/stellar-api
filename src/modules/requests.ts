@@ -89,13 +89,13 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'User not found');
-    if (user.uploaded < input.bounty) {
+    if (user.contributed < input.bounty) {
       throw new AppError(400, 'Insufficient upload balance');
     }
 
     await tx.user.update({
       where: { id: userId },
-      data: { uploaded: { decrement: input.bounty } }
+      data: { contributed: { decrement: input.bounty } }
     });
 
     const request = await tx.request.create({
@@ -160,13 +160,13 @@ export async function addBounty(
     if (!request) throw new AppError(404, 'Request not found or not open');
 
     const user = await tx.user.findUnique({ where: { id: userId } });
-    if (!user || user.uploaded < amount) {
+    if (!user || user.contributed < amount) {
       throw new AppError(400, 'Insufficient upload balance');
     }
 
     await tx.user.update({
       where: { id: userId },
-      data: { uploaded: { decrement: amount } }
+      data: { contributed: { decrement: amount } }
     });
 
     await tx.economyTransaction.create({
@@ -298,7 +298,7 @@ export async function fillRequest(
     if (totalBounty > BigInt(0)) {
       await tx.user.update({
         where: { id: userId },
-        data: { uploaded: { increment: totalBounty } }
+        data: { contributed: { increment: totalBounty } }
       });
 
       await tx.economyTransaction.create({
@@ -371,7 +371,7 @@ export async function unfillRequest(
     if (totalBounty > BigInt(0)) {
       await tx.user.update({
         where: { id: request.fillerId },
-        data: { uploaded: { decrement: totalBounty } }
+        data: { contributed: { decrement: totalBounty } }
       });
 
       await tx.economyTransaction.create({
@@ -441,7 +441,7 @@ export async function deleteRequest(
       for (const bounty of request.bounties) {
         await tx.user.update({
           where: { id: bounty.userId },
-          data: { uploaded: { increment: bounty.amount } }
+          data: { contributed: { increment: bounty.amount } }
         });
         await tx.economyTransaction.create({
           data: {

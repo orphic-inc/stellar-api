@@ -28,8 +28,8 @@ export const updateUserSettings = async (
       | 'Combined';
     showEmail?: boolean;
     showLastSeen?: boolean;
-    showUploadedStats?: boolean;
-    showDownloadedStats?: boolean;
+    showContributedStats?: boolean;
+    showConsumedStats?: boolean;
     showRatioStats?: boolean;
   }
 ) => {
@@ -60,11 +60,11 @@ export const updateUserSettings = async (
         ...(data.showLastSeen !== undefined && {
           showLastSeen: data.showLastSeen
         }),
-        ...(data.showUploadedStats !== undefined && {
-          showUploadedStats: data.showUploadedStats
+        ...(data.showContributedStats !== undefined && {
+          showContributedStats: data.showContributedStats
         }),
-        ...(data.showDownloadedStats !== undefined && {
-          showDownloadedStats: data.showDownloadedStats
+        ...(data.showConsumedStats !== undefined && {
+          showConsumedStats: data.showConsumedStats
         }),
         ...(data.showRatioStats !== undefined && {
           showRatioStats: data.showRatioStats

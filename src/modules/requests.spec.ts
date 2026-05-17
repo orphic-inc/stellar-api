@@ -59,7 +59,7 @@ import {
 
 const makeUser = (overrides = {}) => ({
   id: 1,
-  uploaded: BigInt('1073741824'), // 1 GiB
+  contributed: BigInt('1073741824'), // 1 GiB
   ...overrides
 });
 
@@ -118,7 +118,9 @@ describe('createRequest', () => {
   });
 
   it('throws if user has insufficient balance', async () => {
-    mockTx.user.findUnique.mockResolvedValue(makeUser({ uploaded: BigInt(0) }));
+    mockTx.user.findUnique.mockResolvedValue(
+      makeUser({ contributed: BigInt(0) })
+    );
     await expect(
       createRequest(1, {
         communityId: 1,
@@ -262,7 +264,7 @@ describe('fillRequest', () => {
 
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { uploaded: { increment: bountyAmount } }
+        data: { contributed: { increment: bountyAmount } }
       })
     );
     expect(mockTx.requestFill.create).toHaveBeenCalled();
@@ -313,7 +315,7 @@ describe('unfillRequest', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 7 },
-        data: { uploaded: { decrement: BigInt('209715200') } }
+        data: { contributed: { decrement: BigInt('209715200') } }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(

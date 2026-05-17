@@ -269,8 +269,8 @@ model UserSettings {
   notificationMethod   NotificationMethod @default(Popup)
   showEmail            Boolean            @default(false)
   showLastSeen         Boolean            @default(false)
-  showUploadedStats    Boolean            @default(true)
-  showDownloadedStats  Boolean            @default(true)
+  showContributedStats Boolean            @default(true)
+  showConsumedStats    Boolean            @default(true)
   showRatioStats       Boolean            @default(true)
   user                 User?
 
@@ -290,8 +290,8 @@ model User {
   profileId          Int          @unique
   profile            Profile      @relation(fields: [profileId], references: [id])
   inviteCount        Int          @default(0)
-  uploaded           BigInt       @default(0)
-  downloaded         BigInt       @default(0)
+  contributed        BigInt       @default(0)
+  consumed           BigInt       @default(0)
   totalEarned        BigInt       @default(0)
   ratio              Float        @default(1)
   ratioWatchDownload Int?
@@ -383,6 +383,7 @@ model User {
   massMessagesSent          MassMessage[]                    @relation("MassMessageSender")
   siteHistoryEntries        SiteHistory[]
   requestVotes              RequestVote[]
+  releaseVotes              ReleaseVote[]
   donorRank                 UserDonorRank?
   wikiPagesAuthored         WikiPage[]     @relation("WikiPageAuthor")
   wikiRevisionsAuthored     WikiRevision[] @relation("WikiRevisionAuthor")
@@ -783,6 +784,9 @@ model Release {
   bookmarks        BookmarkRelease[]
   comments         Comment[]
   collageEntries   CollageEntry[]
+  votes            ReleaseVote[]
+  voteAggregate    ReleaseVoteAggregate?
+  snapshotEntries  Top10SnapshotEntry[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1192,7 +1196,7 @@ model RatioPolicyState {
   status                 RatioPolicyStatus @default(OK)
   watchStartedAt         DateTime?
   watchExpiresAt         DateTime?
-  downloadedAtWatchStart BigInt?
+  consumedAtWatchStart BigInt?
   leechDisabledAt        DateTime?
   lastEvaluatedAt        DateTime          @default(now())
 
@@ -1847,4 +1851,65 @@ model WikiAlias {
 
   @@index([pageId])
   @@map("wiki_aliases")
+}
+
+// ─── Top 10 ───────────────────────────────────────────────────────────────────
+
+model ReleaseVote {
+  id        Int      @id @default(autoincrement())
+  releaseId Int
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  positive  Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([releaseId, userId])
+  @@index([releaseId])
+  @@index([userId])
+  @@map("release_votes")
+}
+
+model ReleaseVoteAggregate {
+  id        Int     @id @default(autoincrement())
+  releaseId Int     @unique
+  release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  ups       Int     @default(0)
+  total     Int     @default(0)
+  score     Float   @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@index([score])
+  @@map("release_vote_aggregates")
+}
+
+enum Top10SnapshotType {
+  Daily
+  Weekly
+}
+
+model Top10Snapshot {
+  id        Int               @id @default(autoincrement())
+  type      Top10SnapshotType
+  createdAt DateTime          @default(now())
+  entries   Top10SnapshotEntry[]
+
+  @@index([type, createdAt])
+  @@map("top10_snapshots")
+}
+
+model Top10SnapshotEntry {
+  id           Int           @id @default(autoincrement())
+  snapshotId   Int
+  snapshot     Top10Snapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  rank         Int
+  releaseId    Int?
+  release      Release?      @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  releaseTitle String        @db.VarChar(255)
+  tagString    String        @db.VarChar(255)
+
+  @@index([snapshotId])
+  @@index([releaseId])
+  @@map("top10_snapshot_entries")
 }

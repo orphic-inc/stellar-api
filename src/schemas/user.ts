@@ -18,8 +18,8 @@ export const userSettingsSchema = z.object({
     .optional(),
   showEmail: z.boolean().optional(),
   showLastSeen: z.boolean().optional(),
-  showUploadedStats: z.boolean().optional(),
-  showDownloadedStats: z.boolean().optional(),
+  showContributedStats: z.boolean().optional(),
+  showConsumedStats: z.boolean().optional(),
   showRatioStats: z.boolean().optional()
 });
 

@@ -22,19 +22,16 @@ const BRACKETS: Bracket[] = [
   { upTo: null, maxRequired: 0.6, minRequired: 0.6, label: '100+ GiB' }
 ];
 
-export const computeRatio = (
-  totalEarned: bigint,
-  downloaded: bigint
-): number => {
-  if (downloaded === 0n) return 1.0;
-  return Number(totalEarned) / Number(downloaded);
+export const computeRatio = (totalEarned: bigint, consumed: bigint): number => {
+  if (consumed === 0n) return 1.0;
+  return Number(totalEarned) / Number(consumed);
 };
 
-export const getDownloadBracket = (
-  downloadedBytes: bigint
+export const getConsumptionBracket = (
+  consumedBytes: bigint
 ): { maxRequired: number; minRequired: number; label: string } => {
   for (const b of BRACKETS) {
-    if (b.upTo === null || downloadedBytes < b.upTo) {
+    if (b.upTo === null || consumedBytes < b.upTo) {
       return {
         maxRequired: b.maxRequired,
         minRequired: b.minRequired,
@@ -47,18 +44,15 @@ export const getDownloadBracket = (
 };
 
 export const computeRequiredRatio = (
-  downloadedBytes: bigint,
+  consumedBytes: bigint,
   eligibleContributionBytes: bigint
 ): number => {
-  const { maxRequired, minRequired } = getDownloadBracket(downloadedBytes);
+  const { maxRequired, minRequired } = getConsumptionBracket(consumedBytes);
   if (maxRequired === 0) return 0;
   const coverage =
-    downloadedBytes === 0n
+    consumedBytes === 0n
       ? 1.0
-      : Math.min(
-          1,
-          Number(eligibleContributionBytes) / Number(downloadedBytes)
-        );
+      : Math.min(1, Number(eligibleContributionBytes) / Number(consumedBytes));
   return Math.max(minRequired, maxRequired * (1 - coverage));
 };
 
@@ -87,7 +81,7 @@ export const getEligibleContributionBytes = async (
 export interface RatioStats {
   ratio: number;
   totalEarned: string;
-  downloaded: string;
+  consumed: string;
   bracket: { label: string; maxRequired: number; minRequired: number };
   eligibleContributionBytes: string;
   contributionCoverage: number;
@@ -98,25 +92,25 @@ export interface RatioStats {
 export const getRatioStats = async (userId: number): Promise<RatioStats> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { totalEarned: true, downloaded: true }
+    select: { totalEarned: true, consumed: true }
   });
   if (!user) throw new Error('User not found');
 
-  const { totalEarned, downloaded } = user;
+  const { totalEarned, consumed } = user;
   const eligibleBytes = await getEligibleContributionBytes(userId);
 
-  const ratio = computeRatio(totalEarned, downloaded);
-  const bracket = getDownloadBracket(downloaded);
+  const ratio = computeRatio(totalEarned, consumed);
+  const bracket = getConsumptionBracket(consumed);
   const coverage =
-    downloaded === 0n
+    consumed === 0n
       ? 1.0
-      : Math.min(1, Number(eligibleBytes) / Number(downloaded));
-  const required = computeRequiredRatio(downloaded, eligibleBytes);
+      : Math.min(1, Number(eligibleBytes) / Number(consumed));
+  const required = computeRequiredRatio(consumed, eligibleBytes);
 
   return {
     ratio,
     totalEarned: totalEarned.toString(),
-    downloaded: downloaded.toString(),
+    consumed: consumed.toString(),
     bracket,
     eligibleContributionBytes: eligibleBytes.toString(),
     contributionCoverage: coverage,

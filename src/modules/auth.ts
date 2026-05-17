@@ -20,8 +20,8 @@ export const authUserSelect = {
   inviteCount: true,
   dateRegistered: true,
   lastLogin: true,
-  uploaded: true,
-  downloaded: true,
+  contributed: true,
+  consumed: true,
   ratio: true,
   userRank: {
     select: {
@@ -36,15 +36,15 @@ export const authUserSelect = {
 
 type RawAuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
 
-export type AuthUser = Omit<RawAuthUser, 'uploaded' | 'downloaded'> & {
-  uploaded: string;
-  downloaded: string;
+export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
+  contributed: string;
+  consumed: string;
 };
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
   ...raw,
-  uploaded: raw.uploaded.toString(),
-  downloaded: raw.downloaded.toString()
+  contributed: raw.contributed.toString(),
+  consumed: raw.consumed.toString()
 });
 
 type RegisterResult =
@@ -93,7 +93,7 @@ export const registerUser = async (
         userRankId: defaultRank.id,
         userSettingsId: settings.id,
         profileId: profile.id,
-        uploaded: 5_368_709_120n
+        contributed: 5_368_709_120n
       },
       select: authUserSelect
     });

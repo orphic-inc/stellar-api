@@ -48,6 +48,7 @@ import wikiRouter from './routes/api/wiki';
 import dnuRouter from './routes/api/communities/dnu';
 import searchRouter from './routes/api/search';
 import randomRouter from './routes/api/random';
+import top10Router from './routes/api/top10';
 
 const log = getLogger('app');
 
@@ -108,6 +109,7 @@ export const createApp = () => {
   app.use('/api/communities/:communityId/dnu', dnuRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/random', randomRouter);
+  app.use('/api/top10', top10Router);
 
   app.use(
     (

@@ -36,7 +36,7 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
     getRatioStats(userId),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { downloaded: true }
+      select: { consumed: true }
     })
   ]);
 
@@ -62,7 +62,7 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
           status: RatioPolicyStatus.WATCH,
           watchStartedAt: now,
           watchExpiresAt: new Date(now.getTime() + WATCH_DURATION_MS),
-          downloadedAtWatchStart: user.downloaded,
+          consumedAtWatchStart: user.consumed,
           lastEvaluatedAt: now
         }
       });
@@ -85,7 +85,7 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
             status: RatioPolicyStatus.OK,
             watchStartedAt: null,
             watchExpiresAt: null,
-            downloadedAtWatchStart: null,
+            consumedAtWatchStart: null,
             lastEvaluatedAt: now
           }
         }),
@@ -97,11 +97,11 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
       return;
     }
 
-    const downloadedDuringWatch =
-      state.downloadedAtWatchStart != null
-        ? user.downloaded - state.downloadedAtWatchStart
+    const consumedDuringWatch =
+      state.consumedAtWatchStart != null
+        ? user.consumed - state.consumedAtWatchStart
         : 0n;
-    const exceededDownloadLimit = downloadedDuringWatch >= WATCH_DOWNLOAD_LIMIT;
+    const exceededDownloadLimit = consumedDuringWatch >= WATCH_DOWNLOAD_LIMIT;
     const watchExpired =
       state.watchExpiresAt != null && now >= state.watchExpiresAt;
 
@@ -176,7 +176,7 @@ export const overridePolicyStatus = async (
       newStatus === RatioPolicyStatus.WATCH
         ? new Date(now.getTime() + WATCH_DURATION_MS)
         : null,
-    downloadedAtWatchStart: null,
+    consumedAtWatchStart: null,
     leechDisabledAt: newStatus === RatioPolicyStatus.LEECH_DISABLED ? now : null
   };
 

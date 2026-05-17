@@ -43,7 +43,7 @@ const GiB = BigInt(1024 ** 3);
 const makeStats = (overrides = {}) => ({
   ratio: 0.8,
   totalEarned: '0',
-  downloaded: '0',
+  consumed: '0',
   bracket: { label: '5–10 GiB', maxRequired: 0.15, minRequired: 0 },
   eligibleContributionBytes: '0',
   contributionCoverage: 0,
@@ -57,7 +57,7 @@ const makeState = (overrides = {}) => ({
   status: RatioPolicyStatus.OK,
   watchStartedAt: null,
   watchExpiresAt: null,
-  downloadedAtWatchStart: null,
+  consumedAtWatchStart: null,
   leechDisabledAt: null,
   lastEvaluatedAt: new Date(),
   ...overrides
@@ -71,7 +71,7 @@ describe('evaluateRatioPolicy', () => {
   it('OK + meets requirement: only refreshes lastEvaluatedAt', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 7n * GiB
+      consumed: 7n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
@@ -90,7 +90,7 @@ describe('evaluateRatioPolicy', () => {
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 7n * GiB
+      consumed: 7n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
@@ -102,7 +102,7 @@ describe('evaluateRatioPolicy', () => {
           status: RatioPolicyStatus.WATCH,
           watchStartedAt: expect.any(Date),
           watchExpiresAt: expect.any(Date),
-          downloadedAtWatchStart: 7n * GiB
+          consumedAtWatchStart: 7n * GiB
         })
       })
     );
@@ -111,13 +111,13 @@ describe('evaluateRatioPolicy', () => {
   it('WATCH + ratio restored: transitions to OK, re-enables canDownload', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 9n * GiB
+      consumed: 9n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() + 86400000),
-        downloadedAtWatchStart: 7n * GiB
+        consumedAtWatchStart: 7n * GiB
       })
     );
     mockPrismaPolicy.update.mockResolvedValue({});
@@ -141,13 +141,13 @@ describe('evaluateRatioPolicy', () => {
     );
     const watchStart = 5n * GiB;
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: watchStart + 10n * GiB
+      consumed: watchStart + 10n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() + 86400000),
-        downloadedAtWatchStart: watchStart
+        consumedAtWatchStart: watchStart
       })
     );
     mockPrismaPolicy.update.mockResolvedValue({});
@@ -172,13 +172,13 @@ describe('evaluateRatioPolicy', () => {
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 6n * GiB
+      consumed: 6n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() - 1), // already expired
-        downloadedAtWatchStart: 5n * GiB // only 1 GiB during watch
+        consumedAtWatchStart: 5n * GiB // only 1 GiB during watch
       })
     );
     mockPrismaPolicy.update.mockResolvedValue({});
@@ -203,13 +203,13 @@ describe('evaluateRatioPolicy', () => {
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 6n * GiB
+      consumed: 6n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
         status: RatioPolicyStatus.WATCH,
         watchExpiresAt: new Date(Date.now() + 86400000),
-        downloadedAtWatchStart: 5n * GiB // only 1 GiB during watch
+        consumedAtWatchStart: 5n * GiB // only 1 GiB during watch
       })
     );
 
@@ -226,7 +226,7 @@ describe('evaluateRatioPolicy', () => {
   it('LEECH_DISABLED: no status change, only refreshes timestamp', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: false }));
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      downloaded: 50n * GiB
+      consumed: 50n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({ status: RatioPolicyStatus.LEECH_DISABLED })

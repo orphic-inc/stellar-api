@@ -114,8 +114,8 @@ const AuthUser = registry.register(
     isArtist: z.boolean().optional(),
     isDonor: z.boolean().optional(),
     canDownload: z.boolean().optional(),
-    uploaded: z.string().optional(),
-    downloaded: z.string().optional(),
+    contributed: z.string().optional(),
+    consumed: z.string().optional(),
     ratio: z.number().optional(),
     userRank: z.object({
       level: z.number(),
@@ -315,8 +315,8 @@ const UserSettings = registry.register(
     ]),
     showEmail: z.boolean(),
     showLastSeen: z.boolean(),
-    showUploadedStats: z.boolean(),
-    showDownloadedStats: z.boolean(),
+    showContributedStats: z.boolean(),
+    showConsumedStats: z.boolean(),
     showRatioStats: z.boolean()
   })
 );
@@ -324,8 +324,8 @@ const UserSettings = registry.register(
 const ProfileStats = registry.register(
   'ProfileStats',
   z.object({
-    uploaded: z.string().nullable(),
-    downloaded: z.string().nullable(),
+    contributed: z.string().nullable(),
+    consumed: z.string().nullable(),
     totalEarned: z.string().nullable(),
     ratio: z.string().nullable(),
     buffer: z.string().nullable()
@@ -378,8 +378,8 @@ const ProfilePercentile = registry.register(
 const ProfilePercentiles = registry.register(
   'ProfilePercentiles',
   z.object({
-    uploaded: ProfilePercentile,
-    downloaded: ProfilePercentile,
+    contributed: ProfilePercentile,
+    consumed: ProfilePercentile,
     contributions: ProfilePercentile,
     forumPosts: ProfilePercentile,
     requestsFilled: ProfilePercentile
@@ -482,8 +482,8 @@ const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
     email: z.string().email().optional(),
     joinedAt: z.string(),
     lastSeen: z.string().nullable().optional(),
-    uploaded: z.string().optional(),
-    downloaded: z.string().optional(),
+    contributed: z.string().optional(),
+    consumed: z.string().optional(),
     ratio: z.string().optional(),
     children: z.array(InviteNodeSchema).optional()
   })
@@ -3655,6 +3655,257 @@ registry.registerPath({
     200: {
       description: 'Updated site settings',
       content: { 'application/json': { schema: SiteSettings } }
+    }
+  }
+});
+
+// ─── Top 10 ───────────────────────────────────────────────────────────────────
+
+const Top10Tag = registry.register(
+  'Top10Tag',
+  z.object({ id: z.number(), name: z.string() })
+);
+
+const Top10ReleaseItem = registry.register(
+  'Top10ReleaseItem',
+  z.object({
+    rank: z.number(),
+    releaseId: z.number(),
+    title: z.string(),
+    year: z.number(),
+    artistId: z.number(),
+    artistName: z.string(),
+    type: z.string(),
+    releaseType: z.string(),
+    tags: z.array(Top10Tag),
+    consumerCount: z.number(),
+    totalBytesConsumed: z.string(),
+    contributionCount: z.number()
+  })
+);
+
+const Top10UserItem = registry.register(
+  'Top10UserItem',
+  z.object({
+    rank: z.number(),
+    userId: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable(),
+    contributed: z.string(),
+    consumed: z.string(),
+    ratio: z.number(),
+    numContributions: z.number(),
+    contributionSpeed: z.number(),
+    consumeSpeed: z.number(),
+    joinedAt: z.string(),
+    rankName: z.string(),
+    rankLevel: z.number()
+  })
+);
+
+const Top10TagItem = registry.register(
+  'Top10TagItem',
+  z.object({
+    rank: z.number(),
+    tagId: z.number(),
+    name: z.string(),
+    uses: z.number(),
+    positiveVotes: z.number(),
+    negativeVotes: z.number()
+  })
+);
+
+const Top10VoteItem = registry.register(
+  'Top10VoteItem',
+  z.object({
+    rank: z.number(),
+    releaseId: z.number(),
+    title: z.string(),
+    year: z.number(),
+    artistName: z.string(),
+    ups: z.number(),
+    downs: z.number(),
+    total: z.number(),
+    score: z.number(),
+    positivePercent: z.number()
+  })
+);
+
+const Top10SnapshotEntry = registry.register(
+  'Top10SnapshotEntry',
+  z.object({
+    rank: z.number(),
+    releaseId: z.number().nullable(),
+    releaseTitle: z.string(),
+    tagString: z.string(),
+    deleted: z.boolean()
+  })
+);
+
+const Top10Snapshot = registry.register(
+  'Top10Snapshot',
+  z.object({
+    snapshotId: z.number(),
+    type: z.enum(['Daily', 'Weekly']),
+    date: z.string(),
+    entries: z.array(Top10SnapshotEntry)
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/top10/releases',
+  summary: 'Top releases',
+  tags: ['Top10'],
+  request: {
+    query: z.object({
+      type: z
+        .enum([
+          'day',
+          'week',
+          'month',
+          'year',
+          'overall',
+          'consumed',
+          'contributed'
+        ])
+        .optional(),
+      limit: z.coerce.number().optional(),
+      excludeTags: z.string().optional(),
+      format: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Top releases list',
+      content: {
+        'application/json': {
+          schema: z.object({ items: z.array(Top10ReleaseItem) })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/top10/users',
+  summary: 'Top users',
+  tags: ['Top10'],
+  request: {
+    query: z.object({
+      type: z
+        .enum([
+          'contributed',
+          'consumed',
+          'numContributions',
+          'contributionSpeed',
+          'consumeSpeed'
+        ])
+        .optional(),
+      limit: z.coerce.number().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Top users list',
+      content: {
+        'application/json': {
+          schema: z.object({ items: z.array(Top10UserItem) })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/top10/tags',
+  summary: 'Top tags',
+  tags: ['Top10'],
+  request: {
+    query: z.object({
+      type: z.enum(['used', 'voted']).optional(),
+      limit: z.coerce.number().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Top tags list',
+      content: {
+        'application/json': {
+          schema: z.object({ items: z.array(Top10TagItem) })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/top10/votes',
+  summary: 'Top voted releases (BPCI ranked)',
+  tags: ['Top10'],
+  request: {
+    query: z.object({
+      limit: z.coerce.number().optional(),
+      tags: z.string().optional(),
+      year: z.coerce.number().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Top voted releases',
+      content: {
+        'application/json': {
+          schema: z.object({ items: z.array(Top10VoteItem) })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/top10/history',
+  summary: 'Top 10 history snapshot (staff)',
+  tags: ['Top10'],
+  request: {
+    query: z.object({
+      type: z.enum(['Daily', 'Weekly']).optional(),
+      date: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'History snapshot',
+      content: { 'application/json': { schema: Top10Snapshot } }
+    },
+    404: {
+      description: 'No snapshot found',
+      content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/top10/snapshot',
+  summary: 'Trigger a history snapshot (admin/cron)',
+  tags: ['Top10'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ type: z.enum(['Daily', 'Weekly']).optional() })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Snapshot created',
+      content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
     }
   }
 });

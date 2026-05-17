@@ -5853,8 +5853,8 @@ export interface components {
       email: string;
       joinedAt: string;
       lastSeen?: string | null;
-      uploaded?: string;
-      downloaded?: string;
+      contributed?: string;
+      consumed?: string;
       ratio?: string;
       children?: components['schemas']['InviteNode'][];
     };
