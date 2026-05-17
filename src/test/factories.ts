@@ -442,6 +442,8 @@ export function makeRelease(overrides: Partial<Release> = {}): Release {
     year: 1959,
     isEdition: false,
     edition: null,
+    catalogueNumber: null,
+    recordLabel: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides

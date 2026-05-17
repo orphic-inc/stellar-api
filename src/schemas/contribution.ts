@@ -34,6 +34,19 @@ export const createContributionSchema = z.object({
     .string()
     .optional()
     .transform((value) => value?.trim() || undefined),
+  bitrate: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+  media: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+  hasLog: z.boolean().optional().default(false),
+  hasCue: z.boolean().optional().default(false),
+  isScene: z.boolean().optional().default(false),
   collaborators: z
     .array(
       z.object({
@@ -53,7 +66,20 @@ export const addContributionToReleaseSchema = z.object({
   releaseDescription: z
     .string()
     .optional()
-    .transform((value) => value?.trim() || undefined)
+    .transform((value) => value?.trim() || undefined),
+  bitrate: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+  media: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+  hasLog: z.boolean().optional().default(false),
+  hasCue: z.boolean().optional().default(false),
+  isScene: z.boolean().optional().default(false)
 });
 
 export type AddContributionToReleaseInput = z.infer<

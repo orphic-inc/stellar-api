@@ -46,6 +46,8 @@ import bookmarksRouter from './routes/api/bookmarks';
 import siteHistoryRouter from './routes/api/siteHistory';
 import wikiRouter from './routes/api/wiki';
 import dnuRouter from './routes/api/communities/dnu';
+import searchRouter from './routes/api/search';
+import randomRouter from './routes/api/random';
 
 const log = getLogger('app');
 
@@ -104,6 +106,8 @@ export const createApp = () => {
   app.use('/api/site-history', siteHistoryRouter);
   app.use('/api/wiki', wikiRouter);
   app.use('/api/communities/:communityId/dnu', dnuRouter);
+  app.use('/api/search', searchRouter);
+  app.use('/api/random', randomRouter);
 
   app.use(
     (

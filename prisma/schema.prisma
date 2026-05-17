@@ -772,16 +772,20 @@ model Release {
   type          ReleaseType
   releaseType   ReleaseCategory
   year          Int
-  isEdition     Boolean           @default(false)
-  edition       Json?
-  bookmarks       BookmarkRelease[]
-  comments        Comment[]
-  collageEntries  CollageEntry[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  isEdition        Boolean           @default(false)
+  edition          Json?
+  catalogueNumber  String?
+  recordLabel      String?
+  bookmarks        BookmarkRelease[]
+  comments         Comment[]
+  collageEntries   CollageEntry[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([artistId])
   @@index([communityId])
+  @@index([year])
+  @@index([createdAt])
   @@map("releases")
 }
 
@@ -803,6 +807,11 @@ model Contribution {
   linkStatus               LinkHealthStatus @default(UNKNOWN)
   linkCheckedAt            DateTime?
   type                     FileType
+  bitrate                  String?
+  media                    String?
+  hasLog                   Boolean       @default(false)
+  hasCue                   Boolean       @default(false)
+  isScene                  Boolean       @default(false)
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
   Request                  Request[]
