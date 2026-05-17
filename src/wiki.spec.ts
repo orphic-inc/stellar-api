@@ -161,6 +161,59 @@ describe('GET /api/wiki/:id/revisions', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('returns 404 when the user cannot read the restricted page', async () => {
+    setCurrentUserRankLevel(10);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minReadLevel: 100, minEditLevel: 100 }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/revisions');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── GET /api/wiki/:id/revisions/:rev ────────────────────────────────────────
+
+describe('GET /api/wiki/:id/revisions/:rev', () => {
+  it('returns the current page body when requesting the current revision', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({
+        revision: 4,
+        title: 'Current Title',
+        body: '<p>Current body</p>',
+        updatedAt: new Date('2026-01-03')
+      }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/revisions/4');
+
+    expect(res.status).toBe(200);
+    expect(res.body.revision).toBe(4);
+    expect(res.body.title).toBe('Current Title');
+    expect(res.body.body).toBe('<p>Current body</p>');
+    expect(prismaMock.wikiRevision.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the historical revision does not exist', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(makePage() as never);
+    prismaMock.wikiRevision.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/wiki/2/revisions/7');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toMatch(/revision not found/i);
+  });
 });
 
 // ─── GET /api/wiki/:id/compare ────────────────────────────────────────────────
@@ -209,6 +262,21 @@ describe('GET /api/wiki/:id/compare', () => {
     const res = await request(app).get('/api/wiki/2/compare?old=1&new=2');
 
     expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when a requested revision is missing', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ revision: 3, body: '<p>Current</p>' }) as never
+    );
+    prismaMock.wikiRevision.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/wiki/2/compare?old=1&new=3');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toMatch(/revision 1 not found/i);
   });
 });
 
@@ -328,5 +396,196 @@ describe('GET /api/wiki/by-alias/:alias', () => {
     const res = await request(app).get('/api/wiki/by-alias/missing');
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when alias resolves to a page above the user rank', async () => {
+    setCurrentUserRankLevel(5);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiAlias.findUnique.mockResolvedValue({
+      alias: 'test-page',
+      pageId: 2,
+      userId: 7,
+      createdAt: new Date(),
+      page: makePage({ minReadLevel: 100, deletedAt: null }) as never
+    } as never);
+
+    const res = await request(app).get('/api/wiki/by-alias/test-page');
+
+    expect(res.status).toBe(403);
+  });
+});
+
+// ─── PUT /api/wiki/:id ───────────────────────────────────────────────────────
+
+describe('PUT /api/wiki/:id', () => {
+  it('updates a page, stores a revision, and clamps minEditLevel to minReadLevel', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_manage: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({
+        revision: 3,
+        title: 'Old Title',
+        body: '<p>Old body</p>',
+        minReadLevel: 50,
+        minEditLevel: 75
+      }) as never
+    );
+    prismaMock.wikiRevision.create.mockResolvedValue({} as never);
+    prismaMock.wikiPage.update.mockResolvedValue(
+      makePage({
+        revision: 4,
+        title: 'Updated Title',
+        body: '<p>Updated</p>',
+        minReadLevel: 250,
+        minEditLevel: 250
+      }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+    prismaMock.$transaction.mockImplementation(async (fn: unknown) => {
+      if (typeof fn === 'function') return fn(prismaMock);
+    });
+
+    const res = await request(app).put('/api/wiki/2').send({
+      title: 'Updated Title',
+      body: '<p>Updated</p>',
+      minReadLevel: 250,
+      minEditLevel: 100
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.wikiRevision.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          pageId: 2,
+          revision: 3,
+          title: 'Old Title'
+        })
+      })
+    );
+    expect(prismaMock.wikiPage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Updated Title',
+          body: '<p>Updated</p>',
+          revision: 4,
+          minReadLevel: 250,
+          minEditLevel: 250
+        })
+      })
+    );
+  });
+});
+
+// ─── POST /api/wiki/:id/aliases ──────────────────────────────────────────────
+
+describe('POST /api/wiki/:id/aliases', () => {
+  it('creates an alias for an editable page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minEditLevel: 0 }) as never
+    );
+    prismaMock.wikiAlias.findUnique.mockResolvedValue(null);
+    prismaMock.wikiAlias.create.mockResolvedValue({} as never);
+
+    const res = await request(app).post('/api/wiki/2/aliases').send({
+      alias: 'new-alias'
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.alias).toBe('new-alias');
+    expect(prismaMock.wikiAlias.create).toHaveBeenCalledWith({
+      data: { alias: 'new-alias', pageId: 2, userId: 7 }
+    });
+  });
+
+  it('returns 409 when the alias already exists', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(makePage() as never);
+    prismaMock.wikiAlias.findUnique.mockResolvedValue({
+      alias: 'old-page',
+      pageId: 9
+    } as never);
+
+    const res = await request(app).post('/api/wiki/2/aliases').send({
+      alias: 'old-page'
+    });
+
+    expect(res.status).toBe(409);
+  });
+});
+
+// ─── DELETE /api/wiki/:id/aliases/:alias ─────────────────────────────────────
+
+describe('DELETE /api/wiki/:id/aliases/:alias', () => {
+  it('rejects removing the primary slug alias', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ slug: 'test-page', minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).delete('/api/wiki/2/aliases/test-page');
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/primary slug alias/i);
+  });
+});
+
+// ─── POST /api/wiki/:id/rollback/:rev ────────────────────────────────────────
+
+describe('POST /api/wiki/:id/rollback/:rev', () => {
+  it('rolls back to a historical revision and records audit state', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({
+        revision: 5,
+        title: 'Current Title',
+        body: '<p>Current body</p>',
+        minEditLevel: 0
+      }) as never
+    );
+    prismaMock.wikiRevision.findUnique.mockResolvedValue(
+      makeRevision({
+        revision: 2,
+        title: 'Rollback Title',
+        body: '<p>Rollback body</p>'
+      }) as never
+    );
+    prismaMock.wikiRevision.create.mockResolvedValue({} as never);
+    prismaMock.wikiPage.update.mockResolvedValue(
+      makePage({
+        revision: 6,
+        title: 'Rollback Title',
+        body: '<p>Rollback body</p>'
+      }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+    prismaMock.$transaction.mockImplementation(async (fn: unknown) => {
+      if (typeof fn === 'function') return fn(prismaMock);
+    });
+
+    const res = await request(app).post('/api/wiki/2/rollback/2');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.wikiPage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 2 },
+        data: expect.objectContaining({
+          title: 'Rollback Title',
+          body: '<p>Rollback body</p>',
+          revision: 6
+        })
+      })
+    );
   });
 });
