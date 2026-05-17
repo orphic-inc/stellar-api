@@ -6,6 +6,8 @@ import {
   makeUserRank,
   bcryptMock,
   createInviteMock,
+  getProfileByIdMock,
+  getProfileByLookupMock,
   updateProfileMock,
   getUserSettingsMock,
   updateUserSettingsMock,
@@ -208,10 +210,42 @@ describe('API auth/profile/user flows', () => {
         externalStylesheet: null,
         styledTooltips: true,
         paranoia: 0,
-        notificationMethod: 'Popup' as const
+        notificationMethod: 'Popup' as const,
+        showEmail: false,
+        showLastSeen: false,
+        showUploadedStats: true,
+        showDownloadedStats: true,
+        showRatioStats: true
       },
-      userRank: { name: 'User', color: '' },
-      inviteTree: []
+      userRank: { name: 'User', color: '', badge: '' },
+      inviteTree: [],
+      email: null,
+      dateRegistered: '2026-04-24T00:00:00.000Z',
+      lastSeen: null,
+      isArtist: false,
+      isDonor: false,
+      disabled: false,
+      warned: null,
+      inviteCount: 0,
+      stats: {
+        uploaded: '0',
+        downloaded: '0',
+        totalEarned: '0',
+        ratio: '1.00',
+        buffer: '0'
+      },
+      activitySummary: {
+        contributions: 0,
+        requestsCreated: 0,
+        requestsFilled: 0,
+        forumTopics: 0,
+        forumPosts: 0,
+        comments: 0,
+        collagesStarted: 0,
+        collageEntries: 0
+      },
+      recentContributions: [],
+      recentSnatches: []
     } as Awaited<ReturnType<typeof updateProfile>>);
 
     const res = await request(app).put('/api/profile/me').send({
@@ -225,6 +259,120 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'dark'
     });
     expect(res.body.profile.profileTitle).toBe('New Title');
+  });
+
+  it('returns the current profile aggregate from /api/profile/me', async () => {
+    getProfileByIdMock.mockResolvedValue({
+      id: 7,
+      username: 'kai',
+      avatar: null,
+      email: 'kai@example.com',
+      dateRegistered: '2026-04-24T00:00:00.000Z',
+      lastSeen: '2026-04-24T00:00:00.000Z',
+      isArtist: false,
+      isDonor: false,
+      disabled: false,
+      warned: null,
+      inviteCount: 1,
+      stats: {
+        uploaded: '100',
+        downloaded: '50',
+        totalEarned: '100',
+        ratio: '2.00',
+        buffer: '50'
+      },
+      userRank: { name: 'User', color: '', badge: '' },
+      profile: {
+        id: 3,
+        avatar: null,
+        avatarMouseoverText: null,
+        profileTitle: 'Title',
+        profileInfo: '<p>bio</p>'
+      },
+      userSettings: {
+        id: 4,
+        siteAppearance: 'dark',
+        externalStylesheet: null,
+        styledTooltips: true,
+        paranoia: 0,
+        notificationMethod: 'Popup',
+        showEmail: true,
+        showLastSeen: true,
+        showUploadedStats: true,
+        showDownloadedStats: true,
+        showRatioStats: true
+      },
+      activitySummary: {
+        contributions: 1,
+        requestsCreated: 2,
+        requestsFilled: 3,
+        forumTopics: 4,
+        forumPosts: 5,
+        comments: 6,
+        collagesStarted: 7,
+        collageEntries: 8
+      },
+      recentContributions: [],
+      recentSnatches: [],
+      inviteTree: []
+    });
+
+    const res = await request(app).get('/api/profile/me');
+
+    expect(res.status).toBe(200);
+    expect(getProfileByIdMock).toHaveBeenCalledWith(7, 7);
+    expect(res.body.stats.ratio).toBe('2.00');
+  });
+
+  it('returns the viewer-aware profile aggregate from /api/profile/user/:userId', async () => {
+    getProfileByLookupMock.mockResolvedValue({
+      id: 9,
+      username: 'target-user',
+      avatar: null,
+      email: null,
+      dateRegistered: '2026-04-24T00:00:00.000Z',
+      lastSeen: null,
+      isArtist: false,
+      isDonor: false,
+      disabled: false,
+      warned: null,
+      inviteCount: null,
+      stats: {
+        uploaded: null,
+        downloaded: null,
+        totalEarned: null,
+        ratio: null,
+        buffer: null
+      },
+      userRank: { name: 'User', color: '', badge: '' },
+      profile: {
+        id: 5,
+        avatar: null,
+        avatarMouseoverText: null,
+        profileTitle: 'Hidden Stats',
+        profileInfo: '<p>bio</p>'
+      },
+      activitySummary: {
+        contributions: 0,
+        requestsCreated: 0,
+        requestsFilled: 0,
+        forumTopics: 0,
+        forumPosts: 0,
+        comments: 0,
+        collagesStarted: 0,
+        collageEntries: 0
+      },
+      recentContributions: [],
+      recentSnatches: [],
+      userSettings: undefined,
+      inviteTree: []
+    });
+
+    const res = await request(app).get('/api/profile/user/target-user');
+
+    expect(res.status).toBe(200);
+    expect(getProfileByLookupMock).toHaveBeenCalledWith('target-user', 7);
+    expect(res.body.email).toBeNull();
   });
 
   it('disables the current account and clears the auth cookie', async () => {
@@ -251,7 +399,12 @@ describe('API auth/profile/user flows', () => {
       externalStylesheet: null,
       styledTooltips: true,
       paranoia: 1,
-      notificationMethod: 'Popup' as const
+      notificationMethod: 'Popup' as const,
+      showEmail: false,
+      showLastSeen: false,
+      showUploadedStats: true,
+      showDownloadedStats: true,
+      showRatioStats: true
     });
 
     const res = await request(app).get('/api/users/settings');
@@ -269,7 +422,12 @@ describe('API auth/profile/user flows', () => {
       styledTooltips: false,
       paranoia: 2,
       avatar: 'https://example.com/avatar.png',
-      notificationMethod: 'Popup' as const
+      notificationMethod: 'Popup' as const,
+      showEmail: true,
+      showLastSeen: true,
+      showUploadedStats: false,
+      showDownloadedStats: false,
+      showRatioStats: false
     });
 
     const res = await request(app).put('/api/users/settings').send({
@@ -277,7 +435,12 @@ describe('API auth/profile/user flows', () => {
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
       paranoia: 2,
-      avatar: 'https://example.com/avatar.png'
+      avatar: 'https://example.com/avatar.png',
+      showEmail: true,
+      showLastSeen: true,
+      showUploadedStats: false,
+      showDownloadedStats: false,
+      showRatioStats: false
     });
 
     expect(res.status).toBe(200);
@@ -286,7 +449,12 @@ describe('API auth/profile/user flows', () => {
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
       paranoia: 2,
-      avatar: 'https://example.com/avatar.png'
+      avatar: 'https://example.com/avatar.png',
+      showEmail: true,
+      showLastSeen: true,
+      showUploadedStats: false,
+      showDownloadedStats: false,
+      showRatioStats: false
     });
     expect(res.body.avatar).toBe('https://example.com/avatar.png');
   });

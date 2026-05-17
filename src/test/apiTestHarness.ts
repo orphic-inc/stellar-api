@@ -8,7 +8,8 @@ jest.mock('../modules/installState', () => ({
 }));
 
 jest.mock('../modules/profile', () => ({
-  getCurrentProfile: jest.fn(),
+  getProfileById: jest.fn(),
+  getProfileByLookup: jest.fn(),
   updateProfile: jest.fn(),
   createInvite: jest.fn()
 }));
@@ -126,7 +127,12 @@ import { type PrismaClient } from '@prisma/client';
 import app from '../app';
 import { isInstalled } from '../modules/installState';
 import { prisma } from '../lib/prisma';
-import { createInvite, updateProfile } from '../modules/profile';
+import {
+  createInvite,
+  updateProfile,
+  getProfileById,
+  getProfileByLookup
+} from '../modules/profile';
 import { createContributionSubmission } from '../modules/contribution';
 import {
   getUserSettings,
@@ -163,6 +169,12 @@ export const bcryptMock = bcrypt as unknown as {
 
 export const createInviteMock = createInvite as jest.MockedFunction<
   typeof createInvite
+>;
+export const getProfileByIdMock = getProfileById as jest.MockedFunction<
+  typeof getProfileById
+>;
+export const getProfileByLookupMock = getProfileByLookup as jest.MockedFunction<
+  typeof getProfileByLookup
 >;
 export const updateProfileMock = updateProfile as jest.MockedFunction<
   typeof updateProfile

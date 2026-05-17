@@ -15,7 +15,12 @@ export const userSettingsSchema = z.object({
   avatar: z.string().optional(),
   notificationMethod: z
     .enum(['Disabled', 'Popup', 'Traditional', 'Push', 'Combined'])
-    .optional()
+    .optional(),
+  showEmail: z.boolean().optional(),
+  showLastSeen: z.boolean().optional(),
+  showUploadedStats: z.boolean().optional(),
+  showDownloadedStats: z.boolean().optional(),
+  showRatioStats: z.boolean().optional()
 });
 
 export const warnUserSchema = z.object({

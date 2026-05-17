@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import type { NotificationMethod, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
@@ -6,10 +7,30 @@ import { getLogger } from './logging';
 
 const log = getLogger('profile');
 
-export type InviteTreeNode = {
+type ViewerContext = {
+  viewerId: number | null;
+  isOwner: boolean;
+  isStaff: boolean;
+};
+
+type UserSettingsView = {
+  id: number;
+  siteAppearance: string;
+  externalStylesheet: string | null;
+  styledTooltips: boolean;
+  paranoia: number;
+  notificationMethod: NotificationMethod;
+  showEmail: boolean;
+  showLastSeen: boolean;
+  showUploadedStats: boolean;
+  showDownloadedStats: boolean;
+  showRatioStats: boolean;
+};
+
+type InviteTreeNode = {
   id: number;
   username: string;
-  email: string;
+  email?: string;
   joinedAt: string;
   lastSeen: string | null;
   uploaded: string;
@@ -17,6 +38,79 @@ export type InviteTreeNode = {
   ratio: string;
   children: InviteTreeNode[];
 };
+
+type RecentContribution = {
+  id: number;
+  createdAt: string;
+  release: {
+    id: number;
+    title: string;
+    communityId: number | null;
+    artist: { id: number; name: string } | null;
+  };
+};
+
+type RecentSnatch = {
+  id: number;
+  downloadedAt: string;
+  release: {
+    id: number;
+    title: string;
+    communityId: number | null;
+  };
+  artist: { name: string } | null;
+};
+
+type ProfileActivitySummary = {
+  contributions: number;
+  requestsCreated: number;
+  requestsFilled: number;
+  forumTopics: number;
+  forumPosts: number;
+  comments: number;
+  collagesStarted: number;
+  collageEntries: number;
+};
+
+const PROFILE_BASE_SELECT = {
+  id: true,
+  profileId: true,
+  username: true,
+  email: true,
+  avatar: true,
+  dateRegistered: true,
+  lastLogin: true,
+  isArtist: true,
+  isDonor: true,
+  disabled: true,
+  warned: true,
+  inviteCount: true,
+  uploaded: true,
+  downloaded: true,
+  totalEarned: true,
+  ratio: true,
+  userRank: { select: { name: true, color: true, badge: true } },
+  profile: true,
+  userSettings: {
+    select: {
+      id: true,
+      siteAppearance: true,
+      externalStylesheet: true,
+      styledTooltips: true,
+      paranoia: true,
+      notificationMethod: true,
+      showEmail: true,
+      showLastSeen: true,
+      showUploadedStats: true,
+      showDownloadedStats: true,
+      showRatioStats: true
+    }
+  }
+} as const;
+
+type ProfileUserRecord = Prisma.UserGetPayload<{
+  select: typeof PROFILE_BASE_SELECT;
+}>;
 
 const buildInviteTree = (
   rows: Array<{
@@ -32,7 +126,8 @@ const buildInviteTree = (
       downloaded: bigint;
       ratio: number;
     };
-  }>
+  }>,
+  includeEmail: boolean
 ): InviteTreeNode[] => {
   if (!rows.length) return [];
 
@@ -45,7 +140,7 @@ const buildInviteTree = (
     const node: InviteTreeNode = {
       id: row.user.id,
       username: row.user.username,
-      email: row.user.email,
+      ...(includeEmail ? { email: row.user.email } : {}),
       joinedAt: row.user.dateRegistered.toISOString(),
       lastSeen: row.user.lastLogin?.toISOString() ?? null,
       uploaded: row.user.uploaded.toString(),
@@ -70,47 +165,296 @@ const buildInviteTree = (
   return roots;
 };
 
-export const getCurrentProfile = async (userId: number) => {
-  const [user, inviteRows] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        avatar: true,
-        profile: true,
-        userSettings: true,
-        userRank: { select: { name: true, color: true } }
+const loadViewerContext = async (
+  targetUserId: number,
+  viewerUserId?: number
+): Promise<ViewerContext> => {
+  if (!viewerUserId) {
+    return { viewerId: null, isOwner: false, isStaff: false };
+  }
+
+  if (viewerUserId === targetUserId) {
+    return { viewerId: viewerUserId, isOwner: true, isStaff: false };
+  }
+
+  const viewer = await prisma.user.findUnique({
+    where: { id: viewerUserId },
+    select: {
+      userRank: { select: { permissions: true } }
+    }
+  });
+  const perms = (viewer?.userRank.permissions ?? {}) as Record<string, boolean>;
+  const isStaff = !!(
+    perms.staff ||
+    perms.admin ||
+    perms.users_edit ||
+    perms.users_warn ||
+    perms.users_disable
+  );
+
+  return { viewerId: viewerUserId, isOwner: false, isStaff };
+};
+
+const getActivitySummary = async (
+  userId: number
+): Promise<ProfileActivitySummary> => {
+  const [
+    contributions,
+    requestsCreated,
+    requestsFilled,
+    forumTopics,
+    forumPosts,
+    comments,
+    collagesStarted,
+    collageEntries
+  ] = await Promise.all([
+    prisma.contribution.count({ where: { userId } }),
+    prisma.request.count({ where: { userId, deletedAt: null } }),
+    prisma.request.count({ where: { fillerId: userId, deletedAt: null } }),
+    prisma.forumTopic.count({ where: { authorId: userId, deletedAt: null } }),
+    prisma.forumPost.count({ where: { authorId: userId, deletedAt: null } }),
+    prisma.comment.count({ where: { authorId: userId, deletedAt: null } }),
+    prisma.collage.count({ where: { userId, isDeleted: false } }),
+    prisma.collageEntry.count({ where: { userId } })
+  ]);
+
+  return {
+    contributions,
+    requestsCreated,
+    requestsFilled,
+    forumTopics,
+    forumPosts,
+    comments,
+    collagesStarted,
+    collageEntries
+  };
+};
+
+const getRecentContributions = async (
+  userId: number
+): Promise<RecentContribution[]> => {
+  const rows = await prisma.contribution.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    select: {
+      id: true,
+      createdAt: true,
+      release: {
+        select: {
+          id: true,
+          title: true,
+          communityId: true,
+          artist: { select: { id: true, name: true } }
+        }
       }
-    }),
-    prisma.inviteTree.findMany({
-      where: { treeId: userId },
-      orderBy: { treePosition: 'asc' },
-      select: {
-        treeLevel: true,
-        treePosition: true,
-        user: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            dateRegistered: true,
-            lastLogin: true,
-            uploaded: true,
-            downloaded: true,
-            ratio: true
+    }
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    release: {
+      id: row.release.id,
+      title: row.release.title,
+      communityId: row.release.communityId,
+      artist: row.release.artist
+    }
+  }));
+};
+
+const getRecentSnatches = async (userId: number): Promise<RecentSnatch[]> => {
+  const grants = await prisma.downloadAccessGrant.findMany({
+    where: { consumerId: userId, status: 'COMPLETED' },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      contribution: {
+        include: {
+          release: {
+            select: {
+              id: true,
+              title: true,
+              communityId: true,
+              artist: { select: { name: true } }
+            }
           }
         }
       }
-    })
-  ]);
+    },
+    take: 25
+  });
 
-  if (!user?.profile) return null;
+  const seen = new Set<number>();
+  const items: RecentSnatch[] = [];
+
+  for (const grant of grants) {
+    const release = grant.contribution.release;
+    if (seen.has(release.id)) continue;
+    seen.add(release.id);
+    items.push({
+      id: grant.id,
+      downloadedAt: grant.createdAt.toISOString(),
+      release: {
+        id: release.id,
+        title: release.title,
+        communityId: release.communityId
+      },
+      artist: release.artist ?? null
+    });
+    if (items.length >= 5) break;
+  }
+
+  return items;
+};
+
+const buildProfileView = async (
+  user: ProfileUserRecord,
+  viewer: ViewerContext,
+  includeInviteTree: boolean
+) => {
+  const settings = user.userSettings as UserSettingsView;
+  const profile = user.profile ?? {
+    id: user.profileId,
+    avatar: null,
+    avatarMouseoverText: null,
+    profileTitle: null,
+    profileInfo: null
+  };
+  const canSeeEmail = viewer.isOwner || viewer.isStaff || settings.showEmail;
+  const canSeeLastSeen =
+    viewer.isOwner || viewer.isStaff || settings.showLastSeen;
+  const canSeeUploaded =
+    viewer.isOwner || viewer.isStaff || settings.showUploadedStats;
+  const canSeeDownloaded =
+    viewer.isOwner || viewer.isStaff || settings.showDownloadedStats;
+  const canSeeRatio =
+    viewer.isOwner || viewer.isStaff || settings.showRatioStats;
+  const canSeeSnatches = viewer.isOwner || viewer.isStaff;
+
+  const [activitySummary, recentContributions, recentSnatches, inviteRows] =
+    await Promise.all([
+      getActivitySummary(user.id),
+      getRecentContributions(user.id),
+      canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
+      includeInviteTree
+        ? prisma.inviteTree.findMany({
+            where: { treeId: user.id },
+            orderBy: { treePosition: 'asc' },
+            select: {
+              treeLevel: true,
+              treePosition: true,
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  email: true,
+                  dateRegistered: true,
+                  lastLogin: true,
+                  uploaded: true,
+                  downloaded: true,
+                  ratio: true
+                }
+              }
+            }
+          })
+        : Promise.resolve([])
+    ]);
 
   return {
-    ...user,
-    inviteTree: buildInviteTree(inviteRows)
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar,
+    email: canSeeEmail ? user.email : null,
+    dateRegistered: user.dateRegistered.toISOString(),
+    lastSeen: canSeeLastSeen ? user.lastLogin?.toISOString() ?? null : null,
+    isArtist: user.isArtist,
+    isDonor: user.isDonor,
+    disabled: user.disabled,
+    warned: user.warned?.toISOString() ?? null,
+    inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
+    stats: {
+      uploaded: canSeeUploaded ? user.uploaded.toString() : null,
+      downloaded: canSeeDownloaded ? user.downloaded.toString() : null,
+      totalEarned: canSeeRatio ? user.totalEarned.toString() : null,
+      ratio: canSeeRatio ? user.ratio.toFixed(2) : null,
+      buffer:
+        canSeeUploaded || canSeeDownloaded
+          ? (user.uploaded - user.downloaded).toString()
+          : null
+    },
+    userRank: user.userRank,
+    profile,
+    userSettings: viewer.isOwner
+      ? {
+          id: settings.id,
+          siteAppearance: settings.siteAppearance,
+          externalStylesheet: settings.externalStylesheet,
+          styledTooltips: settings.styledTooltips,
+          paranoia: settings.paranoia,
+          notificationMethod: settings.notificationMethod,
+          showEmail: settings.showEmail,
+          showLastSeen: settings.showLastSeen,
+          showUploadedStats: settings.showUploadedStats,
+          showDownloadedStats: settings.showDownloadedStats,
+          showRatioStats: settings.showRatioStats
+        }
+      : undefined,
+    activitySummary,
+    recentContributions,
+    recentSnatches,
+    inviteTree:
+      includeInviteTree && inviteRows.length
+        ? buildInviteTree(inviteRows, viewer.isOwner || viewer.isStaff)
+        : []
   };
+};
+
+export const getProfileById = async (
+  targetUserId: number,
+  viewerUserId?: number
+) => {
+  const viewer = await loadViewerContext(targetUserId, viewerUserId);
+  const user = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: PROFILE_BASE_SELECT
+  });
+  if (!user) return null;
+  return buildProfileView(user, viewer, viewer.isOwner || viewer.isStaff);
+};
+
+export const getProfileByLookup = async (
+  userIdOrUsername: string,
+  viewerUserId?: number
+) => {
+  const trimmedLookup = userIdOrUsername.trim();
+  const numericId = Number(trimmedLookup);
+  const isNumeric =
+    !Number.isNaN(numericId) && Number.isInteger(numericId) && numericId > 0;
+
+  let user = isNumeric
+    ? await prisma.user.findUnique({
+        where: { id: numericId },
+        select: PROFILE_BASE_SELECT
+      })
+    : await prisma.user.findFirst({
+        where: {
+          username: { equals: trimmedLookup, mode: 'insensitive' }
+        },
+        select: PROFILE_BASE_SELECT
+      });
+
+  if (!user && isNumeric) {
+    user = await prisma.user.findFirst({
+      where: {
+        username: { equals: trimmedLookup, mode: 'insensitive' }
+      },
+      select: PROFILE_BASE_SELECT
+    });
+  }
+
+  if (!user) return null;
+  const viewer = await loadViewerContext(user.id, viewerUserId);
+  return buildProfileView(user, viewer, viewer.isOwner || viewer.isStaff);
 };
 
 export const updateProfile = async (
@@ -123,6 +467,13 @@ export const updateProfile = async (
     siteAppearance?: string;
     externalStylesheet?: string;
     styledTooltips?: boolean;
+    paranoia?: number;
+    notificationMethod?: NotificationMethod;
+    showEmail?: boolean;
+    showLastSeen?: boolean;
+    showUploadedStats?: boolean;
+    showDownloadedStats?: boolean;
+    showRatioStats?: boolean;
   }
 ) => {
   const user = await prisma.user.findUnique({
@@ -136,16 +487,20 @@ export const updateProfile = async (
       where: { id: user.profileId },
       data: {
         ...(data.avatar !== undefined && {
-          avatar: sanitizePlain(data.avatar)
+          avatar: data.avatar ? sanitizePlain(data.avatar) : null
         }),
         ...(data.avatarMouseoverText !== undefined && {
-          avatarMouseoverText: sanitizePlain(data.avatarMouseoverText)
+          avatarMouseoverText: data.avatarMouseoverText
+            ? sanitizePlain(data.avatarMouseoverText)
+            : null
         }),
         ...(data.profileTitle !== undefined && {
-          profileTitle: sanitizePlain(data.profileTitle)
+          profileTitle: data.profileTitle
+            ? sanitizePlain(data.profileTitle)
+            : null
         }),
         ...(data.profileInfo !== undefined && {
-          profileInfo: sanitizeHtml(data.profileInfo)
+          profileInfo: data.profileInfo ? sanitizeHtml(data.profileInfo) : null
         })
       }
     }),
@@ -156,16 +511,35 @@ export const updateProfile = async (
           siteAppearance: data.siteAppearance
         }),
         ...(data.externalStylesheet !== undefined && {
-          externalStylesheet: data.externalStylesheet
+          externalStylesheet: data.externalStylesheet || null
         }),
         ...(data.styledTooltips !== undefined && {
           styledTooltips: data.styledTooltips
+        }),
+        ...(data.paranoia !== undefined && {
+          paranoia: data.paranoia
+        }),
+        ...(data.notificationMethod !== undefined && {
+          notificationMethod: data.notificationMethod
+        }),
+        ...(data.showEmail !== undefined && { showEmail: data.showEmail }),
+        ...(data.showLastSeen !== undefined && {
+          showLastSeen: data.showLastSeen
+        }),
+        ...(data.showUploadedStats !== undefined && {
+          showUploadedStats: data.showUploadedStats
+        }),
+        ...(data.showDownloadedStats !== undefined && {
+          showDownloadedStats: data.showDownloadedStats
+        }),
+        ...(data.showRatioStats !== undefined && {
+          showRatioStats: data.showRatioStats
         })
       }
     })
   ]);
 
-  return getCurrentProfile(userId);
+  return getProfileById(userId, userId);
 };
 
 type CreateInviteResult =
@@ -177,6 +551,9 @@ export const createInvite = async (
   email: string,
   reason: string
 ): Promise<CreateInviteResult> => {
+  const normalizedEmail = sanitizePlain(email).trim().toLowerCase();
+  const normalizedReason = sanitizePlain(reason).trim();
+
   const inviter = await prisma.user.findUnique({
     where: { id: inviterId },
     select: { inviteCount: true }
@@ -185,7 +562,9 @@ export const createInvite = async (
     return { ok: false, reason: 'no_invites' };
   }
 
-  const existing = await prisma.invite.findUnique({ where: { email } });
+  const existing = await prisma.invite.findFirst({
+    where: { email: normalizedEmail }
+  });
   if (existing) {
     return { ok: false, reason: 'already_invited' };
   }
@@ -198,9 +577,9 @@ export const createInvite = async (
       data: {
         inviterId,
         inviteKey,
-        email: sanitizePlain(email),
+        email: normalizedEmail,
         expires,
-        reason: sanitizePlain(reason)
+        reason: normalizedReason
       }
     }),
     prisma.user.update({
@@ -211,9 +590,9 @@ export const createInvite = async (
 
   let emailSent = false;
   try {
-    emailSent = await sendInviteEmail(email, inviteKey);
+    emailSent = await sendInviteEmail(normalizedEmail, inviteKey);
   } catch (err) {
-    log.error('Failed to send invite email', { to: email, err });
+    log.error('Failed to send invite email', { to: normalizedEmail, err });
   }
 
   return { ok: true, inviteKey, emailSent };

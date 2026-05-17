@@ -7,7 +7,16 @@ export const profileUpdateSchema = z.object({
   profileInfo: z.string().max(10000).optional(),
   siteAppearance: z.string().optional(),
   externalStylesheet: z.string().url().optional().or(z.literal('')),
-  styledTooltips: z.boolean().optional()
+  styledTooltips: z.boolean().optional(),
+  paranoia: z.coerce.number().int().min(0).max(3).optional(),
+  notificationMethod: z
+    .enum(['Disabled', 'Popup', 'Traditional', 'Push', 'Combined'])
+    .optional(),
+  showEmail: z.boolean().optional(),
+  showLastSeen: z.boolean().optional(),
+  showUploadedStats: z.boolean().optional(),
+  showDownloadedStats: z.boolean().optional(),
+  showRatioStats: z.boolean().optional()
 });
 
 export const inviteSchema = z.object({

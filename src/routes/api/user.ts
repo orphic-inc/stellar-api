@@ -520,7 +520,20 @@ router.get(
       orderBy: { createdAt: 'desc' },
       take: 50
     });
-    res.json(sessions);
+    const history = new Map<string, string>();
+    for (const session of sessions) {
+      if (!session.ipAddress) continue;
+      const seenAt = (session.lastActiveAt ?? session.createdAt).toISOString();
+      if (!history.has(session.ipAddress)) {
+        history.set(session.ipAddress, seenAt);
+      }
+    }
+    res.json(
+      Array.from(history.entries()).map(([ip, seenAt]) => ({
+        ip,
+        seenAt
+      }))
+    );
   })
 );
 
@@ -533,9 +546,18 @@ router.get(
     const { id } = parsedParams<{ id: number }>(res);
     const history = await prisma.userEmailHistory.findMany({
       where: { userId: id },
+      select: {
+        newEmail: true,
+        changedAt: true
+      },
       orderBy: { changedAt: 'desc' }
     });
-    res.json(history);
+    res.json(
+      history.map((row) => ({
+        email: row.newEmail,
+        changedAt: row.changedAt.toISOString()
+      }))
+    );
   })
 );
 

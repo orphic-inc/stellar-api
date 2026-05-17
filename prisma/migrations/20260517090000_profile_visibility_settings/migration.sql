@@ -1,0 +1,6 @@
+ALTER TABLE "user_settings"
+ADD COLUMN "showEmail" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "showLastSeen" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "showUploadedStats" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "showDownloadedStats" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "showRatioStats" BOOLEAN NOT NULL DEFAULT true;

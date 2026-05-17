@@ -289,13 +289,43 @@ describe('GET /api/users/:id/ip-history', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
-    expect(res.body[0].ipAddress).toBe('1.2.3.4');
+    expect(res.body[0]).toEqual({
+      ip: '1.2.3.4',
+      seenAt: expect.any(String)
+    });
   });
 
   it('returns 403 without staff permission', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app).get('/api/users/9/ip-history');
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/users/:id/email-history', () => {
+  beforeEach(() => setStaff());
+
+  it('returns email history entries in the frontend contract shape', async () => {
+    prismaMock.userEmailHistory.findMany.mockResolvedValue([
+      {
+        id: 1,
+        userId: 9,
+        newEmail: 'first@example.com',
+        oldEmail: 'older@example.com',
+        ipAddress: null,
+        changedAt: new Date('2026-05-01T00:00:00.000Z')
+      } as never
+    ]);
+
+    const res = await request(app).get('/api/users/9/email-history');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      {
+        email: 'first@example.com',
+        changedAt: '2026-05-01T00:00:00.000Z'
+      }
+    ]);
   });
 });
 
