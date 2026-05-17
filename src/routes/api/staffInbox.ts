@@ -259,7 +259,7 @@ router.post(
     const { assignedUserId, assignedUsername } = parsedBody<AssignInput>(res);
 
     let resolvedId: number | null = assignedUserId ?? null;
-    if (assignedUsername && resolvedId === undefined) {
+    if (assignedUsername && assignedUserId === undefined) {
       const user = await prisma.user.findFirst({
         where: { username: { equals: assignedUsername, mode: 'insensitive' } },
         select: { id: true }

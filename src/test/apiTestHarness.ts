@@ -70,6 +70,19 @@ jest.mock('../modules/staffInbox', () => ({
   deleteResponse: jest.fn()
 }));
 
+jest.mock('../modules/staffPm', () => ({
+  createTicket: jest.fn(),
+  listMyTickets: jest.fn(),
+  listQueue: jest.fn(),
+  getQueueCount: jest.fn(),
+  viewTicket: jest.fn(),
+  replyToTicket: jest.fn(),
+  resolveTicket: jest.fn(),
+  unresolveTicket: jest.fn(),
+  assignTicket: jest.fn(),
+  bulkResolve: jest.fn()
+}));
+
 jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
@@ -154,6 +167,7 @@ import {
 } from '../modules/downloads';
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
+import * as staffPmModule from '../modules/staffPm';
 import { makeUserRank } from './factories';
 export { makeUserRank } from './factories';
 
@@ -221,6 +235,7 @@ export const pmMock = pmModule as jest.Mocked<typeof pmModule>;
 export const staffInboxMock = staffInboxModule as jest.Mocked<
   typeof staffInboxModule
 >;
+export const staffPmMock = staffPmModule as jest.Mocked<typeof staffPmModule>;
 
 export const setCurrentUserRankLevel = (level: number): void => {
   currentUserRankLevel = level;

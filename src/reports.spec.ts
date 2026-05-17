@@ -125,6 +125,30 @@ describe('GET /api/reports', () => {
     expect(res.body.reports).toHaveLength(1);
   });
 
+  it('passes queue filters through to listReports', async () => {
+    setStaff();
+    reportsMock.listReports.mockResolvedValue({
+      total: 0,
+      page: 2,
+      pageSize: 25,
+      reports: []
+    });
+
+    const res = await request(app).get(
+      '/api/reports?page=2&status=Claimed&targetType=ForumPost&claimedByMe=true&reporterUsername=alice'
+    );
+
+    expect(res.status).toBe(200);
+    expect(reportsMock.listReports).toHaveBeenCalledWith({
+      page: 2,
+      status: 'Claimed',
+      targetType: 'ForumPost',
+      claimedByMe: true,
+      staffUserId: 7,
+      reporterUsername: 'alice'
+    });
+  });
+
   it('rejects non-staff', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app).get('/api/reports');
@@ -200,6 +224,16 @@ describe('POST /api/reports/:id/claim', () => {
     const res = await request(app).post('/api/reports/1/claim');
     expect(res.status).toBe(409);
   });
+
+  it('returns 422 when the report is already resolved', async () => {
+    setStaff();
+    reportsMock.claimReport.mockResolvedValue({
+      ok: false,
+      reason: 'resolved'
+    });
+    const res = await request(app).post('/api/reports/1/claim');
+    expect(res.status).toBe(422);
+  });
 });
 
 describe('POST /api/reports/:id/unclaim', () => {
@@ -218,6 +252,16 @@ describe('POST /api/reports/:id/unclaim', () => {
     });
     const res = await request(app).post('/api/reports/1/unclaim');
     expect(res.status).toBe(422);
+  });
+
+  it('returns 403 when the report is claimed by another staff member', async () => {
+    setStaff();
+    reportsMock.unclaimReport.mockResolvedValue({
+      ok: false,
+      reason: 'forbidden'
+    });
+    const res = await request(app).post('/api/reports/1/unclaim');
+    expect(res.status).toBe(403);
   });
 });
 
@@ -244,6 +288,12 @@ describe('POST /api/reports/:id/resolve', () => {
     });
     expect(res.status).toBe(422);
   });
+
+  it('rejects missing resolution fields with 400', async () => {
+    setStaff();
+    const res = await request(app).post('/api/reports/1/resolve').send({});
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/reports/:id/notes', () => {
@@ -263,5 +313,29 @@ describe('POST /api/reports/:id/notes', () => {
       .post('/api/reports/1/notes')
       .send({ body: 'note' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/reports/stats', () => {
+  it('returns staff resolution stats', async () => {
+    setStaff();
+    reportsMock.getReportStats.mockResolvedValue({
+      last24h: 1,
+      lastWeek: 4,
+      lastMonth: 10,
+      allTime: 25,
+      byStaff: [{ userId: 7, username: 'alice', count: 8 }]
+    });
+
+    const res = await request(app).get('/api/reports/stats');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      last24h: 1,
+      lastWeek: 4,
+      lastMonth: 10,
+      allTime: 25,
+      byStaff: [{ userId: 7, username: 'alice', count: 8 }]
+    });
   });
 });
