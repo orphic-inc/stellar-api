@@ -305,7 +305,77 @@ const UserSettings = registry.register(
     siteAppearance: z.string(),
     externalStylesheet: z.string().nullable().optional(),
     styledTooltips: z.boolean(),
-    paranoia: z.number()
+    paranoia: z.number(),
+    notificationMethod: z.enum([
+      'Disabled',
+      'Popup',
+      'Traditional',
+      'Push',
+      'Combined'
+    ]),
+    showEmail: z.boolean(),
+    showLastSeen: z.boolean(),
+    showUploadedStats: z.boolean(),
+    showDownloadedStats: z.boolean(),
+    showRatioStats: z.boolean()
+  })
+);
+
+const ProfileStats = registry.register(
+  'ProfileStats',
+  z.object({
+    uploaded: z.string().nullable(),
+    downloaded: z.string().nullable(),
+    totalEarned: z.string().nullable(),
+    ratio: z.string().nullable(),
+    buffer: z.string().nullable()
+  })
+);
+
+const ProfileActivitySummary = registry.register(
+  'ProfileActivitySummary',
+  z.object({
+    contributions: z.number(),
+    requestsCreated: z.number(),
+    requestsFilled: z.number(),
+    forumTopics: z.number(),
+    forumPosts: z.number(),
+    comments: z.number(),
+    collagesStarted: z.number(),
+    collageEntries: z.number()
+  })
+);
+
+const ProfileContribution = registry.register(
+  'ProfileContribution',
+  z.object({
+    id: z.number(),
+    createdAt: z.string(),
+    release: z.object({
+      id: z.number(),
+      title: z.string(),
+      communityId: z.number(),
+      artist: z
+        .object({
+          id: z.number(),
+          name: z.string()
+        })
+        .nullable()
+    })
+  })
+);
+
+const ProfileSnatch = registry.register(
+  'ProfileSnatch',
+  z.object({
+    id: z.number(),
+    downloadedAt: z.string(),
+    release: z.object({
+      id: z.number(),
+      title: z.string(),
+      communityId: z.number().nullable()
+    }),
+    artist: z.object({ name: z.string() }).nullable()
   })
 );
 
@@ -314,7 +384,7 @@ const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     id: z.number(),
     username: z.string(),
-    email: z.string().email(),
+    email: z.string().email().optional(),
     joinedAt: z.string(),
     lastSeen: z.string().nullable().optional(),
     uploaded: z.string().optional(),
@@ -332,31 +402,29 @@ const PublicProfile = registry.register(
     id: z.number(),
     username: z.string(),
     avatar: z.string().nullable(),
+    email: z.string().email().nullable(),
     dateRegistered: z.string(),
+    lastSeen: z.string().nullable(),
     isArtist: z.boolean(),
     isDonor: z.boolean(),
+    disabled: z.boolean(),
+    warned: z.string().nullable(),
+    inviteCount: z.number().nullable(),
+    stats: ProfileStats,
     userRank: UserRankSummary,
     profile: ProfileDetails,
-    userSettings: z.object({
-      siteAppearance: z.string().optional(),
-      styledTooltips: z.boolean().optional()
-    })
+    activitySummary: ProfileActivitySummary,
+    recentContributions: z.array(ProfileContribution),
+    recentSnatches: z.array(ProfileSnatch),
+    inviteTree: z.array(InviteNode)
   })
 );
 
 const MyProfile = registry.register(
   'MyProfile',
   z.object({
-    id: z.number(),
-    username: z.string(),
-    avatar: z.string().nullable(),
-    profile: ProfileDetails,
-    userSettings: UserSettings,
-    userRank: z.object({
-      name: z.string(),
-      color: z.string()
-    }),
-    inviteTree: z.array(InviteNode)
+    ...PublicProfile.shape,
+    userSettings: UserSettings
   })
 );
 

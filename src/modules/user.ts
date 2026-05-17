@@ -20,6 +20,17 @@ export const updateUserSettings = async (
     styledTooltips?: boolean;
     paranoia?: number;
     avatar?: string;
+    notificationMethod?:
+      | 'Disabled'
+      | 'Popup'
+      | 'Traditional'
+      | 'Push'
+      | 'Combined';
+    showEmail?: boolean;
+    showLastSeen?: boolean;
+    showUploadedStats?: boolean;
+    showDownloadedStats?: boolean;
+    showRatioStats?: boolean;
   }
 ) => {
   const user = await prisma.user.findUnique({
@@ -41,7 +52,23 @@ export const updateUserSettings = async (
         ...(data.styledTooltips !== undefined && {
           styledTooltips: data.styledTooltips
         }),
-        ...(data.paranoia !== undefined && { paranoia: data.paranoia })
+        ...(data.paranoia !== undefined && { paranoia: data.paranoia }),
+        ...(data.notificationMethod !== undefined && {
+          notificationMethod: data.notificationMethod
+        }),
+        ...(data.showEmail !== undefined && { showEmail: data.showEmail }),
+        ...(data.showLastSeen !== undefined && {
+          showLastSeen: data.showLastSeen
+        }),
+        ...(data.showUploadedStats !== undefined && {
+          showUploadedStats: data.showUploadedStats
+        }),
+        ...(data.showDownloadedStats !== undefined && {
+          showDownloadedStats: data.showDownloadedStats
+        }),
+        ...(data.showRatioStats !== undefined && {
+          showRatioStats: data.showRatioStats
+        })
       }
     }),
     ...(data.avatar !== undefined

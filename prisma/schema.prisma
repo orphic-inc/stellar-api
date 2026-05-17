@@ -267,6 +267,11 @@ model UserSettings {
   styledTooltips       Boolean            @default(true)
   paranoia             Int                @default(0)
   notificationMethod   NotificationMethod @default(Popup)
+  showEmail            Boolean            @default(false)
+  showLastSeen         Boolean            @default(false)
+  showUploadedStats    Boolean            @default(true)
+  showDownloadedStats  Boolean            @default(true)
+  showRatioStats       Boolean            @default(true)
   user                 User?
 
   @@map("user_settings")

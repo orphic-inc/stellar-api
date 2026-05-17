@@ -2,13 +2,15 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
-  getCurrentProfile,
+  getProfileById,
+  getProfileByLookup,
   updateProfile,
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
+import { audit } from '../../lib/audit';
 import { validate, parsedBody } from '../../middleware/validate';
 import {
   profileUpdateSchema,
@@ -18,31 +20,12 @@ import {
 } from '../../schemas/profile';
 
 const router = express.Router();
-
-const PROFILE_SELECT = {
-  id: true,
-  username: true,
-  avatar: true,
-  dateRegistered: true,
-  isArtist: true,
-  isDonor: true,
-  disabled: true,
-  warned: true,
-  uploaded: true,
-  downloaded: true,
-  totalEarned: true,
-  ratio: true,
-  userRank: { select: { name: true, color: true, badge: true } },
-  profile: true,
-  userSettings: { select: { siteAppearance: true, styledTooltips: true } }
-} as const;
-
 // GET /api/profile/me
 router.get(
   '/me',
   requireAuth,
   authHandler(async (req, res) => {
-    const user = await getCurrentProfile(req.user.id);
+    const user = await getProfileById(req.user.id, req.user.id);
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
@@ -69,22 +52,10 @@ router.get(
 // GET /api/profile/user/:userId — accepts numeric ID or username (case-insensitive)
 router.get(
   '/user/:userId',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const { userId } = req.params;
-
-    const numericId = Number(userId);
-    const isNumeric =
-      !isNaN(numericId) && Number.isInteger(numericId) && numericId > 0;
-
-    const user = isNumeric
-      ? await prisma.user.findUnique({
-          where: { id: numericId },
-          select: PROFILE_SELECT
-        })
-      : await prisma.user.findFirst({
-          where: { username: { equals: userId.trim(), mode: 'insensitive' } },
-          select: PROFILE_SELECT
-        });
+    const user = await getProfileByLookup(userId, req.user!.id);
 
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
@@ -113,6 +84,9 @@ router.put(
     const data = parsedBody<ProfileUpdateInput>(res);
     const updated = await updateProfile(req.user.id, data);
     if (!updated) return res.status(404).json({ msg: 'User not found' });
+    await audit(prisma, req.user.id, 'profile.update', 'User', req.user.id, {
+      fields: Object.keys(data).sort()
+    });
     res.json(updated);
   })
 );
@@ -126,6 +100,13 @@ router.delete(
       where: { id: req.user.id },
       data: { disabled: true }
     });
+    await audit(
+      prisma,
+      req.user.id,
+      'profile.disable_self',
+      'User',
+      req.user.id
+    );
     res.clearCookie('token');
     res.status(204).send();
   })
@@ -146,6 +127,14 @@ router.post(
         .status(409)
         .json({ msg: 'An invite has already been sent to that address' });
     }
+    await audit(
+      prisma,
+      req.user.id,
+      'profile.invite.create',
+      'Invite',
+      undefined,
+      { email: email.toLowerCase() }
+    );
     res
       .status(201)
       .json({ inviteKey: result.inviteKey, emailSent: result.emailSent });
