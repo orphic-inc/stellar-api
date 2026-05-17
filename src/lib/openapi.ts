@@ -354,7 +354,7 @@ const ProfileContribution = registry.register(
     release: z.object({
       id: z.number(),
       title: z.string(),
-      communityId: z.number(),
+      communityId: z.number().nullable(),
       artist: z
         .object({
           id: z.number(),
@@ -362,6 +362,72 @@ const ProfileContribution = registry.register(
         })
         .nullable()
     })
+  })
+);
+
+const ProfilePercentile = registry.register(
+  'ProfilePercentile',
+  z.object({
+    percentile: z.number(),
+    rank: z.number(),
+    total: z.number()
+  })
+);
+
+const ProfilePercentiles = registry.register(
+  'ProfilePercentiles',
+  z.object({
+    uploaded: ProfilePercentile,
+    downloaded: ProfilePercentile,
+    contributions: ProfilePercentile,
+    forumPosts: ProfilePercentile,
+    requestsFilled: ProfilePercentile
+  })
+);
+
+const ProfileCollageShelf = registry.register(
+  'ProfileCollageShelf',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    categoryId: z.number(),
+    isFeatured: z.boolean(),
+    numEntries: z.number(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    coverImages: z.array(z.string())
+  })
+);
+
+const ProfileCollageShelves = registry.register(
+  'ProfileCollageShelves',
+  z.object({
+    featuredPersonalCollages: z.array(ProfileCollageShelf),
+    publicCollages: z.array(ProfileCollageShelf)
+  })
+);
+
+const DonorPresentation = registry.register(
+  'DonorPresentation',
+  z.object({
+    rank: z
+      .object({
+        name: z.string(),
+        badge: z.string(),
+        color: z.string(),
+        grantedAt: z.string(),
+        expiresAt: z.string().nullable()
+      })
+      .nullable(),
+    customIcon: z.string().nullable(),
+    customIconLink: z.string().nullable(),
+    secondAvatar: z.string().nullable(),
+    profileBlocks: z.array(
+      z.object({
+        title: z.string(),
+        body: z.string()
+      })
+    )
   })
 );
 
@@ -411,9 +477,14 @@ const PublicProfile = registry.register(
     warned: z.string().nullable(),
     inviteCount: z.number().nullable(),
     stats: ProfileStats,
-    userRank: UserRankSummary,
+    userRank: UserRankSummary.extend({
+      id: z.number()
+    }),
     profile: ProfileDetails,
     activitySummary: ProfileActivitySummary,
+    percentiles: ProfilePercentiles,
+    donorPresentation: DonorPresentation.nullable(),
+    collageShelves: ProfileCollageShelves,
     recentContributions: z.array(ProfileContribution),
     recentSnatches: z.array(ProfileSnatch),
     inviteTree: z.array(InviteNode)

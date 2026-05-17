@@ -61,6 +61,45 @@ type RecentSnatch = {
   artist: { name: string } | null;
 };
 
+type ProfileCollagePreview = {
+  id: number;
+  name: string;
+  categoryId: number;
+  isFeatured: boolean;
+  numEntries: number;
+  createdAt: string;
+  updatedAt: string;
+  coverImages: string[];
+};
+
+type DonorPresentation = {
+  rank: {
+    name: string;
+    badge: string;
+    color: string;
+    grantedAt: string;
+    expiresAt: string | null;
+  } | null;
+  customIcon: string | null;
+  customIconLink: string | null;
+  secondAvatar: string | null;
+  profileBlocks: Array<{ title: string; body: string }>;
+};
+
+type ProfilePercentile = {
+  percentile: number;
+  rank: number;
+  total: number;
+};
+
+type ProfilePercentileSummary = {
+  uploaded: ProfilePercentile;
+  downloaded: ProfilePercentile;
+  contributions: ProfilePercentile;
+  forumPosts: ProfilePercentile;
+  requestsFilled: ProfilePercentile;
+};
+
 type ProfileActivitySummary = {
   contributions: number;
   requestsCreated: number;
@@ -89,8 +128,36 @@ const PROFILE_BASE_SELECT = {
   downloaded: true,
   totalEarned: true,
   ratio: true,
-  userRank: { select: { name: true, color: true, badge: true } },
+  userRank: { select: { id: true, name: true, color: true, badge: true } },
   profile: true,
+  donorRank: {
+    select: {
+      grantedAt: true,
+      expiresAt: true,
+      donorRank: {
+        select: {
+          name: true,
+          badge: true,
+          color: true
+        }
+      }
+    }
+  },
+  donorReward: {
+    select: {
+      customIcon: true,
+      customIconLink: true,
+      secondAvatar: true,
+      profileInfoTitle1: true,
+      profileInfo1: true,
+      profileInfoTitle2: true,
+      profileInfo2: true,
+      profileInfoTitle3: true,
+      profileInfo3: true,
+      profileInfoTitle4: true,
+      profileInfo4: true
+    }
+  },
   userSettings: {
     select: {
       id: true,
@@ -307,6 +374,242 @@ const getRecentSnatches = async (userId: number): Promise<RecentSnatch[]> => {
   return items;
 };
 
+const getProfileCollages = async (
+  userId: number
+): Promise<{
+  featuredPersonalCollages: ProfileCollagePreview[];
+  publicCollages: ProfileCollagePreview[];
+}> => {
+  const select = {
+    id: true,
+    name: true,
+    categoryId: true,
+    isFeatured: true,
+    numEntries: true,
+    createdAt: true,
+    updatedAt: true,
+    entries: {
+      orderBy: { sort: 'asc' as const },
+      take: 4,
+      select: {
+        release: {
+          select: {
+            image: true
+          }
+        }
+      }
+    }
+  };
+
+  const [featuredPersonalCollages, publicCollages] = await Promise.all([
+    prisma.collage.findMany({
+      where: {
+        userId,
+        categoryId: 0,
+        isDeleted: false,
+        isFeatured: true
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 3,
+      select
+    }),
+    prisma.collage.findMany({
+      where: {
+        userId,
+        categoryId: { gt: 0 },
+        isDeleted: false
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 6,
+      select
+    })
+  ]);
+
+  const mapCollage = (
+    collage: (typeof featuredPersonalCollages)[number]
+  ): ProfileCollagePreview => ({
+    id: collage.id,
+    name: collage.name,
+    categoryId: collage.categoryId,
+    isFeatured: collage.isFeatured,
+    numEntries: collage.numEntries,
+    createdAt: collage.createdAt.toISOString(),
+    updatedAt: collage.updatedAt.toISOString(),
+    coverImages: collage.entries
+      .map((entry) => entry.release.image)
+      .filter((image): image is string => !!image)
+  });
+
+  return {
+    featuredPersonalCollages: featuredPersonalCollages.map(mapCollage),
+    publicCollages: publicCollages.map(mapCollage)
+  };
+};
+
+const buildDonorPresentation = (
+  user: ProfileUserRecord
+): DonorPresentation | null => {
+  const donorRank = user.donorRank;
+  const donorReward = user.donorReward;
+
+  const profileBlocks = donorReward
+    ? [
+        {
+          title: donorReward.profileInfoTitle1,
+          body: donorReward.profileInfo1
+        },
+        {
+          title: donorReward.profileInfoTitle2,
+          body: donorReward.profileInfo2
+        },
+        {
+          title: donorReward.profileInfoTitle3,
+          body: donorReward.profileInfo3
+        },
+        {
+          title: donorReward.profileInfoTitle4,
+          body: donorReward.profileInfo4
+        }
+      ].filter((block) => block.title.trim() || block.body.trim())
+    : [];
+
+  const presentation: DonorPresentation = {
+    rank: donorRank
+      ? {
+          name: donorRank.donorRank.name,
+          badge: donorRank.donorRank.badge,
+          color: donorRank.donorRank.color,
+          grantedAt: donorRank.grantedAt.toISOString(),
+          expiresAt: donorRank.expiresAt?.toISOString() ?? null
+        }
+      : null,
+    customIcon: donorReward?.customIcon || null,
+    customIconLink: donorReward?.customIconLink || null,
+    secondAvatar: donorReward?.secondAvatar || null,
+    profileBlocks
+  };
+
+  if (
+    !presentation.rank &&
+    !presentation.customIcon &&
+    !presentation.customIconLink &&
+    !presentation.secondAvatar &&
+    !presentation.profileBlocks.length
+  ) {
+    return null;
+  }
+
+  return presentation;
+};
+
+const buildPercentile = async (
+  totalUsers: number,
+  aboveCount: number
+): Promise<ProfilePercentile> => {
+  const rank = aboveCount + 1;
+  const percentile =
+    totalUsers <= 1
+      ? 100
+      : Math.max(1, Math.round(((totalUsers - rank) / (totalUsers - 1)) * 100));
+
+  return {
+    percentile,
+    rank,
+    total: totalUsers
+  };
+};
+
+const getPercentileSummary = async (
+  user: ProfileUserRecord,
+  activitySummary: ProfileActivitySummary
+): Promise<ProfilePercentileSummary> => {
+  const [
+    totalRow,
+    uploadedRows,
+    downloadedRows,
+    contributionsRows,
+    forumRows,
+    fillsRows
+  ] = await Promise.all([
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "users"
+      WHERE "disabled" = false
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "users"
+      WHERE "disabled" = false
+        AND "uploaded" > ${user.uploaded}
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "users"
+      WHERE "disabled" = false
+        AND "downloaded" > ${user.downloaded}
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT u."id", COUNT(c."id")::bigint AS metric_count
+        FROM "users" u
+        LEFT JOIN "contributions" c ON c."userId" = u."id"
+        WHERE u."disabled" = false
+        GROUP BY u."id"
+      ) ranked
+      WHERE ranked.metric_count > ${activitySummary.contributions}
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT u."id", COUNT(fp."id")::bigint AS metric_count
+        FROM "users" u
+        LEFT JOIN "forum_posts" fp
+          ON fp."authorId" = u."id" AND fp."deletedAt" IS NULL
+        WHERE u."disabled" = false
+        GROUP BY u."id"
+      ) ranked
+      WHERE ranked.metric_count > ${activitySummary.forumPosts}
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT u."id", COUNT(rf."id")::bigint AS metric_count
+        FROM "users" u
+        LEFT JOIN "request_fills" rf ON rf."fillerId" = u."id"
+        WHERE u."disabled" = false
+        GROUP BY u."id"
+      ) ranked
+      WHERE ranked.metric_count > ${activitySummary.requestsFilled}
+    `
+  ]);
+
+  const totalUsers = Number(totalRow[0]?.count ?? BigInt(0));
+
+  const [uploaded, downloaded, contributions, forumPosts, requestsFilled] =
+    await Promise.all([
+      buildPercentile(totalUsers, Number(uploadedRows[0]?.count ?? BigInt(0))),
+      buildPercentile(
+        totalUsers,
+        Number(downloadedRows[0]?.count ?? BigInt(0))
+      ),
+      buildPercentile(
+        totalUsers,
+        Number(contributionsRows[0]?.count ?? BigInt(0))
+      ),
+      buildPercentile(totalUsers, Number(forumRows[0]?.count ?? BigInt(0))),
+      buildPercentile(totalUsers, Number(fillsRows[0]?.count ?? BigInt(0)))
+    ]);
+
+  return {
+    uploaded,
+    downloaded,
+    contributions,
+    forumPosts,
+    requestsFilled
+  };
+};
+
 const buildProfileView = async (
   user: ProfileUserRecord,
   viewer: ViewerContext,
@@ -331,34 +634,42 @@ const buildProfileView = async (
     viewer.isOwner || viewer.isStaff || settings.showRatioStats;
   const canSeeSnatches = viewer.isOwner || viewer.isStaff;
 
-  const [activitySummary, recentContributions, recentSnatches, inviteRows] =
-    await Promise.all([
-      getActivitySummary(user.id),
-      getRecentContributions(user.id),
-      canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
-      includeInviteTree
-        ? prisma.inviteTree.findMany({
-            where: { treeId: user.id },
-            orderBy: { treePosition: 'asc' },
-            select: {
-              treeLevel: true,
-              treePosition: true,
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                  dateRegistered: true,
-                  lastLogin: true,
-                  uploaded: true,
-                  downloaded: true,
-                  ratio: true
-                }
+  const [
+    activitySummary,
+    recentContributions,
+    recentSnatches,
+    inviteRows,
+    collageShelves
+  ] = await Promise.all([
+    getActivitySummary(user.id),
+    getRecentContributions(user.id),
+    canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
+    includeInviteTree
+      ? prisma.inviteTree.findMany({
+          where: { treeId: user.id },
+          orderBy: { treePosition: 'asc' },
+          select: {
+            treeLevel: true,
+            treePosition: true,
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                dateRegistered: true,
+                lastLogin: true,
+                uploaded: true,
+                downloaded: true,
+                ratio: true
               }
             }
-          })
-        : Promise.resolve([])
-    ]);
+          }
+        })
+      : Promise.resolve([]),
+    getProfileCollages(user.id)
+  ]);
+  const percentiles = await getPercentileSummary(user, activitySummary);
+  const donorPresentation = buildDonorPresentation(user);
 
   return {
     id: user.id,
@@ -400,6 +711,9 @@ const buildProfileView = async (
         }
       : undefined,
     activitySummary,
+    percentiles,
+    donorPresentation,
+    collageShelves,
     recentContributions,
     recentSnatches,
     inviteTree:
