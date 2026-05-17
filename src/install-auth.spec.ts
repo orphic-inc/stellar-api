@@ -217,7 +217,7 @@ describe('API auth/profile/user flows', () => {
         showDownloadedStats: true,
         showRatioStats: true
       },
-      userRank: { name: 'User', color: '', badge: '' },
+      userRank: { id: 1, name: 'User', color: '', badge: '' },
       inviteTree: [],
       email: null,
       dateRegistered: '2026-04-24T00:00:00.000Z',
@@ -244,6 +244,19 @@ describe('API auth/profile/user flows', () => {
         collagesStarted: 0,
         collageEntries: 0
       },
+      percentiles: {
+        uploaded: { percentile: 100, rank: 1, total: 1 },
+        downloaded: { percentile: 100, rank: 1, total: 1 },
+        contributions: { percentile: 100, rank: 1, total: 1 },
+        forumPosts: { percentile: 100, rank: 1, total: 1 },
+        requestsFilled: { percentile: 100, rank: 1, total: 1 }
+      },
+      donorPresentation: null,
+      collageShelves: {
+        featuredPersonalCollages: [],
+        publicCollages: []
+      },
+      staffPmOverview: null,
       recentContributions: [],
       recentSnatches: []
     } as Awaited<ReturnType<typeof updateProfile>>);
@@ -281,7 +294,7 @@ describe('API auth/profile/user flows', () => {
         ratio: '2.00',
         buffer: '50'
       },
-      userRank: { name: 'User', color: '', badge: '' },
+      userRank: { id: 1, name: 'User', color: '', badge: '' },
       profile: {
         id: 3,
         avatar: null,
@@ -312,6 +325,19 @@ describe('API auth/profile/user flows', () => {
         collagesStarted: 7,
         collageEntries: 8
       },
+      percentiles: {
+        uploaded: { percentile: 90, rank: 2, total: 10 },
+        downloaded: { percentile: 80, rank: 3, total: 10 },
+        contributions: { percentile: 70, rank: 4, total: 10 },
+        forumPosts: { percentile: 60, rank: 5, total: 10 },
+        requestsFilled: { percentile: 50, rank: 6, total: 10 }
+      },
+      donorPresentation: null,
+      collageShelves: {
+        featuredPersonalCollages: [],
+        publicCollages: []
+      },
+      staffPmOverview: null,
       recentContributions: [],
       recentSnatches: [],
       inviteTree: []
@@ -344,7 +370,7 @@ describe('API auth/profile/user flows', () => {
         ratio: null,
         buffer: null
       },
-      userRank: { name: 'User', color: '', badge: '' },
+      userRank: { id: 1, name: 'User', color: '', badge: '' },
       profile: {
         id: 5,
         avatar: null,
@@ -362,6 +388,19 @@ describe('API auth/profile/user flows', () => {
         collagesStarted: 0,
         collageEntries: 0
       },
+      percentiles: {
+        uploaded: { percentile: 10, rank: 9, total: 10 },
+        downloaded: { percentile: 10, rank: 9, total: 10 },
+        contributions: { percentile: 10, rank: 9, total: 10 },
+        forumPosts: { percentile: 10, rank: 9, total: 10 },
+        requestsFilled: { percentile: 10, rank: 9, total: 10 }
+      },
+      donorPresentation: null,
+      collageShelves: {
+        featuredPersonalCollages: [],
+        publicCollages: []
+      },
+      staffPmOverview: null,
       recentContributions: [],
       recentSnatches: [],
       userSettings: undefined,

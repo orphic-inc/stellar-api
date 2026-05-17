@@ -355,6 +355,7 @@ const ProfileContribution = registry.register(
       id: z.number(),
       title: z.string(),
       communityId: z.number().nullable(),
+      image: z.string().nullable(),
       artist: z
         .object({
           id: z.number(),
@@ -431,6 +432,34 @@ const DonorPresentation = registry.register(
   })
 );
 
+const ProfileStaffPmSummary = registry.register(
+  'ProfileStaffPmSummary',
+  z.object({
+    id: z.number(),
+    subject: z.string(),
+    status: z.enum(['Unanswered', 'Open', 'Resolved']),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    assignedStaff: z
+      .object({
+        id: z.number(),
+        username: z.string()
+      })
+      .nullable(),
+    replyCount: z.number(),
+    viewerCanOpen: z.boolean()
+  })
+);
+
+const ProfileStaffPmOverview = registry.register(
+  'ProfileStaffPmOverview',
+  z.object({
+    total: z.number(),
+    unresolved: z.number(),
+    recentConversations: z.array(ProfileStaffPmSummary)
+  })
+);
+
 const ProfileSnatch = registry.register(
   'ProfileSnatch',
   z.object({
@@ -485,6 +514,7 @@ const PublicProfile = registry.register(
     percentiles: ProfilePercentiles,
     donorPresentation: DonorPresentation.nullable(),
     collageShelves: ProfileCollageShelves,
+    staffPmOverview: ProfileStaffPmOverview.nullable(),
     recentContributions: z.array(ProfileContribution),
     recentSnatches: z.array(ProfileSnatch),
     inviteTree: z.array(InviteNode)

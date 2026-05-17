@@ -1,5 +1,9 @@
 import crypto from 'crypto';
-import type { NotificationMethod, Prisma } from '@prisma/client';
+import type {
+  NotificationMethod,
+  Prisma,
+  StaffInboxStatus
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
@@ -46,6 +50,7 @@ type RecentContribution = {
     id: number;
     title: string;
     communityId: number | null;
+    image: string | null;
     artist: { id: number; name: string } | null;
   };
 };
@@ -98,6 +103,23 @@ type ProfilePercentileSummary = {
   contributions: ProfilePercentile;
   forumPosts: ProfilePercentile;
   requestsFilled: ProfilePercentile;
+};
+
+type ProfileStaffPmSummary = {
+  id: number;
+  subject: string;
+  status: StaffInboxStatus;
+  createdAt: string;
+  updatedAt: string;
+  assignedStaff: { id: number; username: string } | null;
+  replyCount: number;
+  viewerCanOpen: boolean;
+};
+
+type ProfileStaffPmOverview = {
+  total: number;
+  unresolved: number;
+  recentConversations: ProfileStaffPmSummary[];
 };
 
 type ProfileActivitySummary = {
@@ -312,6 +334,7 @@ const getRecentContributions = async (
           id: true,
           title: true,
           communityId: true,
+          image: true,
           artist: { select: { id: true, name: true } }
         }
       }
@@ -325,6 +348,7 @@ const getRecentContributions = async (
       id: row.release.id,
       title: row.release.title,
       communityId: row.release.communityId,
+      image: row.release.image,
       artist: row.release.artist
     }
   }));
@@ -610,6 +634,63 @@ const getPercentileSummary = async (
   };
 };
 
+const getStaffPmOverview = async (
+  userId: number,
+  viewerId: number
+): Promise<ProfileStaffPmOverview> => {
+  const [total, unresolved, conversations] = await Promise.all([
+    prisma.privateConversation.count({
+      where: {
+        isStaffTicket: true,
+        participants: { some: { userId } }
+      }
+    }),
+    prisma.privateConversation.count({
+      where: {
+        isStaffTicket: true,
+        participants: { some: { userId } },
+        ticketStatus: { not: 'Resolved' }
+      }
+    }),
+    prisma.privateConversation.findMany({
+      where: {
+        isStaffTicket: true,
+        participants: { some: { userId } }
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        subject: true,
+        ticketStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        assignedStaff: { select: { id: true, username: true } },
+        participants: {
+          where: { userId: viewerId },
+          select: { userId: true }
+        },
+        _count: { select: { messages: true } }
+      }
+    })
+  ]);
+
+  return {
+    total,
+    unresolved,
+    recentConversations: conversations.map((conversation) => ({
+      id: conversation.id,
+      subject: conversation.subject,
+      status: conversation.ticketStatus ?? 'Unanswered',
+      createdAt: conversation.createdAt.toISOString(),
+      updatedAt: conversation.updatedAt.toISOString(),
+      assignedStaff: conversation.assignedStaff,
+      replyCount: Math.max(0, conversation._count.messages - 1),
+      viewerCanOpen: conversation.participants.length > 0
+    }))
+  };
+};
+
 const buildProfileView = async (
   user: ProfileUserRecord,
   viewer: ViewerContext,
@@ -639,7 +720,8 @@ const buildProfileView = async (
     recentContributions,
     recentSnatches,
     inviteRows,
-    collageShelves
+    collageShelves,
+    staffPmOverview
   ] = await Promise.all([
     getActivitySummary(user.id),
     getRecentContributions(user.id),
@@ -666,7 +748,10 @@ const buildProfileView = async (
           }
         })
       : Promise.resolve([]),
-    getProfileCollages(user.id)
+    getProfileCollages(user.id),
+    viewer.isStaff && viewer.viewerId
+      ? getStaffPmOverview(user.id, viewer.viewerId)
+      : Promise.resolve(null)
   ]);
   const percentiles = await getPercentileSummary(user, activitySummary);
   const donorPresentation = buildDonorPresentation(user);
@@ -693,7 +778,19 @@ const buildProfileView = async (
           ? (user.uploaded - user.downloaded).toString()
           : null
     },
-    userRank: user.userRank,
+    userRank: user.userRank
+      ? {
+          id: user.userRank.id,
+          name: user.userRank.name,
+          color: user.userRank.color,
+          badge: user.userRank.badge
+        }
+      : {
+          id: 0,
+          name: '',
+          color: '',
+          badge: ''
+        },
     profile,
     userSettings: viewer.isOwner
       ? {
@@ -714,6 +811,7 @@ const buildProfileView = async (
     percentiles,
     donorPresentation,
     collageShelves,
+    staffPmOverview,
     recentContributions,
     recentSnatches,
     inviteTree:
