@@ -762,7 +762,8 @@ const buildProfileView = async (
     avatar: user.avatar,
     email: canSeeEmail ? user.email : null,
     dateRegistered: user.dateRegistered.toISOString(),
-    lastSeen: canSeeLastSeen ? user.lastLogin?.toISOString() ?? null : null,
+    lastSeen:
+      canSeeLastSeen && user.lastLogin ? user.lastLogin.toISOString() : null,
     isArtist: user.isArtist,
     isDonor: user.isDonor,
     disabled: user.disabled,
