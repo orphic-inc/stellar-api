@@ -140,6 +140,33 @@ describe('GET /api/collages/:id', () => {
     const res = await request(app).get('/api/collages/1');
     expect(res.status).toBe(403);
   });
+
+  it('updates subscriber lastVisit when the viewer is subscribed', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        entries: [makeCollageEntryDetail()]
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(
+      makeCollageSubscription({ userId: COLLAGE_USER_ID, collageId: 1 })
+    );
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
+    prismaMock.collageSubscription.update.mockResolvedValue(
+      makeCollageSubscription({ userId: COLLAGE_USER_ID, collageId: 1 })
+    );
+
+    const res = await request(app).get('/api/collages/1');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.collageSubscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_collageId: { userId: COLLAGE_USER_ID, collageId: 1 }
+        },
+        data: { lastVisit: expect.any(Date) }
+      })
+    );
+  });
 });
 
 describe('PUT /api/collages/:id', () => {
@@ -198,6 +225,43 @@ describe('PUT /api/collages/:id', () => {
       .send({ isLocked: true });
 
     expect(res.status).toBe(200);
+  });
+
+  it('marks only one featured personal collage per owner', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ categoryId: 0, isFeatured: false })
+    );
+    prismaMock.collage.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.collage.update.mockResolvedValue(
+      makeCollage({ categoryId: 0, isFeatured: true })
+    );
+
+    const res = await request(app).put('/api/collages/1').send({
+      isFeatured: true
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.collage.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: COLLAGE_USER_ID,
+        categoryId: 0,
+        isFeatured: true,
+        id: { not: 1 }
+      },
+      data: { isFeatured: false }
+    });
+  });
+
+  it('returns 400 when featuring a public collage', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ categoryId: 1 })
+    );
+
+    const res = await request(app).put('/api/collages/1').send({
+      isFeatured: true
+    });
+
+    expect(res.status).toBe(400);
   });
 });
 
@@ -272,6 +336,26 @@ describe('POST /api/collages/:id/recover', () => {
       })
     );
   });
+
+  it('returns 400 when the collage is not deleted', async () => {
+    setStaffPerms();
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+
+    const res = await request(app).post('/api/collages/1/recover');
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when trying to recover a personal collage', async () => {
+    setStaffPerms();
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ isDeleted: true, categoryId: 0 })
+    );
+
+    const res = await request(app).post('/api/collages/1/recover');
+
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/collages/:id/entries', () => {
@@ -333,6 +417,34 @@ describe('POST /api/collages/:id/entries', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('returns 403 when a non-owner adds to another user personal collage', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ categoryId: 0, userId: 99 })
+    );
+
+    const res = await request(app)
+      .post('/api/collages/1/entries')
+      .send({ releaseId: 42 });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 when maxEntriesPerUser is reached', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ maxEntriesPerUser: 2 })
+    );
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(null);
+    prismaMock.collageEntry.count.mockResolvedValue(2);
+
+    const res = await request(app)
+      .post('/api/collages/1/entries')
+      .send({ releaseId: 42 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/per-user entry limit/i);
+  });
 });
 
 describe('DELETE /api/collages/:id/entries/:releaseId', () => {
@@ -361,6 +473,58 @@ describe('DELETE /api/collages/:id/entries/:releaseId', () => {
     );
 
     const res = await request(app).delete('/api/collages/1/entries/42');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 403 when the collage is locked for a non-staff remover', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ isLocked: true })
+    );
+
+    const res = await request(app).delete('/api/collages/1/entries/42');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when the entry does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/collages/1/entries/42');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PUT /api/collages/:id/entries', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('allows the collage owner to reorder entries', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.$transaction.mockResolvedValue([{}, {}]);
+
+    const res = await request(app)
+      .put('/api/collages/1/entries')
+      .send({
+        entries: [
+          { id: 11, sort: 20 },
+          { id: 12, sort: 10 }
+        ]
+      });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
+  });
+
+  it('returns 403 when a non-owner non-staff reorders entries', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ userId: 99 })
+    );
+
+    const res = await request(app)
+      .put('/api/collages/1/entries')
+      .send({ entries: [{ id: 11, sort: 20 }] });
 
     expect(res.status).toBe(403);
   });
