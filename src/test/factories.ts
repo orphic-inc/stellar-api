@@ -284,6 +284,7 @@ export function makeNotification(
     page: SubscriptionPage.forums,
     pageId: 1,
     postId: 1,
+    readAt: null,
     createdAt: new Date(),
     ...overrides
   };
