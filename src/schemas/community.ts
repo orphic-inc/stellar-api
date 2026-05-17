@@ -76,7 +76,21 @@ export const updateGroupSchema = z.object({
   tagIds: z.array(z.number().int().positive()).optional()
 });
 
+export const releaseVoteSchema = z.object({
+  positive: z.boolean()
+});
+
+export const releaseTagSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(50)
+    .transform((s) => s.trim().toLowerCase())
+});
+
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
+export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
+export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;

@@ -14,14 +14,19 @@ import {
 import {
   createGroupSchema,
   updateGroupSchema,
+  releaseVoteSchema,
+  releaseTagSchema,
   type CreateGroupInput,
-  type UpdateGroupInput
+  type UpdateGroupInput,
+  type ReleaseVoteInput,
+  type ReleaseTagInput
 } from '../../../schemas/community';
 import {
   addContributionToReleaseSchema,
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
+import { recomputeVoteAggregate } from '../../../modules/top10';
 import { getSettings } from '../../../modules/settings';
 import { FileType } from '@prisma/client';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
@@ -108,33 +113,45 @@ router.get(
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
-    const release = await prisma.release.findFirst({
-      where: { id, communityId },
-      include: {
-        artist: true,
-        tags: true,
-        contributions: {
-          select: {
-            id: true,
-            userId: true,
-            releaseId: true,
-            contributorId: true,
-            releaseDescription: true,
-            sizeInBytes: true,
-            approvedAccountingBytes: true,
-            linkStatus: true,
-            linkCheckedAt: true,
-            type: true,
-            createdAt: true,
-            updatedAt: true,
-            user: { select: { id: true, username: true } },
-            collaborators: true
+    const [release, myVoteRecord] = await Promise.all([
+      prisma.release.findFirst({
+        where: { id, communityId },
+        include: {
+          artist: true,
+          tags: true,
+          voteAggregate: true,
+          contributions: {
+            select: {
+              id: true,
+              userId: true,
+              releaseId: true,
+              contributorId: true,
+              releaseDescription: true,
+              sizeInBytes: true,
+              approvedAccountingBytes: true,
+              linkStatus: true,
+              linkCheckedAt: true,
+              type: true,
+              createdAt: true,
+              updatedAt: true,
+              user: { select: { id: true, username: true } },
+              collaborators: true
+            }
           }
         }
-      }
-    });
+      }),
+      prisma.releaseVote.findUnique({
+        where: { releaseId_userId: { releaseId: id, userId: req.user.id } },
+        select: { positive: true }
+      })
+    ]);
     if (!release) return res.status(404).json({ msg: 'Release not found' });
-    res.json(release);
+    const myVote = myVoteRecord
+      ? myVoteRecord.positive
+        ? 'up'
+        : 'down'
+      : null;
+    res.json({ ...release, myVote });
   })
 );
 
@@ -278,6 +295,150 @@ router.post(
     if (!contribution)
       return res.status(404).json({ msg: 'Release not found' });
     res.status(201).json(contribution);
+  })
+);
+
+// ─── Vote routes ─────────────────────────────────────────────────────────────
+
+const tagParamsSchema = z.object({
+  communityId: z.coerce.number().int().positive(),
+  releaseId: z.coerce.number().int().positive(),
+  tagId: z.coerce.number().int().positive()
+});
+
+// POST /api/communities/:communityId/releases/:releaseId/vote
+router.post(
+  '/:releaseId/vote',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  validate(releaseVoteSchema),
+  authHandler(async (req, res) => {
+    const { releaseId: id } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const { positive } = parsedBody<ReleaseVoteInput>(res);
+
+    const exists = await prisma.release.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+    if (!exists) return res.status(404).json({ msg: 'Release not found' });
+
+    await prisma.releaseVote.upsert({
+      where: { releaseId_userId: { releaseId: id, userId: req.user.id } },
+      create: { releaseId: id, userId: req.user.id, positive },
+      update: { positive }
+    });
+
+    await recomputeVoteAggregate(id);
+
+    const aggregate = await prisma.releaseVoteAggregate.findUnique({
+      where: { releaseId: id }
+    });
+    res.json({ myVote: positive ? 'up' : 'down', voteAggregate: aggregate });
+  })
+);
+
+// DELETE /api/communities/:communityId/releases/:releaseId/vote
+router.delete(
+  '/:releaseId/vote',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  authHandler(async (req, res) => {
+    const { releaseId: id } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+
+    await prisma.releaseVote.deleteMany({
+      where: { releaseId: id, userId: req.user.id }
+    });
+
+    await recomputeVoteAggregate(id);
+
+    const aggregate = await prisma.releaseVoteAggregate.findUnique({
+      where: { releaseId: id }
+    });
+    res.json({ myVote: null, voteAggregate: aggregate });
+  })
+);
+
+// ─── Tag routes ───────────────────────────────────────────────────────────────
+
+// POST /api/communities/:communityId/releases/:releaseId/tags
+router.post(
+  '/:releaseId/tags',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  validate(releaseTagSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId: id } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const { name } = parsedBody<ReleaseTagInput>(res);
+
+    const release = await prisma.release.findFirst({
+      where: { id, communityId },
+      select: { id: true, tags: { where: { name }, select: { id: true } } }
+    });
+    if (!release) return res.status(404).json({ msg: 'Release not found' });
+    if (release.tags.length > 0)
+      return res.status(409).json({ msg: 'Release already has this tag' });
+
+    const tag = await prisma.$transaction(async (tx) => {
+      const t = await tx.tag.upsert({
+        where: { name },
+        create: { name, occurrences: 1 },
+        update: { occurrences: { increment: 1 } }
+      });
+      await tx.release.update({
+        where: { id },
+        data: { tags: { connect: { id: t.id } } }
+      });
+      return t;
+    });
+
+    res.status(201).json(tag);
+  })
+);
+
+// DELETE /api/communities/:communityId/releases/:releaseId/tags/:tagId
+router.delete(
+  '/:releaseId/tags/:tagId',
+  requireAuth,
+  validateParams(tagParamsSchema),
+  authHandler(async (req, res) => {
+    const {
+      communityId,
+      releaseId: id,
+      tagId
+    } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+      tagId: number;
+    }>(res);
+
+    const release = await prisma.release.findFirst({
+      where: { id, communityId, tags: { some: { id: tagId } } },
+      select: { id: true }
+    });
+    if (!release)
+      return res.status(404).json({ msg: 'Release or tag not found' });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.release.update({
+        where: { id },
+        data: { tags: { disconnect: { id: tagId } } }
+      });
+      await tx.tag.update({
+        where: { id: tagId },
+        data: { occurrences: { decrement: 1 } }
+      });
+    });
+
+    res.status(204).send();
   })
 );
 
