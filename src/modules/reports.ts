@@ -325,16 +325,10 @@ export async function resolveReport(
   resolution: string,
   resolutionAction: ReportResolutionAction
 ) {
-  const report = await prisma.report.findUnique({
-    where: { id },
-    select: { status: true }
-  });
-  if (!report) return { ok: false as const, reason: 'not_found' };
-  if (report.status === 'Resolved')
-    return { ok: false as const, reason: 'already_resolved' };
-
-  await prisma.report.update({
-    where: { id },
+  // Atomic compare-and-swap: only updates rows not yet resolved.
+  // Prevents a race where two staff members resolve simultaneously.
+  const result = await prisma.report.updateMany({
+    where: { id, status: { not: 'Resolved' } },
     data: {
       status: 'Resolved',
       resolvedById: staffUserId,
@@ -345,6 +339,17 @@ export async function resolveReport(
       claimedAt: null
     }
   });
+
+  if (result.count === 0) {
+    const exists = await prisma.report.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+    return exists
+      ? { ok: false as const, reason: 'already_resolved' }
+      : { ok: false as const, reason: 'not_found' };
+  }
+
   return { ok: true as const };
 }
 

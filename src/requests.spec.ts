@@ -17,6 +17,7 @@ import {
 } from './test/apiTestHarness';
 import { makeRequest } from './test/factories';
 import * as requestModule from './modules/requests';
+import { RequestStatus } from '@prisma/client';
 
 jest.mock('./modules/requests');
 
@@ -179,12 +180,21 @@ describe('POST /api/requests/:id/fill', () => {
 });
 
 describe('POST /api/requests/:id/unfill', () => {
-  beforeEach(() => {
-    resetApiTestState();
-    setStaffPerms(); // unfill requires staff or admin
+  // A filled request owned by someone other than the test user (id 7),
+  // so only staff permission (not ownership) grants access in most tests.
+  const FILLED_REQUEST_MOCK = makeRequest({
+    userId: 99,
+    fillerId: 88,
+    status: RequestStatus.filled
   });
 
-  it('calls unfillRequest with moderatorId and optional reason', async () => {
+  beforeEach(() => {
+    resetApiTestState();
+    setStaffPerms();
+    prismaMock.request.findUnique.mockResolvedValue(FILLED_REQUEST_MOCK);
+  });
+
+  it('calls unfillRequest when caller is staff', async () => {
     mod.unfillRequest.mockResolvedValue(OPEN_REQUEST);
     const res = await request(app)
       .post('/api/requests/1/unfill')
@@ -200,8 +210,32 @@ describe('POST /api/requests/:id/unfill', () => {
     expect(mod.unfillRequest).toHaveBeenCalledWith(7, 1, undefined);
   });
 
-  it('returns 403 when user lacks staff/admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  it('allows owner to unfill their own request', async () => {
+    // Reset to a filled request owned by the test user (id 7)
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ userId: 7, fillerId: 88, status: RequestStatus.filled })
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank()); // no staff
+    mod.unfillRequest.mockResolvedValue(OPEN_REQUEST);
+    const res = await request(app)
+      .post('/api/requests/1/unfill')
+      .send({ reason: 'Changed my mind' });
+    expect(res.status).toBe(200);
+  });
+
+  it('allows filler to unfill their own fill', async () => {
+    // Reset to a filled request where filler is the test user (id 7)
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ userId: 99, fillerId: 7, status: RequestStatus.filled })
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank()); // no staff
+    mod.unfillRequest.mockResolvedValue(OPEN_REQUEST);
+    const res = await request(app).post('/api/requests/1/unfill').send({});
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 403 when user is not staff, owner, or filler', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank()); // no staff
     const res = await request(app)
       .post('/api/requests/1/unfill')
       .send({ reason: 'test' });

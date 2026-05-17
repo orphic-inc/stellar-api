@@ -23,6 +23,31 @@ function groupIds(
   ];
 }
 
+// GET /api/notifications/unread-count
+router.get(
+  '/unread-count',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const count = await prisma.notification.count({
+      where: { userId: req.user.id, readAt: null }
+    });
+    res.json({ count });
+  })
+);
+
+// POST /api/notifications/read-all
+router.post(
+  '/read-all',
+  requireAuth,
+  authHandler(async (req, res) => {
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id, readAt: null },
+      data: { readAt: new Date() }
+    });
+    res.status(204).send();
+  })
+);
+
 // GET /api/notifications
 router.get(
   '/',
@@ -105,6 +130,27 @@ router.get(
     });
 
     res.json(enriched);
+  })
+);
+
+// POST /api/notifications/:id/read
+router.post(
+  '/:id/read',
+  requireAuth,
+  validateParams(notificationIdParamsSchema),
+  authHandler(async (req, res) => {
+    const id = Number(res.locals.parsedParams.id);
+    const notif = await prisma.notification.findUnique({ where: { id } });
+    if (!notif) return res.status(404).json({ msg: 'Notification not found' });
+    if (notif.userId !== req.user.id)
+      return res.status(403).json({ msg: 'Not authorized' });
+    if (!notif.readAt) {
+      await prisma.notification.update({
+        where: { id },
+        data: { readAt: new Date() }
+      });
+    }
+    res.status(204).send();
   })
 );
 

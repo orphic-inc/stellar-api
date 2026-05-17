@@ -393,17 +393,15 @@ describe('reports.unclaimReport', () => {
 // ─── reports.resolveReport ───────────────────────────────────────────────────
 
 describe('reports.resolveReport', () => {
-  it('resolves an open report', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({
-      status: 'Open'
-    } as never);
-    prismaMock.report.update.mockResolvedValue({} as never);
+  it('resolves an open report atomically', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 1 } as never);
 
     const result = await resolveReport(1, 7, 'Confirmed spam', 'UserWarned');
 
     expect(result.ok).toBe(true);
-    expect(prismaMock.report.update).toHaveBeenCalledWith(
+    expect(prismaMock.report.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.objectContaining({ id: 1, status: { not: 'Resolved' } }),
         data: expect.objectContaining({
           status: 'Resolved',
           resolvedById: 7,
@@ -415,6 +413,7 @@ describe('reports.resolveReport', () => {
   });
 
   it('returns not_found when report does not exist', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue(null);
     const result = await resolveReport(1, 7, 'reason', 'UserWarned');
     expect(result.ok).toBe(false);
@@ -422,9 +421,8 @@ describe('reports.resolveReport', () => {
   });
 
   it('returns already_resolved when report is already resolved', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({
-      status: 'Resolved'
-    } as never);
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
+    prismaMock.report.findUnique.mockResolvedValue({ id: 1 } as never);
     const result = await resolveReport(1, 7, 'reason', 'UserWarned');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('already_resolved');

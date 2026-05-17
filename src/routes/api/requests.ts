@@ -1,8 +1,5 @@
 import { Router } from 'express';
-import {
-  requirePermission,
-  loadPermissions
-} from '../../middleware/permissions';
+import { loadPermissions } from '../../middleware/permissions';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -17,12 +14,14 @@ import * as requestModule from '../../modules/requests';
 import { prisma } from '../../lib/prisma';
 import {
   createRequestSchema,
+  updateRequestSchema,
   addBountySchema,
   fillRequestSchema,
   unfillRequestSchema,
   listRequestsQuerySchema,
   requestIdParamsSchema,
-  type ListRequestsQuery
+  type ListRequestsQuery,
+  type UpdateRequestInput
 } from '../../schemas/requests';
 import { AppError } from '../../lib/errors';
 import type { AuthenticatedRequest } from '../../types/auth';
@@ -207,16 +206,77 @@ router.post(
   })
 );
 
-// ─── POST /requests/:id/unfill — staff unfill ─────────────────────────────────
+// ─── PUT /requests/:id — owner or staff edit ──────────────────────────────────
+
+router.put(
+  '/:id',
+  requireAuth,
+  validateParams(requestIdParamsSchema),
+  validate(updateRequestSchema),
+  authHandler(async (req: AuthenticatedRequest, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const input = parsedBody<UpdateRequestInput>(res);
+
+    const existing = await prisma.request.findUnique({
+      where: { id, deletedAt: null },
+      select: { userId: true, status: true }
+    });
+    if (!existing) throw new AppError(404, 'Request not found');
+    if (existing.status !== 'open')
+      throw new AppError(422, 'Only open requests can be edited');
+
+    const perms = await loadPermissions(req, res);
+    const isStaff = !!(perms['staff'] || perms['admin']);
+    if (existing.userId !== req.user.id && !isStaff)
+      throw new AppError(403, 'Permission denied');
+
+    const updated = await prisma.request.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined && { title: input.title }),
+        ...(input.description !== undefined && {
+          description: input.description
+        }),
+        ...(input.type !== undefined && { type: input.type }),
+        ...(input.year !== undefined && { year: input.year }),
+        ...(input.image !== undefined && { image: input.image })
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+        bounties: true
+      }
+    });
+    res.json(requestModule.serializeRequest(updated));
+  })
+);
+
+// ─── POST /requests/:id/unfill — owner, filler, or staff unfill ───────────────
 
 router.post(
   '/:id/unfill',
-  ...requirePermission('staff', 'admin'),
+  requireAuth,
   validateParams(requestIdParamsSchema),
   validate(unfillRequestSchema),
-  authHandler(async (req, res) => {
+  authHandler(async (req: AuthenticatedRequest, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { reason } = parsedBody<{ reason?: string }>(res);
+
+    const existing = await prisma.request.findUnique({
+      where: { id, deletedAt: null },
+      select: { userId: true, fillerId: true, status: true }
+    });
+    if (!existing) throw new AppError(404, 'Request not found');
+    if (existing.status !== 'filled')
+      throw new AppError(422, 'Request is not filled');
+
+    const perms = await loadPermissions(req, res);
+    const isStaff = !!(perms['staff'] || perms['admin']);
+    const isOwner = existing.userId === req.user.id;
+    const isFiller = existing.fillerId === req.user.id;
+
+    if (!isStaff && !isOwner && !isFiller)
+      throw new AppError(403, 'Permission denied');
+
     const request = await requestModule.unfillRequest(req.user.id, id, reason);
     res.json(request);
   })

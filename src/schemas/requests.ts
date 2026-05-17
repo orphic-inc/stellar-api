@@ -25,6 +25,19 @@ export const createRequestSchema = z.object({
 
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 
+export const updateRequestSchema = z.object({
+  title: z.string().min(1).max(256).optional(),
+  description: z.string().min(1).optional(),
+  type: releaseTypeEnum.optional(),
+  year: z.number().int().min(1900).max(2100).nullable().optional(),
+  image: z
+    .union([z.string().url(), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? null : v))
+});
+
+export type UpdateRequestInput = z.infer<typeof updateRequestSchema>;
+
 export const addBountySchema = z.object({
   amount: z.coerce.bigint().min(BigInt(1), 'Bounty amount must be positive')
 });

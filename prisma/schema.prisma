@@ -1306,6 +1306,7 @@ model Notification {
   page      SubscriptionPage
   pageId    Int
   postId    Int
+  readAt    DateTime?
   createdAt DateTime         @default(now())
 
   @@map("notifications")
