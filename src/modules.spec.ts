@@ -164,10 +164,6 @@ describe('pm.listInbox', () => {
   const conversation = {
     id: 1,
     subject: 'Hello',
-    isStaffTicket: false,
-    ticketStatus: null,
-    assignedStaffId: null,
-    assignedStaff: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     participants: [

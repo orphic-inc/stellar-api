@@ -635,41 +635,24 @@ const getPercentileSummary = async (
 };
 
 const getStaffPmOverview = async (
-  userId: number,
-  viewerId: number
+  userId: number
 ): Promise<ProfileStaffPmOverview> => {
   const [total, unresolved, conversations] = await Promise.all([
-    prisma.privateConversation.count({
-      where: {
-        isStaffTicket: true,
-        participants: { some: { userId } }
-      }
+    prisma.staffInboxConversation.count({ where: { userId } }),
+    prisma.staffInboxConversation.count({
+      where: { userId, status: { not: 'Resolved' } }
     }),
-    prisma.privateConversation.count({
-      where: {
-        isStaffTicket: true,
-        participants: { some: { userId } },
-        ticketStatus: { not: 'Resolved' }
-      }
-    }),
-    prisma.privateConversation.findMany({
-      where: {
-        isStaffTicket: true,
-        participants: { some: { userId } }
-      },
+    prisma.staffInboxConversation.findMany({
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
       take: 5,
       select: {
         id: true,
         subject: true,
-        ticketStatus: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
-        assignedStaff: { select: { id: true, username: true } },
-        participants: {
-          where: { userId: viewerId },
-          select: { userId: true }
-        },
+        assignedUser: { select: { id: true, username: true } },
         _count: { select: { messages: true } }
       }
     })
@@ -681,12 +664,12 @@ const getStaffPmOverview = async (
     recentConversations: conversations.map((conversation) => ({
       id: conversation.id,
       subject: conversation.subject,
-      status: conversation.ticketStatus ?? 'Unanswered',
+      status: conversation.status,
       createdAt: conversation.createdAt.toISOString(),
       updatedAt: conversation.updatedAt.toISOString(),
-      assignedStaff: conversation.assignedStaff,
+      assignedStaff: conversation.assignedUser,
       replyCount: Math.max(0, conversation._count.messages - 1),
-      viewerCanOpen: conversation.participants.length > 0
+      viewerCanOpen: true
     }))
   };
 };
@@ -749,9 +732,7 @@ const buildProfileView = async (
         })
       : Promise.resolve([]),
     getProfileCollages(user.id),
-    viewer.isStaff && viewer.viewerId
-      ? getStaffPmOverview(user.id, viewer.viewerId)
-      : Promise.resolve(null)
+    viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null)
   ]);
   const percentiles = await getPercentileSummary(user, activitySummary);
   const donorPresentation = buildDonorPresentation(user);

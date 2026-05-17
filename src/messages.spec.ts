@@ -9,13 +9,9 @@ import {
 
 const PAGED_EMPTY = { total: 0, page: 1, pageSize: 25, conversations: [] };
 
-const makeConversation = (isTicket = false) => ({
+const makeConversation = () => ({
   id: 1,
   subject: 'Hello',
-  isStaffTicket: isTicket,
-  ticketStatus: isTicket ? ('Unanswered' as const) : null,
-  assignedStaffId: null,
-  assignedStaff: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   participants: [],
