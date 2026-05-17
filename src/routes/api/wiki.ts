@@ -386,8 +386,10 @@ router.post(
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
-    const minReadLevel = canManage ? input.minReadLevel ?? 0 : 0;
-    const minEditLevel = canManage ? input.minEditLevel ?? 0 : 0;
+    // prettier-ignore
+    const minReadLevel = canManage ? (input.minReadLevel ?? 0) : 0;
+    // prettier-ignore
+    const minEditLevel = canManage ? (input.minEditLevel ?? 0) : 0;
 
     const title = sanitizePlain(input.title).trim();
     const body = sanitizeHtml(input.body);
