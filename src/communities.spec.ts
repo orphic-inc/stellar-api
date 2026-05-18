@@ -1,0 +1,396 @@
+import { CommunityType, RegistrationStatus } from '@prisma/client';
+import {
+  app,
+  makeUserRank,
+  prismaMock,
+  request,
+  resetApiTestState
+} from './test/apiTestHarness';
+import { isCommunityMember } from './routes/api/communities/communities';
+
+const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  name: 'Jazz',
+  description: 'Jazz community',
+  image: '/images/defaults/music.png',
+  type: CommunityType.Music,
+  registrationStatus: RegistrationStatus.open,
+  allowDuplicateFormats: false,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  staff: [],
+  consumers: [],
+  _count: {
+    contributors: 0,
+    releases: 0,
+    consumers: 0
+  },
+  ...overrides
+});
+
+beforeEach(() => resetApiTestState());
+
+describe('isCommunityMember', () => {
+  it('returns true immediately for open communities', async () => {
+    await expect(
+      isCommunityMember(1, 7, RegistrationStatus.open)
+    ).resolves.toBe(true);
+    expect(prismaMock.consumer.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.contributor.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns true for consumer or contributor membership and false otherwise', async () => {
+    prismaMock.consumer.findFirst.mockResolvedValueOnce({ id: 4 } as never);
+    prismaMock.contributor.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      isCommunityMember(1, 7, RegistrationStatus.invite)
+    ).resolves.toBe(true);
+
+    prismaMock.consumer.findFirst.mockResolvedValueOnce(null);
+    prismaMock.contributor.findFirst.mockResolvedValueOnce({ id: 8 } as never);
+    await expect(
+      isCommunityMember(1, 7, RegistrationStatus.closed)
+    ).resolves.toBe(true);
+
+    prismaMock.consumer.findFirst.mockResolvedValueOnce(null);
+    prismaMock.contributor.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      isCommunityMember(1, 7, RegistrationStatus.invite)
+    ).resolves.toBe(false);
+  });
+});
+
+describe('GET /api/communities', () => {
+  it('returns paginated communities the user can access', async () => {
+    prismaMock.community.findMany.mockResolvedValue([makeCommunity()] as never);
+    prismaMock.community.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/communities?page=2');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 25,
+        take: 25,
+        where: {
+          OR: [
+            { registrationStatus: RegistrationStatus.open },
+            { consumers: { some: { userId: 7 } } },
+            { contributors: { some: { userId: 7 } } }
+          ]
+        }
+      })
+    );
+    expect(res.body.data).toHaveLength(1);
+  });
+});
+
+describe('GET /api/communities/:id', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when the user is not a member of a restricted community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
+    );
+    prismaMock.consumer.findFirst.mockResolvedValue(null);
+    prismaMock.contributor.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Not a member of this community' });
+  });
+
+  it('returns the community when the user is allowed to view it', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Jazz');
+  });
+});
+
+describe('POST /api/communities/:id/members', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/communities/1/members')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when the caller lacks admin or community staff access', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/members')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Permission denied' });
+  });
+
+  it('returns 404 when the target user does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ staff: [{ id: 7 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/communities/1/members')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('adds a member for community staff', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ staff: [{ id: 7 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 8 } as never);
+    prismaMock.consumer.upsert.mockResolvedValue({ id: 9, userId: 8 } as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/members')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
+      where: { userId: 8 },
+      create: { userId: 8, communities: { connect: { id: 1 } } },
+      update: { communities: { connect: { id: 1 } } }
+    });
+  });
+});
+
+describe('DELETE /api/communities/:id/members/:userId', () => {
+  it('returns 404 when the consumer record does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ staff: [{ id: 7 }] }) as never
+    );
+    prismaMock.consumer.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/communities/1/members/8');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('disconnects a member for admins', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.consumer.findUnique.mockResolvedValue({ userId: 8 } as never);
+    prismaMock.consumer.update.mockResolvedValue({ userId: 8 } as never);
+
+    const res = await request(app).delete('/api/communities/1/members/8');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.consumer.update).toHaveBeenCalledWith({
+      where: { userId: 8 },
+      data: { communities: { disconnect: { id: 1 } } }
+    });
+  });
+});
+
+describe('POST /api/communities/:id/staff', () => {
+  it('returns 404 when the user does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ staff: [{ id: 7 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/communities/1/staff')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('adds staff membership for admins', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 8 } as never);
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/staff')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { staff: { connect: { id: 8 } } }
+    });
+  });
+});
+
+describe('DELETE /api/communities/:id/staff/:userId', () => {
+  it('removes staff membership for community staff', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ staff: [{ id: 7 }] }) as never
+    );
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app).delete('/api/communities/1/staff/8');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { staff: { disconnect: { id: 8 } } }
+    });
+  });
+});
+
+describe('POST /api/communities', () => {
+  it('requires communities_manage permission', async () => {
+    const res = await request(app).post('/api/communities').send({
+      name: 'Jazz',
+      type: 'Music',
+      registrationStatus: 'open'
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when ownerId does not exist', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/communities').send({
+      name: 'Jazz',
+      type: 'Music',
+      registrationStatus: 'open',
+      ownerId: 99
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Owner user not found' });
+  });
+
+  it('creates a community with default image and owner membership', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 9 } as never);
+    prismaMock.community.create.mockResolvedValue(
+      makeCommunity({ id: 4, staff: [] }) as never
+    );
+    prismaMock.consumer.upsert.mockResolvedValue({
+      id: 10,
+      userId: 9
+    } as never);
+
+    const res = await request(app)
+      .post('/api/communities')
+      .send({
+        name: 'Jazz',
+        type: 'Music',
+        registrationStatus: 'open',
+        ownerId: 9,
+        staffIds: [9, 11]
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.community.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: 'Jazz',
+        type: 'Music',
+        registrationStatus: 'open',
+        image: '/images/defaults/music.png',
+        staff: {
+          connect: [{ id: 9 }, { id: 11 }]
+        }
+      })
+    });
+    expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
+      where: { userId: 9 },
+      create: { userId: 9, communities: { connect: { id: 4 } } },
+      update: { communities: { connect: { id: 4 } } }
+    });
+  });
+});
+
+describe('PUT /api/communities/:id', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).put('/api/communities/1').send({
+      name: 'Updated'
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('updates mutable fields and staff assignments', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.community.update.mockResolvedValue(
+      makeCommunity({ name: 'Updated' }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({
+        name: 'Updated',
+        registrationStatus: 'invite',
+        staffIds: [8, 9]
+      });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: {
+        name: 'Updated',
+        registrationStatus: 'invite',
+        staff: { set: [{ id: 8 }, { id: 9 }] }
+      }
+    });
+  });
+});
+
+describe('DELETE /api/communities/:id', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/communities/1');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('deletes the community for admins', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.community.delete.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app).delete('/api/communities/1');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.community.delete).toHaveBeenCalledWith({
+      where: { id: 1 }
+    });
+  });
+});
