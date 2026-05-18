@@ -21,7 +21,9 @@ beforeEach(() => resetApiTestState());
 
 describe('GET /api/tools/user-ranks', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
   });
 
   it('returns list of user ranks with user counts', async () => {
@@ -46,7 +48,9 @@ describe('GET /api/tools/user-ranks', () => {
 
 describe('GET /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
   });
 
   it('returns a single rank', async () => {
@@ -73,7 +77,9 @@ describe('GET /api/tools/user-ranks/:id', () => {
 
 describe('POST /api/tools/user-ranks', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
   });
 
   it('creates a rank and returns 201', async () => {
@@ -107,7 +113,9 @@ describe('POST /api/tools/user-ranks', () => {
 
 describe('PUT /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
   });
 
   it('updates a rank and returns it', async () => {
@@ -126,7 +134,9 @@ describe('PUT /api/tools/user-ranks/:id', () => {
 
 describe('DELETE /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
   });
 
   it('deletes a rank and returns 204 when no users assigned', async () => {

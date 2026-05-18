@@ -121,7 +121,9 @@ describe('PUT /api/profile/me', () => {
       .send({ profileTitle: 'Jazz fan' });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, { profileTitle: 'Jazz fan' });
+    expect(updateProfileMock).toHaveBeenCalledWith(7, {
+      profileTitle: 'Jazz fan'
+    });
   });
 
   it('returns 404 when user not found', async () => {
