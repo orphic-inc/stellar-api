@@ -216,6 +216,13 @@ describe('GET /api/staff-inbox/queue/count', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ count: 3 });
   });
+
+  it('returns 403 without staff permission', async () => {
+    const res = await request(app).get('/api/staff-inbox/queue/count');
+
+    expect(res.status).toBe(403);
+    expect(staffPmMock.getQueueCount).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/staff-inbox/tickets/:id', () => {
@@ -233,6 +240,19 @@ describe('GET /api/staff-inbox/tickets/:id', () => {
     expect(staffPmMock.viewTicket).toHaveBeenCalledWith(1, 7, false);
   });
 
+  it('treats staff viewers as moderators', async () => {
+    setStaff();
+    staffPmMock.viewTicket.mockResolvedValue({
+      ok: true,
+      ticket: makeTicket()
+    });
+
+    const res = await request(app).get('/api/staff-inbox/tickets/1');
+
+    expect(res.status).toBe(200);
+    expect(staffPmMock.viewTicket).toHaveBeenCalledWith(1, 7, true);
+  });
+
   it('returns 404 when the ticket is not visible', async () => {
     staffPmMock.viewTicket.mockResolvedValue({
       ok: false,
@@ -242,6 +262,13 @@ describe('GET /api/staff-inbox/tickets/:id', () => {
     const res = await request(app).get('/api/staff-inbox/tickets/99');
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for an invalid ticket id', async () => {
+    const res = await request(app).get('/api/staff-inbox/tickets/nope');
+
+    expect(res.status).toBe(400);
+    expect(staffPmMock.viewTicket).not.toHaveBeenCalled();
   });
 });
 
@@ -299,6 +326,42 @@ describe('POST /api/staff-inbox/tickets/:id/reply', () => {
       ).status
     ).toBe(422);
   });
+
+  it('passes moderator=true for staff replies', async () => {
+    setStaff();
+    staffPmMock.replyToTicket.mockResolvedValue({
+      ok: true,
+      message: {
+        id: 3,
+        conversationId: 1,
+        senderId: 7,
+        body: 'Staff reply',
+        createdAt: new Date(),
+        sender: { id: 7, username: 'mod', avatar: null }
+      }
+    });
+
+    const res = await request(app)
+      .post('/api/staff-inbox/tickets/1/reply')
+      .send({ body: 'Staff reply' });
+
+    expect(res.status).toBe(201);
+    expect(staffPmMock.replyToTicket).toHaveBeenCalledWith(
+      1,
+      7,
+      'Staff reply',
+      true
+    );
+  });
+
+  it('returns 400 for an invalid ticket id', async () => {
+    const res = await request(app)
+      .post('/api/staff-inbox/tickets/nope/reply')
+      .send({ body: 'Reply' });
+
+    expect(res.status).toBe(400);
+    expect(staffPmMock.replyToTicket).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/staff-inbox/tickets/:id/resolve', () => {
@@ -313,6 +376,16 @@ describe('POST /api/staff-inbox/tickets/:id/resolve', () => {
     expect(staffPmMock.resolveTicket).toHaveBeenCalledWith(1, 7, false);
   });
 
+  it('passes moderator=true for staff resolution', async () => {
+    setStaff();
+    staffPmMock.resolveTicket.mockResolvedValue({ ok: true });
+
+    const res = await request(app).post('/api/staff-inbox/tickets/1/resolve');
+
+    expect(res.status).toBe(204);
+    expect(staffPmMock.resolveTicket).toHaveBeenCalledWith(1, 7, true);
+  });
+
   it('maps already_resolved to 422', async () => {
     staffPmMock.resolveTicket.mockResolvedValue({
       ok: false,
@@ -322,6 +395,26 @@ describe('POST /api/staff-inbox/tickets/:id/resolve', () => {
     const res = await request(app).post('/api/staff-inbox/tickets/1/resolve');
 
     expect(res.status).toBe(422);
+  });
+
+  it('maps forbidden to 403', async () => {
+    staffPmMock.resolveTicket.mockResolvedValue({
+      ok: false,
+      reason: 'forbidden'
+    });
+
+    const res = await request(app).post('/api/staff-inbox/tickets/1/resolve');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 for an invalid ticket id', async () => {
+    const res = await request(app).post(
+      '/api/staff-inbox/tickets/nope/resolve'
+    );
+
+    expect(res.status).toBe(400);
+    expect(staffPmMock.resolveTicket).not.toHaveBeenCalled();
   });
 });
 
@@ -343,6 +436,27 @@ describe('POST /api/staff-inbox/tickets/:id/unresolve', () => {
     const res = await request(app).post('/api/staff-inbox/tickets/1/unresolve');
 
     expect(res.status).toBe(422);
+  });
+
+  it('returns 204 on success', async () => {
+    setStaff();
+    staffPmMock.unresolveTicket.mockResolvedValue({ ok: true });
+
+    const res = await request(app).post('/api/staff-inbox/tickets/1/unresolve');
+
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 404 when the ticket is missing', async () => {
+    setStaff();
+    staffPmMock.unresolveTicket.mockResolvedValue({
+      ok: false,
+      reason: 'not_found'
+    });
+
+    const res = await request(app).post('/api/staff-inbox/tickets/1/unresolve');
+
+    expect(res.status).toBe(404);
   });
 });
 
@@ -386,6 +500,31 @@ describe('POST /api/staff-inbox/tickets/:id/assign', () => {
 
     expect(res.status).toBe(422);
   });
+
+  it('uses assignedUserId directly without username lookup', async () => {
+    setStaff();
+    staffPmMock.assignTicket.mockResolvedValue({ ok: true });
+
+    const res = await request(app)
+      .post('/api/staff-inbox/tickets/1/assign')
+      .send({ assignedUserId: 44, assignedUsername: 'ignored-name' });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+    expect(staffPmMock.assignTicket).toHaveBeenCalledWith(1, 44);
+  });
+
+  it('allows unassigning a ticket with null assignedUserId', async () => {
+    setStaff();
+    staffPmMock.assignTicket.mockResolvedValue({ ok: true });
+
+    const res = await request(app)
+      .post('/api/staff-inbox/tickets/1/assign')
+      .send({ assignedUserId: null });
+
+    expect(res.status).toBe(204);
+    expect(staffPmMock.assignTicket).toHaveBeenCalledWith(1, null);
+  });
 });
 
 describe('POST /api/staff-inbox/bulk-resolve', () => {
@@ -402,5 +541,14 @@ describe('POST /api/staff-inbox/bulk-resolve', () => {
     expect(res.status).toBe(200);
     expect(staffPmMock.bulkResolve).toHaveBeenCalledWith([1, 2]);
     expect(res.body.resolved).toBe(2);
+  });
+
+  it('returns 403 without staff permission', async () => {
+    const res = await request(app)
+      .post('/api/staff-inbox/bulk-resolve')
+      .send({ ids: [1, 2] });
+
+    expect(res.status).toBe(403);
+    expect(staffPmMock.bulkResolve).not.toHaveBeenCalled();
   });
 });
