@@ -982,12 +982,10 @@ describe('POST /api/users/:id/warn with expiresAt', () => {
     ] as never);
     prismaMock.auditLog.create.mockResolvedValue({} as never);
 
-    const res = await request(app)
-      .post('/api/users/9/warn')
-      .send({
-        reason: 'Repeated violations',
-        expiresAt: '2026-12-31T00:00:00.000Z'
-      });
+    const res = await request(app).post('/api/users/9/warn').send({
+      reason: 'Repeated violations',
+      expiresAt: '2026-12-31T00:00:00.000Z'
+    });
 
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('warning');
