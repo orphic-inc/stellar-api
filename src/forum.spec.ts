@@ -200,6 +200,46 @@ describe('API forum flows', () => {
     });
   });
 
+  it('returns 404 when the topic note does not exist on DELETE', async () => {
+    prismaMock.forumTopicNote.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/forums/topic-notes/99');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Note not found');
+  });
+
+  it('returns 403 when a non-author tries to delete a topic note', async () => {
+    prismaMock.forumTopicNote.findUnique.mockResolvedValue(
+      makeForumTopicNote({ id: 77, authorId: 99 })
+    );
+
+    const res = await request(app).delete('/api/forums/topic-notes/77');
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe('Not authorized');
+  });
+
+  it('allows moderators to list topic notes for a topic', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
+    prismaMock.forumTopicNote.findMany.mockResolvedValue([
+      {
+        ...makeForumTopicNote({ id: 77, forumTopicId: 44 }),
+        author: { id: 7, username: 'testuser' }
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/forums/topic-notes/44');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(prismaMock.forumTopicNote.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { forumTopicId: 44 } })
+    );
+  });
+
   it('filters forum listings by the current user rank', async () => {
     setCurrentUserRankLevel(100);
     prismaMock.forum.findMany.mockResolvedValue(
