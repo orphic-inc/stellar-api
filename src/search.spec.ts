@@ -65,6 +65,39 @@ describe('GET /api/search/releases', () => {
     );
   });
 
+  it('filters by bitrate and media in contribution predicate', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?bitrate=320&media=CD');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          contributions: {
+            some: expect.objectContaining({
+              bitrate: { contains: '320', mode: 'insensitive' },
+              media: { contains: 'CD', mode: 'insensitive' }
+            })
+          }
+        })
+      })
+    );
+  });
+
+  it('filters by artist, recordLabel, catalogueNumber, and description fields', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get(
+      '/api/search/releases?artist=miles&recordLabel=columbia&catalogueNumber=CS8163&description=modal'
+    );
+    const call = prismaMock.release.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({
+      artist: { name: { contains: 'miles', mode: 'insensitive' } },
+      recordLabel: { contains: 'columbia', mode: 'insensitive' },
+      catalogueNumber: { contains: 'CS8163', mode: 'insensitive' },
+      description: { contains: 'modal', mode: 'insensitive' }
+    });
+  });
+
   it('adds contribution predicate when hasLog=true', async () => {
     prismaMock.release.findMany.mockResolvedValue([]);
     prismaMock.release.count.mockResolvedValue(0);
@@ -156,6 +189,22 @@ describe('GET /api/search/artists', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tags: { some: { tag: { name: { in: ['jazz'] } } } }
+        })
+      })
+    );
+  });
+
+  it('uses AND array ArtistTag predicate when tagMode=all', async () => {
+    prismaMock.artist.findMany.mockResolvedValue([]);
+    prismaMock.artist.count.mockResolvedValue(0);
+    await request(app).get('/api/search/artists?tags=jazz,blues&tagMode=all');
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: [
+            { tags: { some: { tag: { name: 'jazz' } } } },
+            { tags: { some: { tag: { name: 'blues' } } } }
+          ]
         })
       })
     );
