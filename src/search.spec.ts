@@ -78,6 +78,36 @@ describe('GET /api/search/releases', () => {
     );
   });
 
+  it('applies year bounds, multi-community filters, and vanityHouse artist filter', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get(
+      '/api/search/releases?year=1990&yearTo=1995&communityId=1&communityId=2&vanityHouse=true'
+    );
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          year: { gte: 1990, lte: 1995 },
+          communityId: { in: [1, 2] },
+          artist: expect.objectContaining({ vanityHouse: true })
+        })
+      })
+    );
+  });
+
+  it('uses yearTo upper bound when no year lower bound is provided', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?yearTo=1988');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          year: { lte: 1988 }
+        })
+      })
+    );
+  });
+
   it('uses count then random skip when orderBy=random', async () => {
     prismaMock.release.count.mockResolvedValue(100);
     prismaMock.release.findMany.mockResolvedValue([]);
@@ -170,6 +200,43 @@ describe('GET /api/search/requests', () => {
     );
   });
 
+  it('filters request search by q, artist, type, year, and community', async () => {
+    prismaMock.request.findMany.mockResolvedValue([]);
+    prismaMock.request.count.mockResolvedValue(0);
+    await request(app).get(
+      '/api/search/requests?q=fusion&artist=herbie&type=Music&year=1974&communityId=12'
+    );
+    expect(prismaMock.request.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { title: { contains: 'fusion', mode: 'insensitive' } },
+            { description: { contains: 'fusion', mode: 'insensitive' } }
+          ],
+          artists: {
+            some: {
+              artist: { name: { contains: 'herbie', mode: 'insensitive' } }
+            }
+          },
+          type: 'Music',
+          year: 1974,
+          communityId: 12
+        })
+      })
+    );
+  });
+
+  it('uses count then random skip for random request ordering', async () => {
+    prismaMock.request.count.mockResolvedValue(25);
+    prismaMock.request.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/search/requests?orderBy=random');
+    expect(res.status).toBe(200);
+    expect(prismaMock.request.count).toHaveBeenCalledTimes(1);
+    expect(prismaMock.request.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: expect.any(Number), take: 25 })
+    );
+  });
+
   it('rejects an invalid status with 400', async () => {
     const res = await request(app).get('/api/search/requests?status=bogus');
     expect(res.status).toBe(400);
@@ -221,6 +288,32 @@ describe('GET /api/search/log', () => {
     expect(res.body).toHaveProperty('topics');
     expect(res.body).toHaveProperty('posts');
   });
+
+  it('applies q and authorId filters to both topic and post log searches', async () => {
+    prismaMock.forumTopic.findMany.mockResolvedValue([]);
+    prismaMock.forumTopic.count.mockResolvedValue(0);
+    prismaMock.forumPost.findMany.mockResolvedValue([]);
+    prismaMock.forumPost.count.mockResolvedValue(0);
+    await request(app).get('/api/search/log?type=all&q=modal&authorId=44');
+    expect(prismaMock.forumTopic.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deletedAt: null,
+          title: { contains: 'modal', mode: 'insensitive' },
+          authorId: 44
+        }
+      })
+    );
+    expect(prismaMock.forumPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deletedAt: null,
+          body: { contains: 'modal', mode: 'insensitive' },
+          authorId: 44
+        }
+      })
+    );
+  });
 });
 
 // ─── GET /api/search/users ────────────────────────────────────────────────────
@@ -271,6 +364,51 @@ describe('GET /api/search/users', () => {
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ disabled: true })
+      })
+    );
+  });
+
+  it('uses username ordering and public select shape for non-privileged users', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({}));
+    prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.user.count.mockResolvedValue(0);
+    await request(app).get('/api/search/users?order=desc&page=2&limit=5&q=neo');
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          disabled: false,
+          username: { contains: 'neo', mode: 'insensitive' }
+        },
+        orderBy: { username: 'desc' },
+        skip: 5,
+        take: 5,
+        select: expect.objectContaining({
+          id: true,
+          username: true,
+          userRank: expect.any(Object)
+        })
+      })
+    );
+  });
+
+  it('uses privileged ordering and staff-only select fields when admin can search users', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.user.count.mockResolvedValue(0);
+    await request(app).get('/api/search/users?orderBy=lastLogin&order=asc');
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { lastLogin: 'asc' },
+        select: expect.objectContaining({
+          email: true,
+          lastLogin: true,
+          disabled: true,
+          ratio: true,
+          contributed: true,
+          consumed: true
+        })
       })
     );
   });

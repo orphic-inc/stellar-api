@@ -142,3 +142,77 @@ describe('POST /api/downloads/:grantId/reverse', () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe('GET /api/contributions/:id/access/latest', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('returns the most recent completed grant with serialized fields', async () => {
+    const createdAt = new Date('2026-05-18T12:00:00.000Z');
+    prismaMock.downloadAccessGrant.findFirst.mockResolvedValue({
+      id: 41,
+      amountBytes: 4096n,
+      status: DownloadGrantStatus.COMPLETED,
+      createdAt
+    } as never);
+    prismaMock.contribution.findUnique.mockResolvedValue({
+      downloadUrl: 'https://example.com/latest.zip'
+    } as never);
+
+    const res = await request(app).get('/api/contributions/8/access/latest');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.downloadAccessGrant.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          consumerId: 7,
+          contributionId: 8,
+          status: DownloadGrantStatus.COMPLETED
+        }),
+        orderBy: { createdAt: 'desc' }
+      })
+    );
+    expect(prismaMock.contribution.findUnique).toHaveBeenCalledWith({
+      where: { id: 8 },
+      select: { downloadUrl: true }
+    });
+    expect(res.body).toEqual({
+      grantId: 41,
+      downloadUrl: 'https://example.com/latest.zip',
+      amountBytes: '4096',
+      status: DownloadGrantStatus.COMPLETED,
+      createdAt: createdAt.toISOString()
+    });
+  });
+
+  it('returns 404 when no recent grant exists', async () => {
+    prismaMock.downloadAccessGrant.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/contributions/8/access/latest');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('No recent grant found');
+    expect(prismaMock.contribution.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the contribution no longer exists', async () => {
+    prismaMock.downloadAccessGrant.findFirst.mockResolvedValue({
+      id: 41,
+      amountBytes: 4096n,
+      status: DownloadGrantStatus.COMPLETED,
+      createdAt: new Date('2026-05-18T12:00:00.000Z')
+    } as never);
+    prismaMock.contribution.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/contributions/8/access/latest');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Contribution not found');
+  });
+
+  it('returns 400 for a non-numeric contribution id', async () => {
+    const res = await request(app).get('/api/contributions/nope/access/latest');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.downloadAccessGrant.findFirst).not.toHaveBeenCalled();
+  });
+});
