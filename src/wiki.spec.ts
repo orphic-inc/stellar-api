@@ -83,6 +83,64 @@ describe('GET /api/wiki', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(0);
   });
+
+  it('filters by title when type=title is provided', async () => {
+    prismaMock.wikiPage.findMany.mockResolvedValue([makePage()] as never);
+    prismaMock.wikiPage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/wiki?q=jazz&type=title');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.wikiPage.findMany.mock.calls[0][0] as {
+      where: { AND?: unknown[] };
+    };
+    const firstAnd = call.where.AND?.[0] as { title?: unknown };
+    expect(firstAnd?.title).toBeDefined();
+  });
+
+  it('filters by body when type=body is provided', async () => {
+    prismaMock.wikiPage.findMany.mockResolvedValue([makePage()] as never);
+    prismaMock.wikiPage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/wiki?q=jazz&type=body');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.wikiPage.findMany.mock.calls[0][0] as {
+      where: { AND?: unknown[] };
+    };
+    const firstAnd = call.where.AND?.[0] as { body?: unknown };
+    expect(firstAnd?.body).toBeDefined();
+  });
+
+  it('searches both title and body when no type is specified', async () => {
+    prismaMock.wikiPage.findMany.mockResolvedValue([makePage()] as never);
+    prismaMock.wikiPage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/wiki?q=jazz');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.wikiPage.findMany.mock.calls[0][0] as {
+      where: { AND?: unknown[] };
+    };
+    const firstAnd = call.where.AND?.[0] as { OR?: unknown[] };
+    expect(firstAnd?.OR).toBeDefined();
+  });
+
+  it('omits rank filter for wiki_manage users who can see all pages', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_manage: true }) as never
+    );
+    prismaMock.wikiPage.findMany.mockResolvedValue([makePage()] as never);
+    prismaMock.wikiPage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/wiki');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.wikiPage.findMany.mock.calls[0][0] as {
+      where: { minReadLevel?: unknown };
+    };
+    expect(call.where.minReadLevel).toBeUndefined();
+  });
 });
 
 // ─── GET /api/wiki/:id ─────────────────────────────────────────────────────────
@@ -117,6 +175,20 @@ describe('GET /api/wiki/:id', () => {
     const res = await request(app).get('/api/wiki/2');
 
     expect(res.status).toBe(403);
+  });
+
+  it('returns 200 when user rank meets minReadLevel without needing permission check', async () => {
+    setCurrentUserRankLevel(200);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minReadLevel: 100 }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2');
+
+    expect(res.status).toBe(200);
   });
 });
 
@@ -202,6 +274,28 @@ describe('GET /api/wiki/:id/revisions/:rev', () => {
     expect(prismaMock.wikiRevision.findUnique).not.toHaveBeenCalled();
   });
 
+  it('returns the historical revision body when it exists', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ revision: 5 }) as never
+    );
+    prismaMock.wikiRevision.findUnique.mockResolvedValue(
+      makeRevision({
+        revision: 3,
+        title: 'Old Title',
+        body: '<p>Old</p>'
+      }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/revisions/3');
+
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe('Old Title');
+    expect(res.body.body).toBe('<p>Old</p>');
+  });
+
   it('returns 404 when the historical revision does not exist', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRankWithPerms({ wiki_edit: true }) as never
@@ -213,6 +307,33 @@ describe('GET /api/wiki/:id/revisions/:rev', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toMatch(/revision not found/i);
+  });
+
+  it('returns 404 when the user cannot read the restricted page', async () => {
+    setCurrentUserRankLevel(10);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minReadLevel: 500, minEditLevel: 500 }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/revisions/3');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when user lacks edit permission for revision content', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minReadLevel: 0, minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/revisions/3');
+
+    expect(res.status).toBe(403);
   });
 });
 
@@ -277,6 +398,39 @@ describe('GET /api/wiki/:id/compare', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toMatch(/revision 1 not found/i);
+  });
+
+  it('returns 404 when the new historical revision is missing', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ revision: 5, body: '<p>Current</p>' }) as never
+    );
+    prismaMock.wikiRevision.findUnique
+      .mockResolvedValueOnce(
+        makeRevision({ revision: 1, body: '<p>Rev 1</p>' }) as never
+      )
+      .mockResolvedValueOnce(null);
+
+    const res = await request(app).get('/api/wiki/2/compare?old=1&new=2');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toMatch(/revision 2 not found/i);
+  });
+
+  it('returns 404 when the page cannot be read due to rank restriction', async () => {
+    setCurrentUserRankLevel(10);
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minReadLevel: 500, revision: 3 }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2/compare?old=1&new=2');
+
+    expect(res.status).toBe(404);
   });
 });
 
@@ -370,6 +524,20 @@ describe('POST /api/wiki', () => {
 
     expect(res.status).toBe(409);
   });
+
+  it('returns 400 when the title normalizes to an empty slug', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+
+    const res = await request(app).post('/api/wiki').send({
+      title: '!!!',
+      body: '<p>Content</p>'
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/valid slug/i);
+  });
 });
 
 // ─── GET /api/wiki/by-alias/:alias ───────────────────────────────────────────
@@ -420,6 +588,22 @@ describe('GET /api/wiki/by-alias/:alias', () => {
 // ─── PUT /api/wiki/:id ───────────────────────────────────────────────────────
 
 describe('PUT /api/wiki/:id', () => {
+  it('returns 403 when user cannot edit the page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).put('/api/wiki/2').send({
+      title: 'Updated Title',
+      body: '<p>Updated</p>'
+    });
+
+    expect(res.status).toBe(403);
+  });
+
   it('updates a page, stores a revision, and clamps minEditLevel to minReadLevel', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRankWithPerms({ wiki_manage: true }) as never
@@ -519,6 +703,21 @@ describe('POST /api/wiki/:id/aliases', () => {
 
     expect(res.status).toBe(409);
   });
+
+  it('returns 403 when user cannot edit the page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).post('/api/wiki/2/aliases').send({
+      alias: 'new-alias'
+    });
+
+    expect(res.status).toBe(403);
+  });
 });
 
 // ─── DELETE /api/wiki/:id/aliases/:alias ─────────────────────────────────────
@@ -536,6 +735,56 @@ describe('DELETE /api/wiki/:id/aliases/:alias', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.msg).toMatch(/primary slug alias/i);
+  });
+
+  it('returns 403 when user cannot edit the page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ slug: 'test-page', minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).delete('/api/wiki/2/aliases/other-alias');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when the alias does not exist on this page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ slug: 'test-page', minEditLevel: 0 }) as never
+    );
+    prismaMock.wikiAlias.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/wiki/2/aliases/other-alias');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toMatch(/alias not found/i);
+  });
+
+  it('deletes an alias and returns 204', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({ wiki_edit: true }) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ slug: 'test-page', minEditLevel: 0 }) as never
+    );
+    prismaMock.wikiAlias.findUnique.mockResolvedValue({
+      alias: 'other-alias',
+      pageId: 2,
+      userId: 7
+    } as never);
+    prismaMock.wikiAlias.delete.mockResolvedValue({} as never);
+
+    const res = await request(app).delete('/api/wiki/2/aliases/other-alias');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.wikiAlias.delete).toHaveBeenCalledWith({
+      where: { alias: 'other-alias' }
+    });
   });
 });
 
@@ -587,5 +836,18 @@ describe('POST /api/wiki/:id/rollback/:rev', () => {
         })
       })
     );
+  });
+
+  it('returns 403 when user cannot edit the page', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRankWithPerms({}) as never
+    );
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ minEditLevel: 0 }) as never
+    );
+
+    const res = await request(app).post('/api/wiki/2/rollback/2');
+
+    expect(res.status).toBe(403);
   });
 });
