@@ -15,12 +15,21 @@ jest.mock('../modules/profile', () => ({
 }));
 
 jest.mock('../modules/contribution', () => ({
-  createContributionSubmission: jest.fn()
+  createContributionSubmission: jest.fn(),
+  addContributionToRelease: jest.fn()
 }));
 
 jest.mock('../modules/downloads', () => ({
   grantDownloadAccess: jest.fn(),
   reverseDownloadAccess: jest.fn()
+}));
+
+jest.mock('../modules/reports', () => ({
+  fileReport: jest.fn()
+}));
+
+jest.mock('../modules/linkHealth', () => ({
+  recordContributionReport: jest.fn()
 }));
 
 jest.mock('../modules/user', () => ({
@@ -146,7 +155,10 @@ import {
   getProfileById,
   getProfileByLookup
 } from '../modules/profile';
-import { createContributionSubmission } from '../modules/contribution';
+import {
+  createContributionSubmission,
+  addContributionToRelease
+} from '../modules/contribution';
 import {
   getUserSettings,
   updateUserSettings,
@@ -165,6 +177,8 @@ import {
   grantDownloadAccess,
   reverseDownloadAccess
 } from '../modules/downloads';
+import { fileReport } from '../modules/reports';
+import { recordContributionReport } from '../modules/linkHealth';
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
 import * as staffPmModule from '../modules/staffPm';
@@ -196,6 +210,10 @@ export const updateProfileMock = updateProfile as jest.MockedFunction<
 export const createContributionSubmissionMock =
   createContributionSubmission as jest.MockedFunction<
     typeof createContributionSubmission
+  >;
+export const addContributionToReleaseMock =
+  addContributionToRelease as jest.MockedFunction<
+    typeof addContributionToRelease
   >;
 export const getUserSettingsMock = getUserSettings as jest.MockedFunction<
   typeof getUserSettings
@@ -231,6 +249,13 @@ export const grantDownloadAccessMock =
   grantDownloadAccess as jest.MockedFunction<typeof grantDownloadAccess>;
 export const reverseDownloadAccessMock =
   reverseDownloadAccess as jest.MockedFunction<typeof reverseDownloadAccess>;
+export const fileReportMock = fileReport as jest.MockedFunction<
+  typeof fileReport
+>;
+export const recordContributionReportMock =
+  recordContributionReport as jest.MockedFunction<
+    typeof recordContributionReport
+  >;
 export const pmMock = pmModule as jest.Mocked<typeof pmModule>;
 export const staffInboxMock = staffInboxModule as jest.Mocked<
   typeof staffInboxModule

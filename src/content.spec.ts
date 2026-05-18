@@ -4,6 +4,8 @@ import {
   prismaMock,
   makeUserRank,
   createContributionSubmissionMock,
+  fileReportMock,
+  recordContributionReportMock,
   resetApiTestState
 } from './test/apiTestHarness';
 import {
@@ -100,6 +102,221 @@ describe('API content and shared flows', () => {
       include: { user: { select: { id: true, username: true, avatar: true } } }
     });
     expect(res.body.text).toBe('Nice post');
+  });
+
+  it('returns paginated contributions', async () => {
+    prismaMock.contribution.findMany.mockResolvedValue([
+      {
+        id: 5,
+        userId: 7,
+        releaseId: 3,
+        contributorId: null,
+        releaseDescription: 'Seeded',
+        sizeInBytes: 1234,
+        approvedAccountingBytes: 1234,
+        linkStatus: 'PASS',
+        linkCheckedAt: null,
+        type: 'flac',
+        bitrate: null,
+        media: null,
+        hasLog: false,
+        hasCue: false,
+        isScene: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: 7, username: 'kai' },
+        release: { id: 3, title: 'Kind of Blue' },
+        collaborators: []
+      } as never
+    ]);
+    prismaMock.contribution.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/contributions?page=2');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.contribution.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 25, take: 25 })
+    );
+    expect(res.body.data).toHaveLength(1);
+  });
+
+  it('returns 404 for a missing contribution detail', async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/contributions/999');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns contribution detail when present', async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue({
+      id: 5,
+      userId: 7,
+      releaseId: 3,
+      contributorId: null,
+      releaseDescription: 'Seeded',
+      sizeInBytes: 1234,
+      approvedAccountingBytes: 1234,
+      linkStatus: 'PASS',
+      linkCheckedAt: null,
+      type: 'flac',
+      bitrate: null,
+      media: null,
+      hasLog: false,
+      hasCue: false,
+      isScene: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: { id: 7, username: 'kai' },
+      release: { id: 3, title: 'Kind of Blue' },
+      collaborators: [],
+      comments: []
+    } as never);
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(5);
+  });
+
+  it('rejects contribution creation for invalid download URLs when domains are enforced', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: ['approved.example'],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      updatedAt: new Date()
+    });
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 1,
+        type: 'Music',
+        title: 'Kind of Blue',
+        year: 1959,
+        fileType: 'flac',
+        sizeInBytes: 1234,
+        releaseDescription: 'Seeded',
+        downloadUrl: 'not-a-url',
+        collaborators: [{ artist: 'Miles Davis', importance: 'Main' }]
+      });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects contribution creation for unapproved domains', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: ['approved.example'],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      updatedAt: new Date()
+    });
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 1,
+        type: 'Music',
+        title: 'Kind of Blue',
+        year: 1959,
+        fileType: 'flac',
+        sizeInBytes: 1234,
+        releaseDescription: 'Seeded',
+        downloadUrl: 'https://evil.example/file.zip',
+        collaborators: [{ artist: 'Miles Davis', importance: 'Main' }]
+      });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when contribution submission cannot find a community', async () => {
+    createContributionSubmissionMock.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 1,
+        type: 'Music',
+        title: 'Kind of Blue',
+        year: 1959,
+        fileType: 'flac',
+        sizeInBytes: 1234,
+        releaseDescription: 'Seeded',
+        downloadUrl: 'https://approved.example/file.zip',
+        collaborators: [{ artist: 'Miles Davis', importance: 'Main' }]
+      });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('creates a contribution submission for valid input', async () => {
+    createContributionSubmissionMock.mockResolvedValue({
+      id: 5,
+      releaseId: 3,
+      userId: 7
+    } as never);
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 1,
+        type: 'Music',
+        title: 'Kind of Blue',
+        year: 1959,
+        fileType: 'flac',
+        sizeInBytes: 1234,
+        releaseDescription: 'Seeded',
+        downloadUrl: 'https://approved.example/file.zip',
+        collaborators: [{ artist: 'Miles Davis', importance: 'Main' }]
+      });
+
+    expect(res.status).toBe(201);
+    expect(createContributionSubmissionMock).toHaveBeenCalledWith({
+      userId: 7,
+      input: expect.objectContaining({
+        fileType: 'flac',
+        communityId: 1,
+        title: 'Kind of Blue'
+      })
+    });
+  });
+
+  it('reports a contribution and records both moderation side effects', async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue({ id: 5 } as never);
+    fileReportMock.mockResolvedValue({
+      ok: true,
+      report: {} as never
+    });
+    recordContributionReportMock.mockResolvedValue(undefined);
+
+    const res = await request(app).post('/api/contributions/5/report').send({
+      reason: 'Dead link'
+    });
+
+    expect(res.status).toBe(201);
+    expect(fileReportMock).toHaveBeenCalledWith(7, {
+      targetType: 'Contribution',
+      targetId: 5,
+      category: 'dead_link',
+      reason: 'Dead link'
+    });
+    expect(recordContributionReportMock).toHaveBeenCalledWith(
+      5,
+      7,
+      'Dead link'
+    );
+  });
+
+  it('returns 404 when reporting a missing contribution', async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/contributions/999/report').send({
+      reason: 'Dead link'
+    });
+
+    expect(res.status).toBe(404);
   });
 
   it('subscribes to a topic with a 204 response', async () => {
