@@ -94,6 +94,21 @@ describe('POST /api/posts', () => {
     );
   });
 
+  it('defaults tags to an empty array when omitted', async () => {
+    prismaMock.post.create.mockResolvedValue(makePost({ tags: [] }) as never);
+
+    const res = await request(app)
+      .post('/api/posts')
+      .send({ title: 'Jazz History', text: 'A deep dive.', category: 'Music' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.post.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tags: [] })
+      })
+    );
+  });
+
   it('returns 400 when title is missing', async () => {
     const res = await request(app)
       .post('/api/posts')
@@ -130,6 +145,13 @@ describe('DELETE /api/posts/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('returns 400 for non-numeric id', async () => {
+    const res = await request(app).delete('/api/posts/nope');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.post.findUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/posts/:id/comments', () => {
@@ -143,6 +165,11 @@ describe('POST /api/posts/:id/comments', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.text).toBe('Great post!');
+    expect(prismaMock.postComment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { postId: 1, userId: 7, text: 'Great post!' }
+      })
+    );
   });
 
   it('returns 404 when post does not exist', async () => {
@@ -153,6 +180,22 @@ describe('POST /api/posts/:id/comments', () => {
       .send({ text: 'Comment' });
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for a non-numeric post id', async () => {
+    const res = await request(app)
+      .post('/api/posts/nope/comments')
+      .send({ text: 'Comment' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.post.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when comment text is missing', async () => {
+    const res = await request(app).post('/api/posts/1/comments').send({});
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.postComment.create).not.toHaveBeenCalled();
   });
 });
 
@@ -184,5 +227,12 @@ describe('DELETE /api/posts/:id/comments/:commentId', () => {
     const res = await request(app).delete('/api/posts/1/comments/999');
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for non-numeric ids', async () => {
+    const res = await request(app).delete('/api/posts/nope/comments/abc');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.postComment.findFirst).not.toHaveBeenCalled();
   });
 });

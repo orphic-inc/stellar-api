@@ -82,6 +82,24 @@ describe('GET /api/comments', () => {
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'release', releaseId: 7 });
   });
+
+  it('filters only by page when pageId is omitted', async () => {
+    prismaMock.comment.findMany.mockResolvedValue([]);
+    prismaMock.comment.count.mockResolvedValue(0);
+
+    await request(app).get('/api/comments?page=artist');
+
+    const call = prismaMock.comment.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({ page: 'artist', deletedAt: null });
+    expect(call?.where).not.toHaveProperty('artistId');
+  });
+
+  it('returns 400 for an invalid page filter', async () => {
+    const res = await request(app).get('/api/comments?page=bad-page&pageId=1');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findMany).not.toHaveBeenCalled();
+  });
 });
 
 // ─── GET /api/comments/:id ────────────────────────────────────────────────────
@@ -105,6 +123,13 @@ describe('GET /api/comments/:id', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('Comment not found');
+  });
+
+  it('returns 400 for a non-numeric comment id', async () => {
+    const res = await request(app).get('/api/comments/nope');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -132,6 +157,37 @@ describe('POST /api/comments', () => {
         })
       })
     );
+  });
+
+  it('persists release comments with the matching foreign key', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeCommentWithAuthor({ id: 21, page: 'release', releaseId: 9 }) as never
+    );
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'release',
+      body: 'Excellent release.',
+      releaseId: 9
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.comment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          page: 'release',
+          releaseId: 9
+        })
+      })
+    );
+  });
+
+  it('returns 400 when required fields are missing', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'communities'
+    });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
   });
 });
 
@@ -181,6 +237,15 @@ describe('PUT /api/comments/:id', () => {
 
     expect(res.status).toBe(403);
     expect(res.body.msg).toBe('Not authorized');
+  });
+
+  it('returns 400 for a non-numeric comment id', async () => {
+    const res = await request(app).put('/api/comments/nope').send({
+      body: 'Updated body'
+    });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -233,5 +298,12 @@ describe('DELETE /api/comments/:id', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('Comment not found');
+  });
+
+  it('returns 400 for a non-numeric comment id', async () => {
+    const res = await request(app).delete('/api/comments/nope');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findUnique).not.toHaveBeenCalled();
   });
 });
