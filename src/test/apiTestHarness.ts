@@ -32,6 +32,12 @@ jest.mock('../modules/linkHealth', () => ({
   recordContributionReport: jest.fn()
 }));
 
+jest.mock('../modules/artist', () => ({
+  createArtist: jest.fn(),
+  updateArtist: jest.fn(),
+  revertArtistFromHistory: jest.fn()
+}));
+
 jest.mock('../modules/user', () => ({
   getUserSettings: jest.fn(),
   updateUserSettings: jest.fn(),
@@ -160,6 +166,11 @@ import {
   addContributionToRelease
 } from '../modules/contribution';
 import {
+  createArtist,
+  updateArtist,
+  revertArtistFromHistory
+} from '../modules/artist';
+import {
   getUserSettings,
   updateUserSettings,
   createUser
@@ -214,6 +225,16 @@ export const createContributionSubmissionMock =
 export const addContributionToReleaseMock =
   addContributionToRelease as jest.MockedFunction<
     typeof addContributionToRelease
+  >;
+export const createArtistMock = createArtist as jest.MockedFunction<
+  typeof createArtist
+>;
+export const updateArtistMock = updateArtist as jest.MockedFunction<
+  typeof updateArtist
+>;
+export const revertArtistFromHistoryMock =
+  revertArtistFromHistory as jest.MockedFunction<
+    typeof revertArtistFromHistory
   >;
 export const getUserSettingsMock = getUserSettings as jest.MockedFunction<
   typeof getUserSettings
