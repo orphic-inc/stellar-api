@@ -873,3 +873,91 @@ describe('forum.createTopicNote', () => {
     });
   });
 });
+
+// ─── ratioPolicy.getPolicyState ───────────────────────────────────────────────
+
+import type * as RatioPolicyModule from './modules/ratioPolicy';
+const { getPolicyState } = jest.requireActual<typeof RatioPolicyModule>(
+  './modules/ratioPolicy'
+);
+
+describe('ratioPolicy.getPolicyState', () => {
+  it('returns default OK state when no policy record exists', async () => {
+    prismaMock.ratioPolicyState.findUnique.mockResolvedValue(null);
+
+    const result = await getPolicyState(9);
+
+    expect(result.status).toBe('OK');
+    expect(result.watchStartedAt).toBeNull();
+    expect(result.leechDisabledAt).toBeNull();
+    expect(result.lastEvaluatedAt).toBeDefined();
+  });
+});
+
+// ─── requests module ──────────────────────────────────────────────────────────
+
+import type * as RequestsModule from './modules/requests';
+const { createRequest, unfillRequest } =
+  jest.requireActual<typeof RequestsModule>('./modules/requests');
+
+describe('requests.createRequest', () => {
+  it('includes artist associations when artists array is provided', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      contributed: BigInt(2e9)
+    } as never);
+    prismaMock.user.update.mockResolvedValueOnce({} as never);
+    prismaMock.request.create.mockResolvedValueOnce({
+      id: 1,
+      status: 'open',
+      fillerId: null,
+      filledAt: null,
+      filledContributionId: null,
+      voteCount: 0,
+      bounties: [{ amount: BigInt(110_000_000) }],
+      artists: [{ artistId: 5 }]
+    } as never);
+    prismaMock.economyTransaction.create.mockResolvedValueOnce({} as never);
+    prismaMock.requestAction.create.mockResolvedValueOnce({} as never);
+
+    await createRequest(7, {
+      communityId: 1,
+      title: 'Untitled',
+      description: 'A description',
+      type: 'Music',
+      year: undefined,
+      image: undefined,
+      bounty: BigInt(110_000_000),
+      artists: [5, 10]
+    });
+
+    expect(prismaMock.request.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          artists: { create: [{ artistId: 5 }, { artistId: 10 }] }
+        })
+      })
+    );
+  });
+});
+
+describe('requests.unfillRequest', () => {
+  it('throws AppError(500) when filled request has no fillerId', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.request.findUnique.mockResolvedValueOnce({
+      id: 1,
+      status: 'filled',
+      fillerId: null,
+      bounties: []
+    } as never);
+
+    await expect(unfillRequest(7, 1)).rejects.toThrow(
+      'Filled request has no fillerId'
+    );
+  });
+});
