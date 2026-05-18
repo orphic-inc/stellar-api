@@ -182,7 +182,10 @@ import {
   updatePost,
   deleteTopic,
   deletePost,
-  createTopicNote
+  createTopicNote,
+  createPoll,
+  closePoll,
+  castVote
 } from '../modules/forum';
 import {
   grantDownloadAccess,
@@ -266,6 +269,11 @@ export const deletePostMock = deletePost as jest.MockedFunction<
 export const createTopicNoteMock = createTopicNote as jest.MockedFunction<
   typeof createTopicNote
 >;
+export const createPollMock = createPoll as jest.MockedFunction<
+  typeof createPoll
+>;
+export const closePollMock = closePoll as jest.MockedFunction<typeof closePoll>;
+export const castVoteMock = castVote as jest.MockedFunction<typeof castVote>;
 export const grantDownloadAccessMock =
   grantDownloadAccess as jest.MockedFunction<typeof grantDownloadAccess>;
 export const reverseDownloadAccessMock =
