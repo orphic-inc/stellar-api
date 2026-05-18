@@ -47,6 +47,125 @@ describe('API auth/profile/user flows', () => {
     expect(res.body).toEqual({ msg: 'User already exists' });
   });
 
+  it('rejects self-registration when registration is closed', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'closed',
+      maxUsers: 7000,
+      updatedAt: new Date()
+    });
+
+    const res = await request(app).post('/api/auth/register').send({
+      username: 'closed-user',
+      email: 'closed@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ msg: 'Registration is currently closed' });
+  });
+
+  it('enforces invite-only registration rules and accepts a matching invite', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'invite',
+      maxUsers: 7000,
+      updatedAt: new Date()
+    });
+
+    const missingInvite = await request(app).post('/api/auth/register').send({
+      username: 'invite-user',
+      email: 'invite@example.com',
+      password: 'password123'
+    });
+    expect(missingInvite.status).toBe(403);
+
+    prismaMock.invite.findUnique.mockResolvedValueOnce(null);
+    const invalidInvite = await request(app).post('/api/auth/register').send({
+      username: 'invite-user',
+      email: 'invite@example.com',
+      password: 'password123',
+      inviteKey: 'bad-key'
+    });
+    expect(invalidInvite.status).toBe(403);
+
+    prismaMock.invite.findUnique.mockResolvedValueOnce({
+      id: 1,
+      inviterId: 5,
+      inviteKey: 'abc123',
+      email: 'other@example.com',
+      expires: new Date(),
+      reason: 'Referral',
+      status: 'pending'
+    });
+    const wrongEmail = await request(app).post('/api/auth/register').send({
+      username: 'invite-user',
+      email: 'invite@example.com',
+      password: 'password123',
+      inviteKey: 'abc123'
+    });
+    expect(wrongEmail.status).toBe(403);
+
+    prismaMock.invite.findUnique.mockResolvedValueOnce({
+      id: 2,
+      inviterId: 5,
+      inviteKey: 'good-key',
+      email: 'invite@example.com',
+      expires: new Date(),
+      reason: 'Referral',
+      status: 'pending'
+    });
+    prismaMock.user.findFirst.mockResolvedValueOnce(null);
+    prismaMock.badPassword.findFirst.mockResolvedValueOnce(null);
+    prismaMock.userRank.findFirst.mockResolvedValueOnce(makeUserRank());
+    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
+    prismaMock.profile.create.mockResolvedValueOnce({ id: 5 } as never);
+    prismaMock.user.create.mockResolvedValueOnce(
+      asUserMock({
+        id: 12,
+        username: 'invite-user',
+        email: 'invite@example.com',
+        password: 'hashed-password',
+        avatar: null,
+        isArtist: false,
+        isDonor: false,
+        canDownload: true,
+        inviteCount: 0,
+        contributed: BigInt(0),
+        consumed: BigInt(0),
+        ratio: 0,
+        dateRegistered: '2026-04-24T00:00:00.000Z',
+        lastLogin: '2026-04-24T00:00:00.000Z',
+        userRank: {
+          level: 100,
+          name: 'User',
+          color: '',
+          badge: '',
+          permissions: {}
+        }
+      })
+    );
+    prismaMock.invite.update.mockResolvedValueOnce({} as never);
+
+    const accepted = await request(app).post('/api/auth/register').send({
+      username: 'invite-user',
+      email: 'invite@example.com',
+      password: 'password123',
+      inviteKey: 'good-key'
+    });
+
+    expect(accepted.status).toBe(201);
+    expect(prismaMock.invite.update).toHaveBeenCalledWith({
+      where: { inviteKey: 'good-key' },
+      data: { status: 'accepted' }
+    });
+  });
+
   it('returns a msg response when login is attempted on a disabled account', async () => {
     prismaMock.user.findUnique.mockResolvedValue(
       makeUser({ password: 'hashed-password', disabled: true })
@@ -113,6 +232,21 @@ describe('API auth/profile/user flows', () => {
     );
   });
 
+  it('returns invalid credentials when the password does not match', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ password: 'hashed-password', disabled: false })
+    );
+    bcryptMock.compare.mockResolvedValue(false);
+
+    const res = await request(app).post('/api/auth').send({
+      email: 'kai@example.com',
+      password: 'wrong-password'
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ msg: 'Invalid credentials' });
+  });
+
   it('returns the current authenticated user from /api/auth', async () => {
     prismaMock.user.findUnique.mockResolvedValue(
       asUserMock({
@@ -158,6 +292,209 @@ describe('API auth/profile/user flows', () => {
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([expect.stringContaining('token=;')])
     );
+  });
+
+  it('changes password and revokes active sessions', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 7,
+      password: 'hashed-password'
+    } as never);
+    bcryptMock.compare.mockResolvedValue(true);
+    prismaMock.badPassword.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/auth/password').send({
+      currentPassword: 'password123',
+      newPassword: 'new-password-123'
+    });
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { password: 'hashed-password' }
+    });
+    expect(prismaMock.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 7, revokedAt: null },
+      data: { revokedAt: expect.any(Date) }
+    });
+  });
+
+  it('rejects password changes for bad current passwords or banned new passwords', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 7,
+      password: 'hashed-password'
+    } as never);
+    bcryptMock.compare.mockResolvedValueOnce(false);
+
+    const wrongCurrent = await request(app).post('/api/auth/password').send({
+      currentPassword: 'wrong',
+      newPassword: 'new-password-123'
+    });
+    expect(wrongCurrent.status).toBe(400);
+
+    bcryptMock.compare.mockResolvedValueOnce(true);
+    prismaMock.badPassword.findFirst.mockResolvedValueOnce({ id: 1 } as never);
+
+    const banned = await request(app).post('/api/auth/password').send({
+      currentPassword: 'password123',
+      newPassword: 'password'
+    });
+    expect(banned.status).toBe(400);
+    expect(banned.body).toEqual({ msg: 'Password is not allowed' });
+  });
+
+  it('changes email with a password check and writes email history', async () => {
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({
+        id: 7,
+        email: 'old@example.com',
+        password: 'hashed-password'
+      } as never)
+      .mockResolvedValueOnce(null);
+    bcryptMock.compare.mockResolvedValue(true);
+
+    const res = await request(app)
+      .put('/api/auth/email')
+      .set('x-forwarded-for', '203.0.113.10, 10.0.0.1')
+      .send({
+        newEmail: 'NEW@example.com',
+        password: 'password123'
+      });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.userEmailHistory.create).toHaveBeenCalledWith({
+      data: {
+        userId: 7,
+        oldEmail: 'old@example.com',
+        newEmail: 'new@example.com',
+        ipAddress: '203.0.113.10'
+      }
+    });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { email: 'new@example.com' }
+    });
+  });
+
+  it('rejects email changes for wrong passwords or duplicate emails', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      email: 'old@example.com',
+      password: 'hashed-password'
+    } as never);
+    bcryptMock.compare.mockResolvedValueOnce(false);
+
+    const wrongPassword = await request(app).put('/api/auth/email').send({
+      newEmail: 'new@example.com',
+      password: 'wrong'
+    });
+    expect(wrongPassword.status).toBe(400);
+
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({
+        id: 7,
+        email: 'old@example.com',
+        password: 'hashed-password'
+      } as never)
+      .mockResolvedValueOnce(makeUser({ id: 12, email: 'new@example.com' }));
+    bcryptMock.compare.mockResolvedValueOnce(true);
+
+    const duplicate = await request(app).put('/api/auth/email').send({
+      newEmail: 'new@example.com',
+      password: 'password123'
+    });
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.body).toEqual({ msg: 'Email already in use' });
+  });
+
+  it('handles recovery requests and reset flows', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 7 } as never);
+    prismaMock.accountRecovery.create.mockResolvedValueOnce({ id: 1 } as never);
+
+    const requestRes = await request(app)
+      .post('/api/auth/recovery/request')
+      .send({ email: 'kai@example.com' });
+
+    expect(requestRes.status).toBe(200);
+    expect(prismaMock.accountRecovery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 7,
+        token: expect.any(String),
+        expiresAt: expect.any(Date)
+      })
+    });
+
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce(null);
+    const invalidReset = await request(app)
+      .post('/api/auth/recovery/reset')
+      .send({ token: 'bad-token', newPassword: 'new-password-123' });
+    expect(invalidReset.status).toBe(400);
+
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce({
+      id: 9,
+      userId: 7
+    } as never);
+    prismaMock.badPassword.findFirst.mockResolvedValueOnce({ id: 1 } as never);
+    const bannedReset = await request(app)
+      .post('/api/auth/recovery/reset')
+      .send({ token: 'good-token', newPassword: 'password' });
+    expect(bannedReset.status).toBe(400);
+
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce({
+      id: 9,
+      userId: 7
+    } as never);
+    prismaMock.badPassword.findFirst.mockResolvedValueOnce(null);
+    const successReset = await request(app)
+      .post('/api/auth/recovery/reset')
+      .send({ token: 'good-token', newPassword: 'new-password-123' });
+
+    expect(successReset.status).toBe(200);
+    expect(prismaMock.accountRecovery.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { usedAt: expect.any(Date) }
+    });
+    expect(prismaMock.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 7, revokedAt: null },
+      data: { revokedAt: expect.any(Date) }
+    });
+
+    logSpy.mockRestore();
+  });
+
+  it('lists and revokes the current user sessions', async () => {
+    prismaMock.userSession.findMany.mockResolvedValue([
+      {
+        id: 'sess-1',
+        userId: 7,
+        ipAddress: '203.0.113.10',
+        userAgent: 'Jest',
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+        revokedAt: null
+      }
+    ] as never);
+
+    const listRes = await request(app).get('/api/auth/sessions');
+    expect(listRes.status).toBe(200);
+    expect(listRes.body).toHaveLength(1);
+
+    prismaMock.userSession.findFirst.mockResolvedValueOnce(null);
+    const missingRes = await request(app).delete('/api/auth/sessions/sess-2');
+    expect(missingRes.status).toBe(404);
+
+    prismaMock.userSession.findFirst.mockResolvedValueOnce({
+      id: 'sess-1',
+      userId: 7
+    } as never);
+    prismaMock.userSession.update.mockResolvedValueOnce({} as never);
+
+    const deleteRes = await request(app).delete('/api/auth/sessions/sess-1');
+    expect(deleteRes.status).toBe(204);
+    expect(prismaMock.userSession.update).toHaveBeenCalledWith({
+      where: { id: 'sess-1' },
+      data: { revokedAt: expect.any(Date) }
+    });
   });
 
   it('maps profile invite exhaustion to a msg response', async () => {
