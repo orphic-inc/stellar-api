@@ -25,7 +25,16 @@ jest.mock('../modules/downloads', () => ({
 }));
 
 jest.mock('../modules/reports', () => ({
-  fileReport: jest.fn()
+  fileReport: jest.fn(),
+  listReports: jest.fn(),
+  getReport: jest.fn(),
+  claimReport: jest.fn(),
+  unclaimReport: jest.fn(),
+  resolveReport: jest.fn(),
+  addNote: jest.fn(),
+  listMyReports: jest.fn(),
+  getReportCounts: jest.fn(),
+  getReportStats: jest.fn()
 }));
 
 jest.mock('../modules/linkHealth', () => ({
