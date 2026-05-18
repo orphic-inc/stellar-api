@@ -47,6 +47,45 @@ describe('GET /api/collages', () => {
     const res = await request(app).get('/api/collages?orderBy=invalid');
     expect(res.status).toBe(400);
   });
+
+  it('filters by categoryId when provided', async () => {
+    prismaMock.collage.findMany.mockResolvedValue([makeCollage()]);
+    prismaMock.collage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/collages?categoryId=2');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.collage.findMany.mock.calls[0][0] as {
+      where: { categoryId?: unknown };
+    };
+    expect(call.where.categoryId).toBe(2);
+  });
+
+  it('adds OR search filter when search query is provided', async () => {
+    prismaMock.collage.findMany.mockResolvedValue([makeCollage()]);
+    prismaMock.collage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/collages?search=jazz');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.collage.findMany.mock.calls[0][0] as {
+      where: { OR?: unknown };
+    };
+    expect(call.where.OR).toBeDefined();
+  });
+
+  it('filters by bookmarked when bookmarked=true', async () => {
+    prismaMock.collage.findMany.mockResolvedValue([makeCollage()]);
+    prismaMock.collage.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/collages?bookmarked=true');
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.collage.findMany.mock.calls[0][0] as {
+      where: { bookmarks?: unknown };
+    };
+    expect(call.where.bookmarks).toBeDefined();
+  });
 });
 
 describe('POST /api/collages', () => {
@@ -263,6 +302,109 @@ describe('PUT /api/collages/:id', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/collages/99')
+      .send({ description: 'Updated description that is long enough.' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 409 when renaming to a conflicting name', async () => {
+    setStaffPerms();
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ userId: 99, categoryId: 1 })
+    );
+    prismaMock.collage.findFirst.mockResolvedValue(
+      makeCollage({ id: 2, name: 'Taken Name' })
+    );
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ name: 'Taken Name' });
+
+    expect(res.status).toBe(409);
+  });
+
+  it('staff can rename a public collage when no conflict', async () => {
+    setStaffPerms();
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ userId: 99, categoryId: 1 })
+    );
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.update.mockResolvedValue(
+      makeCollage({ name: 'New Name' })
+    );
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ name: 'New Name' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.collage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'New Name' })
+      })
+    );
+  });
+
+  it('staff can set maxEntries and maxEntriesPerUser', async () => {
+    setStaffPerms();
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ userId: 99, categoryId: 1 })
+    );
+    prismaMock.collage.update.mockResolvedValue(
+      makeCollage({ maxEntries: 100, maxEntriesPerUser: 5 })
+    );
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ maxEntries: 100, maxEntriesPerUser: 5 });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.collage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ maxEntries: 100, maxEntriesPerUser: 5 })
+      })
+    );
+  });
+
+  it('returns 403 when non-staff tries to lock a collage', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.collage.update.mockResolvedValue(makeCollage());
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ isLocked: true });
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toMatch(/only staff can lock/i);
+  });
+
+  it('returns 403 when non-staff tries to set maxEntries', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ maxEntries: 50 });
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toMatch(/only staff can set entry limits/i);
+  });
+
+  it('returns 403 when non-staff tries to set maxEntriesPerUser', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+
+    const res = await request(app)
+      .put('/api/collages/1')
+      .send({ maxEntriesPerUser: 5 });
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toMatch(/only staff can set per-user limits/i);
+  });
 });
 
 describe('DELETE /api/collages/:id', () => {
@@ -307,6 +449,25 @@ describe('DELETE /api/collages/:id', () => {
         data: expect.objectContaining({ isDeleted: true })
       })
     );
+  });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/collages/99');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when non-owner non-staff tries to delete', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollage({ userId: 99 })
+    );
+
+    const res = await request(app).delete('/api/collages/1');
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe('Permission denied');
   });
 });
 
@@ -445,6 +606,17 @@ describe('POST /api/collages/:id/entries', () => {
     expect(res.status).toBe(400);
     expect(res.body.msg).toMatch(/per-user entry limit/i);
   });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/collages/99/entries')
+      .send({ releaseId: 42 });
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Collage not found');
+  });
 });
 
 describe('DELETE /api/collages/:id/entries/:releaseId', () => {
@@ -495,6 +667,14 @@ describe('DELETE /api/collages/:id/entries/:releaseId', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/collages/99/entries/42');
+
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('PUT /api/collages/:id/entries', () => {
@@ -528,6 +708,16 @@ describe('PUT /api/collages/:id/entries', () => {
 
     expect(res.status).toBe(403);
   });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/collages/99/entries')
+      .send({ entries: [{ id: 11, sort: 20 }] });
+
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('POST /api/collages/:id/subscribe', () => {
@@ -556,6 +746,14 @@ describe('POST /api/collages/:id/subscribe', () => {
     expect(res.status).toBe(200);
     expect(res.body.subscribed).toBe(false);
   });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/collages/99/subscribe');
+
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('POST /api/collages/:id/bookmark', () => {
@@ -583,6 +781,14 @@ describe('POST /api/collages/:id/bookmark', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.bookmarked).toBe(false);
+  });
+
+  it('returns 404 when collage does not exist', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/collages/99/bookmark');
+
+    expect(res.status).toBe(404);
   });
 });
 
