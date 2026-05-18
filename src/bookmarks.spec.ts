@@ -124,6 +124,24 @@ describe('POST /api/bookmarks/releases/:releaseId', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ bookmarked: false });
   });
+
+  it('rejects non-numeric releaseId with 400', async () => {
+    const res = await request(app).post('/api/bookmarks/releases/notanumber');
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /api/bookmarks/releases/:releaseId', () => {
+  it('removes the release bookmark and returns 204', async () => {
+    prismaMock.bookmarkRelease.deleteMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).delete('/api/bookmarks/releases/42');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.bookmarkRelease.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 7, releaseId: 42 }
+    });
+  });
 });
 
 // ─── Community bookmarks ──────────────────────────────────────────────────────
@@ -155,6 +173,33 @@ describe('POST /api/bookmarks/communities/:communityId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ bookmarked: true });
+  });
+
+  it('toggles a community bookmark off', async () => {
+    prismaMock.bookmarkCommunity.findUnique.mockResolvedValue({
+      userId: 7,
+      communityId: 3,
+      createdAt: new Date()
+    } as never);
+    prismaMock.bookmarkCommunity.delete.mockResolvedValue({} as never);
+
+    const res = await request(app).post('/api/bookmarks/communities/3');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ bookmarked: false });
+  });
+});
+
+describe('DELETE /api/bookmarks/communities/:communityId', () => {
+  it('removes the community bookmark and returns 204', async () => {
+    prismaMock.bookmarkCommunity.deleteMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).delete('/api/bookmarks/communities/3');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.bookmarkCommunity.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 7, communityId: 3 }
+    });
   });
 });
 
@@ -201,5 +246,23 @@ describe('POST /api/bookmarks/requests/:requestId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ bookmarked: false });
+  });
+
+  it('rejects non-numeric requestId with 400', async () => {
+    const res = await request(app).post('/api/bookmarks/requests/notanumber');
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /api/bookmarks/requests/:requestId', () => {
+  it('removes the request bookmark and returns 204', async () => {
+    prismaMock.bookmarkRequest.deleteMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).delete('/api/bookmarks/requests/10');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.bookmarkRequest.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 7, requestId: 10 }
+    });
   });
 });
