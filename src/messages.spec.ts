@@ -86,6 +86,31 @@ describe('POST /api/messages', () => {
       (await request(app).post('/api/messages').send(payload)).status
     ).toBe(404);
   });
+
+  it('looks up recipient by username when toUserId is omitted', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({ id: 99 } as never);
+    pmMock.sendMessage.mockResolvedValue({
+      ok: true,
+      conversation: makeConversation()
+    });
+    const res = await request(app)
+      .post('/api/messages')
+      .send({ toUsername: 'alice', subject: 'Hi', body: 'Hello!' });
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { username: { equals: 'alice', mode: 'insensitive' } }
+      })
+    );
+  });
+
+  it('returns 404 when toUsername is provided but user is not found', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/messages')
+      .send({ toUsername: 'ghost', subject: 'Hi', body: 'Hello!' });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('GET /api/messages/:id', () => {

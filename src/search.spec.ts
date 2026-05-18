@@ -156,6 +156,61 @@ describe('GET /api/search/releases', () => {
     const res = await request(app).get('/api/search/releases?orderBy=invalid');
     expect(res.status).toBe(400);
   });
+
+  it('wraps a single communityId in an array', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?communityId=5');
+    const call = prismaMock.release.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({ communityId: { in: [5] } });
+  });
+
+  it('filters by format, hasCue, isScene, title, type, and releaseType', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get(
+      '/api/search/releases?format=flac&hasCue=true&isScene=true&title=blue&type=Music&releaseType=Album'
+    );
+    const call = prismaMock.release.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({
+      title: { contains: 'blue', mode: 'insensitive' },
+      type: 'Music',
+      releaseType: 'Album'
+    });
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          contributions: {
+            some: expect.objectContaining({
+              type: 'flac',
+              hasCue: true,
+              isScene: true
+            })
+          }
+        })
+      })
+    );
+  });
+
+  it('applies year lower bound without yearTo', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?year=2000');
+    const call = prismaMock.release.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({ year: { gte: 2000 } });
+    expect((call?.where as Record<string, unknown>)?.year).not.toHaveProperty(
+      'lte'
+    );
+  });
+
+  it('uses skip=0 when count is within page limit for random ordering', async () => {
+    prismaMock.release.count.mockResolvedValue(5);
+    prismaMock.release.findMany.mockResolvedValue([]);
+    await request(app).get('/api/search/releases?orderBy=random');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0 })
+    );
+  });
 });
 
 // ─── GET /api/search/artists ──────────────────────────────────────────────────
@@ -220,6 +275,15 @@ describe('GET /api/search/artists', () => {
       expect.objectContaining({ skip: expect.any(Number) })
     );
   });
+
+  it('uses skip=0 when count is within page limit for random ordering', async () => {
+    prismaMock.artist.count.mockResolvedValue(5);
+    prismaMock.artist.findMany.mockResolvedValue([]);
+    await request(app).get('/api/search/artists?orderBy=random');
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0 })
+    );
+  });
 });
 
 // ─── GET /api/search/requests ─────────────────────────────────────────────────
@@ -276,13 +340,22 @@ describe('GET /api/search/requests', () => {
   });
 
   it('uses count then random skip for random request ordering', async () => {
-    prismaMock.request.count.mockResolvedValue(25);
+    prismaMock.request.count.mockResolvedValue(100);
     prismaMock.request.findMany.mockResolvedValue([]);
     const res = await request(app).get('/api/search/requests?orderBy=random');
     expect(res.status).toBe(200);
     expect(prismaMock.request.count).toHaveBeenCalledTimes(1);
     expect(prismaMock.request.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: expect.any(Number), take: 25 })
+    );
+  });
+
+  it('uses skip=0 when count is within page limit for random request ordering', async () => {
+    prismaMock.request.count.mockResolvedValue(5);
+    prismaMock.request.findMany.mockResolvedValue([]);
+    await request(app).get('/api/search/requests?orderBy=random');
+    expect(prismaMock.request.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0 })
     );
   });
 
@@ -458,6 +531,19 @@ describe('GET /api/search/users', () => {
           contributed: true,
           consumed: true
         })
+      })
+    );
+  });
+
+  it('treats null rank lookup as non-privileged', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(null);
+    prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.user.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/search/users');
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ disabled: false })
       })
     );
   });

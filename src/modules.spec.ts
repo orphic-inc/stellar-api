@@ -25,9 +25,12 @@ const {
   listMyTickets,
   listQueue,
   getQueueCount,
+  viewTicket,
   replyToTicket,
   resolveTicket,
-  unresolveTicket
+  unresolveTicket,
+  assignTicket,
+  bulkResolve
 } = jest.requireActual<typeof StaffPmModule>('./modules/staffPm');
 
 beforeEach(() => resetApiTestState());
@@ -897,7 +900,7 @@ describe('ratioPolicy.getPolicyState', () => {
 // ─── requests module ──────────────────────────────────────────────────────────
 
 import type * as RequestsModule from './modules/requests';
-const { createRequest, unfillRequest } =
+const { createRequest, unfillRequest, serializeRequest, listRequests } =
   jest.requireActual<typeof RequestsModule>('./modules/requests');
 
 describe('requests.createRequest', () => {
@@ -959,5 +962,273 @@ describe('requests.unfillRequest', () => {
     await expect(unfillRequest(7, 1)).rejects.toThrow(
       'Filled request has no fillerId'
     );
+  });
+
+  it('claws back bounty from filler when bounties exist', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.request.findUnique
+      .mockResolvedValueOnce({
+        id: 1,
+        status: 'filled',
+        fillerId: 42,
+        bounties: [{ amount: BigInt(110_000_000) }]
+      } as never)
+      .mockResolvedValueOnce({
+        id: 1,
+        status: 'open',
+        fillerId: null,
+        bounties: [{ amount: BigInt(110_000_000) }]
+      } as never);
+    prismaMock.user.update.mockResolvedValueOnce({} as never);
+    prismaMock.economyTransaction.create.mockResolvedValueOnce({} as never);
+    prismaMock.request.update.mockResolvedValueOnce({} as never);
+    prismaMock.requestAction.create.mockResolvedValueOnce({} as never);
+
+    await unfillRequest(7, 1);
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 42 },
+        data: { contributed: { decrement: BigInt(110_000_000) } }
+      })
+    );
+  });
+});
+
+// ─── requests.serializeRequest ────────────────────────────────────────────────
+
+describe('requests.serializeRequest', () => {
+  const base = {
+    id: 1,
+    communityId: 1,
+    userId: 7,
+    title: 'Test',
+    description: 'desc',
+    type: 'Music' as const,
+    year: null,
+    image: null,
+    status: 'open' as const,
+    fillerId: null,
+    filledAt: null,
+    filledContributionId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    voteCount: 0
+  };
+
+  it('sums bounties and serializes amounts to strings', () => {
+    const makeBounty = (amount: bigint) => ({
+      id: 1,
+      requestId: 1,
+      userId: 7,
+      amount,
+      createdAt: new Date()
+    });
+    const result = serializeRequest({
+      ...base,
+      bounties: [
+        makeBounty(BigInt(110_000_000)),
+        makeBounty(BigInt(50_000_000))
+      ]
+    });
+    expect(result.totalBounty).toBe('160000000');
+    expect(result.bounties![0].amount).toBe('110000000');
+  });
+
+  it('returns totalBounty "0" when no bounties', () => {
+    const result = serializeRequest({ ...base, bounties: [] });
+    expect(result.totalBounty).toBe('0');
+  });
+});
+
+// ─── requests.listRequests ────────────────────────────────────────────────────
+
+describe('requests.listRequests', () => {
+  it('returns paginated requests with no filters', async () => {
+    prismaMock.request.findMany.mockResolvedValueOnce([
+      {
+        id: 1,
+        communityId: 1,
+        userId: 7,
+        title: 'Test',
+        description: 'desc',
+        type: 'Music',
+        year: null,
+        image: null,
+        status: 'open',
+        fillerId: null,
+        filledAt: null,
+        filledContributionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        voteCount: 0,
+        bounties: []
+      }
+    ] as never);
+    prismaMock.request.count.mockResolvedValueOnce(1);
+
+    const result = await listRequests();
+
+    expect(result.meta.total).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+});
+
+// ─── staffPm.viewTicket ───────────────────────────────────────────────────────
+
+describe('staffPm.viewTicket', () => {
+  it('returns not_found when ticket does not exist', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce(null);
+
+    const result = await viewTicket(1, 7, false);
+
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('returns not_found when non-staff accesses another user ticket', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1,
+      userId: 99,
+      isReadByUser: true,
+      messages: []
+    } as never);
+
+    const result = await viewTicket(1, 7, false);
+
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('marks ticket as read for non-staff user who owns it', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1,
+      userId: 7,
+      isReadByUser: false,
+      messages: []
+    } as never);
+    prismaMock.staffInboxConversation.update.mockResolvedValueOnce({} as never);
+
+    const result = await viewTicket(1, 7, false);
+
+    expect(result.ok).toBe(true);
+    expect(prismaMock.staffInboxConversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { isReadByUser: true } })
+    );
+  });
+});
+
+// ─── staffPm.assignTicket ─────────────────────────────────────────────────────
+
+describe('staffPm.assignTicket', () => {
+  it('returns not_found when ticket does not exist', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce(null);
+
+    const result = await assignTicket(1, 5);
+
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('unassigns ticket when assignedUserId is null', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1
+    } as never);
+    prismaMock.staffInboxConversation.update.mockResolvedValueOnce({} as never);
+
+    const result = await assignTicket(1, null);
+
+    expect(result.ok).toBe(true);
+    expect(prismaMock.staffInboxConversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { assignedUserId: null } })
+    );
+  });
+
+  it('returns assignee_not_found when assignee user does not exist', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+    const result = await assignTicket(1, 5);
+
+    expect(result).toEqual({ ok: false, reason: 'assignee_not_found' });
+  });
+
+  it('returns assignee_not_staff when assignee lacks staff/admin permission', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 5,
+      userRank: { permissions: { download: true } }
+    } as never);
+
+    const result = await assignTicket(1, 5);
+
+    expect(result).toEqual({ ok: false, reason: 'assignee_not_staff' });
+  });
+});
+
+// ─── staffPm.bulkResolve ──────────────────────────────────────────────────────
+
+describe('staffPm.bulkResolve', () => {
+  it('returns resolved: 0 when all tickets are already resolved', async () => {
+    prismaMock.staffInboxConversation.findMany.mockResolvedValueOnce([]);
+
+    const result = await bulkResolve([1, 2, 3]);
+
+    expect(result).toEqual({ ok: true, resolved: 0 });
+    expect(prismaMock.staffInboxConversation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('resolves unresolved tickets and returns count', async () => {
+    prismaMock.staffInboxConversation.findMany.mockResolvedValueOnce([
+      { id: 1 },
+      { id: 2 }
+    ] as never);
+    prismaMock.staffInboxConversation.updateMany.mockResolvedValueOnce({
+      count: 2
+    } as never);
+
+    const result = await bulkResolve([1, 2]);
+
+    expect(result).toEqual({ ok: true, resolved: 2 });
+  });
+});
+
+// ─── stats.getSystemStats ─────────────────────────────────────────────────────
+
+import type * as StatsModule from './modules/stats';
+const { getSystemStats } =
+  jest.requireActual<typeof StatsModule>('./modules/stats');
+
+describe('stats.getSystemStats', () => {
+  it('aggregates counts and download totals', async () => {
+    prismaMock.user.count
+      .mockResolvedValueOnce(100)
+      .mockResolvedValueOnce(80)
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(20)
+      .mockResolvedValueOnce(60);
+    prismaMock.community.count.mockResolvedValueOnce(12);
+    prismaMock.release.count.mockResolvedValueOnce(500);
+    prismaMock.artist.count.mockResolvedValueOnce(200);
+    prismaMock.blog.count.mockResolvedValueOnce(10);
+    prismaMock.news.count.mockResolvedValueOnce(3);
+    prismaMock.comment.count.mockResolvedValueOnce(400);
+    prismaMock.contribution.count.mockResolvedValueOnce(1000);
+    prismaMock.contribution.findMany.mockResolvedValueOnce([
+      { _count: { consumers: 10 } },
+      { _count: { consumers: 5 } }
+    ] as never);
+
+    const result = await getSystemStats();
+
+    expect(result.totalUsers).toBe(100);
+    expect(result.enabledUsers).toBe(80);
+    expect(result.contributedLinkDownloads).toBe(15);
+    expect(result.communities).toBe(12);
   });
 });
