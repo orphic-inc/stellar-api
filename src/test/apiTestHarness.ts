@@ -182,6 +182,7 @@ import {
   updatePost,
   deleteTopic,
   deletePost,
+  deleteForum,
   createTopicNote,
   createPoll,
   closePoll,
@@ -262,6 +263,9 @@ export const updatePostMock = updatePost as jest.MockedFunction<
 >;
 export const deleteTopicMock = deleteTopic as jest.MockedFunction<
   typeof deleteTopic
+>;
+export const deleteForumMock = deleteForum as jest.MockedFunction<
+  typeof deleteForum
 >;
 export const deletePostMock = deletePost as jest.MockedFunction<
   typeof deletePost
