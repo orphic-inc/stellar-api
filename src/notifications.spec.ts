@@ -73,9 +73,7 @@ describe('GET /api/notifications', () => {
 
 describe('POST /api/notifications/:id/read', () => {
   it('marks notification as read and returns 204', async () => {
-    prismaMock.notification.findUnique.mockResolvedValue(
-      makeNotif() as never
-    );
+    prismaMock.notification.findUnique.mockResolvedValue(makeNotif() as never);
     prismaMock.notification.update.mockResolvedValue(
       makeNotif({ readAt: new Date() }) as never
     );
@@ -117,9 +115,7 @@ describe('POST /api/notifications/:id/read', () => {
 
 describe('DELETE /api/notifications/:id', () => {
   it('deletes notification and returns 204', async () => {
-    prismaMock.notification.findUnique.mockResolvedValue(
-      makeNotif() as never
-    );
+    prismaMock.notification.findUnique.mockResolvedValue(makeNotif() as never);
     prismaMock.notification.delete.mockResolvedValue(makeNotif() as never);
 
     const res = await request(app).delete('/api/notifications/1');

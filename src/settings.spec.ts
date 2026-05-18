@@ -43,7 +43,9 @@ describe('GET /api/settings', () => {
 
 describe('PUT /api/settings', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({ admin: true }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
     prismaMock.auditLog.create.mockResolvedValue({
       id: 1,
       actorId: 7,
