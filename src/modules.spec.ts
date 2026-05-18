@@ -4,7 +4,8 @@
  */
 
 import { prismaMock, resetApiTestState } from './test/apiTestHarness';
-import {
+import type * as ReportsModule from './modules/reports';
+const {
   fileReport,
   listMyReports,
   getReport,
@@ -12,7 +13,7 @@ import {
   unclaimReport,
   resolveReport,
   addNote
-} from './modules/reports';
+} = jest.requireActual<typeof ReportsModule>('./modules/reports');
 import type * as PmModule from './modules/pm';
 const { listInbox } = jest.requireActual<typeof PmModule>('./modules/pm');
 import type * as ForumModule from './modules/forum';

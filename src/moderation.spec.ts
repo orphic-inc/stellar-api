@@ -3,7 +3,10 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeUserRank,
+  getUserSettingsMock,
+  updateUserSettingsMock,
+  createUserMock
 } from './test/apiTestHarness';
 import { makeUser } from './test/factories';
 
@@ -22,7 +25,8 @@ const setAdmin = () =>
       admin: true,
       staff: true,
       users_warn: true,
-      users_disable: true
+      users_disable: true,
+      users_edit: true
     })
   );
 
@@ -229,6 +233,12 @@ describe('POST /api/users/:id/enable', () => {
     expect(res.status).toBe(200);
     expect(res.body.msg).toBe('User enabled');
   });
+
+  it('returns 404 when the user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    const res = await request(app).post('/api/users/9/enable');
+    expect(res.status).toBe(404);
+  });
 });
 
 // ─── Rank change ──────────────────────────────────────────────────────────────
@@ -293,6 +303,66 @@ describe('GET /api/users/:id/ip-history', () => {
       ip: '1.2.3.4',
       seenAt: expect.any(String)
     });
+  });
+
+  it('skips sessions with null ipAddress', async () => {
+    prismaMock.userSession.findMany.mockResolvedValue([
+      {
+        id: 'sess-null',
+        userId: 9,
+        ipAddress: null,
+        userAgent: null,
+        createdAt: new Date(),
+        lastActiveAt: null,
+        revokedAt: null
+      } as never
+    ]);
+
+    const res = await request(app).get('/api/users/9/ip-history');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+
+  it('uses createdAt as seenAt when lastActiveAt is null', async () => {
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    prismaMock.userSession.findMany.mockResolvedValue([
+      {
+        id: 'sess-2',
+        userId: 9,
+        ipAddress: '5.6.7.8',
+        userAgent: null,
+        createdAt,
+        lastActiveAt: null,
+        revokedAt: null
+      } as never
+    ]);
+
+    const res = await request(app).get('/api/users/9/ip-history');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].seenAt).toBe(createdAt.toISOString());
+  });
+
+  it('deduplicates sessions from the same IP address', async () => {
+    const session = {
+      id: 'sess-a',
+      userId: 9,
+      ipAddress: '10.0.0.1',
+      userAgent: null,
+      createdAt: new Date(),
+      lastActiveAt: null,
+      revokedAt: null
+    };
+    prismaMock.userSession.findMany.mockResolvedValue([
+      { ...session, id: 'sess-a' } as never,
+      { ...session, id: 'sess-b' } as never
+    ]);
+
+    const res = await request(app).get('/api/users/9/ip-history');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
   });
 
   it('returns 403 without staff permission', async () => {
@@ -372,6 +442,32 @@ describe('POST /api/users/donor-ranks', () => {
     expect(res.body.name).toBe('Gold');
   });
 
+  it('creates a donor rank with all optional fields', async () => {
+    prismaMock.donorRank.create.mockResolvedValue({
+      id: 2,
+      name: 'Platinum',
+      minDonation: 10000,
+      badge: 'plat',
+      expiresAfterDays: 180,
+      perks: { downloads: true },
+      color: '#silver'
+    } as never);
+
+    const res = await request(app)
+      .post('/api/users/donor-ranks')
+      .send({
+        name: 'Platinum',
+        minDonation: 10000,
+        expiresAfterDays: 180,
+        perks: { downloads: true },
+        color: '#silver',
+        badge: 'plat'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.badge).toBe('plat');
+  });
+
   it('returns 403 without admin permission', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
@@ -442,5 +538,506 @@ describe('GET /api/users/me/snatch-list', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
+  });
+
+  it('returns null artist when release has no artist', async () => {
+    prismaMock.downloadAccessGrant.findMany.mockResolvedValue([
+      {
+        id: 12,
+        consumerId: 7,
+        status: 'COMPLETED',
+        createdAt: new Date('2026-01-01'),
+        contribution: {
+          release: {
+            id: 43,
+            title: 'VA Compilation',
+            communityId: null,
+            artist: null
+          }
+        }
+      } as never
+    ]);
+
+    const res = await request(app).get('/api/users/me/snatch-list');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].artist).toBeNull();
+  });
+});
+
+// ─── User settings ────────────────────────────────────────────────────────────
+
+describe('GET /api/users/settings', () => {
+  it('returns settings for the authenticated user', async () => {
+    const settings = { siteAppearance: 'dark', styledTooltips: true };
+    getUserSettingsMock.mockResolvedValue(settings as never);
+
+    const res = await request(app).get('/api/users/settings');
+
+    expect(res.status).toBe(200);
+    expect(res.body.siteAppearance).toBe('dark');
+  });
+
+  it('returns 404 when the user does not exist', async () => {
+    getUserSettingsMock.mockResolvedValue(null);
+    const res = await request(app).get('/api/users/settings');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PUT /api/users/settings', () => {
+  it('updates and returns settings', async () => {
+    const updated = { siteAppearance: 'light', styledTooltips: false };
+    updateUserSettingsMock.mockResolvedValue(updated as never);
+
+    const res = await request(app)
+      .put('/api/users/settings')
+      .send({ siteAppearance: 'light' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.siteAppearance).toBe('light');
+  });
+
+  it('returns 404 when the user does not exist', async () => {
+    updateUserSettingsMock.mockResolvedValue(null);
+    const res = await request(app)
+      .put('/api/users/settings')
+      .send({ siteAppearance: 'light' });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Public user profile ──────────────────────────────────────────────────────
+
+describe('GET /api/users/:id', () => {
+  it('returns a public user profile', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ id: 9, username: 'alice' }) as never
+    );
+
+    const res = await request(app).get('/api/users/9');
+
+    expect(res.status).toBe(200);
+    expect(res.body.username).toBe('alice');
+  });
+
+  it('returns 404 when the user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    const res = await request(app).get('/api/users/9');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for a non-numeric id', async () => {
+    const res = await request(app).get('/api/users/not-a-number');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── Admin user creation ──────────────────────────────────────────────────────
+
+describe('POST /api/users', () => {
+  beforeEach(() => setAdmin());
+
+  it('creates a user and returns 201', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    createUserMock.mockResolvedValue(makeUser({ id: 20 }) as never);
+
+    const res = await request(app).post('/api/users').send({
+      username: 'newuser',
+      email: 'new@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('returns 400 when the username or email already exists', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(makeUser({ id: 1 }) as never);
+
+    const res = await request(app).post('/api/users').send({
+      username: 'existing',
+      email: 'existing@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('User already exists');
+  });
+
+  it('returns 403 without users_edit permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app).post('/api/users').send({
+      username: 'newuser',
+      email: 'new@example.com',
+      password: 'password123'
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 when required fields are missing', async () => {
+    const res = await request(app)
+      .post('/api/users')
+      .send({ username: 'newuser' }); // missing email and password
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── Warning deletion ─────────────────────────────────────────────────────────
+
+describe('DELETE /api/users/:id/warnings/:warnId', () => {
+  beforeEach(() => setStaff());
+
+  it('deletes the warning and returns 204', async () => {
+    prismaMock.userWarning.findUnique.mockResolvedValue({
+      id: 5,
+      userId: 9
+    } as never);
+    prismaMock.userWarning.delete.mockResolvedValue({} as never);
+    prismaMock.userWarning.count.mockResolvedValue(1);
+
+    const res = await request(app).delete('/api/users/9/warnings/5');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.userWarning.delete).toHaveBeenCalledWith({
+      where: { id: 5 }
+    });
+  });
+
+  it('clears the warned timestamp when no warnings remain', async () => {
+    prismaMock.userWarning.findUnique.mockResolvedValue({
+      id: 5,
+      userId: 9
+    } as never);
+    prismaMock.userWarning.delete.mockResolvedValue({} as never);
+    prismaMock.userWarning.count.mockResolvedValue(0);
+    prismaMock.user.update.mockResolvedValue({} as never);
+
+    const res = await request(app).delete('/api/users/9/warnings/5');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { warned: null }
+    });
+  });
+
+  it('returns 404 when the warning does not belong to the user', async () => {
+    prismaMock.userWarning.findUnique.mockResolvedValue({
+      id: 5,
+      userId: 99 // different user
+    } as never);
+
+    const res = await request(app).delete('/api/users/9/warnings/5');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when the warning does not exist', async () => {
+    prismaMock.userWarning.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/users/9/warnings/5');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Donor rank update and deletion ──────────────────────────────────────────
+
+describe('PUT /api/users/donor-ranks/:rankId', () => {
+  beforeEach(() => setAdmin());
+
+  it('updates a donor rank and returns it', async () => {
+    const existing = { id: 2, name: 'Silver', minDonation: 2000 };
+    prismaMock.donorRank.findUnique.mockResolvedValue(existing as never);
+    prismaMock.donorRank.update.mockResolvedValue({
+      ...existing,
+      name: 'Gold'
+    } as never);
+
+    const res = await request(app)
+      .put('/api/users/donor-ranks/2')
+      .send({ name: 'Gold', minDonation: 2000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Gold');
+  });
+
+  it('updates a donor rank with all optional fields', async () => {
+    const existing = { id: 2, name: 'Silver', minDonation: 2000 };
+    prismaMock.donorRank.findUnique.mockResolvedValue(existing as never);
+    prismaMock.donorRank.update.mockResolvedValue({
+      ...existing,
+      name: 'Platinum',
+      expiresAfterDays: 90,
+      perks: { extra: true },
+      color: '#gold',
+      badge: 'plat'
+    } as never);
+
+    const res = await request(app)
+      .put('/api/users/donor-ranks/2')
+      .send({
+        name: 'Platinum',
+        minDonation: 2000,
+        expiresAfterDays: 90,
+        perks: { extra: true },
+        color: '#gold',
+        badge: 'plat'
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.badge).toBe('plat');
+  });
+
+  it('returns 404 when the donor rank does not exist', async () => {
+    prismaMock.donorRank.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/users/donor-ranks/2')
+      .send({ name: 'Gold', minDonation: 2000 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 without admin permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app)
+      .put('/api/users/donor-ranks/2')
+      .send({ name: 'Gold', minDonation: 2000 });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('DELETE /api/users/donor-ranks/:rankId', () => {
+  beforeEach(() => setAdmin());
+
+  it('deletes a donor rank and returns 204', async () => {
+    prismaMock.donorRank.findUnique.mockResolvedValue({ id: 2 } as never);
+    prismaMock.donorRank.delete.mockResolvedValue({} as never);
+
+    const res = await request(app).delete('/api/users/donor-ranks/2');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.donorRank.delete).toHaveBeenCalledWith({
+      where: { id: 2 }
+    });
+  });
+
+  it('returns 404 when the donor rank does not exist', async () => {
+    prismaMock.donorRank.findUnique.mockResolvedValue(null);
+    const res = await request(app).delete('/api/users/donor-ranks/2');
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Grant and revoke donor status ────────────────────────────────────────────
+
+describe('POST /api/users/:id/donor', () => {
+  beforeEach(() => setStaff());
+
+  it('grants donor status and returns 201', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(
+      makeUser({ id: 9 }) as never
+    );
+    prismaMock.donorRank.findUnique.mockResolvedValue({ id: 3 } as never);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .post('/api/users/9/donor')
+      .send({ donorRankId: 3 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.msg).toBe('Donor status granted');
+  });
+
+  it('returns 404 when the target user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/users/9/donor')
+      .send({ donorRankId: 3 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when the donor rank does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(makeUser({ id: 9 }) as never);
+    prismaMock.donorRank.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/users/9/donor')
+      .send({ donorRankId: 99 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when donorRankId is missing', async () => {
+    const res = await request(app).post('/api/users/9/donor').send({});
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /api/users/:id/donor', () => {
+  beforeEach(() => setStaff());
+
+  it('revokes donor status and returns 204', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(makeUser({ id: 9 }) as never);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+
+    const res = await request(app).delete('/api/users/9/donor');
+
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 404 when the target user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    const res = await request(app).delete('/api/users/9/donor');
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Staff snatch list ────────────────────────────────────────────────────────
+
+describe('GET /api/users/:id/snatch-list', () => {
+  beforeEach(() => setStaff());
+
+  it('returns the snatch list for a user as staff', async () => {
+    prismaMock.downloadAccessGrant.findMany.mockResolvedValue([
+      {
+        id: 20,
+        consumerId: 9,
+        status: 'COMPLETED',
+        createdAt: new Date('2026-01-01'),
+        contribution: {
+          release: {
+            id: 55,
+            title: 'Dark Side',
+            communityId: 2,
+            artist: { name: 'Pink Floyd' }
+          }
+        }
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/users/9/snatch-list');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].release.title).toBe('Dark Side');
+  });
+
+  it('returns 403 without staff permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    const res = await request(app).get('/api/users/9/snatch-list');
+    expect(res.status).toBe(403);
+  });
+
+  it('returns null artist when release has no artist', async () => {
+    prismaMock.downloadAccessGrant.findMany.mockResolvedValue([
+      {
+        id: 21,
+        consumerId: 9,
+        status: 'COMPLETED',
+        createdAt: new Date('2026-01-01'),
+        contribution: {
+          release: {
+            id: 56,
+            title: 'Various Artists',
+            communityId: 2,
+            artist: null
+          }
+        }
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/users/9/snatch-list');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].artist).toBeNull();
+  });
+});
+
+// ─── Additional branch coverage ───────────────────────────────────────────────
+
+describe('POST /api/users/:id/warn with expiresAt', () => {
+  beforeEach(() => setStaff());
+
+  it('creates a warning with an expiry date', async () => {
+    mockTargetUser();
+    prismaMock.$transaction.mockResolvedValue([
+      {
+        id: 2,
+        userId: 9,
+        warnedById: 7,
+        reason: 'Repeated violations',
+        expiresAt: new Date('2026-12-31'),
+        createdAt: new Date()
+      },
+      makeUser()
+    ] as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .post('/api/users/9/warn')
+      .send({
+        reason: 'Repeated violations',
+        expiresAt: '2026-12-31T00:00:00.000Z'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty('warning');
+  });
+});
+
+describe('PUT /api/users/:id/rank — rank not found', () => {
+  beforeEach(() => setAdmin());
+
+  it('returns 404 when the target rank does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(makeUser({ id: 9 }) as never);
+    prismaMock.userRank.findUnique
+      .mockResolvedValueOnce(makeUserRank({ admin: true, users_edit: true })) // permission check
+      .mockResolvedValueOnce(null); // rank existence check → not found
+
+    const res = await request(app)
+      .put('/api/users/9/rank')
+      .send({ userRankId: 999 });
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Rank not found');
+  });
+
+  it('returns 404 when the target user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/users/9/rank')
+      .send({ userRankId: 2 });
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('User not found');
+  });
+});
+
+describe('POST /api/users/:id/donor with expiresAt', () => {
+  beforeEach(() => setStaff());
+
+  it('grants donor status with an expiry date', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(
+      makeUser({ id: 9 }) as never
+    );
+    prismaMock.donorRank.findUnique.mockResolvedValue({ id: 3 } as never);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .post('/api/users/9/donor')
+      .send({ donorRankId: 3, expiresAt: '2027-01-01T00:00:00.000Z' });
+
+    expect(res.status).toBe(201);
   });
 });
