@@ -47,12 +47,14 @@ jest.mock('./config', () => ({
 }));
 
 import {
+  addBounty,
   createRequest,
   fillRequest,
   unfillRequest,
   deleteRequest,
   listRequests,
-  MINIMUM_BOUNTY
+  MINIMUM_BOUNTY,
+  serializeRequest
 } from './requests';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,6 +184,141 @@ describe('createRequest', () => {
 });
 
 // ─── fillRequest ──────────────────────────────────────────────────────────────
+
+describe('serializeRequest', () => {
+  it('sums bounty totals and stringifies individual amounts', () => {
+    const result = serializeRequest({
+      ...makeRequest(),
+      bounties: [
+        {
+          id: 1,
+          requestId: 10,
+          userId: 1,
+          amount: BigInt('104857600'),
+          createdAt: new Date()
+        },
+        {
+          id: 2,
+          requestId: 10,
+          userId: 2,
+          amount: BigInt('52428800'),
+          createdAt: new Date()
+        }
+      ]
+    } as Parameters<typeof serializeRequest>[0]);
+
+    expect(result.totalBounty).toBe('157286400');
+    expect(result.bounties?.map((b) => b.amount)).toEqual([
+      '104857600',
+      '52428800'
+    ]);
+  });
+});
+
+// ─── addBounty ───────────────────────────────────────────────────────────────
+
+describe('addBounty', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('throws if the added bounty is below minimum', async () => {
+    await expect(addBounty(1, 10, BigInt(1))).rejects.toThrow(AppError);
+  });
+
+  it('throws when request is missing or not open', async () => {
+    mockTx.request.findUnique.mockResolvedValue(null);
+
+    await expect(addBounty(1, 10, MINIMUM_BOUNTY)).rejects.toMatchObject({
+      statusCode: 404
+    });
+  });
+
+  it('throws when user lacks contributed balance', async () => {
+    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.user.findUnique.mockResolvedValue(
+      makeUser({ contributed: BigInt(0) })
+    );
+
+    await expect(addBounty(1, 10, MINIMUM_BOUNTY)).rejects.toMatchObject({
+      statusCode: 400
+    });
+  });
+
+  it('increments an existing bounty and records ledger/action rows', async () => {
+    const updated = makeRequest({
+      bounties: [
+        {
+          id: 3,
+          requestId: 10,
+          userId: 1,
+          amount: BigInt('314572800'),
+          createdAt: new Date(),
+          user: { id: 1, username: 'testuser' }
+        }
+      ]
+    });
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(makeRequest())
+      .mockResolvedValueOnce(updated);
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.requestBounty.findUnique.mockResolvedValue({
+      id: 3,
+      requestId: 10,
+      userId: 1,
+      amount: BigInt('209715200'),
+      createdAt: new Date()
+    });
+    mockTx.requestBounty.update.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    const result = await addBounty(1, 10, MINIMUM_BOUNTY);
+
+    expect(mockTx.requestBounty.update).toHaveBeenCalledWith({
+      where: { id: 3 },
+      data: { amount: { increment: MINIMUM_BOUNTY } }
+    });
+    expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reason: 'REQUEST_VOTE',
+          amount: -MINIMUM_BOUNTY
+        })
+      })
+    );
+    expect(result.totalBounty).toBe('314572800');
+  });
+
+  it('creates a new bounty row when the user has not pledged before', async () => {
+    const updated = makeRequest({
+      bounties: [
+        {
+          id: 4,
+          requestId: 10,
+          userId: 2,
+          amount: MINIMUM_BOUNTY,
+          createdAt: new Date(),
+          user: { id: 2, username: 'other' }
+        }
+      ]
+    });
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(makeRequest())
+      .mockResolvedValueOnce(updated);
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.requestBounty.findUnique.mockResolvedValue(null);
+    mockTx.requestBounty.create.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await addBounty(1, 10, MINIMUM_BOUNTY);
+
+    expect(mockTx.requestBounty.create).toHaveBeenCalledWith({
+      data: { requestId: 10, userId: 1, amount: MINIMUM_BOUNTY }
+    });
+  });
+});
 
 describe('fillRequest', () => {
   beforeEach(() => jest.clearAllMocks());

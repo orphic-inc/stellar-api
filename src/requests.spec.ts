@@ -19,7 +19,15 @@ import { makeRequest } from './test/factories';
 import * as requestModule from './modules/requests';
 import { RequestStatus } from '@prisma/client';
 
-jest.mock('./modules/requests');
+jest.mock('./modules/requests', () => ({
+  ...jest.requireActual('./modules/requests'),
+  createRequest: jest.fn(),
+  addBounty: jest.fn(),
+  fillRequest: jest.fn(),
+  unfillRequest: jest.fn(),
+  deleteRequest: jest.fn(),
+  listRequests: jest.fn()
+}));
 
 const mod = requestModule as jest.Mocked<typeof requestModule>;
 
@@ -296,6 +304,138 @@ describe('POST /api/requests/:id/bounty', () => {
       .send({ amount: '0' });
     expect(res.status).toBe(400);
     expect(mod.addBounty).not.toHaveBeenCalled();
+  });
+
+  it('propagates AppError from addBounty', async () => {
+    const { AppError } = await import('./lib/errors');
+    mod.addBounty.mockRejectedValue(
+      new AppError(400, 'Insufficient upload balance')
+    );
+    const res = await request(app)
+      .post('/api/requests/1/bounty')
+      .send({ amount: '104857600' });
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('Insufficient upload balance');
+  });
+});
+
+describe('GET /api/requests/:id', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('returns 404 when the request is missing', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/requests/999');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns serialized request detail with vote metadata', async () => {
+    prismaMock.request.findUnique.mockResolvedValue({
+      ...makeRequest(),
+      bounties: [
+        {
+          id: 1,
+          requestId: 1,
+          userId: 7,
+          amount: BigInt('104857600'),
+          createdAt: new Date(),
+          user: { id: 7, username: 'testuser' }
+        }
+      ],
+      user: { id: 7, username: 'testuser' },
+      filler: null,
+      community: { id: 1, name: 'Jazz' },
+      artists: [],
+      filledContribution: null,
+      votes: [{ userId: 7 }],
+      voteCount: 1
+    } as never);
+
+    const res = await request(app).get('/api/requests/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalBounty).toBe('104857600');
+    expect(res.body.voteCount).toBe(1);
+    expect(res.body.votes).toEqual([{ userId: 7 }]);
+  });
+});
+
+describe('PUT /api/requests/:id', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('returns 404 when the request does not exist', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).put('/api/requests/1').send({
+      title: 'Updated'
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 422 when editing a non-open request', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ status: RequestStatus.filled, userId: 7 }) as never
+    );
+
+    const res = await request(app).put('/api/requests/1').send({
+      title: 'Updated'
+    });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 403 when a non-owner non-staff edits the request', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ status: RequestStatus.open, userId: 99 }) as never
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app).put('/api/requests/1').send({
+      title: 'Updated'
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('allows owners to update open requests and serializes response', async () => {
+    prismaMock.request.findUnique.mockResolvedValue(
+      makeRequest({ status: RequestStatus.open, userId: 7 }) as never
+    );
+    prismaMock.request.update.mockResolvedValue({
+      ...makeRequest({
+        title: 'Updated',
+        status: RequestStatus.open,
+        userId: 7
+      }),
+      bounties: [
+        {
+          id: 1,
+          requestId: 1,
+          userId: 7,
+          amount: BigInt('104857600'),
+          createdAt: new Date()
+        }
+      ],
+      user: { id: 7, username: 'testuser' }
+    } as never);
+
+    const res = await request(app).put('/api/requests/1').send({
+      title: 'Updated',
+      image: ''
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.request.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { title: 'Updated', image: null },
+      include: {
+        user: { select: { id: true, username: true } },
+        bounties: true
+      }
+    });
+    expect(res.body.totalBounty).toBe('104857600');
   });
 });
 
