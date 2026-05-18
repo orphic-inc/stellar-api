@@ -1,4 +1,10 @@
-import { request, app, resetApiTestState } from './test/apiTestHarness';
+import {
+  request,
+  app,
+  resetApiTestState,
+  prismaMock,
+  makeUserRank
+} from './test/apiTestHarness';
 import * as top10Module from './modules/top10';
 
 jest.mock('./modules/top10', () => ({
@@ -227,6 +233,31 @@ describe('GET /api/top10/history', () => {
     const res = await request(app).get('/api/top10/history');
     expect(res.status).toBe(403);
   });
+
+  it('returns the snapshot with staff permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ staff: true })
+    );
+    const snapshot = { type: 'Daily', date: '2026-01-01', items: [] };
+    top10Mock.getHistorySnapshot.mockResolvedValue(snapshot as never);
+
+    const res = await request(app).get('/api/top10/history?date=2026-01-01');
+
+    expect(res.status).toBe(200);
+    expect(top10Mock.getHistorySnapshot).toHaveBeenCalled();
+  });
+
+  it('returns 404 when no snapshot exists for the date', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ staff: true })
+    );
+    top10Mock.getHistorySnapshot.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/top10/history');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('No snapshot found for this date and type');
+  });
 });
 
 describe('POST /api/top10/snapshot', () => {
@@ -235,5 +266,32 @@ describe('POST /api/top10/snapshot', () => {
   it('requires admin permission', async () => {
     const res = await request(app).post('/api/top10/snapshot');
     expect(res.status).toBe(403);
+  });
+
+  it('creates a Daily snapshot with admin permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    top10Mock.createSnapshot.mockResolvedValue(undefined);
+
+    const res = await request(app).post('/api/top10/snapshot');
+
+    expect(res.status).toBe(200);
+    expect(res.body.msg).toBe('Snapshot created');
+    expect(top10Mock.createSnapshot).toHaveBeenCalledWith('Daily');
+  });
+
+  it('passes Weekly type when body.type is Weekly', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    top10Mock.createSnapshot.mockResolvedValue(undefined);
+
+    const res = await request(app)
+      .post('/api/top10/snapshot')
+      .send({ type: 'Weekly' });
+
+    expect(res.status).toBe(200);
+    expect(top10Mock.createSnapshot).toHaveBeenCalledWith('Weekly');
   });
 });
