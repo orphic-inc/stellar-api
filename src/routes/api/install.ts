@@ -2,16 +2,24 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
-import { auth as authConfig } from '../../modules/config';
+import {
+  auth as authConfig,
+  http as httpConfig,
+  email as emailConfig
+} from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 import { getSettings } from '../../modules/settings';
+import { seedRanks, seedForums } from '../../modules/bootstrap';
+import { createTicket } from '../../modules/staffPm';
+import { AppError } from '../../lib/errors';
 
 const TOKEN_TTL_SECONDS = 3600;
+const STARTUP_BUFFER = 5_368_709_120n; // 5 GiB — matches self-registration buffer
+
 const issueToken = (userId: number): Promise<string> =>
   new Promise((resolve, reject) => {
     jwt.sign(
@@ -26,72 +34,48 @@ const issueToken = (userId: number): Promise<string> =>
     );
   });
 
+function getConfigWarnings(): string[] {
+  const warnings: string[] = [];
+  if (httpConfig.corsOrigin === 'http://localhost:3000') {
+    warnings.push(
+      'STELLAR_HTTP_CORS_ORIGIN is not set or uses the development default. Update this to your frontend URL before going live.'
+    );
+  }
+  if (emailConfig.siteUrl === 'http://localhost:3000') {
+    warnings.push(
+      'STELLAR_SITE_URL is not set or uses the development default. Update this before going live.'
+    );
+  }
+  if (!emailConfig.smtpHost) {
+    warnings.push(
+      'SMTP is not configured (STELLAR_SMTP_HOST is unset). Invite emails will not be delivered.'
+    );
+  }
+  return warnings;
+}
+
+const SETUP_MESSAGE_SUBJECT =
+  'Welcome to Stellar — Pre-launch Configuration Checklist';
+
+const SETUP_MESSAGE_BODY = `Your Stellar instance has been installed. Before opening registration to the public, review the following checklist.
+
+**Database-stored settings** (Admin → Site Settings):
+- registrationStatus — currently "open". Set to "closed" or "invite" until you are ready for users.
+- maxUsers — adjust to match your planned capacity (default: 7000).
+- approvedDomains — leave empty to allow all email domains, or restrict to specific domains for invite-only registration.
+
+**Environment variables** (set in your deployment config or .env file):
+- STELLAR_AUTH_JWT_SECRET — must be a strong, unique secret. Never use the development default in production.
+- STELLAR_PSQL_URI — confirm this points to your production database.
+- STELLAR_HTTP_CORS_ORIGIN — set to your frontend URL (e.g., https://yoursite.com).
+- STELLAR_SITE_URL — set to your canonical site URL; used in invite email links.
+- STELLAR_SMTP_HOST / STELLAR_SMTP_USER / STELLAR_SMTP_PASS / STELLAR_SMTP_FROM — required if invite emails are expected to work.
+
+You can dismiss this ticket once configuration is complete.`;
+
 const router = express.Router();
 
-// Ranks seeded on first install, in level order (lowest first so default registration rank exists)
-const DEFAULT_RANKS = [
-  {
-    level: 100,
-    name: 'User',
-    color: '',
-    badge: '',
-    permissions: {
-      forums_read: true,
-      forums_post: true
-    }
-  },
-  {
-    level: 200,
-    name: 'Power User',
-    color: '#e2a822',
-    badge: '',
-    permissions: {
-      forums_read: true,
-      forums_post: true
-    }
-  },
-  {
-    level: 500,
-    name: 'Staff',
-    color: '#e22a2a',
-    badge: '',
-    permissions: {
-      forums_read: true,
-      forums_post: true,
-      forums_moderate: true,
-      forums_manage: true,
-      communities_manage: true,
-      news_manage: true,
-      invites_manage: true,
-      users_edit: true,
-      users_warn: true,
-      users_disable: true,
-      staff: true
-    }
-  },
-  {
-    level: 1000,
-    name: 'SysOp',
-    color: '#a0d468',
-    badge: '',
-    permissions: {
-      forums_read: true,
-      forums_post: true,
-      forums_moderate: true,
-      forums_manage: true,
-      communities_manage: true,
-      news_manage: true,
-      invites_manage: true,
-      users_edit: true,
-      users_warn: true,
-      users_disable: true,
-      staff: true,
-      admin: true
-    }
-  }
-];
-
-// GET /api/install — returns installation status and public site config
+// GET /api/install — installation status and live environment warnings
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
@@ -102,12 +86,13 @@ router.get(
     ]);
     res.json({
       installed: rankCount > 0 && userCount > 0,
-      registrationStatus: settings.registrationStatus
+      registrationStatus: settings.registrationStatus,
+      configWarnings: getConfigWarnings()
     });
   })
 );
 
-// POST /api/install — one-time setup: seed ranks and create first SysOp user
+// POST /api/install — one-time setup: seed ranks/forums and create first SysOp
 router.post(
   '/',
   installLimiter,
@@ -120,78 +105,66 @@ router.post(
     const { username, email, password } = parsedBody<InstallInput>(res);
 
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ email }, { username }] }
+      where: { OR: [{ email: email.toLowerCase() }, { username }] }
     });
     if (existing) return res.status(400).json({ msg: 'User already exists' });
 
+    // Bootstrap ranks and forums outside the user transaction so they exist
+    // even if user creation fails, and so the transaction stays minimal.
+    await seedRanks(prisma);
+    await seedForums(prisma);
+
+    const sysopRank = await prisma.userRank.findFirst({
+      where: { level: 1000 }
+    });
+    if (!sysopRank)
+      throw new AppError(
+        500,
+        'SysOp rank missing after bootstrap — run db:seed'
+      );
+
     const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(
+      password,
+      await bcrypt.genSalt(10)
+    );
 
-    const user = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        // Ranks may already exist if the seed ran after a DB reset
-        let sysopRankId: number | null = null;
-        const existingRanks = await tx.userRank.count();
-        if (existingRanks === 0) {
-          for (const rank of DEFAULT_RANKS) {
-            const created = await tx.userRank.create({ data: rank });
-            if (rank.level === 1000) sysopRankId = created.id;
-          }
-        } else {
-          const sysop = await tx.userRank.findFirst({ where: { level: 1000 } });
-          sysopRankId = sysop?.id ?? null;
-        }
-
-        const systemCategory = await tx.forumCategory.create({
-          data: { name: 'System', sort: 0 }
-        });
-        await tx.forum.create({
-          data: {
-            forumCategoryId: systemCategory.id,
-            sort: 0,
-            name: 'Trash',
-            description: 'Holds topics from deleted forums.',
-            isTrash: true,
-            minClassRead: 500,
-            minClassWrite: 500,
-            minClassCreate: 500
-          }
-        });
-
-        const settings = await tx.userSettings.create({ data: {} });
-        const profile = await tx.profile.create({ data: {} });
-        return tx.user.create({
-          data: {
-            username,
-            email,
-            password: hashedPassword,
-            avatar,
-            userRankId: sysopRankId!,
-            userSettingsId: settings.id,
-            profileId: profile.id,
-            inviteCount: 100
-          },
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            avatar: true,
-            inviteCount: true,
-            dateRegistered: true,
-            userRank: {
-              select: {
-                level: true,
-                name: true,
-                color: true,
-                badge: true,
-                permissions: true
-              }
+    const user = await prisma.$transaction(async (tx) => {
+      const settings = await tx.userSettings.create({ data: {} });
+      const profile = await tx.profile.create({ data: {} });
+      return tx.user.create({
+        data: {
+          username,
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          avatar,
+          userRankId: sysopRank.id,
+          userSettingsId: settings.id,
+          profileId: profile.id,
+          inviteCount: 100,
+          contributed: STARTUP_BUFFER
+        },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          avatar: true,
+          inviteCount: true,
+          dateRegistered: true,
+          userRank: {
+            select: {
+              level: true,
+              name: true,
+              color: true,
+              badge: true,
+              permissions: true
             }
           }
-        });
-      }
-    );
+        }
+      });
+    });
+
+    await createTicket(user.id, SETUP_MESSAGE_SUBJECT, SETUP_MESSAGE_BODY);
 
     const token = await issueToken(user.id);
     res.cookie('token', token, {

@@ -2,10 +2,47 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock
+  prismaMock,
+  staffPmMock
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
+
+// Shared mock setup for a successful install with pre-seeded ranks/forums.
+// seedRanks/seedForums both no-op when counts > 0.
+function mockPreseededBootstrap() {
+  prismaMock.userRank.count.mockResolvedValue(4);
+  prismaMock.forumCategory.count.mockResolvedValue(7);
+  prismaMock.userRank.findFirst.mockResolvedValue({
+    id: 13,
+    level: 1000
+  } as never);
+}
+
+function mockSysopTransaction() {
+  prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) => {
+    const tx = prismaMock;
+    tx.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
+    tx.profile.create.mockResolvedValueOnce({ id: 5 } as never);
+    tx.user.create.mockResolvedValueOnce({
+      id: 1,
+      username: 'sysop',
+      email: 'sysop@example.com',
+      avatar: 'https://gravatar.test/avatar.png',
+      inviteCount: 100,
+      dateRegistered: new Date().toISOString(),
+      userRank: {
+        level: 1000,
+        name: 'SysOp',
+        color: '#a0d468',
+        badge: '',
+        permissions: { admin: true }
+      }
+    } as never);
+    return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
+  });
+  staffPmMock.createTicket.mockResolvedValue({} as never);
+}
 
 // ─── GET /api/install ─────────────────────────────────────────────────────────
 
@@ -29,6 +66,16 @@ describe('GET /api/install', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.installed).toBe(false);
+  });
+
+  it('includes configWarnings in the response', async () => {
+    prismaMock.userRank.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/install');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.configWarnings)).toBe(true);
   });
 });
 
@@ -63,36 +110,8 @@ describe('POST /api/install', () => {
   it('creates the first SysOp user and returns a JWT cookie', async () => {
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
-
-    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) => {
-      const tx = prismaMock;
-      tx.userRank.count.mockResolvedValueOnce(0);
-      tx.userRank.create
-        .mockResolvedValueOnce({ id: 10, level: 100 } as never)
-        .mockResolvedValueOnce({ id: 11, level: 200 } as never)
-        .mockResolvedValueOnce({ id: 12, level: 500 } as never)
-        .mockResolvedValueOnce({ id: 13, level: 1000 } as never);
-      tx.forumCategory.create.mockResolvedValueOnce({ id: 1 } as never);
-      tx.forum.create.mockResolvedValueOnce({ id: 1 } as never);
-      tx.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
-      tx.profile.create.mockResolvedValueOnce({ id: 5 } as never);
-      tx.user.create.mockResolvedValueOnce({
-        id: 1,
-        username: 'sysop',
-        email: 'sysop@example.com',
-        avatar: 'https://gravatar.test/avatar.png',
-        inviteCount: 100,
-        dateRegistered: new Date().toISOString(),
-        userRank: {
-          level: 1000,
-          name: 'SysOp',
-          color: '#a0d468',
-          badge: '',
-          permissions: { admin: true }
-        }
-      } as never);
-      return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
-    });
+    mockPreseededBootstrap();
+    mockSysopTransaction();
 
     const res = await request(app).post('/api/install').send({
       username: 'sysop',
@@ -107,35 +126,28 @@ describe('POST /api/install', () => {
     );
   });
 
-  it('uses existing ranks when they were pre-seeded', async () => {
+  it('seeds ranks and forums on a completely fresh DB', async () => {
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
 
-    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) => {
-      const tx = prismaMock;
-      tx.userRank.count.mockResolvedValueOnce(4);
-      tx.userRank.findFirst.mockResolvedValueOnce({ id: 13 } as never);
-      tx.forumCategory.create.mockResolvedValueOnce({ id: 1 } as never);
-      tx.forum.create.mockResolvedValueOnce({ id: 1 } as never);
-      tx.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
-      tx.profile.create.mockResolvedValueOnce({ id: 5 } as never);
-      tx.user.create.mockResolvedValueOnce({
-        id: 1,
-        username: 'sysop',
-        email: 'sysop@example.com',
-        avatar: 'https://gravatar.test/avatar.png',
-        inviteCount: 100,
-        dateRegistered: new Date().toISOString(),
-        userRank: {
-          level: 1000,
-          name: 'SysOp',
-          color: '#a0d468',
-          badge: '',
-          permissions: { admin: true }
-        }
-      } as never);
-      return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
-    });
+    // seedRanks: no existing ranks → creates 4
+    prismaMock.userRank.count.mockResolvedValue(0);
+    prismaMock.userRank.create
+      .mockResolvedValueOnce({ id: 10, level: 100 } as never)
+      .mockResolvedValueOnce({ id: 11, level: 200 } as never)
+      .mockResolvedValueOnce({ id: 12, level: 500 } as never)
+      .mockResolvedValueOnce({ id: 13, level: 1000 } as never);
+
+    // seedForums: no existing categories → creates them
+    prismaMock.forumCategory.count.mockResolvedValue(0);
+    prismaMock.forumCategory.create.mockResolvedValue({ id: 1 } as never);
+    prismaMock.forum.create.mockResolvedValue({ id: 1 } as never);
+
+    prismaMock.userRank.findFirst.mockResolvedValue({
+      id: 13,
+      level: 1000
+    } as never);
+    mockSysopTransaction();
 
     const res = await request(app).post('/api/install').send({
       username: 'sysop',
@@ -144,6 +156,63 @@ describe('POST /api/install', () => {
     });
 
     expect(res.status).toBe(201);
+    expect(prismaMock.userRank.create).toHaveBeenCalledTimes(4);
+    expect(prismaMock.forumCategory.create).toHaveBeenCalled();
+  });
+
+  it('skips seeding when ranks and forums already exist', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
     expect(prismaMock.userRank.create).not.toHaveBeenCalled();
+    expect(prismaMock.forumCategory.create).not.toHaveBeenCalled();
+  });
+
+  it('assigns the 5 GiB startup buffer to the SysOp user', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contributed: 5_368_709_120n
+        })
+      })
+    );
+  });
+
+  it('creates a post-install staff inbox message for the SysOp', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    expect(staffPmMock.createTicket).toHaveBeenCalledWith(
+      1,
+      expect.stringContaining('Pre-launch Configuration Checklist'),
+      expect.any(String)
+    );
   });
 });
