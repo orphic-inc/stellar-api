@@ -373,6 +373,30 @@ describe('DELETE /api/comments/:id', () => {
   });
 });
 
+// ─── POST /api/comments — keyCount invariant ─────────────────────────────────
+
+describe('POST /api/comments — exactly-one target id invariant', () => {
+  it('returns 400 when no target id is provided (keyCount = 0)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'communities',
+      body: 'test'
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when multiple target ids are provided (keyCount > 1)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'contributions',
+      body: 'test',
+      contributionId: 1,
+      requestId: 2
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+});
+
 // ─── POST /api/comments — cross-page ID validation ───────────────────────────
 // Each test sends exactly one foreign-key ID but for a mismatched page type,
 // exercising the per-page superRefine branches (lines 46, 54, 62, 73, 81
