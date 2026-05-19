@@ -250,6 +250,7 @@ export function makeComment(overrides: Partial<Comment> = {}): Comment {
     artistId: null,
     communityId: null,
     contributionId: null,
+    requestId: null,
     releaseId: null,
     collageId: null,
     createdAt: new Date(),

@@ -88,6 +88,7 @@ enum ReleaseCategory {
 enum CommentPage {
   artist
   collages
+  contributions
   requests
   communities
   release
@@ -862,6 +863,8 @@ model Comment {
   community      Community?    @relation(fields: [communityId], references: [id])
   contributionId Int?
   contribution   Contribution? @relation(fields: [contributionId], references: [id])
+  requestId      Int?
+  request        Request?      @relation(fields: [requestId], references: [id])
   releaseId      Int?
   release        Release?      @relation(fields: [releaseId], references: [id])
   collageId      Int?
@@ -871,6 +874,7 @@ model Comment {
 
   @@index([page, communityId])
   @@index([page, contributionId])
+  @@index([page, requestId])
   @@index([page, artistId])
   @@index([page, releaseId])
   @@index([page, collageId])
@@ -1088,6 +1092,7 @@ model Request {
   fills     RequestFill[]
   votes     RequestVote[]
   bookmarks BookmarkRequest[]
+  comments  Comment[]
   voteCount Int              @default(0)
 
   createdAt DateTime  @default(now())

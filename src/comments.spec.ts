@@ -63,14 +63,27 @@ describe('GET /api/comments', () => {
     expect(call?.where).toMatchObject({ page: 'collages', collageId: 2 });
   });
 
+  it('filters by contributions page and pageId', async () => {
+    prismaMock.comment.findMany.mockResolvedValue([]);
+    prismaMock.comment.count.mockResolvedValue(0);
+
+    await request(app).get('/api/comments?page=contributions&pageId=1');
+
+    const call = prismaMock.comment.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({
+      page: 'contributions',
+      contributionId: 1
+    });
+  });
+
   it('filters by requests page and pageId', async () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=requests&pageId=1');
+    await request(app).get('/api/comments?page=requests&pageId=4');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
-    expect(call?.where).toMatchObject({ page: 'requests', contributionId: 1 });
+    expect(call?.where).toMatchObject({ page: 'requests', requestId: 4 });
   });
 
   it('filters by release page and pageId', async () => {
@@ -176,6 +189,58 @@ describe('POST /api/comments', () => {
         data: expect.objectContaining({
           page: 'release',
           releaseId: 9
+        })
+      })
+    );
+  });
+
+  it('persists contribution comments with the matching foreign key', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({
+        id: 22,
+        page: 'contributions' as never,
+        contributionId: 11
+      }) as never
+    );
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'contributions',
+      body: 'Helpful contribution.',
+      contributionId: 11
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.comment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          page: 'contributions',
+          contributionId: 11
+        })
+      })
+    );
+  });
+
+  it('persists request comments with the matching foreign key', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({
+        id: 23,
+        page: 'requests' as never,
+        requestId: 14
+      }) as never
+    );
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'requests',
+      body: 'Please fill this.',
+      requestId: 14
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.comment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          page: 'requests',
+          requestId: 14
         })
       })
     );
