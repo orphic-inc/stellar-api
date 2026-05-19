@@ -124,7 +124,7 @@ describe('POST /api/requests', () => {
   it('propagates AppError from module', async () => {
     const { AppError } = await import('./lib/errors');
     mod.createRequest.mockRejectedValue(
-      new AppError(400, 'Insufficient upload balance')
+      new AppError(400, 'Insufficient contributed balance')
     );
     const res = await request(app).post('/api/requests').send({
       communityId: 1,
@@ -134,7 +134,7 @@ describe('POST /api/requests', () => {
       bounty: '104857600'
     });
     expect(res.status).toBe(400);
-    expect(res.body.msg).toBe('Insufficient upload balance');
+    expect(res.body.msg).toBe('Insufficient contributed balance');
   });
 });
 
@@ -309,13 +309,13 @@ describe('POST /api/requests/:id/bounty', () => {
   it('propagates AppError from addBounty', async () => {
     const { AppError } = await import('./lib/errors');
     mod.addBounty.mockRejectedValue(
-      new AppError(400, 'Insufficient upload balance')
+      new AppError(400, 'Insufficient contributed balance')
     );
     const res = await request(app)
       .post('/api/requests/1/bounty')
       .send({ amount: '104857600' });
     expect(res.status).toBe(400);
-    expect(res.body.msg).toBe('Insufficient upload balance');
+    expect(res.body.msg).toBe('Insufficient contributed balance');
   });
 });
 

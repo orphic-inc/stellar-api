@@ -132,7 +132,7 @@ describe('createRequest', () => {
         image: undefined,
         bounty: MINIMUM_BOUNTY
       })
-    ).rejects.toThrow('Insufficient upload balance');
+    ).rejects.toThrow('Insufficient contributed balance');
   });
 
   it('creates request, ledger row, and audit action in one transaction', async () => {

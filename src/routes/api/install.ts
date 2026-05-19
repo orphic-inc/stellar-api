@@ -14,8 +14,8 @@ import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 import { getSettings } from '../../modules/settings';
 import { seedRanks, seedForums } from '../../modules/bootstrap';
-import { createTicket } from '../../modules/staffPm';
 import { AppError } from '../../lib/errors';
+import { authUserSelect, toAuthUser } from '../../modules/auth';
 
 const TOKEN_TTL_SECONDS = 3600;
 const STARTUP_BUFFER = 5_368_709_120n; // 5 GiB — matches self-registration buffer
@@ -54,24 +54,33 @@ function getConfigWarnings(): string[] {
   return warnings;
 }
 
-const SETUP_MESSAGE_SUBJECT =
-  'Welcome to Stellar — Pre-launch Configuration Checklist';
+function getSetupChecklist(settings: {
+  registrationStatus: 'open' | 'invite' | 'closed';
+  maxUsers: number;
+  approvedDomains: string[];
+}): string[] {
+  const checklist: string[] = [];
 
-const SETUP_MESSAGE_BODY = `Your Stellar instance has been installed. Before opening registration to the public, review the following checklist.
+  if (settings.registrationStatus === 'open') {
+    checklist.push(
+      'registrationStatus is still "open". Switch it to "closed" or "invite" until you are ready for public launch.'
+    );
+  }
 
-**Database-stored settings** (Admin → Site Settings):
-- registrationStatus — currently "open". Set to "closed" or "invite" until you are ready for users.
-- maxUsers — adjust to match your planned capacity (default: 7000).
-- approvedDomains — leave empty to allow all email domains, or restrict to specific domains for invite-only registration.
+  if (settings.maxUsers === 7000) {
+    checklist.push(
+      'maxUsers is still the default value (7000). Review and set a launch-ready capacity limit.'
+    );
+  }
 
-**Environment variables** (set in your deployment config or .env file):
-- STELLAR_AUTH_JWT_SECRET — must be a strong, unique secret. Never use the development default in production.
-- STELLAR_PSQL_URI — confirm this points to your production database.
-- STELLAR_HTTP_CORS_ORIGIN — set to your frontend URL (e.g., https://yoursite.com).
-- STELLAR_SITE_URL — set to your canonical site URL; used in invite email links.
-- STELLAR_SMTP_HOST / STELLAR_SMTP_USER / STELLAR_SMTP_PASS / STELLAR_SMTP_FROM — required if invite emails are expected to work.
+  if (settings.approvedDomains.length === 0) {
+    checklist.push(
+      'approvedDomains is empty. Leave it unrestricted only if you intentionally want to allow all email domains.'
+    );
+  }
 
-You can dismiss this ticket once configuration is complete.`;
+  return [...checklist, ...getConfigWarnings()];
+}
 
 const router = express.Router();
 
@@ -87,7 +96,8 @@ router.get(
     res.json({
       installed: rankCount > 0 && userCount > 0,
       registrationStatus: settings.registrationStatus,
-      configWarnings: getConfigWarnings()
+      configWarnings: getConfigWarnings(),
+      setupChecklist: getSetupChecklist(settings)
     });
   })
 );
@@ -129,7 +139,7 @@ router.post(
       await bcrypt.genSalt(10)
     );
 
-    const user = await prisma.$transaction(async (tx) => {
+    const rawUser = await prisma.$transaction(async (tx) => {
       const settings = await tx.userSettings.create({ data: {} });
       const profile = await tx.profile.create({ data: {} });
       return tx.user.create({
@@ -144,36 +154,18 @@ router.post(
           inviteCount: 100,
           contributed: STARTUP_BUFFER
         },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          avatar: true,
-          inviteCount: true,
-          dateRegistered: true,
-          userRank: {
-            select: {
-              level: true,
-              name: true,
-              color: true,
-              badge: true,
-              permissions: true
-            }
-          }
-        }
+        select: authUserSelect
       });
     });
 
-    await createTicket(user.id, SETUP_MESSAGE_SUBJECT, SETUP_MESSAGE_BODY);
-
-    const token = await issueToken(user.id);
+    const token = await issueToken(rawUser.id);
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: TOKEN_TTL_SECONDS * 1000
     });
-    res.status(201).json({ user });
+    res.status(201).json({ user: toAuthUser(rawUser) });
   })
 );
 

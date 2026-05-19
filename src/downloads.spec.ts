@@ -48,11 +48,11 @@ describe('POST /api/contributions/:id/access', () => {
 
   it('returns 400 on insufficient balance from module', async () => {
     grantDownloadAccessMock.mockRejectedValue(
-      new AppError(400, 'Insufficient upload balance')
+      new AppError(400, 'Insufficient contributed balance')
     );
     const res = await request(app).post('/api/contributions/5/access').send({});
     expect(res.status).toBe(400);
-    expect(res.body.msg).toBe('Insufficient upload balance');
+    expect(res.body.msg).toBe('Insufficient contributed balance');
   });
 
   it('returns 403 when canDownload is disabled', async () => {

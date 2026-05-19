@@ -258,6 +258,9 @@ describe('API auth/profile/user flows', () => {
         isDonor: false,
         canDownload: true,
         inviteCount: 0,
+        contributed: BigInt(0),
+        consumed: BigInt(0),
+        ratio: 0,
         dateRegistered: '2026-04-24T00:00:00.000Z',
         lastLogin: '2026-04-24T00:00:00.000Z',
         userRank: {
@@ -274,6 +277,8 @@ describe('API auth/profile/user flows', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.username).toBe('kai');
+    expect(res.body.contributed).toBe('0');
+    expect(res.body.consumed).toBe('0');
   });
 
   it('returns 401 from /api/auth when the authenticated user no longer exists', async () => {
