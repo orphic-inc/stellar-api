@@ -90,7 +90,7 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'User not found');
     if (user.contributed < input.bounty) {
-      throw new AppError(400, 'Insufficient upload balance');
+      throw new AppError(400, 'Insufficient contributed balance');
     }
 
     await tx.user.update({
@@ -161,7 +161,7 @@ export async function addBounty(
 
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user || user.contributed < amount) {
-      throw new AppError(400, 'Insufficient upload balance');
+      throw new AppError(400, 'Insufficient contributed balance');
     }
 
     await tx.user.update({

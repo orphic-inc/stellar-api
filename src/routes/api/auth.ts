@@ -31,7 +31,8 @@ import {
   authUserSelect,
   registerUser,
   loginUser,
-  isPasswordBanned
+  isPasswordBanned,
+  toAuthUser
 } from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
 import { z } from 'zod';
@@ -156,7 +157,7 @@ router.get(
       select: authUserSelect
     });
     if (!user) return res.status(401).json({ msg: 'Unauthorized' });
-    res.json(user);
+    res.json(toAuthUser(user));
   })
 );
 

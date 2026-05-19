@@ -81,7 +81,7 @@ export const grantDownloadAccess = async (
     }
 
     if (consumer.contributed < cost)
-      throw new AppError(400, 'Insufficient upload balance');
+      throw new AppError(400, 'Insufficient contributed balance');
 
     // CAS: atomically debit consumer's balance and update cached ratio
     const newConsumed = consumer.consumed + cost;

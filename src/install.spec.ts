@@ -2,8 +2,7 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock,
-  staffPmMock
+  prismaMock
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
@@ -29,8 +28,15 @@ function mockSysopTransaction() {
       username: 'sysop',
       email: 'sysop@example.com',
       avatar: 'https://gravatar.test/avatar.png',
+      isArtist: false,
+      isDonor: false,
+      canDownload: true,
       inviteCount: 100,
-      dateRegistered: new Date().toISOString(),
+      dateRegistered: new Date(),
+      lastLogin: null,
+      contributed: 5_368_709_120n,
+      consumed: 0n,
+      ratio: 0,
       userRank: {
         level: 1000,
         name: 'SysOp',
@@ -41,7 +47,6 @@ function mockSysopTransaction() {
     } as never);
     return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
   });
-  staffPmMock.createTicket.mockResolvedValue({} as never);
 }
 
 // ─── GET /api/install ─────────────────────────────────────────────────────────
@@ -76,6 +81,22 @@ describe('GET /api/install', () => {
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.configWarnings)).toBe(true);
+  });
+
+  it('includes setupChecklist items for unresolved launch configuration', async () => {
+    prismaMock.userRank.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/install');
+
+    expect(res.status).toBe(200);
+    expect(res.body.setupChecklist).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('registrationStatus is still "open"'),
+        expect.stringContaining('maxUsers is still the default value'),
+        expect.stringContaining('approvedDomains is empty')
+      ])
+    );
   });
 });
 
@@ -124,6 +145,24 @@ describe('POST /api/install', () => {
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([expect.stringContaining('token=signed-jwt')])
     );
+  });
+
+  it('returns a complete auth user with canDownload and contributed in the response', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    const res = await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.user.canDownload).toBe(true);
+    expect(res.body.user.contributed).toBe('5368709120');
+    expect(res.body.user.consumed).toBe('0');
   });
 
   it('seeds ranks and forums on a completely fresh DB', async () => {
@@ -194,25 +233,6 @@ describe('POST /api/install', () => {
           contributed: 5_368_709_120n
         })
       })
-    );
-  });
-
-  it('creates a post-install staff inbox message for the SysOp', async () => {
-    prismaMock.user.count.mockResolvedValue(0);
-    prismaMock.user.findFirst.mockResolvedValue(null);
-    mockPreseededBootstrap();
-    mockSysopTransaction();
-
-    await request(app).post('/api/install').send({
-      username: 'sysop',
-      email: 'sysop@example.com',
-      password: 'secure-password-123'
-    });
-
-    expect(staffPmMock.createTicket).toHaveBeenCalledWith(
-      1,
-      expect.stringContaining('Pre-launch Configuration Checklist'),
-      expect.any(String)
     );
   });
 });

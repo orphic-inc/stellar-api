@@ -216,7 +216,8 @@ registry.registerPath({
           schema: z.object({
             installed: z.boolean(),
             registrationStatus: z.enum(['open', 'invite', 'closed']),
-            configWarnings: z.array(z.string())
+            configWarnings: z.array(z.string()),
+            setupChecklist: z.array(z.string())
           })
         }
       }
