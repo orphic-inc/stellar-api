@@ -42,7 +42,9 @@ router.get(
       if (page === CommentPage.communities) where.communityId = pageId;
       else if (page === CommentPage.artist) where.artistId = pageId;
       else if (page === CommentPage.collages) where.collageId = pageId;
-      else if (page === CommentPage.requests) where.contributionId = pageId;
+      else if (page === CommentPage.contributions)
+        where.contributionId = pageId;
+      else if (page === CommentPage.requests) where.requestId = pageId;
       else if (page === CommentPage.release) where.releaseId = pageId;
     }
 
@@ -92,6 +94,7 @@ router.post(
       body,
       communityId,
       contributionId,
+      requestId,
       artistId,
       releaseId,
       collageId
@@ -104,6 +107,7 @@ router.post(
         authorId: req.user.id,
         ...(communityId && { communityId }),
         ...(contributionId && { contributionId }),
+        ...(requestId && { requestId }),
         ...(artistId && { artistId }),
         ...(releaseId && { releaseId }),
         ...(collageId && { collageId })

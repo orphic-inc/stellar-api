@@ -18,6 +18,7 @@ export const createCommentSchema = z
     body: z.string().min(1, 'Body is required'),
     communityId: pageIdSchema.optional(),
     contributionId: pageIdSchema.optional(),
+    requestId: pageIdSchema.optional(),
     artistId: pageIdSchema.optional(),
     releaseId: pageIdSchema.optional(),
     collageId: pageIdSchema.optional()
@@ -26,6 +27,7 @@ export const createCommentSchema = z
     const keyCount = [
       value.communityId,
       value.contributionId,
+      value.requestId,
       value.artistId,
       value.releaseId,
       value.collageId
@@ -67,13 +69,21 @@ export const createCommentSchema = z
     }
 
     if (
-      value.page === CommentPage.requests &&
+      value.page === CommentPage.contributions &&
       value.contributionId === undefined
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'contributionId is required for request comments',
+        message: 'contributionId is required for contribution comments',
         path: ['contributionId']
+      });
+    }
+
+    if (value.page === CommentPage.requests && value.requestId === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'requestId is required for request comments',
+        path: ['requestId']
       });
     }
 
