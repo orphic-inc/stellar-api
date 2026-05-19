@@ -117,7 +117,8 @@ export const createUser = async (
         avatar: '',
         userRankId: rankId,
         userSettingsId: settings.id,
-        profileId: profile.id
+        profileId: profile.id,
+        contributed: 5_368_709_120n // 5 GiB startup buffer
       },
       select: { id: true, username: true, email: true }
     });

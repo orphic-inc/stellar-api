@@ -215,7 +215,8 @@ registry.registerPath({
         'application/json': {
           schema: z.object({
             installed: z.boolean(),
-            registrationStatus: z.enum(['open', 'invite', 'closed'])
+            registrationStatus: z.enum(['open', 'invite', 'closed']),
+            configWarnings: z.array(z.string())
           })
         }
       }
