@@ -2,6 +2,7 @@ import { ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
+import { computeRatio } from './ratio';
 import { CreateRequestInput } from '../schemas/requests';
 
 export const MINIMUM_BOUNTY = BigInt(economy.minimumBounty);
@@ -89,13 +90,18 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'User not found');
-    if (user.contributed < input.bounty) {
+    if (user.contributed - user.consumed < input.bounty) {
       throw new AppError(400, 'Insufficient contributed balance');
     }
 
+    const newConsumed = user.consumed + input.bounty;
+    const newRatio = computeRatio(user.totalEarned, newConsumed);
     await tx.user.update({
       where: { id: userId },
-      data: { contributed: { decrement: input.bounty } }
+      data: {
+        consumed: { increment: input.bounty },
+        ratio: newRatio
+      }
     });
 
     const request = await tx.request.create({
@@ -160,13 +166,18 @@ export async function addBounty(
     if (!request) throw new AppError(404, 'Request not found or not open');
 
     const user = await tx.user.findUnique({ where: { id: userId } });
-    if (!user || user.contributed < amount) {
+    if (!user || user.contributed - user.consumed < amount) {
       throw new AppError(400, 'Insufficient contributed balance');
     }
 
+    const newConsumed = user.consumed + amount;
+    const newRatio = computeRatio(user.totalEarned, newConsumed);
     await tx.user.update({
       where: { id: userId },
-      data: { contributed: { decrement: amount } }
+      data: {
+        consumed: { increment: amount },
+        ratio: newRatio
+      }
     });
 
     await tx.economyTransaction.create({
@@ -296,9 +307,21 @@ export async function fillRequest(
     }
 
     if (totalBounty > BigInt(0)) {
+      const filler = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { consumed: true, totalEarned: true }
+      });
+      const newFillerRatio = computeRatio(
+        filler.totalEarned + totalBounty,
+        filler.consumed
+      );
       await tx.user.update({
         where: { id: userId },
-        data: { contributed: { increment: totalBounty } }
+        data: {
+          contributed: { increment: totalBounty },
+          totalEarned: { increment: totalBounty },
+          ratio: newFillerRatio
+        }
       });
 
       await tx.economyTransaction.create({
@@ -369,9 +392,22 @@ export async function unfillRequest(
     );
 
     if (totalBounty > BigInt(0)) {
+      const filler = await tx.user.findUniqueOrThrow({
+        where: { id: request.fillerId },
+        select: { consumed: true, totalEarned: true }
+      });
+      const clawedEarned =
+        filler.totalEarned >= totalBounty
+          ? filler.totalEarned - totalBounty
+          : 0n;
+      const newFillerRatio = computeRatio(clawedEarned, filler.consumed);
       await tx.user.update({
         where: { id: request.fillerId },
-        data: { contributed: { decrement: totalBounty } }
+        data: {
+          contributed: { decrement: totalBounty },
+          totalEarned: { decrement: totalBounty },
+          ratio: newFillerRatio
+        }
       });
 
       await tx.economyTransaction.create({
@@ -439,9 +475,19 @@ export async function deleteRequest(
     // Refund bounties only for open requests (bounty not yet disbursed)
     if (request.status === 'open') {
       for (const bounty of request.bounties) {
+        const user = await tx.user.findUniqueOrThrow({
+          where: { id: bounty.userId },
+          select: { consumed: true, totalEarned: true }
+        });
+        const refundedConsumed =
+          user.consumed >= bounty.amount ? user.consumed - bounty.amount : 0n;
+        const refundedRatio = computeRatio(user.totalEarned, refundedConsumed);
         await tx.user.update({
           where: { id: bounty.userId },
-          data: { contributed: { increment: bounty.amount } }
+          data: {
+            consumed: { decrement: bounty.amount },
+            ratio: refundedRatio
+          }
         });
         await tx.economyTransaction.create({
           data: {

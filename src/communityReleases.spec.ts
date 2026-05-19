@@ -328,11 +328,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/vote', () => {
   it('upserts the vote and returns aggregate state', async () => {
     prismaMock.release.findUnique.mockResolvedValue({ id: 3 } as never);
     prismaMock.releaseVote.upsert.mockResolvedValue({} as never);
-    prismaMock.releaseVote.aggregate.mockResolvedValue({
-      _count: { id: 3 },
-      _sum: { positive: null }
-    } as never);
-    prismaMock.releaseVote.count.mockResolvedValue(2);
+    prismaMock.releaseVote.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(2);
     prismaMock.releaseVoteAggregate.upsert.mockResolvedValue({} as never);
     prismaMock.releaseVoteAggregate.findUnique.mockResolvedValue({
       releaseId: 3,
@@ -358,11 +356,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/vote', () => {
 describe('DELETE /api/communities/:communityId/releases/:releaseId/vote', () => {
   it('clears the vote and returns updated aggregate', async () => {
     prismaMock.releaseVote.deleteMany.mockResolvedValue({ count: 1 } as never);
-    prismaMock.releaseVote.aggregate.mockResolvedValue({
-      _count: { id: 0 },
-      _sum: { positive: null }
-    } as never);
-    prismaMock.releaseVote.count.mockResolvedValue(0);
+    prismaMock.releaseVote.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
     prismaMock.releaseVoteAggregate.upsert.mockResolvedValue({} as never);
     prismaMock.releaseVoteAggregate.findUnique.mockResolvedValue(null);
 

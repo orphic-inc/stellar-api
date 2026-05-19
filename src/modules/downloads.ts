@@ -97,12 +97,21 @@ export const grantDownloadAccess = async (
     if (debited.count === 0)
       throw new AppError(409, 'Balance changed concurrently, please retry');
 
-    // Credit contributor balance and gross earnings
+    // Credit contributor balance, gross earnings, and recompute ratio
+    const contributor = await tx.user.findUniqueOrThrow({
+      where: { id: contribution.userId },
+      select: { consumed: true, totalEarned: true }
+    });
+    const newContributorRatio = computeRatio(
+      contributor.totalEarned + cost,
+      contributor.consumed
+    );
     await tx.user.update({
       where: { id: contribution.userId },
       data: {
         contributed: { increment: cost },
-        totalEarned: { increment: cost }
+        totalEarned: { increment: cost },
+        ratio: newContributorRatio
       }
     });
 
