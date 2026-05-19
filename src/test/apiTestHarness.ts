@@ -111,7 +111,15 @@ jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
   logging: { level: 'error', timestampFormat: undefined },
-  economy: { minimumBounty: 104857600 }
+  economy: { minimumBounty: 104857600 },
+  email: {
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUser: '',
+    smtpPass: '',
+    fromAddress: 'noreply@stellar.local',
+    siteUrl: 'http://localhost:3000'
+  }
 }));
 
 let currentUserRankLevel = 1000;
