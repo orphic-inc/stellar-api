@@ -307,11 +307,9 @@ describe('recomputeVoteAggregate', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('recomputes ups, totals, and binomial score before upserting', async () => {
-    prismaMock.releaseVote.aggregate.mockResolvedValue({
-      _count: { id: 10 },
-      _sum: { positive: null }
-    });
-    prismaMock.releaseVote.count.mockResolvedValue(7);
+    prismaMock.releaseVote.count
+      .mockResolvedValueOnce(10) // total
+      .mockResolvedValueOnce(7); // ups
     prismaMock.releaseVoteAggregate.upsert.mockResolvedValue(undefined);
 
     await recomputeVoteAggregate(5);

@@ -910,7 +910,9 @@ describe('requests.createRequest', () => {
     );
     prismaMock.user.findUnique.mockResolvedValueOnce({
       id: 7,
-      contributed: BigInt(2e9)
+      contributed: BigInt(2e9),
+      consumed: BigInt(0),
+      totalEarned: BigInt(0)
     } as never);
     prismaMock.user.update.mockResolvedValueOnce({} as never);
     prismaMock.request.create.mockResolvedValueOnce({
@@ -981,6 +983,10 @@ describe('requests.unfillRequest', () => {
         fillerId: null,
         bounties: [{ amount: BigInt(110_000_000) }]
       } as never);
+    prismaMock.user.findUniqueOrThrow.mockResolvedValueOnce({
+      consumed: BigInt(0),
+      totalEarned: BigInt(110_000_000)
+    } as never);
     prismaMock.user.update.mockResolvedValueOnce({} as never);
     prismaMock.economyTransaction.create.mockResolvedValueOnce({} as never);
     prismaMock.request.update.mockResolvedValueOnce({} as never);
@@ -991,7 +997,11 @@ describe('requests.unfillRequest', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 42 },
-        data: { contributed: { decrement: BigInt(110_000_000) } }
+        data: expect.objectContaining({
+          contributed: { decrement: BigInt(110_000_000) },
+          totalEarned: { decrement: BigInt(110_000_000) },
+          ratio: expect.any(Number)
+        })
       })
     );
   });

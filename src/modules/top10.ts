@@ -532,16 +532,10 @@ export async function getTopVotedReleases(
 // ─── Vote mutations ───────────────────────────────────────────────────────────
 
 export async function recomputeVoteAggregate(releaseId: number): Promise<void> {
-  const result = await prisma.releaseVote.aggregate({
-    where: { releaseId },
-    _count: { id: true },
-    _sum: { positive: false } as never
-  });
-
-  const total = result._count.id;
-  const ups = await prisma.releaseVote.count({
-    where: { releaseId, positive: true }
-  });
+  const [total, ups] = await Promise.all([
+    prisma.releaseVote.count({ where: { releaseId } }),
+    prisma.releaseVote.count({ where: { releaseId, positive: true } })
+  ]);
 
   const score = binomialScore(ups, total);
 

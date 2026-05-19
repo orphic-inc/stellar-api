@@ -11,7 +11,11 @@ import { AppError } from '../lib/errors';
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
 const mockTx = {
-  user: { findUnique: jest.fn(), update: jest.fn() },
+  user: {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn()
+  },
   request: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -62,6 +66,8 @@ import {
 const makeUser = (overrides = {}) => ({
   id: 1,
   contributed: BigInt('1073741824'), // 1 GiB
+  consumed: BigInt('0'),
+  totalEarned: BigInt('0'),
   ...overrides
 });
 
@@ -121,7 +127,7 @@ describe('createRequest', () => {
 
   it('throws if user has insufficient balance', async () => {
     mockTx.user.findUnique.mockResolvedValue(
-      makeUser({ contributed: BigInt(0) })
+      makeUser({ contributed: BigInt(100), consumed: BigInt(100) })
     );
     await expect(
       createRequest(1, {
@@ -165,6 +171,14 @@ describe('createRequest', () => {
       bounty: MINIMUM_BOUNTY
     });
 
+    expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          consumed: { increment: MINIMUM_BOUNTY },
+          ratio: expect.any(Number)
+        })
+      })
+    );
     expect(mockTx.request.create).toHaveBeenCalled();
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -235,7 +249,7 @@ describe('addBounty', () => {
   it('throws when user lacks contributed balance', async () => {
     mockTx.request.findUnique.mockResolvedValue(makeRequest());
     mockTx.user.findUnique.mockResolvedValue(
-      makeUser({ contributed: BigInt(0) })
+      makeUser({ contributed: BigInt(100), consumed: BigInt(100) })
     );
 
     await expect(addBounty(1, 10, MINIMUM_BOUNTY)).rejects.toMatchObject({
@@ -274,6 +288,14 @@ describe('addBounty', () => {
 
     const result = await addBounty(1, 10, MINIMUM_BOUNTY);
 
+    expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          consumed: { increment: MINIMUM_BOUNTY },
+          ratio: expect.any(Number)
+        })
+      })
+    );
     expect(mockTx.requestBounty.update).toHaveBeenCalledWith({
       where: { id: 3 },
       data: { amount: { increment: MINIMUM_BOUNTY } }
@@ -392,6 +414,10 @@ describe('fillRequest', () => {
       .mockResolvedValueOnce(makeRequest({ status: 'filled', fillerId: 1 })); // final fetch
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      totalEarned: BigInt(0)
+    });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.requestFill.create.mockResolvedValue(undefined);
@@ -401,7 +427,11 @@ describe('fillRequest', () => {
 
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { contributed: { increment: bountyAmount } }
+        data: expect.objectContaining({
+          contributed: { increment: bountyAmount },
+          totalEarned: { increment: bountyAmount },
+          ratio: expect.any(Number)
+        })
       })
     );
     expect(mockTx.requestFill.create).toHaveBeenCalled();
@@ -442,6 +472,10 @@ describe('unfillRequest', () => {
     mockTx.request.findUnique
       .mockResolvedValueOnce(filledReq) // initial fetch
       .mockResolvedValueOnce({ ...filledReq, status: 'open', fillerId: null }); // final fetch
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      totalEarned: BigInt('209715200')
+    });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.request.update.mockResolvedValue(undefined);
@@ -452,7 +486,11 @@ describe('unfillRequest', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 7 },
-        data: { contributed: { decrement: BigInt('209715200') } }
+        data: expect.objectContaining({
+          contributed: { decrement: BigInt('209715200') },
+          totalEarned: { decrement: BigInt('209715200') },
+          ratio: expect.any(Number)
+        })
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
@@ -502,6 +540,15 @@ describe('deleteRequest', () => {
       { id: 2, userId: 2, amount: BigInt('52428800'), requestId: 10 }
     ];
     mockTx.request.findUnique.mockResolvedValue(makeRequest({ bounties }));
+    mockTx.user.findUniqueOrThrow
+      .mockResolvedValueOnce({
+        consumed: BigInt('104857600'),
+        totalEarned: BigInt('0')
+      })
+      .mockResolvedValueOnce({
+        consumed: BigInt('52428800'),
+        totalEarned: BigInt('0')
+      });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
     mockTx.request.update.mockResolvedValue(undefined);
@@ -510,6 +557,26 @@ describe('deleteRequest', () => {
     await deleteRequest(1, 10, false);
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
+    expect(mockTx.user.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { id: 1 },
+        data: expect.objectContaining({
+          consumed: { decrement: BigInt('104857600') },
+          ratio: expect.any(Number)
+        })
+      })
+    );
+    expect(mockTx.user.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: 2 },
+        data: expect.objectContaining({
+          consumed: { decrement: BigInt('52428800') },
+          ratio: expect.any(Number)
+        })
+      })
+    );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
     expect(
       (

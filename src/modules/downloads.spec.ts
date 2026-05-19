@@ -145,6 +145,10 @@ describe('grantDownloadAccess', () => {
       })
     );
     mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      totalEarned: BigInt(0)
+    });
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.update.mockResolvedValue(undefined);
@@ -164,7 +168,10 @@ describe('grantDownloadAccess', () => {
     );
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ totalEarned: { increment: cost } })
+        data: expect.objectContaining({
+          totalEarned: { increment: cost },
+          ratio: expect.any(Number)
+        })
       })
     );
   });
@@ -174,6 +181,10 @@ describe('grantDownloadAccess', () => {
     const grant = makeGrant();
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      totalEarned: BigInt(0)
+    });
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.update.mockResolvedValue(undefined);
@@ -199,7 +210,8 @@ describe('grantDownloadAccess', () => {
         where: { id: 99 },
         data: {
           contributed: { increment: cost },
-          totalEarned: { increment: cost }
+          totalEarned: { increment: cost },
+          ratio: expect.any(Number)
         }
       })
     );

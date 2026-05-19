@@ -14,12 +14,13 @@ const mockPrismaPolicy = {
   upsert: jest.fn(),
   update: jest.fn()
 };
+const mockTransaction = jest.fn((ops: unknown[]) => Promise.all(ops));
 
 jest.mock('../lib/prisma', () => ({
   prisma: {
     user: mockPrismaUser,
     ratioPolicyState: mockPrismaPolicy,
-    $transaction: jest.fn((ops: unknown[]) => Promise.all(ops))
+    $transaction: mockTransaction
   }
 }));
 
@@ -66,7 +67,10 @@ const makeState = (overrides = {}) => ({
 // ─── evaluateRatioPolicy ──────────────────────────────────────────────────────
 
 describe('evaluateRatioPolicy', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockTransaction.mockImplementation((ops: unknown[]) => Promise.all(ops));
+  });
 
   it('OK + meets requirement: only refreshes lastEvaluatedAt', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
@@ -246,7 +250,10 @@ describe('evaluateRatioPolicy', () => {
 // ─── overridePolicyStatus ─────────────────────────────────────────────────────
 
 describe('overridePolicyStatus', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockTransaction.mockImplementation((ops: unknown[]) => Promise.all(ops));
+  });
 
   it('throws 404 when user not found', async () => {
     mockPrismaUser.findUnique.mockResolvedValue(null);
