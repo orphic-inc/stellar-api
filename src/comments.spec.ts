@@ -372,3 +372,70 @@ describe('DELETE /api/comments/:id', () => {
     expect(prismaMock.comment.findUnique).not.toHaveBeenCalled();
   });
 });
+
+// ─── POST /api/comments — cross-page ID validation ───────────────────────────
+// Each test sends exactly one foreign-key ID but for a mismatched page type,
+// exercising the per-page superRefine branches (lines 46, 54, 62, 73, 81
+// in schemas/comment.ts) that are skipped when keyCount !== 1.
+
+describe('POST /api/comments — cross-page ID mismatch validation', () => {
+  it('returns 400 when page=communities but communityId is missing (artistId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'communities',
+      body: 'test',
+      artistId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when page=artist but artistId is missing (communityId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'artist',
+      body: 'test',
+      communityId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when page=collages but collageId is missing (artistId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'collages',
+      body: 'test',
+      artistId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when page=contributions but contributionId is missing (communityId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'contributions',
+      body: 'test',
+      communityId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when page=requests but requestId is missing (artistId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'requests',
+      body: 'test',
+      artistId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when page=release but releaseId is missing (communityId provided)', async () => {
+    const res = await request(app).post('/api/comments').send({
+      page: 'release',
+      body: 'test',
+      communityId: 5
+    });
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
+  });
+});
