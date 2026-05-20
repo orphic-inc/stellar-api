@@ -42,6 +42,7 @@ import {
   bulkUpdateConversations,
   getUnreadCount
 } from '../../modules/pm';
+import { AppError } from '../../lib/errors';
 
 const router = express.Router();
 
@@ -60,6 +61,23 @@ const conversationIdSchema = z.object({
 const draftIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+
+async function resolveDraftRecipient(
+  explicitUserId: number | undefined,
+  toUsername: string | undefined
+) {
+  if (explicitUserId) return explicitUserId;
+
+  const username = toUsername?.trim();
+  if (!username) return undefined;
+
+  const found = await prisma.user.findFirst({
+    where: { username }
+  });
+  if (!found) throw new AppError(404, 'recipient_not_found');
+
+  return found.id;
+}
 
 // GET /api/messages — inbox list
 router.get(
@@ -104,7 +122,22 @@ router.get(
       where: { userId: req.user.id },
       orderBy: { updatedAt: 'desc' }
     });
-    res.json(drafts);
+    const toUserIds = [
+      ...new Set(drafts.filter((d) => d.toUserId).map((d) => d.toUserId!))
+    ];
+    const toUsers =
+      toUserIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: toUserIds } },
+            select: { id: true, username: true }
+          })
+        : [];
+    const toUserMap = Object.fromEntries(toUsers.map((u) => [u.id, u]));
+    const result = drafts.map((d) => ({
+      ...d,
+      toUser: d.toUserId ? toUserMap[d.toUserId] ?? null : null
+    }));
+    res.json(result);
   })
 );
 
@@ -114,7 +147,13 @@ router.post(
   requireAuth,
   validate(pmDraftSchema),
   authHandler(async (req, res) => {
-    const { toUserId, subject, body } = parsedBody<PmDraftInput>(res);
+    const {
+      toUserId: explicitUserId,
+      toUsername,
+      subject,
+      body
+    } = parsedBody<PmDraftInput>(res);
+    const toUserId = await resolveDraftRecipient(explicitUserId, toUsername);
     const draft = await prisma.pmDraft.create({
       data: {
         userId: req.user.id,
@@ -135,7 +174,13 @@ router.put(
   validate(pmDraftSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { toUserId, subject, body } = parsedBody<PmDraftInput>(res);
+    const {
+      toUserId: explicitUserId,
+      toUsername,
+      subject,
+      body
+    } = parsedBody<PmDraftInput>(res);
+    const toUserId = await resolveDraftRecipient(explicitUserId, toUsername);
 
     const draft = await prisma.pmDraft.findFirst({
       where: { id, userId: req.user.id }

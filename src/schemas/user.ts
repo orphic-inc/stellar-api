@@ -52,6 +52,7 @@ export const grantDonorSchema = z.object({
 
 export const pmDraftSchema = z.object({
   toUserId: z.number().int().positive().optional(),
+  toUsername: z.string().optional(),
   subject: z.string().max(255),
   body: z.string()
 });
