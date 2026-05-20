@@ -8,13 +8,14 @@ import {
 const makeNotif = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   userId: 7,
-  quoterId: 10,
+  type: 'forum_sub',
+  actorId: 10,
   page: 'forums',
   pageId: 5,
   postId: 3,
   readAt: null,
   createdAt: new Date('2026-01-01'),
-  quoter: { id: 10, username: 'alice', avatar: null },
+  actor: { id: 10, username: 'alice', avatar: null },
   ...overrides
 });
 

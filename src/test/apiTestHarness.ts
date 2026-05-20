@@ -343,6 +343,9 @@ export const resetApiTestState = (): void => {
     ) => callback(null, 'signed-jwt')
   );
   prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  prismaMock.commentSubscription.findMany.mockResolvedValue([]);
+  prismaMock.collageSubscription.findMany.mockResolvedValue([]);
+  prismaMock.notification.createMany.mockResolvedValue({ count: 0 });
   prismaMock.siteSettings.upsert.mockResolvedValue({
     id: 1,
     approvedDomains: [],
@@ -353,11 +356,7 @@ export const resetApiTestState = (): void => {
   });
   prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
     if (typeof arg === 'function') {
-      return arg({
-        userSettings: prismaMock.userSettings,
-        profile: prismaMock.profile,
-        user: prismaMock.user
-      });
+      return arg(prismaMock);
     }
     return Promise.all(arg as Promise<unknown>[]);
   });

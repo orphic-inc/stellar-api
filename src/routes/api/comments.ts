@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
-import { CommentPage } from '@prisma/client';
+import { CommentPage, SubscriptionPage } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { emitNotifications } from '../../lib/notifications';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
@@ -100,22 +101,57 @@ router.post(
       collageId
     } = parsedBody<CreateCommentInput>(res);
 
-    const comment = await prisma.comment.create({
-      data: {
-        page,
-        body: sanitizeHtml(body),
-        authorId: req.user.id,
-        ...(communityId && { communityId }),
-        ...(contributionId && { contributionId }),
-        ...(requestId && { requestId }),
-        ...(artistId && { artistId }),
-        ...(releaseId && { releaseId }),
-        ...(collageId && { collageId })
-      },
-      include: {
-        author: { select: { id: true, username: true, avatar: true } }
+    // Map CommentPage + entity FK to SubscriptionPage + pageId for notification lookup
+    const subPageMap: Partial<
+      Record<
+        CommentPage,
+        { subPage: SubscriptionPage; pageId: number | undefined }
+      >
+    > = {
+      requests: { subPage: 'requests', pageId: requestId },
+      artist: { subPage: 'artist', pageId: artistId },
+      collages: { subPage: 'collages', pageId: collageId },
+      communities: { subPage: 'communities', pageId: communityId }
+    };
+    const subTarget = subPageMap[page];
+
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          page,
+          body: sanitizeHtml(body),
+          authorId: req.user.id,
+          ...(communityId && { communityId }),
+          ...(contributionId && { contributionId }),
+          ...(requestId && { requestId }),
+          ...(artistId && { artistId }),
+          ...(releaseId && { releaseId }),
+          ...(collageId && { collageId })
+        },
+        include: {
+          author: { select: { id: true, username: true, avatar: true } }
+        }
+      });
+
+      if (subTarget?.pageId) {
+        const subs = await tx.commentSubscription.findMany({
+          where: { page: subTarget.subPage, pageId: subTarget.pageId },
+          select: { userId: true }
+        });
+        if (subs.length > 0) {
+          await emitNotifications(tx, {
+            userIds: subs.map((s) => s.userId),
+            type: 'comment_sub',
+            actorId: req.user.id,
+            page: subTarget.subPage,
+            pageId: subTarget.pageId
+          });
+        }
       }
+
+      return created;
     });
+
     res.status(201).json(comment);
   })
 );

@@ -110,7 +110,8 @@ export const createPost = async (
       await tx.notification.createMany({
         data: notifyUserIds.map((uid) => ({
           userId: uid,
-          quoterId: authorId,
+          type: 'forum_sub' as const,
+          actorId: authorId,
           page: 'forums' as const,
           pageId: forumTopicId,
           postId: post.id

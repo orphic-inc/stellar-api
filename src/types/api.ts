@@ -5946,15 +5946,18 @@ export interface components {
     };
     Notification: {
       id: number;
-      page: string;
-      pageId: number;
-      postId: number;
-      createdAt: string;
-      quoter: {
+      type: string;
+      actorId?: number | null;
+      actor?: {
         id: number;
         username: string;
         avatar?: string | null;
-      };
+      } | null;
+      page: string;
+      pageId: number;
+      postId?: number | null;
+      readAt?: string | null;
+      createdAt: string;
       source?: {
         title: string;
         forumId?: number;

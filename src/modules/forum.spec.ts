@@ -188,14 +188,16 @@ describe('createPost', () => {
       data: [
         {
           userId: 9,
-          quoterId: 7,
+          type: 'forum_sub',
+          actorId: 7,
           page: 'forums',
           pageId: 44,
           postId: 31
         },
         {
           userId: 11,
-          quoterId: 7,
+          type: 'forum_sub',
+          actorId: 7,
           page: 'forums',
           pageId: 44,
           postId: 31

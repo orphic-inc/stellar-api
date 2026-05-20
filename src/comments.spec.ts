@@ -254,6 +254,53 @@ describe('POST /api/comments', () => {
     expect(res.status).toBe(400);
     expect(prismaMock.comment.create).not.toHaveBeenCalled();
   });
+
+  it('notifies comment subscribers on pages with subscription support', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({ id: 30, page: 'requests' as never, requestId: 14 }) as never
+    );
+    prismaMock.commentSubscription.findMany.mockResolvedValue([
+      { userId: 20 },
+      { userId: 21 },
+      { userId: 7 } // auth user — should be excluded
+    ] as never);
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'requests',
+      body: 'Nice.',
+      requestId: 14
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 20, type: 'comment_sub' }),
+          expect.objectContaining({ userId: 21, type: 'comment_sub' })
+        ]),
+        skipDuplicates: true
+      })
+    );
+    const callData = (prismaMock.notification.createMany as jest.Mock).mock
+      .calls[0][0].data as { userId: number }[];
+    expect(callData.map((d) => d.userId)).not.toContain(7);
+  });
+
+  it('skips comment subscription notifications for non-subscribable pages', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({ id: 31, page: 'release' as never, releaseId: 9 }) as never
+    );
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'release',
+      body: 'Great.',
+      releaseId: 9
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.commentSubscription.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.notification.createMany).not.toHaveBeenCalled();
+  });
 });
 
 // ─── PUT /api/comments/:id ────────────────────────────────────────────────────

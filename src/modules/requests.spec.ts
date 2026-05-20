@@ -31,7 +31,8 @@ const mockTx = {
   economyTransaction: { create: jest.fn() },
   requestAction: { create: jest.fn() },
   requestFill: { create: jest.fn() },
-  contribution: { findUnique: jest.fn() }
+  contribution: { findUnique: jest.fn() },
+  notification: { createMany: jest.fn() }
 };
 
 const mockTransaction = jest.fn();
@@ -438,6 +439,97 @@ describe('fillRequest', () => {
         data: expect.objectContaining({ action: 'FILL' })
       })
     );
+  });
+
+  it('notifies requester and bounty holders, excluding the filler', async () => {
+    // makeRequest(): userId=1, bounties=[{userId:1}]
+    // filler is userId=1 → should be excluded (actor === recipient)
+    const requestWithBounties = makeRequest({
+      userId: 2, // requester
+      bounties: [
+        {
+          id: 1,
+          requestId: 10,
+          userId: 2,
+          amount: BigInt('209715200'),
+          createdAt: new Date()
+        },
+        {
+          id: 2,
+          requestId: 10,
+          userId: 3,
+          amount: BigInt('104857600'),
+          createdAt: new Date()
+        }
+      ]
+    });
+    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(requestWithBounties)
+      .mockResolvedValueOnce({
+        ...requestWithBounties,
+        status: 'filled',
+        fillerId: 1
+      });
+    mockTx.request.findFirst.mockResolvedValue(null);
+    mockTx.request.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      contributed: BigInt('1073741824')
+    });
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.requestFill.create.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+    mockTx.notification.createMany.mockResolvedValue({ count: 2 });
+
+    await fillRequest(1, 10, 5); // filler = userId 1
+
+    expect(mockTx.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 2, type: 'request_filled' }),
+          expect.objectContaining({ userId: 3, type: 'request_filled' })
+        ]),
+        skipDuplicates: true
+      })
+    );
+    const notifData = (mockTx.notification.createMany as jest.Mock).mock
+      .calls[0][0].data as { userId: number }[];
+    expect(notifData.map((d) => d.userId)).not.toContain(1); // filler excluded
+  });
+
+  it('emits no notification when filler is the only interested party', async () => {
+    const selfRequest = makeRequest({
+      userId: 1,
+      bounties: [
+        {
+          id: 1,
+          requestId: 10,
+          userId: 1,
+          amount: BigInt('209715200'),
+          createdAt: new Date()
+        }
+      ]
+    });
+    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(selfRequest)
+      .mockResolvedValueOnce({ ...selfRequest, status: 'filled', fillerId: 1 });
+    mockTx.request.findFirst.mockResolvedValue(null);
+    mockTx.request.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      contributed: BigInt('1073741824')
+    });
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.requestFill.create.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await fillRequest(1, 10, 5); // filler = userId 1 = requester
+
+    expect(mockTx.notification.createMany).not.toHaveBeenCalled();
   });
 });
 
