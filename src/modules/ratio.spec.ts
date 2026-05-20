@@ -31,7 +31,7 @@ describe('computeRatio', () => {
     expect(computeRatio(500n * GiB, 0n)).toBe(1.0);
   });
 
-  it('returns totalEarned / downloaded', () => {
+  it('returns contributed / consumed', () => {
     expect(computeRatio(10n * GiB, 10n * GiB)).toBeCloseTo(1.0);
     expect(computeRatio(5n * GiB, 10n * GiB)).toBeCloseTo(0.5);
     expect(computeRatio(0n, 10n * GiB)).toBeCloseTo(0.0);
@@ -138,7 +138,7 @@ describe('getRatioStats', () => {
 
   it('returns correct stats for a user with no downloads', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
-      totalEarned: 0n,
+      contributed: 0n,
       consumed: 0n
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
@@ -154,7 +154,7 @@ describe('getRatioStats', () => {
   it('correctly identifies a user who fails the requirement', async () => {
     // 7 GiB downloaded (5–10 GiB bracket), 0 earned, 0 eligible contributions
     mockPrismaUser.findUnique.mockResolvedValue({
-      totalEarned: 0n,
+      contributed: 0n,
       consumed: 7n * GiB
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
@@ -168,14 +168,14 @@ describe('getRatioStats', () => {
 
   it('serializes BigInts as strings', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
-      totalEarned: 5n * GiB,
+      contributed: 5n * GiB,
       consumed: 10n * GiB
     });
     mockPrismaContribution.findMany.mockResolvedValue([]);
 
     const stats = await getRatioStats(1);
 
-    expect(typeof stats.totalEarned).toBe('string');
+    expect(typeof stats.contributed).toBe('string');
     expect(typeof stats.consumed).toBe('string');
     expect(typeof stats.eligibleContributionBytes).toBe('string');
   });

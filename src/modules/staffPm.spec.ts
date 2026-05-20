@@ -10,6 +10,8 @@ const mockTx = {
   }
 };
 
+const mockTransaction = jest.fn();
+
 jest.mock('../lib/prisma', () => ({
   prisma: {
     staffInboxConversation: {
@@ -26,9 +28,7 @@ jest.mock('../lib/prisma', () => ({
     user: {
       findUnique: jest.fn()
     },
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) =>
-      cb(mockTx)
-    )
+    $transaction: mockTransaction
   }
 }));
 
@@ -67,9 +67,13 @@ const makeTicket = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
-describe('createTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  mockTransaction.mockImplementation(
+    (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
+  );
+});
 
+describe('createTicket', () => {
   it('creates an unanswered ticket with the initial message', async () => {
     const created = makeTicket({
       messages: [{ id: 10, body: 'Please help', sender: { id: 7 } }]
@@ -93,8 +97,6 @@ describe('createTicket', () => {
 });
 
 describe('viewTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns not_found for a non-staff user viewing another user ticket', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(
       makeTicket({ userId: 99 })
@@ -122,8 +124,6 @@ describe('viewTicket', () => {
 });
 
 describe('replyToTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('moves staff replies to Open and marks the ticket unread for the user', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(
       makeTicket({ status: 'Unanswered' })
@@ -177,8 +177,6 @@ describe('replyToTicket', () => {
 });
 
 describe('resolveTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('allows owners to resolve their own ticket', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(
       makeTicket({ userId: 7, status: 'Open' })
@@ -207,8 +205,6 @@ describe('resolveTicket', () => {
 });
 
 describe('unresolveTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns the ticket to Unanswered', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(
       makeTicket({ status: 'Resolved' })
@@ -226,8 +222,6 @@ describe('unresolveTicket', () => {
 });
 
 describe('assignTicket', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('rejects assignees without staff/admin permissions', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(
       makeTicket({ id: 1 })
@@ -264,11 +258,6 @@ describe('assignTicket', () => {
 });
 
 describe('bulkResolve', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    prismaMock.staffInboxConversation.updateMany = jest.fn();
-  });
-
   it('resolves only unresolved tickets and reports the count', async () => {
     prismaMock.staffInboxConversation.findMany.mockResolvedValue([
       { id: 1 },

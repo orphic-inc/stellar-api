@@ -43,7 +43,7 @@ const GiB = BigInt(1024 ** 3);
 
 const makeStats = (overrides = {}) => ({
   ratio: 0.8,
-  totalEarned: '0',
+  contributed: '0',
   consumed: '0',
   bracket: { label: '5–10 GiB', maxRequired: 0.15, minRequired: 0 },
   eligibleContributionBytes: '0',

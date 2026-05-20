@@ -25,16 +25,15 @@ const mockTx = {
   consumer: { upsert: jest.fn(), update: jest.fn() }
 };
 
+const mockEvaluateRatioPolicy = jest.fn();
+const mockTransaction = jest.fn();
+
 jest.mock('./ratioPolicy', () => ({
-  evaluateRatioPolicy: jest.fn().mockResolvedValue(undefined)
+  evaluateRatioPolicy: mockEvaluateRatioPolicy
 }));
 
 jest.mock('../lib/prisma', () => ({
-  prisma: {
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) =>
-      cb(mockTx)
-    )
-  }
+  prisma: { $transaction: mockTransaction }
 }));
 
 import { grantDownloadAccess, reverseDownloadAccess } from './downloads';
@@ -54,7 +53,6 @@ const makeUser = (overrides = {}) => ({
   canDownload: true,
   contributed: BigInt('1073741824'),
   consumed: BigInt('0'),
-  totalEarned: BigInt('0'),
   ...overrides
 });
 
@@ -73,11 +71,16 @@ const makeGrant = (overrides = {}) => ({
   ...overrides
 });
 
+beforeEach(() => {
+  mockTransaction.mockImplementation(
+    (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
+  );
+  mockEvaluateRatioPolicy.mockResolvedValue(undefined);
+});
+
 // ─── grantDownloadAccess ───────────────────────────────────────────────────────
 
 describe('grantDownloadAccess', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws 404 when contribution not found', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(null);
     await expect(grantDownloadAccess(7, 5)).rejects.toThrow(AppError);
@@ -112,7 +115,7 @@ describe('grantDownloadAccess', () => {
     });
   });
 
-  it('throws 409 on CAS failure (concurrent balance change)', async () => {
+  it('throws 409 on CAS failure (concurrent balance drain)', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
@@ -147,7 +150,7 @@ describe('grantDownloadAccess', () => {
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
-      totalEarned: BigInt(0)
+      contributed: cost
     });
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
@@ -163,13 +166,18 @@ describe('grantDownloadAccess', () => {
 
     expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ contributed: { decrement: cost } })
+        data: expect.objectContaining({ consumed: { increment: cost } })
+      })
+    );
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ contributed: { decrement: cost } })
       })
     );
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          totalEarned: { increment: cost },
+          contributed: { increment: cost },
           ratio: expect.any(Number)
         })
       })
@@ -183,7 +191,7 @@ describe('grantDownloadAccess', () => {
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
-      totalEarned: BigInt(0)
+      contributed: BigInt('2000000000')
     });
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
@@ -197,9 +205,11 @@ describe('grantDownloadAccess', () => {
 
     expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: 7, contributed: { gte: cost } }),
+        where: expect.objectContaining({
+          id: 7,
+          consumed: { lte: expect.anything() }
+        }),
         data: expect.objectContaining({
-          contributed: { decrement: cost },
           consumed: { increment: cost },
           ratio: expect.any(Number)
         })
@@ -210,7 +220,6 @@ describe('grantDownloadAccess', () => {
         where: { id: 99 },
         data: {
           contributed: { increment: cost },
-          totalEarned: { increment: cost },
           ratio: expect.any(Number)
         }
       })
@@ -236,8 +245,6 @@ describe('grantDownloadAccess', () => {
 // ─── reverseDownloadAccess ─────────────────────────────────────────────────────
 
 describe('reverseDownloadAccess', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws 404 when grant not found', async () => {
     mockTx.downloadAccessGrant.findUnique.mockResolvedValue(null);
     await expect(reverseDownloadAccess(99, 1, 'reason')).rejects.toMatchObject({
@@ -259,10 +266,13 @@ describe('reverseDownloadAccess', () => {
     mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
     // findUniqueOrThrow called for consumer then contributor
     mockTx.user.findUniqueOrThrow
-      .mockResolvedValueOnce({ consumed: grant.amountBytes, totalEarned: 0n }) // consumer
+      .mockResolvedValueOnce({
+        consumed: grant.amountBytes,
+        contributed: BigInt('2000000000')
+      }) // consumer
       .mockResolvedValueOnce({
         consumed: 0n,
-        totalEarned: grant.amountBytes
+        contributed: grant.amountBytes
       }); // contributor
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -275,23 +285,23 @@ describe('reverseDownloadAccess', () => {
     const result = await reverseDownloadAccess(99, 1, 'Dead link');
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // contributor deducted (balance + gross earnings + ratio)
+    // contributor deducted (contributed balance + ratio)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.contributorId },
         data: expect.objectContaining({
           contributed: { decrement: grant.amountBytes },
-          totalEarned: { decrement: grant.amountBytes }
+          ratio: expect.any(Number)
         })
       })
     );
-    // consumer refunded (balance + downloaded + ratio)
+    // consumer refunded (consumed decrements + ratio; contributed unchanged)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.consumerId },
         data: expect.objectContaining({
-          contributed: { increment: grant.amountBytes },
-          consumed: { decrement: grant.amountBytes }
+          consumed: { decrement: grant.amountBytes },
+          ratio: expect.any(Number)
         })
       })
     );

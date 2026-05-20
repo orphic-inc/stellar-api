@@ -190,9 +190,9 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       canDownload: true,
       inviteCount: 0,
-      contributed: '0',
-      consumed: '0',
-      ratio: 0,
+      contributed: '10',
+      consumed: '5',
+      ratio: 2,
       dateRegistered: '2026-04-24T00:00:00.000Z',
       lastLogin: '2026-04-24T00:00:00.000Z',
       userRank: {
@@ -208,7 +208,12 @@ describe('API auth/profile/user flows', () => {
     );
     bcryptMock.compare.mockResolvedValue(true);
     prismaMock.user.update.mockResolvedValue(
-      asUserMock({ ...authUser, contributed: BigInt(0), consumed: BigInt(0) })
+      asUserMock({
+        ...authUser,
+        contributed: BigInt(10),
+        consumed: BigInt(5),
+        ratio: 0
+      })
     );
     prismaMock.userSession.create.mockResolvedValue({
       id: 'test-session-id',
@@ -572,7 +577,6 @@ describe('API auth/profile/user flows', () => {
       stats: {
         contributed: '0',
         consumed: '0',
-        totalEarned: '0',
         ratio: '1.00',
         buffer: '0'
       },
@@ -632,7 +636,6 @@ describe('API auth/profile/user flows', () => {
       stats: {
         contributed: '100',
         consumed: '50',
-        totalEarned: '100',
         ratio: '2.00',
         buffer: '50'
       },
@@ -708,7 +711,6 @@ describe('API auth/profile/user flows', () => {
       stats: {
         contributed: null,
         consumed: null,
-        totalEarned: null,
         ratio: null,
         buffer: null
       },

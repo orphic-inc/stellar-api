@@ -3,6 +3,7 @@ import gravatar from 'gravatar';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { computeRatio } from './ratio';
 
 export const isPasswordBanned = async (password: string): Promise<boolean> => {
   const found = await prisma.badPassword.findFirst({ where: { password } });
@@ -43,6 +44,7 @@ export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
   ...raw,
+  ratio: computeRatio(raw.contributed, raw.consumed),
   contributed: raw.contributed.toString(),
   consumed: raw.consumed.toString()
 });
