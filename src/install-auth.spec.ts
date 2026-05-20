@@ -53,6 +53,7 @@ describe('API auth/profile/user flows', () => {
       approvedDomains: [],
       registrationStatus: 'closed',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 
@@ -72,6 +73,7 @@ describe('API auth/profile/user flows', () => {
       approvedDomains: [],
       registrationStatus: 'invite',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 
