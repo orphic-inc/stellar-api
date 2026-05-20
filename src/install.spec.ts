@@ -90,12 +90,75 @@ describe('GET /api/install', () => {
     const res = await request(app).get('/api/install');
 
     expect(res.status).toBe(200);
-    expect(res.body.setupChecklist).toEqual(
+    expect(
+      res.body.setupChecklist.map((item: { message: string }) => item.message)
+    ).toEqual(
       expect.arrayContaining([
         expect.stringContaining('registrationStatus is still "open"'),
         expect.stringContaining('maxUsers is still the default value'),
         expect.stringContaining('approvedDomains is empty')
       ])
+    );
+  });
+
+  it('omits dismissed launch checklist items', async () => {
+    prismaMock.userRank.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: ['max-users-default'],
+      updatedAt: new Date()
+    } as never);
+
+    const res = await request(app).get('/api/install');
+
+    expect(res.status).toBe(200);
+    expect(
+      res.body.setupChecklist.find(
+        (item: { id: string }) => item.id === 'max-users-default'
+      )
+    ).toBeUndefined();
+  });
+});
+
+describe('POST /api/install/checklist/:id/dismiss', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('persists a dismissed checklist item for staff', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      id: 1,
+      permissions: { staff: true }
+    } as never);
+    prismaMock.siteSettings.upsert
+      .mockResolvedValueOnce({
+        id: 1,
+        approvedDomains: [],
+        registrationStatus: 'open',
+        maxUsers: 7000,
+        dismissedLaunchChecklist: [],
+        updatedAt: new Date()
+      } as never)
+      .mockResolvedValueOnce({
+        id: 1,
+        approvedDomains: [],
+        registrationStatus: 'open',
+        maxUsers: 7000,
+        dismissedLaunchChecklist: ['max-users-default'],
+        updatedAt: new Date()
+      } as never);
+
+    const res = await request(app).post(
+      '/api/install/checklist/max-users-default/dismiss'
+    );
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.siteSettings.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        update: { dismissedLaunchChecklist: ['max-users-default'] }
+      })
     );
   });
 });

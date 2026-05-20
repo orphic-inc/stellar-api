@@ -36,10 +36,16 @@ router.get(
   asyncHandler(async (req, res) => {
     const q = parsedQuery<ListRequestsQuery>(res);
     const result = await requestModule.listRequests({
+      q: q.q,
+      artist: q.artist,
+      type: q.type,
+      year: q.year,
       page: q.page,
       limit: q.limit,
       communityId: q.communityId,
-      status: q.status
+      status: q.status,
+      orderBy: q.orderBy,
+      order: q.order
     });
     res.json(result);
   })

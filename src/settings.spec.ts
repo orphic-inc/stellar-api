@@ -23,6 +23,7 @@ const mockSettings = {
   registrationStatus: 'open',
   maxUsers: 5000,
   approvedDomains: ['example.com'],
+  dismissedLaunchChecklist: [],
   updatedAt: new Date('2026-01-01')
 };
 

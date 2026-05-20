@@ -57,6 +57,7 @@ const OPEN_REQUEST = {
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
+  _count: { bounties: 0 },
   bounties: []
 };
 
@@ -68,7 +69,7 @@ describe('GET /api/requests', () => {
       data: [],
       meta: { total: 0, page: 1, limit: 25, totalPages: 0 }
     });
-    const res = await request(app).get('/api/requests');
+    const res = await request(app).get('/api/requests?page=1');
     expect(res.status).toBe(200);
   });
 
@@ -80,6 +81,30 @@ describe('GET /api/requests', () => {
     await request(app).get('/api/requests?communityId=3&status=open');
     expect(mod.listRequests).toHaveBeenCalledWith(
       expect.objectContaining({ communityId: 3, status: 'open' })
+    );
+  });
+
+  it('passes full request-list filters and ordering through', async () => {
+    mod.listRequests.mockResolvedValue({
+      data: [],
+      meta: { total: 0, page: 2, limit: 25, totalPages: 0 }
+    });
+
+    await request(app).get(
+      '/api/requests?q=fusion&artist=herbie&type=Music&year=1974&status=open&orderBy=voteCount&order=asc&page=2'
+    );
+
+    expect(mod.listRequests).toHaveBeenCalledWith(
+      expect.objectContaining({
+        q: 'fusion',
+        artist: 'herbie',
+        type: 'Music',
+        year: 1974,
+        status: 'open',
+        orderBy: 'voteCount',
+        order: 'asc',
+        page: 2
+      })
     );
   });
 

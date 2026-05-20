@@ -325,6 +325,20 @@ describe('GET /api/messages/drafts', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].subject).toBe('Draft subject');
   });
+
+  it('hydrates draft recipient usernames when toUserId is present', async () => {
+    prismaMock.pmDraft.findMany.mockResolvedValue([
+      makeDraft({ toUserId: 99 })
+    ] as never);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 99, username: 'alice' }
+    ] as never);
+
+    const res = await request(app).get('/api/messages/drafts');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].toUser).toEqual({ id: 99, username: 'alice' });
+  });
 });
 
 describe('POST /api/messages/drafts', () => {
@@ -356,6 +370,42 @@ describe('POST /api/messages/drafts', () => {
         data: expect.objectContaining({ toUserId: 99 })
       })
     );
+  });
+
+  it('looks up toUserId by username when creating a draft', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 99,
+      username: 'alice'
+    } as never);
+    prismaMock.pmDraft.create.mockResolvedValue(
+      makeDraft({ toUserId: 99, subject: 'Hi', body: 'Hey' }) as never
+    );
+
+    const res = await request(app)
+      .post('/api/messages/drafts')
+      .send({ toUsername: '  alice  ', subject: 'Hi', body: 'Hey' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: { username: 'alice' }
+    });
+    expect(prismaMock.pmDraft.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ toUserId: 99 })
+      })
+    );
+  });
+
+  it('returns 404 when draft recipient username is not found on create', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/messages/drafts')
+      .send({ toUsername: 'ghost', subject: 'Hi', body: 'Hey' });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'recipient_not_found' });
+    expect(prismaMock.pmDraft.create).not.toHaveBeenCalled();
   });
 
   it('returns 400 when subject or body is missing', async () => {
@@ -397,6 +447,41 @@ describe('PUT /api/messages/drafts/:id', () => {
         data: expect.objectContaining({ toUserId: null })
       })
     );
+  });
+
+  it('looks up toUserId by username when updating a draft', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 99,
+      username: 'alice'
+    } as never);
+    prismaMock.pmDraft.findFirst.mockResolvedValue(makeDraft() as never);
+    prismaMock.pmDraft.update.mockResolvedValue(
+      makeDraft({ toUserId: 99, subject: 'Updated', body: 'Body' }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/messages/drafts/1')
+      .send({ toUsername: 'alice', subject: 'Updated', body: 'Body' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.pmDraft.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ toUserId: 99 })
+      })
+    );
+  });
+
+  it('returns 404 when draft recipient username is not found on update', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/messages/drafts/1')
+      .send({ toUsername: 'ghost', subject: 'S', body: 'B' });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'recipient_not_found' });
+    expect(prismaMock.pmDraft.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.pmDraft.update).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the draft does not belong to the current user', async () => {

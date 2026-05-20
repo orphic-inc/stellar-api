@@ -359,6 +359,36 @@ describe('GET /api/search/requests', () => {
     );
   });
 
+  it('serializes request totals and community info in search results', async () => {
+    prismaMock.request.findMany.mockResolvedValue([
+      {
+        id: 44,
+        title: 'Need live set',
+        description: 'Audience tape wanted',
+        type: 'Music',
+        year: 1978,
+        status: 'open',
+        voteCount: 3,
+        communityId: 12,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        user: { id: 7, username: 'alice' },
+        community: { id: 12, name: 'Jazz Vault' },
+        artists: [],
+        bounties: [{ amount: BigInt(1048576) }, { amount: BigInt(512) }]
+      }
+    ] as never);
+    prismaMock.request.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/search/requests');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({
+      totalBounty: '1049088',
+      _count: { bounties: 2 },
+      community: { id: 12, name: 'Jazz Vault' }
+    });
+  });
+
   it('rejects an invalid status with 400', async () => {
     const res = await request(app).get('/api/search/requests?status=bogus');
     expect(res.status).toBe(400);
