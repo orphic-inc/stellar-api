@@ -185,6 +185,7 @@ describe('API content and shared flows', () => {
       approvedDomains: ['approved.example'],
       registrationStatus: 'open',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 
@@ -211,6 +212,7 @@ describe('API content and shared flows', () => {
       approvedDomains: ['approved.example'],
       registrationStatus: 'open',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 

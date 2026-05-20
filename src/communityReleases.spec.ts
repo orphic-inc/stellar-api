@@ -223,6 +223,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       approvedDomains: ['approved.example'],
       registrationStatus: 'open',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 
@@ -239,6 +240,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       approvedDomains: ['approved.example'],
       registrationStatus: 'open',
       maxUsers: 7000,
+      dismissedLaunchChecklist: [],
       updatedAt: new Date()
     });
 

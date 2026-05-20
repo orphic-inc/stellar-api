@@ -172,7 +172,6 @@ jest.mock('../lib/sanitize', () => ({
 
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
-import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
 import { type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
@@ -218,6 +217,8 @@ import {
 } from '../modules/downloads';
 import { fileReport } from '../modules/reports';
 import { recordContributionReport } from '../modules/linkHealth';
+
+const gravatar = jest.requireMock('gravatar') as { url: jest.Mock };
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
 import * as staffPmModule from '../modules/staffPm';
@@ -347,6 +348,7 @@ export const resetApiTestState = (): void => {
     approvedDomains: [],
     registrationStatus: 'open',
     maxUsers: 7000,
+    dismissedLaunchChecklist: [],
     updatedAt: new Date()
   });
   prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
