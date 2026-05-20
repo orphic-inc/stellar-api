@@ -95,7 +95,7 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
     }
 
     const newConsumed = user.consumed + input.bounty;
-    const newRatio = computeRatio(user.totalEarned, newConsumed);
+    const newRatio = computeRatio(user.contributed, newConsumed);
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -171,7 +171,7 @@ export async function addBounty(
     }
 
     const newConsumed = user.consumed + amount;
-    const newRatio = computeRatio(user.totalEarned, newConsumed);
+    const newRatio = computeRatio(user.contributed, newConsumed);
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -309,17 +309,16 @@ export async function fillRequest(
     if (totalBounty > BigInt(0)) {
       const filler = await tx.user.findUniqueOrThrow({
         where: { id: userId },
-        select: { consumed: true, totalEarned: true }
+        select: { consumed: true, contributed: true }
       });
       const newFillerRatio = computeRatio(
-        filler.totalEarned + totalBounty,
+        filler.contributed + totalBounty,
         filler.consumed
       );
       await tx.user.update({
         where: { id: userId },
         data: {
           contributed: { increment: totalBounty },
-          totalEarned: { increment: totalBounty },
           ratio: newFillerRatio
         }
       });
@@ -394,18 +393,17 @@ export async function unfillRequest(
     if (totalBounty > BigInt(0)) {
       const filler = await tx.user.findUniqueOrThrow({
         where: { id: request.fillerId },
-        select: { consumed: true, totalEarned: true }
+        select: { consumed: true, contributed: true }
       });
-      const clawedEarned =
-        filler.totalEarned >= totalBounty
-          ? filler.totalEarned - totalBounty
+      const clawedContributed =
+        filler.contributed >= totalBounty
+          ? filler.contributed - totalBounty
           : 0n;
-      const newFillerRatio = computeRatio(clawedEarned, filler.consumed);
+      const newFillerRatio = computeRatio(clawedContributed, filler.consumed);
       await tx.user.update({
         where: { id: request.fillerId },
         data: {
           contributed: { decrement: totalBounty },
-          totalEarned: { decrement: totalBounty },
           ratio: newFillerRatio
         }
       });
@@ -477,11 +475,11 @@ export async function deleteRequest(
       for (const bounty of request.bounties) {
         const user = await tx.user.findUniqueOrThrow({
           where: { id: bounty.userId },
-          select: { consumed: true, totalEarned: true }
+          select: { consumed: true, contributed: true }
         });
         const refundedConsumed =
           user.consumed >= bounty.amount ? user.consumed - bounty.amount : 0n;
-        const refundedRatio = computeRatio(user.totalEarned, refundedConsumed);
+        const refundedRatio = computeRatio(user.contributed, refundedConsumed);
         await tx.user.update({
           where: { id: bounty.userId },
           data: {

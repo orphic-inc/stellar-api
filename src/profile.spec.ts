@@ -36,7 +36,7 @@ const mockProfile = {
 };
 
 const mockRatioStats = {
-  totalEarned: '1000000000',
+  contributed: '1000000000',
   consumed: '500000000',
   ratio: 2.0,
   requiredRatio: 0.6,

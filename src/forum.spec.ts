@@ -29,11 +29,11 @@ import {
   createTopicNote
 } from './modules/forum';
 
-describe('API forum flows', () => {
-  beforeEach(() => {
-    resetApiTestState();
-  });
+beforeEach(() => {
+  resetApiTestState();
+});
 
+describe('API forum flows', () => {
   it('creates a forum topic when the user meets the create-class requirement', async () => {
     prismaMock.forum.findUnique.mockResolvedValue(
       makeForum({ id: 9, minClassCreate: 100 })

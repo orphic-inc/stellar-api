@@ -34,11 +34,11 @@ const mockTx = {
   contribution: { findUnique: jest.fn() }
 };
 
+const mockTransaction = jest.fn();
+
 jest.mock('../lib/prisma', () => ({
   prisma: {
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) =>
-      cb(mockTx)
-    ),
+    $transaction: mockTransaction,
     request: {
       findMany: jest.fn(),
       count: jest.fn()
@@ -67,7 +67,6 @@ const makeUser = (overrides = {}) => ({
   id: 1,
   contributed: BigInt('1073741824'), // 1 GiB
   consumed: BigInt('0'),
-  totalEarned: BigInt('0'),
   ...overrides
 });
 
@@ -107,11 +106,15 @@ const makeContribution = (overrides = {}) => ({
   ...overrides
 });
 
+beforeEach(() => {
+  mockTransaction.mockImplementation(
+    (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
+  );
+});
+
 // ─── createRequest ─────────────────────────────────────────────────────────────
 
 describe('createRequest', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws if bounty below minimum', async () => {
     await expect(
       createRequest(1, {
@@ -232,8 +235,6 @@ describe('serializeRequest', () => {
 // ─── addBounty ───────────────────────────────────────────────────────────────
 
 describe('addBounty', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws if the added bounty is below minimum', async () => {
     await expect(addBounty(1, 10, BigInt(1))).rejects.toThrow(AppError);
   });
@@ -343,8 +344,6 @@ describe('addBounty', () => {
 });
 
 describe('fillRequest', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws 404 when contribution not found', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(null);
     await expect(fillRequest(1, 10, 999)).rejects.toThrow(AppError);
@@ -416,7 +415,7 @@ describe('fillRequest', () => {
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
-      totalEarned: BigInt(0)
+      contributed: BigInt('1073741824')
     });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -429,7 +428,6 @@ describe('fillRequest', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           contributed: { increment: bountyAmount },
-          totalEarned: { increment: bountyAmount },
           ratio: expect.any(Number)
         })
       })
@@ -446,8 +444,6 @@ describe('fillRequest', () => {
 // ─── unfillRequest ─────────────────────────────────────────────────────────────
 
 describe('unfillRequest', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws 404 if request is not filled', async () => {
     mockTx.request.findUnique.mockResolvedValue(null);
     await expect(unfillRequest(99, 10, 'reason')).rejects.toMatchObject({
@@ -474,7 +470,7 @@ describe('unfillRequest', () => {
       .mockResolvedValueOnce({ ...filledReq, status: 'open', fillerId: null }); // final fetch
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
-      totalEarned: BigInt('209715200')
+      contributed: BigInt('209715200')
     });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -488,7 +484,6 @@ describe('unfillRequest', () => {
         where: { id: 7 },
         data: expect.objectContaining({
           contributed: { decrement: BigInt('209715200') },
-          totalEarned: { decrement: BigInt('209715200') },
           ratio: expect.any(Number)
         })
       })
@@ -516,8 +511,6 @@ describe('unfillRequest', () => {
 // ─── deleteRequest ─────────────────────────────────────────────────────────────
 
 describe('deleteRequest', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('throws 404 when request not found', async () => {
     mockTx.request.findUnique.mockResolvedValue(null);
     await expect(deleteRequest(1, 10, false)).rejects.toMatchObject({
@@ -543,11 +536,11 @@ describe('deleteRequest', () => {
     mockTx.user.findUniqueOrThrow
       .mockResolvedValueOnce({
         consumed: BigInt('104857600'),
-        totalEarned: BigInt('0')
+        contributed: BigInt('1073741824')
       })
       .mockResolvedValueOnce({
         consumed: BigInt('52428800'),
-        totalEarned: BigInt('0')
+        contributed: BigInt('1073741824')
       });
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -609,8 +602,6 @@ describe('deleteRequest', () => {
 // ─── listRequests ─────────────────────────────────────────────────────────────
 
 describe('listRequests', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns paginated results with serialized BigInt', async () => {
     const { prisma } = await import('../lib/prisma');
     (prisma.request.findMany as jest.Mock).mockResolvedValue([

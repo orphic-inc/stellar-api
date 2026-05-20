@@ -14,7 +14,7 @@
     "watch": "tsc -w",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write src",
-    "test": "jest --runInBand",
+    "test": "jest",
     "test:watch": "jest --watch",
     "test:integration": "DOTENV_CONFIG_PATH=.env.test node -r dotenv/config ./node_modules/jest/bin/jest.js --runInBand --config jest.integration.cjs",
     "openapi:export": "ts-node src/scripts/export-openapi.ts",

@@ -44,6 +44,7 @@ router.get(
           releaseId: true,
           contributorId: true,
           releaseDescription: true,
+          downloadUrl: true,
           sizeInBytes: true,
           approvedAccountingBytes: true,
           linkStatus: true,
@@ -57,7 +58,7 @@ router.get(
           createdAt: true,
           updatedAt: true,
           user: { select: { id: true, username: true } },
-          release: { select: { id: true, title: true } },
+          release: { select: { id: true, title: true, communityId: true } },
           collaborators: { select: { id: true, name: true } }
         }
       }),

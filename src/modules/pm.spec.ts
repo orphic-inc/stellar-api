@@ -10,6 +10,8 @@ const mockTx = {
   }
 };
 
+const mockTransaction = jest.fn();
+
 jest.mock('../lib/prisma', () => ({
   prisma: {
     privateConversation: {
@@ -29,9 +31,7 @@ jest.mock('../lib/prisma', () => ({
     user: {
       findUnique: jest.fn()
     },
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) =>
-      cb(mockTx)
-    )
+    $transaction: mockTransaction
   }
 }));
 
@@ -71,9 +71,13 @@ const makeConversation = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
-describe('listInbox', () => {
-  beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  mockTransaction.mockImplementation(
+    (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
+  );
+});
 
+describe('listInbox', () => {
   it('filters by inbox membership and optional search', async () => {
     prismaMock.privateConversation.count.mockResolvedValue(2);
     prismaMock.privateConversation.findMany.mockResolvedValue([
@@ -103,8 +107,6 @@ describe('listInbox', () => {
 });
 
 describe('listSentbox', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('filters by sentbox membership', async () => {
     prismaMock.privateConversation.count.mockResolvedValue(1);
     prismaMock.privateConversation.findMany.mockResolvedValue([
@@ -121,8 +123,6 @@ describe('listSentbox', () => {
 });
 
 describe('getUnreadCount', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('counts unread inbox conversations for the user', async () => {
     prismaMock.privateConversation.count.mockResolvedValue(4);
 
@@ -136,8 +136,6 @@ describe('getUnreadCount', () => {
 });
 
 describe('sendMessage', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('rejects self messaging before any database lookup', async () => {
     await expect(sendMessage(7, 7, 'Hi', 'Body')).resolves.toEqual({
       ok: false,
@@ -220,8 +218,6 @@ describe('sendMessage', () => {
 });
 
 describe('replyToConversation', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('rejects callers that are not visible participants', async () => {
     prismaMock.privateConversationParticipant.findFirst.mockResolvedValue(null);
 
@@ -271,8 +267,6 @@ describe('replyToConversation', () => {
 });
 
 describe('viewConversation', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns not_found when the conversation does not exist', async () => {
     prismaMock.privateConversation.findUnique.mockResolvedValue(null);
 
@@ -319,8 +313,6 @@ describe('viewConversation', () => {
 });
 
 describe('updateConversationFlags', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns not_found for inaccessible conversations', async () => {
     prismaMock.privateConversationParticipant.findFirst.mockResolvedValue(null);
 
@@ -354,8 +346,6 @@ describe('updateConversationFlags', () => {
 });
 
 describe('deleteConversation', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('returns not_found when the user is not a participant', async () => {
     prismaMock.privateConversationParticipant.findFirst.mockResolvedValue(null);
 
@@ -385,8 +375,6 @@ describe('deleteConversation', () => {
 });
 
 describe('bulkUpdateConversations', () => {
-  beforeEach(() => jest.clearAllMocks());
-
   it('marks selected conversations unread', async () => {
     prismaMock.privateConversationParticipant.updateMany.mockResolvedValue({
       count: 2

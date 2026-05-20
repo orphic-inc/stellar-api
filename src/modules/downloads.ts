@@ -40,8 +40,7 @@ export const grantDownloadAccess = async (
       select: {
         canDownload: true,
         contributed: true,
-        consumed: true,
-        totalEarned: true
+        consumed: true
       }
     });
     if (!consumer) throw new AppError(404, 'User not found');
@@ -80,16 +79,15 @@ export const grantDownloadAccess = async (
       };
     }
 
-    if (consumer.contributed < cost)
+    if (consumer.contributed - consumer.consumed < cost)
       throw new AppError(400, 'Insufficient contributed balance');
 
-    // CAS: atomically debit consumer's balance and update cached ratio
+    // CAS: atomically increment consumed, guarding against concurrent balance drain
     const newConsumed = consumer.consumed + cost;
-    const newRatio = computeRatio(consumer.totalEarned, newConsumed);
+    const newRatio = computeRatio(consumer.contributed, newConsumed);
     const debited = await tx.user.updateMany({
-      where: { id: consumerId, contributed: { gte: cost } },
+      where: { id: consumerId, consumed: { lte: consumer.contributed - cost } },
       data: {
-        contributed: { decrement: cost },
         consumed: { increment: cost },
         ratio: newRatio
       }
@@ -97,20 +95,19 @@ export const grantDownloadAccess = async (
     if (debited.count === 0)
       throw new AppError(409, 'Balance changed concurrently, please retry');
 
-    // Credit contributor balance, gross earnings, and recompute ratio
+    // Credit contributor balance and recompute ratio
     const contributor = await tx.user.findUniqueOrThrow({
       where: { id: contribution.userId },
-      select: { consumed: true, totalEarned: true }
+      select: { consumed: true, contributed: true }
     });
     const newContributorRatio = computeRatio(
-      contributor.totalEarned + cost,
+      contributor.contributed + cost,
       contributor.consumed
     );
     await tx.user.update({
       where: { id: contribution.userId },
       data: {
         contributed: { increment: cost },
-        totalEarned: { increment: cost },
         ratio: newContributorRatio
       }
     });
@@ -195,40 +192,41 @@ export const reverseDownloadAccess = async (
     const [consumer, contributor] = await Promise.all([
       tx.user.findUniqueOrThrow({
         where: { id: grant.consumerId },
-        select: { consumed: true, totalEarned: true }
+        select: { consumed: true, contributed: true }
       }),
       tx.user.findUniqueOrThrow({
         where: { id: grant.contributorId },
-        select: { consumed: true, totalEarned: true }
+        select: { consumed: true, contributed: true }
       })
     ]);
 
     const consumerNewConsumed = consumer.consumed - grant.amountBytes;
     const consumerNewRatio = computeRatio(
-      consumer.totalEarned,
+      consumer.contributed,
       consumerNewConsumed < 0n ? 0n : consumerNewConsumed
     );
-    const contribNewEarned = contributor.totalEarned - grant.amountBytes;
+    const contribNewContributed =
+      contributor.contributed >= grant.amountBytes
+        ? contributor.contributed - grant.amountBytes
+        : 0n;
     const contribNewRatio = computeRatio(
-      contribNewEarned < 0n ? 0n : contribNewEarned,
+      contribNewContributed,
       contributor.consumed
     );
 
-    // Claw back from contributor balance and gross earnings
+    // Claw back from contributor balance
     await tx.user.update({
       where: { id: grant.contributorId },
       data: {
         contributed: { decrement: grant.amountBytes },
-        totalEarned: { decrement: grant.amountBytes },
         ratio: contribNewRatio
       }
     });
 
-    // Refund consumer
+    // Refund consumer (consumed decrements; contributed unchanged)
     await tx.user.update({
       where: { id: grant.consumerId },
       data: {
-        contributed: { increment: grant.amountBytes },
         consumed: { decrement: grant.amountBytes },
         ratio: consumerNewRatio
       }

@@ -22,9 +22,9 @@ const BRACKETS: Bracket[] = [
   { upTo: null, maxRequired: 0.6, minRequired: 0.6, label: '100+ GiB' }
 ];
 
-export const computeRatio = (totalEarned: bigint, consumed: bigint): number => {
+export const computeRatio = (contributed: bigint, consumed: bigint): number => {
   if (consumed === 0n) return 1.0;
-  return Number(totalEarned) / Number(consumed);
+  return Number(contributed) / Number(consumed);
 };
 
 export const getConsumptionBracket = (
@@ -80,7 +80,7 @@ export const getEligibleContributionBytes = async (
 
 export interface RatioStats {
   ratio: number;
-  totalEarned: string;
+  contributed: string;
   consumed: string;
   bracket: { label: string; maxRequired: number; minRequired: number };
   eligibleContributionBytes: string;
@@ -92,14 +92,14 @@ export interface RatioStats {
 export const getRatioStats = async (userId: number): Promise<RatioStats> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { totalEarned: true, consumed: true }
+    select: { contributed: true, consumed: true }
   });
   if (!user) throw new Error('User not found');
 
-  const { totalEarned, consumed } = user;
+  const { contributed, consumed } = user;
   const eligibleBytes = await getEligibleContributionBytes(userId);
 
-  const ratio = computeRatio(totalEarned, consumed);
+  const ratio = computeRatio(contributed, consumed);
   const bracket = getConsumptionBracket(consumed);
   const coverage =
     consumed === 0n
@@ -109,7 +109,7 @@ export const getRatioStats = async (userId: number): Promise<RatioStats> => {
 
   return {
     ratio,
-    totalEarned: totalEarned.toString(),
+    contributed: contributed.toString(),
     consumed: consumed.toString(),
     bracket,
     eligibleContributionBytes: eligibleBytes.toString(),

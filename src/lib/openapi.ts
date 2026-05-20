@@ -328,7 +328,6 @@ const ProfileStats = registry.register(
   z.object({
     contributed: z.string().nullable(),
     consumed: z.string().nullable(),
-    totalEarned: z.string().nullable(),
     ratio: z.string().nullable(),
     buffer: z.string().nullable()
   })

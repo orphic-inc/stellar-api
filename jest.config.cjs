@@ -4,7 +4,7 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
-  clearMocks: true,
+  resetMocks: true,
   setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
   transform: {
     '^.+\\.ts$': [

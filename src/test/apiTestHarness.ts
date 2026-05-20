@@ -38,7 +38,12 @@ jest.mock('../modules/reports', () => ({
 }));
 
 jest.mock('../modules/linkHealth', () => ({
-  recordContributionReport: jest.fn()
+  recordContributionReport: jest.fn(),
+  recheckStaleLinks: jest.fn()
+}));
+
+jest.mock('../modules/linkHealthJob', () => ({
+  startLinkHealthJob: jest.fn()
 }));
 
 jest.mock('../modules/artist', () => ({
@@ -167,6 +172,8 @@ jest.mock('../lib/sanitize', () => ({
 
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
+import gravatar from 'gravatar';
+import jwt from 'jsonwebtoken';
 import { type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
 import app from '../app';
@@ -320,6 +327,20 @@ export const resetApiTestState = (): void => {
   jest.clearAllMocks();
   mockedIsInstalled.mockResolvedValue(true);
   currentUserRankLevel = 1000;
+  // Restore implementations cleared by resetMocks: true
+  (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt');
+  (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+  (gravatar.url as jest.Mock).mockReturnValue(
+    'https://gravatar.test/avatar.png'
+  );
+  (jwt.sign as jest.Mock).mockImplementation(
+    (
+      _payload: unknown,
+      _secret: string,
+      _options: unknown,
+      callback: (err: Error | null, token?: string) => void
+    ) => callback(null, 'signed-jwt')
+  );
   prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
   prismaMock.siteSettings.upsert.mockResolvedValue({
     id: 1,

@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
+import { computeRatio } from './ratio';
 
 const log = getLogger('profile');
 
@@ -148,7 +149,6 @@ const PROFILE_BASE_SELECT = {
   inviteCount: true,
   contributed: true,
   consumed: true,
-  totalEarned: true,
   ratio: true,
   userRank: { select: { id: true, name: true, color: true, badge: true } },
   profile: true,
@@ -234,7 +234,7 @@ const buildInviteTree = (
       lastSeen: row.user.lastLogin?.toISOString() ?? null,
       contributed: row.user.contributed.toString(),
       consumed: row.user.consumed.toString(),
-      ratio: row.user.ratio.toFixed(2),
+      ratio: computeRatio(row.user.contributed, row.user.consumed).toFixed(2),
       children: []
     };
 
@@ -736,6 +736,7 @@ const buildProfileView = async (
   ]);
   const percentiles = await getPercentileSummary(user, activitySummary);
   const donorPresentation = buildDonorPresentation(user);
+  const derivedRatio = computeRatio(user.contributed, user.consumed);
 
   return {
     id: user.id,
@@ -753,8 +754,7 @@ const buildProfileView = async (
     stats: {
       contributed: canSeeUploaded ? user.contributed.toString() : null,
       consumed: canSeeDownloaded ? user.consumed.toString() : null,
-      totalEarned: canSeeRatio ? user.totalEarned.toString() : null,
-      ratio: canSeeRatio ? user.ratio.toFixed(2) : null,
+      ratio: canSeeRatio ? derivedRatio.toFixed(2) : null,
       buffer:
         canSeeUploaded || canSeeDownloaded
           ? (user.contributed - user.consumed).toString()
