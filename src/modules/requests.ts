@@ -4,6 +4,7 @@ import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { computeRatio } from './ratio';
 import { CreateRequestInput } from '../schemas/requests';
+import { emitNotifications } from '../lib/notifications';
 
 export const MINIMUM_BOUNTY = BigInt(economy.minimumBounty);
 
@@ -355,6 +356,20 @@ export async function fillRequest(
           awardedAmount: totalBounty.toString()
         }
       }
+    });
+
+    // Notify requester + all bounty contributors (excluding the filler)
+    const interestedUserIds = [
+      request.userId,
+      ...request.bounties.map((b) => b.userId)
+    ];
+    const uniqueIds = [...new Set(interestedUserIds)];
+    await emitNotifications(tx, {
+      userIds: uniqueIds,
+      type: 'request_filled',
+      actorId: userId,
+      page: 'requests',
+      pageId: requestId
     });
 
     const filled = await tx.request.findUnique({

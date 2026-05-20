@@ -58,7 +58,7 @@ router.get(
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
-        quoter: { select: { id: true, username: true, avatar: true } }
+        actor: { select: { id: true, username: true, avatar: true } }
       }
     });
 

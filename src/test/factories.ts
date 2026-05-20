@@ -281,7 +281,8 @@ export function makeNotification(
   return {
     id: 8,
     userId: TEST_USER_ID,
-    quoterId: 99,
+    type: 'forum_sub' as const,
+    actorId: 99,
     page: SubscriptionPage.forums,
     pageId: 1,
     postId: 1,

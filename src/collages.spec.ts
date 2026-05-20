@@ -869,12 +869,72 @@ describe('collages Prisma contract', () => {
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
     );
-    prismaMock.$transaction.mockResolvedValue([makeCollageEntryDetail(), {}]);
+    prismaMock.collageEntry.create.mockResolvedValue(makeCollageEntryDetail());
+    prismaMock.collage.update.mockResolvedValue(makeCollage());
 
-    await request(app).post('/api/collages/1/entries').send({ releaseId: 42 });
+    const res = await request(app)
+      .post('/api/collages/1/entries')
+      .send({ releaseId: 42 });
 
-    const txArgs = (prismaMock.$transaction as jest.Mock).mock
-      .calls[0][0] as unknown[];
-    expect(txArgs).toHaveLength(2);
+    expect(res.status).toBe(201);
+    // interactive transaction used (function form)
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(prismaMock.collageEntry.create).toHaveBeenCalled();
+    expect(prismaMock.collage.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { numEntries: { increment: 1 } } })
+    );
+  });
+
+  it('POST /:id/entries notifies collage subscribers excluding the adder', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage({ id: 1 }));
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(null);
+    prismaMock.collageEntry.aggregate.mockResolvedValue(
+      makeEntryAggregateResult(10)
+    );
+    prismaMock.collageEntry.create.mockResolvedValue(makeCollageEntryDetail());
+    prismaMock.collage.update.mockResolvedValue(makeCollage());
+    prismaMock.collageSubscription.findMany.mockResolvedValue([
+      { userId: 10 },
+      { userId: 11 },
+      { userId: 7 } // 7 is the auth user — should be excluded
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/collages/1/entries')
+      .send({ releaseId: 42 });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 10, type: 'collage_updated' }),
+          expect.objectContaining({ userId: 11, type: 'collage_updated' })
+        ]),
+        skipDuplicates: true
+      })
+    );
+    const callData = (prismaMock.notification.createMany as jest.Mock).mock
+      .calls[0][0].data as { userId: number }[];
+    expect(callData.map((d) => d.userId)).not.toContain(7);
+  });
+
+  it('POST /:id/entries emits no notification when no subscribers', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage({ id: 1 }));
+    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue(null);
+    prismaMock.collageEntry.aggregate.mockResolvedValue(
+      makeEntryAggregateResult(10)
+    );
+    prismaMock.collageEntry.create.mockResolvedValue(makeCollageEntryDetail());
+    prismaMock.collage.update.mockResolvedValue(makeCollage());
+    prismaMock.collageSubscription.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/api/collages/1/entries')
+      .send({ releaseId: 42 });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.notification.createMany).not.toHaveBeenCalled();
   });
 });

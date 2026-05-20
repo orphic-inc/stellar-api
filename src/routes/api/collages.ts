@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { emitNotifications } from '../../lib/notifications';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
@@ -444,8 +445,8 @@ router.post(
     });
     const nextSort = (maxSort._max.sort ?? 0) + 10;
 
-    const [entry] = await prisma.$transaction([
-      prisma.collageEntry.create({
+    const entry = await prisma.$transaction(async (tx) => {
+      const created = await tx.collageEntry.create({
         data: { collageId: id, releaseId, userId, sort: nextSort },
         include: {
           release: {
@@ -460,12 +461,26 @@ router.post(
           },
           user: { select: { id: true, username: true } }
         }
-      }),
-      prisma.collage.update({
+      });
+      await tx.collage.update({
         where: { id },
         data: { numEntries: { increment: 1 } }
-      })
-    ]);
+      });
+
+      const subs = await tx.collageSubscription.findMany({
+        where: { collageId: id },
+        select: { userId: true }
+      });
+      await emitNotifications(tx, {
+        userIds: subs.map((s) => s.userId),
+        type: 'collage_updated',
+        actorId: userId,
+        page: 'collages',
+        pageId: id
+      });
+
+      return created;
+    });
 
     res.status(201).json(entry);
   })

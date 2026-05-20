@@ -102,6 +102,14 @@ enum SubscriptionPage {
   communities
 }
 
+enum NotificationType {
+  forum_quote
+  forum_sub
+  request_filled
+  collage_updated
+  comment_sub
+}
+
 enum ThreadType {
   forum
   application
@@ -336,7 +344,7 @@ model User {
   subscriptions         Subscription[]
   commentSubscriptions  CommentSubscription[]
   notifications         Notification[]        @relation("NotificationUser")
-  quotedInNotifications Notification[]        @relation("NotificationQuoter")
+  actedNotifications    Notification[]        @relation("NotificationActor")
   blogs                 Blog[]
   posts                 Post[]
   apiApplications       ApiApplication[]
@@ -1323,14 +1331,16 @@ model Notification {
   id        Int              @id @default(autoincrement())
   userId    Int
   user      User             @relation("NotificationUser", fields: [userId], references: [id])
-  quoterId  Int
-  quoter    User             @relation("NotificationQuoter", fields: [quoterId], references: [id])
+  type      NotificationType @default(forum_quote)
+  actorId   Int?
+  actor     User?            @relation("NotificationActor", fields: [actorId], references: [id])
   page      SubscriptionPage
   pageId    Int
-  postId    Int
+  postId    Int?
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
+  @@index([userId, readAt])
   @@map("notifications")
 }
 

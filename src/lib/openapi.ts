@@ -873,15 +873,21 @@ const Notification = registry.register(
   'Notification',
   z.object({
     id: z.number(),
+    type: z.string(),
+    actorId: z.number().nullable().optional(),
+    actor: z
+      .object({
+        id: z.number(),
+        username: z.string(),
+        avatar: z.string().nullable().optional()
+      })
+      .nullable()
+      .optional(),
     page: z.string(),
     pageId: z.number(),
-    postId: z.number(),
+    postId: z.number().nullable().optional(),
+    readAt: z.string().nullable().optional(),
     createdAt: z.string(),
-    quoter: z.object({
-      id: z.number(),
-      username: z.string(),
-      avatar: z.string().nullable().optional()
-    }),
     source: z
       .object({ title: z.string(), forumId: z.number().optional() })
       .nullable()
