@@ -5,7 +5,8 @@ const DEFAULTS = {
   id: 1,
   approvedDomains: [] as string[],
   registrationStatus: 'open' as const,
-  maxUsers: 7000
+  maxUsers: 7000,
+  dismissedLaunchChecklist: [] as string[]
 };
 
 export async function getSettings() {

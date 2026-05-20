@@ -51,10 +51,16 @@ export const unfillRequestSchema = z.object({
 });
 
 export const listRequestsQuerySchema = z.object({
+  q: z.string().trim().optional(),
+  artist: z.string().trim().optional(),
+  type: releaseTypeEnum.optional(),
+  year: z.coerce.number().int().min(1900).max(2100).optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   communityId: z.coerce.number().int().positive().optional(),
-  status: requestStatusEnum.optional()
+  status: requestStatusEnum.optional(),
+  orderBy: z.enum(['createdAt', 'voteCount', 'random']).optional(),
+  order: z.enum(['asc', 'desc']).optional()
 });
 
 export type ListRequestsQuery = z.infer<typeof listRequestsQuerySchema>;

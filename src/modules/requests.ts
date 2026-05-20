@@ -38,6 +38,7 @@ export type SerializedRequest = {
   user?: { id: number; username: string };
   filler?: { id: number; username: string } | null;
   community?: { id: number; name: string };
+  _count: { bounties: number };
   bounties?: Array<Omit<RawBounty, 'amount'> & { amount: string }>;
   artists?: unknown[];
   filledContribution?: unknown;
@@ -73,6 +74,7 @@ export function serializeRequest(request: {
   return {
     ...request,
     totalBounty: totalBounty.toString(),
+    _count: { bounties: request.bounties?.length ?? 0 },
     bounties: request.bounties?.map((b) => ({
       ...b,
       amount: b.amount.toString()
@@ -522,38 +524,87 @@ export async function deleteRequest(
 // ─── listRequests ─────────────────────────────────────────────────────────────
 
 export type ListRequestsOptions = {
+  q?: string;
+  artist?: string;
+  type?: ReleaseType;
+  year?: number;
   page?: number;
   limit?: number;
   communityId?: number;
   status?: RequestStatus;
+  orderBy?: 'createdAt' | 'voteCount' | 'random';
+  order?: 'asc' | 'desc';
 };
 
 export async function listRequests({
+  q,
+  artist,
+  type,
+  year,
   page = 1,
   limit = 25,
   communityId,
-  status
+  status,
+  orderBy = 'createdAt',
+  order = 'desc'
 }: ListRequestsOptions = {}) {
   const skip = (Math.max(1, page) - 1) * Math.min(100, limit);
   const take = Math.min(100, limit);
 
-  const where = {
+  const where: Record<string, unknown> = {
     deletedAt: null,
+    ...(q && {
+      OR: [
+        { title: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } }
+      ]
+    }),
+    ...(artist && {
+      artists: {
+        some: { artist: { name: { contains: artist, mode: 'insensitive' } } }
+      }
+    }),
+    ...(type != null && { type }),
+    ...(year != null && { year }),
     ...(communityId != null && { communityId }),
     ...(status != null && { status })
   };
+
+  const include = {
+    user: { select: { id: true, username: true } },
+    community: { select: { id: true, name: true } },
+    bounties: true
+  } as const;
+
+  if (orderBy === 'random') {
+    const total = await prisma.request.count({ where });
+    const randomSkip =
+      total > take ? Math.floor(Math.random() * (total - take)) : 0;
+    const requests = await prisma.request.findMany({
+      where,
+      skip: randomSkip,
+      take,
+      include
+    });
+
+    return {
+      data: requests.map(serializeRequest),
+      meta: {
+        total,
+        page: Math.max(1, page),
+        limit: take,
+        totalPages: Math.ceil(total / take)
+      }
+    };
+  }
 
   const [requests, total] = await Promise.all([
     prisma.request.findMany({
       where,
       skip,
       take,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: { select: { id: true, username: true } },
-        community: { select: { id: true, name: true } },
-        bounties: true
-      }
+      orderBy: { [orderBy]: order },
+      include
     }),
     prisma.request.count({ where })
   ]);

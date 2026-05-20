@@ -1231,9 +1231,18 @@ describe('stats.getSystemStats', () => {
       { _count: { consumers: 10 } },
       { _count: { consumers: 5 } }
     ] as never);
+    prismaMock.siteSettings.upsert.mockResolvedValueOnce({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 5000,
+      dismissedLaunchChecklist: [],
+      updatedAt: new Date()
+    } as never);
 
     const result = await getSystemStats();
 
+    expect(result.maxUsers).toBe(5000);
     expect(result.totalUsers).toBe(100);
     expect(result.enabledUsers).toBe(80);
     expect(result.contributedLinkDownloads).toBe(15);

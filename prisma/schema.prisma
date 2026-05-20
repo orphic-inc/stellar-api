@@ -1646,6 +1646,7 @@ model SiteSettings {
   approvedDomains    String[]
   registrationStatus RegistrationStatus @default(open)
   maxUsers           Int                @default(7000)
+  dismissedLaunchChecklist String[]
   updatedAt          DateTime           @updatedAt
 
   @@map("site_settings")

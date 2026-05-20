@@ -11,6 +11,7 @@ const getStatsMock = getSystemStats as jest.MockedFunction<
 >;
 
 const mockStats = {
+  maxUsers: 5000,
   totalUsers: 250,
   totalReleases: 1800,
   totalContributions: 4500,
@@ -28,6 +29,7 @@ describe('GET /api/stats', () => {
     const res = await request(app).get('/api/stats');
 
     expect(res.status).toBe(200);
+    expect(res.body.maxUsers).toBe(5000);
     expect(res.body.totalUsers).toBe(250);
     expect(res.body.totalReleases).toBe(1800);
   });

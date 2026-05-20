@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getSettings } from './settings';
 
 export const getSystemStats = async () => {
   const now = new Date();
@@ -22,7 +23,8 @@ export const getSystemStats = async () => {
     announcements,
     comments,
     contributedLinks,
-    contributionDownloadCounts
+    contributionDownloadCounts,
+    settings
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { disabled: false } }),
@@ -38,7 +40,8 @@ export const getSystemStats = async () => {
     prisma.contribution.count(),
     prisma.contribution.findMany({
       select: { _count: { select: { consumers: true } } }
-    })
+    }),
+    getSettings()
   ]);
 
   const contributedLinkDownloads = contributionDownloadCounts.reduce(
@@ -47,6 +50,7 @@ export const getSystemStats = async () => {
   );
 
   return {
+    maxUsers: settings.maxUsers,
     totalUsers,
     enabledUsers,
     activeToday,

@@ -3,13 +3,14 @@ import bcrypt from 'bcryptjs';
 import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   auth as authConfig,
   http as httpConfig,
   email as emailConfig
 } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
+import { requirePermission } from '../../middleware/permissions';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 import { getSettings } from '../../modules/settings';
@@ -19,6 +20,15 @@ import { authUserSelect, toAuthUser } from '../../modules/auth';
 
 const TOKEN_TTL_SECONDS = 3600;
 const STARTUP_BUFFER = 5_368_709_120n; // 5 GiB — matches self-registration buffer
+
+export type LaunchChecklistItem = {
+  id: string;
+  message: string;
+};
+
+type SettingsWithDismissals = Awaited<ReturnType<typeof getSettings>> & {
+  dismissedLaunchChecklist?: string[];
+};
 
 const issueToken = (userId: number): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -34,52 +44,65 @@ const issueToken = (userId: number): Promise<string> =>
     );
   });
 
-function getConfigWarnings(): string[] {
-  const warnings: string[] = [];
+function getConfigWarnings(): LaunchChecklistItem[] {
+  const warnings: LaunchChecklistItem[] = [];
   if (httpConfig.corsOrigin === 'http://localhost:3000') {
-    warnings.push(
-      'STELLAR_HTTP_CORS_ORIGIN is not set or uses the development default. Update this to your frontend URL before going live.'
-    );
+    warnings.push({
+      id: 'cors-origin-default',
+      message:
+        'STELLAR_HTTP_CORS_ORIGIN is not set or uses the development default. Update this to your frontend URL before going live.'
+    });
   }
   if (emailConfig.siteUrl === 'http://localhost:3000') {
-    warnings.push(
-      'STELLAR_SITE_URL is not set or uses the development default. Update this before going live.'
-    );
+    warnings.push({
+      id: 'site-url-default',
+      message:
+        'STELLAR_SITE_URL is not set or uses the development default. Update this before going live.'
+    });
   }
   if (!emailConfig.smtpHost) {
-    warnings.push(
-      'SMTP is not configured (STELLAR_SMTP_HOST is unset). Invite emails will not be delivered.'
-    );
+    warnings.push({
+      id: 'smtp-host-unset',
+      message:
+        'SMTP is not configured (STELLAR_SMTP_HOST is unset). Invite emails will not be delivered.'
+    });
   }
   return warnings;
 }
 
-function getSetupChecklist(settings: {
-  registrationStatus: 'open' | 'invite' | 'closed';
-  maxUsers: number;
-  approvedDomains: string[];
-}): string[] {
-  const checklist: string[] = [];
+function getSetupChecklist(
+  settings: SettingsWithDismissals
+): LaunchChecklistItem[] {
+  const dismissed = new Set(settings.dismissedLaunchChecklist ?? []);
+  const checklist: LaunchChecklistItem[] = [];
 
   if (settings.registrationStatus === 'open') {
-    checklist.push(
-      'registrationStatus is still "open". Switch it to "closed" or "invite" until you are ready for public launch.'
-    );
+    checklist.push({
+      id: 'registration-open',
+      message:
+        'registrationStatus is still "open". Switch it to "closed" or "invite" until you are ready for public launch.'
+    });
   }
 
   if (settings.maxUsers === 7000) {
-    checklist.push(
-      'maxUsers is still the default value (7000). Review and set a launch-ready capacity limit.'
-    );
+    checklist.push({
+      id: 'max-users-default',
+      message:
+        'maxUsers is still the default value (7000). Review and set a launch-ready capacity limit.'
+    });
   }
 
   if (settings.approvedDomains.length === 0) {
-    checklist.push(
-      'approvedDomains is empty. Leave it unrestricted only if you intentionally want to allow all email domains.'
-    );
+    checklist.push({
+      id: 'approved-domains-empty',
+      message:
+        'approvedDomains is empty. Leave it unrestricted only if you intentionally want to allow all email domains.'
+    });
   }
 
-  return [...checklist, ...getConfigWarnings()];
+  return [...checklist, ...getConfigWarnings()].filter(
+    (item) => !dismissed.has(item.id)
+  );
 }
 
 const router = express.Router();
@@ -96,9 +119,33 @@ router.get(
     res.json({
       installed: rankCount > 0 && userCount > 0,
       registrationStatus: settings.registrationStatus,
-      configWarnings: getConfigWarnings(),
-      setupChecklist: getSetupChecklist(settings)
+      configWarnings: getConfigWarnings().map((item) => item.message),
+      setupChecklist: getSetupChecklist(settings as SettingsWithDismissals)
     });
+  })
+);
+
+router.post(
+  '/checklist/:id/dismiss',
+  ...requirePermission('staff'),
+  authHandler(async (req, res) => {
+    const settings = (await getSettings()) as SettingsWithDismissals;
+    const itemId = req.params.id;
+    const dismissedLaunchChecklist = Array.from(
+      new Set([...(settings.dismissedLaunchChecklist ?? []), itemId])
+    );
+    await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      create: {
+        id: 1,
+        approvedDomains: settings.approvedDomains,
+        registrationStatus: settings.registrationStatus,
+        maxUsers: settings.maxUsers,
+        dismissedLaunchChecklist
+      } as never,
+      update: { dismissedLaunchChecklist } as never
+    });
+    res.status(204).send();
   })
 );
 

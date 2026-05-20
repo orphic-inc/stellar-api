@@ -236,9 +236,25 @@ const REQUEST_SELECT = {
   communityId: true,
   createdAt: true,
   user: { select: { id: true, username: true } },
+  community: { select: { id: true, name: true } },
   artists: { select: { artist: { select: { id: true, name: true } } } },
-  _count: { select: { bounties: true } }
+  bounties: { select: { amount: true } }
 } as const;
+
+type RawRequestRow = {
+  bounties: { amount: bigint }[];
+  [key: string]: unknown;
+};
+
+function serializeRequestRow(row: RawRequestRow) {
+  const { bounties, ...rest } = row;
+  const total = bounties.reduce((acc, b) => acc + BigInt(b.amount), BigInt(0));
+  return {
+    ...rest,
+    totalBounty: total.toString(),
+    _count: { bounties: bounties.length }
+  };
+}
 
 router.get(
   '/requests',
@@ -274,7 +290,12 @@ router.get(
         take: q.limit,
         select: REQUEST_SELECT
       });
-      return paginatedResponse(res, data, count, pg);
+      return paginatedResponse(
+        res,
+        data.map((r) => serializeRequestRow(r as unknown as RawRequestRow)),
+        count,
+        pg
+      );
     }
 
     const orderByMap: Record<string, unknown> = {
@@ -293,7 +314,12 @@ router.get(
       prisma.request.count({ where })
     ]);
 
-    paginatedResponse(res, data, total, pg);
+    paginatedResponse(
+      res,
+      data.map((r) => serializeRequestRow(r as unknown as RawRequestRow)),
+      total,
+      pg
+    );
   })
 );
 
