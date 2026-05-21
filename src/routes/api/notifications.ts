@@ -73,51 +73,65 @@ router.get(
     const requestIds = groupIds(notifications, 'requests');
     const communityIds = groupIds(notifications, 'communities');
     const contributionIds = groupIds(notifications, 'contributions');
+    const releaseIds = groupIds(notifications, 'release');
 
-    const [topics, artists, collages, requests, communities, contributions] =
-      await Promise.all([
-        forumIds.length > 0
-          ? prisma.forumTopic.findMany({
-              where: { id: { in: forumIds } },
-              select: { id: true, forumId: true, title: true }
-            })
-          : [],
-        artistIds.length > 0
-          ? prisma.artist.findMany({
-              where: { id: { in: artistIds } },
-              select: { id: true, name: true }
-            })
-          : [],
-        collageIds.length > 0
-          ? prisma.collage.findMany({
-              where: { id: { in: collageIds } },
-              select: { id: true, name: true }
-            })
-          : [],
-        requestIds.length > 0
-          ? prisma.request.findMany({
-              where: { id: { in: requestIds } },
-              select: { id: true, title: true }
-            })
-          : [],
-        communityIds.length > 0
-          ? prisma.community.findMany({
-              where: { id: { in: communityIds } },
-              select: { id: true, name: true }
-            })
-          : [],
-        contributionIds.length > 0
-          ? prisma.contribution.findMany({
-              where: { id: { in: contributionIds } },
-              select: {
-                id: true,
-                release: {
-                  select: { id: true, title: true, communityId: true }
-                }
+    const [
+      topics,
+      artists,
+      collages,
+      requests,
+      communities,
+      contributions,
+      releases
+    ] = await Promise.all([
+      forumIds.length > 0
+        ? prisma.forumTopic.findMany({
+            where: { id: { in: forumIds } },
+            select: { id: true, forumId: true, title: true }
+          })
+        : [],
+      artistIds.length > 0
+        ? prisma.artist.findMany({
+            where: { id: { in: artistIds } },
+            select: { id: true, name: true }
+          })
+        : [],
+      collageIds.length > 0
+        ? prisma.collage.findMany({
+            where: { id: { in: collageIds } },
+            select: { id: true, name: true }
+          })
+        : [],
+      requestIds.length > 0
+        ? prisma.request.findMany({
+            where: { id: { in: requestIds } },
+            select: { id: true, title: true }
+          })
+        : [],
+      communityIds.length > 0
+        ? prisma.community.findMany({
+            where: { id: { in: communityIds } },
+            select: { id: true, name: true }
+          })
+        : [],
+      contributionIds.length > 0
+        ? prisma.contribution.findMany({
+            where: { id: { in: contributionIds } },
+            select: {
+              id: true,
+              release: {
+                select: { id: true, title: true, communityId: true }
               }
-            })
-          : []
-      ]);
+            }
+          })
+        : [],
+      releaseIds.length > 0
+        ? prisma.release.findMany({
+            where: { id: { in: releaseIds } },
+            select: { id: true, title: true, communityId: true }
+          })
+        : []
+    ]);
 
     const topicMap = new Map(topics.map((t) => [t.id, t]));
     const artistMap = new Map(artists.map((a) => [a.id, a]));
@@ -125,7 +139,17 @@ router.get(
     const requestMap = new Map(requests.map((r) => [r.id, r]));
     const communityMap = new Map(communities.map((c) => [c.id, c]));
     const contributionMap = new Map(
-      (contributions as { id: number; release: { id: number; title: string; communityId: number | null } }[]).map((c) => [c.id, c])
+      (
+        contributions as {
+          id: number;
+          release: { id: number; title: string; communityId: number | null };
+        }[]
+      ).map((c) => [c.id, c])
+    );
+    const releaseMap = new Map(
+      (
+        releases as { id: number; title: string; communityId: number | null }[]
+      ).map((r) => [r.id, r])
     );
 
     const enriched = notifications.map((n) => {
@@ -152,6 +176,15 @@ router.get(
               title: c.release.title,
               releaseId: c.release.id,
               communityId: c.release.communityId ?? undefined
+            }
+          : null;
+      } else if (n.page === 'release') {
+        const r = releaseMap.get(n.pageId);
+        source = r
+          ? {
+              title: r.title,
+              releaseId: r.id,
+              communityId: r.communityId ?? undefined
             }
           : null;
       }

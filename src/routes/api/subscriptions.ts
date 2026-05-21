@@ -1,14 +1,23 @@
 import express from 'express';
+import { z } from 'zod';
+import { SubscriptionPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate, parsedBody } from '../../middleware/validate';
+import { validate, parsedBody, validateQuery } from '../../middleware/validate';
 import {
   subscribeSchema,
   subscribeCommentsSchema,
   type SubscribeInput,
   type SubscribeCommentsInput
 } from '../../schemas/subscription';
+
+const commentStatusQuerySchema = z.object({
+  page: z.enum(
+    Object.values(SubscriptionPage) as [SubscriptionPage, ...SubscriptionPage[]]
+  ),
+  pageId: z.coerce.number().int().positive()
+});
 
 const router = express.Router();
 
@@ -46,6 +55,23 @@ router.get(
       take: 100
     });
     res.json(subscriptions);
+  })
+);
+
+// GET /api/subscriptions/comment-status
+router.get(
+  '/comment-status',
+  requireAuth,
+  validateQuery(commentStatusQuerySchema),
+  authHandler(async (req, res) => {
+    const { page, pageId } = res.locals.parsedQuery as {
+      page: SubscriptionPage;
+      pageId: number;
+    };
+    const sub = await prisma.commentSubscription.findUnique({
+      where: { userId_page_pageId: { userId: req.user.id, page, pageId } }
+    });
+    res.json({ subscribed: !!sub });
   })
 );
 
