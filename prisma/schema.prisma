@@ -101,6 +101,7 @@ enum SubscriptionPage {
   requests
   communities
   contributions
+  release
 }
 
 enum NotificationType {

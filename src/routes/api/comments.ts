@@ -108,10 +108,12 @@ router.post(
         { subPage: SubscriptionPage; pageId: number | undefined }
       >
     > = {
+      release: { subPage: 'release', pageId: releaseId },
       requests: { subPage: 'requests', pageId: requestId },
       artist: { subPage: 'artist', pageId: artistId },
       collages: { subPage: 'collages', pageId: collageId },
-      communities: { subPage: 'communities', pageId: communityId }
+      communities: { subPage: 'communities', pageId: communityId },
+      contributions: { subPage: 'contributions', pageId: contributionId }
     };
     const subTarget = subPageMap[page];
 
