@@ -798,8 +798,37 @@ describe('POST /api/forums/:forumId/topics/:forumTopicId/posts — error paths',
 
 // ─── PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id (403) ───────────
 
-describe('PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id — 403', () => {
+describe('PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
+  it('allows moderators to edit another user post', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
+    prismaMock.forumPost.findFirst.mockResolvedValue(
+      makeForumPost({ id: 21, authorId: 99, body: 'Old body' })
+    );
+    updatePostMock.mockResolvedValue(
+      makeForumPost({
+        id: 21,
+        authorId: 99,
+        body: 'Edited by mod'
+      }) as Awaited<ReturnType<typeof updatePost>>
+    );
+
+    const res = await request(app)
+      .put('/api/forums/9/topics/44/posts/21')
+      .send({ body: 'Edited by mod' });
+
+    expect(res.status).toBe(200);
+    expect(updatePostMock).toHaveBeenCalledWith(
+      21,
+      7,
+      'Old body',
+      'Edited by mod'
+    );
+  });
+
   it('returns 403 when user is not the post author', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     prismaMock.forumPost.findFirst.mockResolvedValue(
       makeForumPost({ id: 21, authorId: 99 })
     );

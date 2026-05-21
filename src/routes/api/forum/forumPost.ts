@@ -151,7 +151,7 @@ router.post(
   })
 );
 
-// PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id — author only
+// PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id — author or moderator
 router.put(
   '/:id',
   requireAuth,
@@ -174,7 +174,8 @@ router.put(
       }
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    if (post.authorId !== req.user.id)
+    const isOwner = post.authorId === req.user.id;
+    if (!isOwner && !(await isModerator(req, res)))
       return res.status(403).json({ msg: 'Not authorized' });
 
     const updated = await updatePost(id, req.user.id, post.body, body);
