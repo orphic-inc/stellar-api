@@ -257,7 +257,8 @@ describe('API content and shared flows', () => {
     createContributionSubmissionMock.mockResolvedValue({
       id: 5,
       releaseId: 3,
-      userId: 7
+      userId: 7,
+      collaborators: []
     } as never);
 
     const res = await request(app)
@@ -560,5 +561,79 @@ describe('API content and shared flows', () => {
       })
     });
     expect(res.body.release.title).toBe('Test Release');
+  });
+
+  it('emits artist_release notifications to subscribers of each collaborating artist', async () => {
+    createContributionSubmissionMock.mockResolvedValue({
+      id: 12,
+      user: { id: 7, username: 'kai' },
+      release: { id: 55, title: 'Test Release', communityId: 3 },
+      collaborators: [
+        { id: 21, name: 'Miles Davis' },
+        { id: 22, name: 'John Coltrane' }
+      ],
+      releaseDescription: 'A real contribution'
+    } as Awaited<ReturnType<typeof createContributionSubmissionMock>>);
+
+    prismaMock.artistSubscription.findMany.mockResolvedValue([
+      { userId: 99 },
+      { userId: 100 }
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 3,
+        type: 'Music',
+        title: 'Test Release',
+        year: 2024,
+        fileType: 'wav',
+        downloadUrl: 'https://example.com/download',
+        sizeInBytes: 12345,
+        collaborators: [
+          { artist: 'Miles Davis', importance: 'primary' },
+          { artist: 'John Coltrane', importance: 'secondary' }
+        ]
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.artistSubscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { artistId: { in: [21, 22] } } })
+    );
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'artist_release',
+            page: 'contributions',
+            pageId: 12
+          })
+        ])
+      })
+    );
+  });
+
+  it('skips notification emission when the contribution has no collaborators', async () => {
+    createContributionSubmissionMock.mockResolvedValue({
+      id: 13,
+      collaborators: [],
+      release: { id: 56, title: 'Solo', communityId: 3 }
+    } as never);
+
+    const res = await request(app)
+      .post('/api/contributions')
+      .send({
+        communityId: 3,
+        type: 'Music',
+        title: 'Solo',
+        year: 2024,
+        fileType: 'wav',
+        downloadUrl: 'https://example.com/download',
+        sizeInBytes: 12345,
+        collaborators: [{ artist: 'Unknown', importance: 'primary' }]
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.artistSubscription.findMany).not.toHaveBeenCalled();
   });
 });

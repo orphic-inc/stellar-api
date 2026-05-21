@@ -154,6 +154,52 @@ router.post(
   })
 );
 
+// GET /api/artists/:id/subscribe
+router.get(
+  '/:id/subscribe',
+  requireAuth,
+  validateParams(artistIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const sub = await prisma.artistSubscription.findUnique({
+      where: { userId_artistId: { userId: req.user.id, artistId: id } }
+    });
+    res.json({ subscribed: sub !== null });
+  })
+);
+
+// POST /api/artists/:id/subscribe
+router.post(
+  '/:id/subscribe',
+  requireAuth,
+  validateParams(artistIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const artist = await prisma.artist.findUnique({ where: { id } });
+    if (!artist) return res.status(404).json({ msg: 'Artist not found' });
+    await prisma.artistSubscription.upsert({
+      where: { userId_artistId: { userId: req.user.id, artistId: id } },
+      create: { userId: req.user.id, artistId: id },
+      update: {}
+    });
+    res.json({ subscribed: true });
+  })
+);
+
+// DELETE /api/artists/:id/subscribe
+router.delete(
+  '/:id/subscribe',
+  requireAuth,
+  validateParams(artistIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    await prisma.artistSubscription.deleteMany({
+      where: { userId: req.user.id, artistId: id }
+    });
+    res.json({ subscribed: false });
+  })
+);
+
 // GET /api/artists/:id
 router.get(
   '/:id',
@@ -185,25 +231,30 @@ router.get(
     ];
     const accessibleCommunityIds = [...new Set(accessibleIds)];
 
-    const artist = await prisma.artist.findUnique({
-      where: { id },
-      include: {
-        aliases: {
-          include: { redirect: { select: { id: true, name: true } } }
-        },
-        tags: { include: { tag: true } },
-        similarTo: {
-          include: { similarArtist: { select: { id: true, name: true } } }
-        },
-        releases: {
-          where: { communityId: { in: accessibleCommunityIds } },
-          include: { community: { select: { id: true, name: true } } },
-          orderBy: [{ year: 'desc' }, { title: 'asc' }]
+    const [artist, subscription] = await Promise.all([
+      prisma.artist.findUnique({
+        where: { id },
+        include: {
+          aliases: {
+            include: { redirect: { select: { id: true, name: true } } }
+          },
+          tags: { include: { tag: true } },
+          similarTo: {
+            include: { similarArtist: { select: { id: true, name: true } } }
+          },
+          releases: {
+            where: { communityId: { in: accessibleCommunityIds } },
+            include: { community: { select: { id: true, name: true } } },
+            orderBy: [{ year: 'desc' }, { title: 'asc' }]
+          }
         }
-      }
-    });
+      }),
+      prisma.artistSubscription.findUnique({
+        where: { userId_artistId: { userId: req.user.id, artistId: id } }
+      })
+    ]);
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
-    res.json(artist);
+    res.json({ ...artist, isSubscribed: subscription !== null });
   })
 );
 

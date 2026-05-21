@@ -873,7 +873,14 @@ const Notification = registry.register(
   'Notification',
   z.object({
     id: z.number(),
-    type: z.string(),
+    type: z.enum([
+      'forum_quote',
+      'forum_sub',
+      'request_filled',
+      'collage_updated',
+      'comment_sub',
+      'artist_release'
+    ]),
     actorId: z.number().nullable().optional(),
     actor: z
       .object({
@@ -889,7 +896,12 @@ const Notification = registry.register(
     readAt: z.string().nullable().optional(),
     createdAt: z.string(),
     source: z
-      .object({ title: z.string(), forumId: z.number().optional() })
+      .object({
+        title: z.string(),
+        forumId: z.number().optional(),
+        releaseId: z.number().optional(),
+        communityId: z.number().optional()
+      })
       .nullable()
       .optional()
   })
@@ -2333,7 +2345,8 @@ const Artist = registry.register(
             .optional()
         })
       )
-      .optional()
+      .optional(),
+    isSubscribed: z.boolean().optional()
   })
 );
 
@@ -2450,6 +2463,61 @@ registry.registerPath({
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/artists/{id}/subscribe',
+  tags: ['Artists'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Subscription status',
+      content: {
+        'application/json': {
+          schema: z.object({ subscribed: z.boolean() })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/artists/{id}/subscribe',
+  tags: ['Artists'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Subscribed',
+      content: {
+        'application/json': {
+          schema: z.object({ subscribed: z.boolean() })
+        }
+      }
+    },
+    404: {
+      description: 'Artist not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/artists/{id}/subscribe',
+  tags: ['Artists'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Unsubscribed',
+      content: {
+        'application/json': {
+          schema: z.object({ subscribed: z.boolean() })
+        }
+      }
     }
   }
 });
