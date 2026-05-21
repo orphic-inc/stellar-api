@@ -1165,6 +1165,25 @@ registry.registerPath({
   }
 });
 
+registry.registerPath({
+  method: 'get',
+  path: '/subscriptions/comment-status',
+  tags: ['Subscriptions'],
+  request: {
+    query: subscribeCommentsSchema.omit({ action: true })
+  },
+  responses: {
+    200: {
+      description: 'Comment subscription status',
+      content: {
+        'application/json': {
+          schema: z.object({ subscribed: z.boolean() })
+        }
+      }
+    }
+  }
+});
+
 // ─── Forums ───────────────────────────────────────────────────────────────────
 
 const Forum = registry.register(

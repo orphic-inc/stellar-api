@@ -286,10 +286,11 @@ describe('POST /api/comments', () => {
     expect(callData.map((d) => d.userId)).not.toContain(7);
   });
 
-  it('skips comment subscription notifications for non-subscribable pages', async () => {
+  it('checks comment subscriptions for release page', async () => {
     prismaMock.comment.create.mockResolvedValue(
       makeComment({ id: 31, page: 'release' as never, releaseId: 9 }) as never
     );
+    prismaMock.commentSubscription.findMany.mockResolvedValue([]);
 
     const res = await request(app).post('/api/comments').send({
       page: 'release',
@@ -298,8 +299,9 @@ describe('POST /api/comments', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(prismaMock.commentSubscription.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.notification.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.commentSubscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { page: 'release', pageId: 9 } })
+    );
   });
 });
 
