@@ -10,7 +10,12 @@ const notificationIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-type NotificationSource = { title: string; forumId?: number } | null;
+type NotificationSource = {
+  title: string;
+  forumId?: number;
+  releaseId?: number;
+  communityId?: number;
+} | null;
 
 function groupIds(
   notifications: { page: string; pageId: number }[],
@@ -67,8 +72,9 @@ router.get(
     const collageIds = groupIds(notifications, 'collages');
     const requestIds = groupIds(notifications, 'requests');
     const communityIds = groupIds(notifications, 'communities');
+    const contributionIds = groupIds(notifications, 'contributions');
 
-    const [topics, artists, collages, requests, communities] =
+    const [topics, artists, collages, requests, communities, contributions] =
       await Promise.all([
         forumIds.length > 0
           ? prisma.forumTopic.findMany({
@@ -99,6 +105,17 @@ router.get(
               where: { id: { in: communityIds } },
               select: { id: true, name: true }
             })
+          : [],
+        contributionIds.length > 0
+          ? prisma.contribution.findMany({
+              where: { id: { in: contributionIds } },
+              select: {
+                id: true,
+                release: {
+                  select: { id: true, title: true, communityId: true }
+                }
+              }
+            })
           : []
       ]);
 
@@ -107,6 +124,9 @@ router.get(
     const collageMap = new Map(collages.map((c) => [c.id, c]));
     const requestMap = new Map(requests.map((r) => [r.id, r]));
     const communityMap = new Map(communities.map((c) => [c.id, c]));
+    const contributionMap = new Map(
+      (contributions as { id: number; release: { id: number; title: string; communityId: number | null } }[]).map((c) => [c.id, c])
+    );
 
     const enriched = notifications.map((n) => {
       let source: NotificationSource = null;
@@ -125,6 +145,15 @@ router.get(
       } else if (n.page === 'communities') {
         const c = communityMap.get(n.pageId);
         source = c ? { title: c.name } : null;
+      } else if (n.page === 'contributions') {
+        const c = contributionMap.get(n.pageId);
+        source = c
+          ? {
+              title: c.release.title,
+              releaseId: c.release.id,
+              communityId: c.release.communityId ?? undefined
+            }
+          : null;
       }
       return { ...n, source };
     });

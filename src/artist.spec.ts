@@ -224,14 +224,32 @@ describe('GET /api/artists/:id', () => {
     prismaMock.community.findMany.mockResolvedValue([{ id: 3 }] as never);
   };
 
-  it('returns an artist with community-filtered releases', async () => {
+  it('returns an artist with community-filtered releases and isSubscribed false', async () => {
     setupAccessMocks();
     prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+    prismaMock.artistSubscription.findUnique.mockResolvedValue(null);
 
     const res = await request(app).get('/api/artists/1');
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Miles Davis');
+    expect(res.body.isSubscribed).toBe(false);
+  });
+
+  it('returns isSubscribed true when the user follows the artist', async () => {
+    setupAccessMocks();
+    prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+    prismaMock.artistSubscription.findUnique.mockResolvedValue({
+      id: 1,
+      userId: 7,
+      artistId: 1,
+      createdAt: new Date()
+    } as never);
+
+    const res = await request(app).get('/api/artists/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.isSubscribed).toBe(true);
   });
 
   it('returns 404 when the artist does not exist', async () => {
@@ -258,6 +276,104 @@ describe('GET /api/artists/:id', () => {
     const res = await request(app).get('/api/artists/1');
 
     expect(res.status).toBe(200);
+  });
+});
+
+// ─── GET /api/artists/:id/subscribe ──────────────────────────────────────────
+
+describe('GET /api/artists/:id/subscribe', () => {
+  it('returns subscribed false when not following', async () => {
+    const res = await request(app).get('/api/artists/1/subscribe');
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(false);
+  });
+
+  it('returns subscribed true when following', async () => {
+    prismaMock.artistSubscription.findUnique.mockResolvedValue({
+      id: 1,
+      userId: 7,
+      artistId: 1,
+      createdAt: new Date()
+    } as never);
+
+    const res = await request(app).get('/api/artists/1/subscribe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(true);
+  });
+
+  it('returns 400 for a non-numeric id', async () => {
+    const res = await request(app).get('/api/artists/abc/subscribe');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── POST /api/artists/:id/subscribe ─────────────────────────────────────────
+
+describe('POST /api/artists/:id/subscribe', () => {
+  it('subscribes to an artist and returns subscribed true', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+    prismaMock.artistSubscription.upsert.mockResolvedValue({
+      id: 1,
+      userId: 7,
+      artistId: 1,
+      createdAt: new Date()
+    } as never);
+
+    const res = await request(app).post('/api/artists/1/subscribe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(true);
+    expect(prismaMock.artistSubscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_artistId: { userId: 7, artistId: 1 } },
+        create: { userId: 7, artistId: 1 }
+      })
+    );
+  });
+
+  it('returns 404 when the artist does not exist', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/artists/99/subscribe');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Artist not found');
+  });
+
+  it('returns 400 for a non-numeric id', async () => {
+    const res = await request(app).post('/api/artists/abc/subscribe');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── DELETE /api/artists/:id/subscribe ───────────────────────────────────────
+
+describe('DELETE /api/artists/:id/subscribe', () => {
+  it('unsubscribes and returns subscribed false', async () => {
+    prismaMock.artistSubscription.deleteMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).delete('/api/artists/1/subscribe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(false);
+    expect(prismaMock.artistSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 7, artistId: 1 }
+    });
+  });
+
+  it('returns 200 even when no subscription existed (idempotent)', async () => {
+    prismaMock.artistSubscription.deleteMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app).delete('/api/artists/1/subscribe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(false);
+  });
+
+  it('returns 400 for a non-numeric id', async () => {
+    const res = await request(app).delete('/api/artists/abc/subscribe');
+    expect(res.status).toBe(400);
   });
 });
 

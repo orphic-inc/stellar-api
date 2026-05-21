@@ -100,6 +100,7 @@ enum SubscriptionPage {
   collages
   requests
   communities
+  contributions
 }
 
 enum NotificationType {
@@ -108,6 +109,7 @@ enum NotificationType {
   request_filled
   collage_updated
   comment_sub
+  artist_release
 }
 
 enum ThreadType {
@@ -343,6 +345,7 @@ model User {
   bookmarkRequests      BookmarkRequest[]
   subscriptions         Subscription[]
   commentSubscriptions  CommentSubscription[]
+  artistSubscriptions   ArtistSubscription[]
   notifications         Notification[]        @relation("NotificationUser")
   actedNotifications    Notification[]        @relation("NotificationActor")
   blogs                 Blog[]
@@ -653,6 +656,7 @@ model Artist {
   bookmarks      BookmarkArtist[]
   comments       Comment[]
   RequestArtist  RequestArtist[]
+  subscriptions  ArtistSubscription[]
 
   @@map("artists")
 }
@@ -694,6 +698,19 @@ model ArtistTag {
   @@unique([artistId, tagId])
   @@index([artistId])
   @@map("artist_tags")
+}
+
+model ArtistSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  artistId  Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, artistId])
+  @@index([artistId])
+  @@map("artist_subscriptions")
 }
 
 model Concert {

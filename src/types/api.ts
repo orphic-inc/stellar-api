@@ -5946,7 +5946,13 @@ export interface components {
     };
     Notification: {
       id: number;
-      type: string;
+      type:
+        | 'forum_quote'
+        | 'forum_sub'
+        | 'request_filled'
+        | 'collage_updated'
+        | 'comment_sub'
+        | 'artist_release';
       actorId?: number | null;
       actor?: {
         id: number;

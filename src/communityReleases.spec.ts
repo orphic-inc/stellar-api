@@ -299,7 +299,8 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       id: 15,
       releaseId: 3,
       userId: 7,
-      type: FileType.flac
+      type: FileType.flac,
+      release: { id: 3, title: 'Kind of Blue', communityId: 1, artistId: 5 }
     } as never);
 
     const res = await request(app)
@@ -313,6 +314,42 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       releaseId: 3,
       input: expect.objectContaining({ fileType: 'flac' })
     });
+  });
+
+  it('emits artist_release notifications to subscribers when contribution is added', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ allowDuplicateFormats: true }) as never
+    );
+    addContributionToReleaseMock.mockResolvedValue({
+      id: 15,
+      releaseId: 3,
+      userId: 7,
+      type: FileType.flac,
+      release: { id: 3, title: 'Kind of Blue', communityId: 1, artistId: 5 }
+    } as never);
+    prismaMock.artistSubscription.findMany.mockResolvedValue([
+      { userId: 99 }
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/releases/3/contributions')
+      .send(validPayload);
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.artistSubscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { artistId: 5 } })
+    );
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'artist_release',
+            page: 'contributions',
+            pageId: 15
+          })
+        ])
+      })
+    );
   });
 });
 

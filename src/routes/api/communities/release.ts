@@ -26,6 +26,7 @@ import {
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
+import { emitNotifications } from '../../../lib/notifications';
 import { recomputeVoteAggregate } from '../../../modules/top10';
 import { getSettings } from '../../../modules/settings';
 import { FileType } from '@prisma/client';
@@ -294,6 +295,23 @@ router.post(
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Release not found' });
+
+    await prisma.$transaction(async (tx) => {
+      const subs = await tx.artistSubscription.findMany({
+        where: { artistId: contribution.release.artistId },
+        select: { userId: true }
+      });
+      if (subs.length > 0) {
+        await emitNotifications(tx, {
+          userIds: subs.map((s) => s.userId),
+          type: 'artist_release',
+          actorId: req.user.id,
+          page: 'contributions',
+          pageId: contribution.id
+        });
+      }
+    });
+
     res.status(201).json(contribution);
   })
 );

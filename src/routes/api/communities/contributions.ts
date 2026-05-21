@@ -5,6 +5,7 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createContributionSubmission } from '../../../modules/contribution';
 import { fileReport } from '../../../modules/reports';
 import { recordContributionReport } from '../../../modules/linkHealth';
+import { emitNotifications } from '../../../lib/notifications';
 import { requireAuth } from '../../../middleware/auth';
 import {
   parsedBody,
@@ -32,10 +33,12 @@ const reportSchema = z.object({
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const pg = parsePage(req);
+    const where = { userId: req.user.id };
     const [contributions, total] = await Promise.all([
       prisma.contribution.findMany({
+        where,
         skip: pg.skip,
         take: pg.limit,
         select: {
@@ -62,7 +65,7 @@ router.get(
           collaborators: { select: { id: true, name: true } }
         }
       }),
-      prisma.contribution.count()
+      prisma.contribution.count({ where })
     ]);
     paginatedResponse(res, contributions, total, pg);
   })
@@ -140,6 +143,26 @@ router.post(
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Community not found' });
+
+    const artistIds = contribution.collaborators.map((c) => c.id);
+    if (artistIds.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        const subs = await tx.artistSubscription.findMany({
+          where: { artistId: { in: artistIds } },
+          select: { userId: true }
+        });
+        const userIds = [...new Set(subs.map((s) => s.userId))];
+        if (userIds.length > 0) {
+          await emitNotifications(tx, {
+            userIds,
+            type: 'artist_release',
+            actorId: req.user.id,
+            page: 'contributions',
+            pageId: contribution.id
+          });
+        }
+      });
+    }
 
     res.status(201).json(contribution);
   })

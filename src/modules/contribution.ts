@@ -227,7 +227,9 @@ export const addContributionToRelease = async ({
           createdAt: true,
           updatedAt: true,
           user: { select: { id: true, username: true } },
-          release: { select: { id: true, title: true, communityId: true } },
+          release: {
+            select: { id: true, title: true, communityId: true, artistId: true }
+          },
           collaborators: { select: { id: true, name: true } }
         }
       });
