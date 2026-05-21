@@ -126,12 +126,20 @@ async function resolveExcludeTagIds(excludeTags?: string): Promise<number[]> {
 async function attachTags(
   releaseIds: number[]
 ): Promise<Map<number, Array<{ id: number; name: string }>>> {
-  const releases = await prisma.release.findMany({
-    where: { id: { in: releaseIds } },
-    select: { id: true, tags: { select: { id: true, name: true } } }
+  const releaseTags = await prisma.releaseTag.findMany({
+    where: { releaseId: { in: releaseIds } },
+    select: {
+      releaseId: true,
+      tag: { select: { id: true, name: true } }
+    }
   });
   const map = new Map<number, Array<{ id: number; name: string }>>();
-  for (const r of releases) map.set(r.id, r.tags);
+  for (const releaseId of releaseIds) map.set(releaseId, []);
+  for (const row of releaseTags) {
+    const tags = map.get(row.releaseId) ?? [];
+    tags.push(row.tag);
+    map.set(row.releaseId, tags);
+  }
   return map;
 }
 
@@ -159,8 +167,8 @@ export async function getTopReleases(
   const tagFilter =
     excludeTagIds.length > 0
       ? Prisma.sql`AND NOT EXISTS (
-          SELECT 1 FROM "_ReleaseToTag" rt
-          WHERE rt."A" = r.id AND rt."B" = ANY(${excludeTagIds}::int[])
+          SELECT 1 FROM release_tags rt
+          WHERE rt."releaseId" = r.id AND rt."tagId" = ANY(${excludeTagIds}::int[])
         )`
       : Prisma.empty;
 
@@ -469,9 +477,9 @@ export async function getTopVotedReleases(
   const tagFilter =
     tags && tags.trim()
       ? Prisma.sql`AND EXISTS (
-          SELECT 1 FROM "_ReleaseToTag" rt
-          INNER JOIN tags tg ON tg.id = rt."B"
-          WHERE rt."A" = r.id
+          SELECT 1 FROM release_tags rt
+          INNER JOIN tags tg ON tg.id = rt."tagId"
+          WHERE rt."releaseId" = r.id
             AND tg.name = ANY(${tags
               .split(',')
               .map((s) => s.trim().toLowerCase())
