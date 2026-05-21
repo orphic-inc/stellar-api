@@ -1,9 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `quoterId` on the `notifications` table. All the data in the column will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('forum_quote', 'forum_sub', 'request_filled', 'collage_updated', 'comment_sub');
 
@@ -11,10 +5,17 @@ CREATE TYPE "NotificationType" AS ENUM ('forum_quote', 'forum_sub', 'request_fil
 ALTER TABLE "notifications" DROP CONSTRAINT "notifications_quoterId_fkey";
 
 -- AlterTable
-ALTER TABLE "notifications" DROP COLUMN "quoterId",
-ADD COLUMN     "actorId" INTEGER,
+ALTER TABLE "notifications" ADD COLUMN     "actorId" INTEGER,
 ADD COLUMN     "type" "NotificationType" NOT NULL DEFAULT 'forum_quote',
 ALTER COLUMN "postId" DROP NOT NULL;
+
+-- Backfill legacy quote notifications before removing the old actor column.
+UPDATE "notifications"
+SET "actorId" = "quoterId"
+WHERE "actorId" IS NULL;
+
+-- Drop legacy column after backfill.
+ALTER TABLE "notifications" DROP COLUMN "quoterId";
 
 -- CreateIndex
 CREATE INDEX "notifications_userId_readAt_idx" ON "notifications"("userId", "readAt");
