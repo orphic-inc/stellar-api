@@ -2,6 +2,9 @@ const prismaMock = {
   tag: {
     findMany: jest.fn()
   },
+  releaseTag: {
+    findMany: jest.fn()
+  },
   release: {
     findMany: jest.fn()
   },
@@ -55,8 +58,8 @@ describe('getTopReleases', () => {
         contributionCount: 4
       }
     ]);
-    prismaMock.release.findMany.mockResolvedValue([
-      { id: 1, tags: [{ id: 5, name: 'jazz' }] }
+    prismaMock.releaseTag.findMany.mockResolvedValue([
+      { releaseId: 1, tag: { id: 5, name: 'jazz' } }
     ]);
 
     const result = await getTopReleases({
@@ -119,9 +122,7 @@ describe('getTopReleases', () => {
           contributionCount: 1
         }
       ]);
-    prismaMock.release.findMany
-      .mockResolvedValueOnce([{ id: 3, tags: [] }])
-      .mockResolvedValueOnce([{ id: 4, tags: [] }]);
+    prismaMock.releaseTag.findMany.mockResolvedValue([]);
 
     const consumed = await getTopReleases({
       type: 'consumed',
@@ -410,8 +411,8 @@ describe('createSnapshot', () => {
         contributionCount: 5
       }
     ]);
-    prismaMock.release.findMany.mockResolvedValue([
-      { id: 9, tags: [{ id: 1, name: 'jazz' }] }
+    prismaMock.releaseTag.findMany.mockResolvedValue([
+      { releaseId: 9, tag: { id: 1, name: 'jazz' } }
     ]);
     prismaMock.top10Snapshot.create.mockResolvedValue(undefined);
 

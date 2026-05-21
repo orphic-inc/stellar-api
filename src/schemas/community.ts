@@ -73,7 +73,8 @@ export const updateGroupSchema = z.object({
   year: z.number().int().min(1900).max(2100).optional(),
   isEdition: z.boolean().optional(),
   edition: z.record(z.string(), z.unknown()).optional(),
-  tagIds: z.array(z.number().int().positive()).optional()
+  tagIds: z.array(z.number().int().positive()).optional(),
+  editSummary: z.string().trim().max(255).optional()
 });
 
 export const releaseVoteSchema = z.object({
@@ -88,9 +89,14 @@ export const releaseTagSchema = z.object({
     .transform((s) => s.trim().toLowerCase())
 });
 
+export const releaseTagVoteSchema = z.object({
+  direction: z.enum(['up', 'down'])
+});
+
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
 export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;
+export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;

@@ -43,7 +43,7 @@ describe('GET /api/search/releases', () => {
     expect(prismaMock.release.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          tags: { some: { name: { in: ['jazz'] } } }
+          releaseTags: { some: { tag: { name: { in: ['jazz'] } } } }
         })
       })
     );
@@ -57,8 +57,8 @@ describe('GET /api/search/releases', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           AND: [
-            { tags: { some: { name: 'jazz' } } },
-            { tags: { some: { name: 'blues' } } }
+            { releaseTags: { some: { tag: { name: 'jazz' } } } },
+            { releaseTags: { some: { tag: { name: 'blues' } } } }
           ]
         })
       })

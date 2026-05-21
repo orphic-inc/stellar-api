@@ -86,6 +86,18 @@ export const createContributionSubmission = async ({
       (c) => artistMap.get(c.artist)!
     );
     const primaryArtist = collaboratorRecords[0];
+    const tagRecords =
+      normalizedTags.length > 0
+        ? await Promise.all(
+            normalizedTags.map((name) =>
+              tx.tag.upsert({
+                where: { name },
+                create: { name, occurrences: 1 },
+                update: { occurrences: { increment: 1 } }
+              })
+            )
+          )
+        : [];
 
     const release = await tx.release.create({
       data: {
@@ -100,21 +112,21 @@ export const createContributionSubmission = async ({
             : ReleaseCategory.Unknown,
         image: image ?? null,
         description: description ?? releaseDescription ?? title,
-        contributors: { connect: { id: contributor.id } },
-        ...(normalizedTags.length > 0 && {
-          tags: {
-            connectOrCreate: normalizedTags.map((tagName) => ({
-              where: { name: tagName },
-              create: { name: tagName }
-            }))
-          }
-        })
+        contributors: { connect: { id: contributor.id } }
       },
       include: {
-        artist: true,
-        tags: true
+        artist: true
       }
     });
+
+    if (tagRecords.length > 0) {
+      await tx.releaseTag.createMany({
+        data: tagRecords.map((tag) => ({
+          releaseId: release.id,
+          tagId: tag.id
+        }))
+      });
+    }
 
     return tx.contribution.create({
       data: {

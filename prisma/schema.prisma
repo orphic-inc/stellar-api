@@ -397,6 +397,9 @@ model User {
   siteHistoryEntries        SiteHistory[]
   requestVotes              RequestVote[]
   releaseVotes              ReleaseVote[]
+  releaseTagVotes           ReleaseTagVote[]
+  releaseTagsAdded          ReleaseTag[]   @relation("ReleaseTagAdder")
+  releaseHistoriesAuthored  ReleaseHistory[] @relation("ReleaseHistoryActor")
   donorRank                 UserDonorRank?
   wikiPagesAuthored         WikiPage[]     @relation("WikiPageAuthor")
   wikiRevisionsAuthored     WikiRevision[] @relation("WikiRevisionAuthor")
@@ -701,6 +704,46 @@ model ArtistTag {
   @@map("artist_tags")
 }
 
+model ReleaseTag {
+  id            Int              @id @default(autoincrement())
+  releaseId     Int
+  release       Release          @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  tagId         Int
+  tag           Tag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  positiveVotes Int              @default(1)
+  negativeVotes Int              @default(1)
+  userId        Int?
+  user          User?            @relation("ReleaseTagAdder", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  votes         ReleaseTagVote[]
+
+  @@unique([releaseId, tagId])
+  @@index([releaseId])
+  @@index([tagId])
+  @@map("release_tags")
+}
+
+enum ReleaseTagVoteDirection {
+  up
+  down
+}
+
+model ReleaseTagVote {
+  id           Int                     @id @default(autoincrement())
+  releaseTagId Int
+  releaseTag   ReleaseTag              @relation(fields: [releaseTagId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction    ReleaseTagVoteDirection
+  createdAt    DateTime                @default(now())
+
+  @@unique([releaseTagId, userId, direction])
+  @@index([releaseTagId])
+  @@index([userId])
+  @@map("release_tag_votes")
+}
+
 model ArtistSubscription {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -793,7 +836,6 @@ model Release {
   artistId      Int
   artist        Artist            @relation(fields: [artistId], references: [id])
   title         String            @db.VarChar(100)
-  tags          Tag[]
   image         String?
   description   String            @db.VarChar(1000)
   communityId   Int?
@@ -812,6 +854,8 @@ model Release {
   comments         Comment[]
   collageEntries   CollageEntry[]
   votes            ReleaseVote[]
+  releaseTags      ReleaseTag[]
+  historyEntries   ReleaseHistory[]
   voteAggregate    ReleaseVoteAggregate?
   snapshotEntries  Top10SnapshotEntry[]
   createdAt        DateTime          @default(now())
@@ -1368,10 +1412,36 @@ model Tag {
   id          Int         @id @default(autoincrement())
   name        String      @unique
   occurrences Int         @default(0)
-  releases    Release[]
   artistTags  ArtistTag[]
+  releaseTags ReleaseTag[]
 
   @@map("tags")
+}
+
+enum ReleaseHistoryAction {
+  created
+  edit
+  tag_added
+  tag_removed
+  contribution_added
+}
+
+model ReleaseHistory {
+  id            Int                  @id @default(autoincrement())
+  releaseId     Int
+  release       Release              @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  actorId       Int
+  actor         User                 @relation("ReleaseHistoryActor", fields: [actorId], references: [id], onDelete: Cascade)
+  action        ReleaseHistoryAction
+  summary       String               @db.VarChar(255)
+  changedFields String[]
+  before        Json?
+  after         Json?
+  createdAt     DateTime             @default(now())
+
+  @@index([releaseId, createdAt])
+  @@index([actorId])
+  @@map("release_histories")
 }
 
 model Post {

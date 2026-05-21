@@ -32,8 +32,12 @@ function buildTagWhere(
     .filter(Boolean);
   if (!names?.length) return undefined;
   return tagMode === 'all'
-    ? { AND: names.map((name) => ({ tags: { some: { name } } })) }
-    : { tags: { some: { name: { in: names } } } };
+    ? {
+        AND: names.map((name) => ({
+          releaseTags: { some: { tag: { name } } }
+        }))
+      }
+    : { releaseTags: { some: { tag: { name: { in: names } } } } };
 }
 
 function buildArtistTagWhere(
@@ -68,7 +72,7 @@ const RELEASE_SELECT = {
   description: true,
   createdAt: true,
   artist: { select: { id: true, name: true, vanityHouse: true } },
-  tags: { select: { id: true, name: true } },
+  releaseTags: { select: { tag: { select: { id: true, name: true } } } },
   _count: { select: { consumers: true, contributors: true } }
 } as const;
 
@@ -145,7 +149,15 @@ router.get(
         take: q.limit,
         select: RELEASE_SELECT
       });
-      return paginatedResponse(res, data, count, pg);
+      return paginatedResponse(
+        res,
+        data.map((release) => ({
+          ...release,
+          tags: release.releaseTags.map((entry) => entry.tag)
+        })),
+        count,
+        pg
+      );
     }
 
     const orderByMap: Record<string, unknown> = {
@@ -166,7 +178,15 @@ router.get(
       prisma.release.count({ where })
     ]);
 
-    paginatedResponse(res, data, total, pg);
+    paginatedResponse(
+      res,
+      data.map((release) => ({
+        ...release,
+        tags: release.releaseTags.map((entry) => entry.tag)
+      })),
+      total,
+      pg
+    );
   })
 );
 
