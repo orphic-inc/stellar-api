@@ -31,13 +31,45 @@ const forumPostParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-const postInclude = {
+const publicPostInclude = {
   author: { select: { id: true, username: true, avatar: true } },
   edits: {
-    orderBy: { editedAt: 'asc' as const },
+    orderBy: { editedAt: 'desc' as const },
+    take: 1,
+    select: {
+      id: true,
+      forumPostId: true,
+      editorId: true,
+      editedAt: true,
+      editor: { select: { id: true, username: true } }
+    }
+  }
+};
+
+const editHistoryInclude = {
+  edits: {
+    orderBy: { editedAt: 'desc' as const },
     include: { editor: { select: { id: true, username: true } } }
   }
 };
+
+const serializeForumPost = <
+  T extends {
+    edits?: Array<{
+      id: number;
+      forumPostId: number;
+      editorId: number;
+      editedAt: Date;
+      editor?: { id: number; username: string } | null;
+    }>;
+  }
+>(
+  post: T
+) => ({
+  ...post,
+  ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
+  edits: undefined
+});
 
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
@@ -72,7 +104,7 @@ router.get(
         orderBy: { createdAt: 'asc' },
         skip: pg.skip,
         take: pg.limit,
-        include: postInclude
+        include: publicPostInclude
       }),
       prisma.forumPost.count({
         where: {
@@ -82,7 +114,12 @@ router.get(
         }
       })
     ]);
-    paginatedResponse(res, posts, total, pg);
+    paginatedResponse(
+      res,
+      posts.map((post) => serializeForumPost(post)),
+      total,
+      pg
+    );
   })
 );
 
@@ -116,10 +153,52 @@ router.get(
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       },
-      include: postInclude
+      include: publicPostInclude
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    res.json(post);
+    res.json(serializeForumPost(post));
+  })
+);
+
+// GET /api/forums/:forumId/topics/:forumTopicId/posts/:id/edits — moderator only
+router.get(
+  '/:id/edits',
+  requireAuth,
+  validateParams(forumPostParamsSchema),
+  authHandler(async (req, res) => {
+    const { forumId, forumTopicId, id } = parsedParams<{
+      forumId: number;
+      forumTopicId: number;
+      id: number;
+    }>(res);
+
+    const forum = await prisma.forum.findUnique({
+      where: { id: forumId },
+      select: { minClassRead: true }
+    });
+    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
+    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient class to read this forum' });
+    }
+    if (!(await isModerator(req, res))) {
+      return res
+        .status(403)
+        .json({ msg: 'Insufficient permission to view edit history' });
+    }
+
+    const post = await prisma.forumPost.findFirst({
+      where: {
+        id,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { forumId, deletedAt: null }
+      },
+      include: editHistoryInclude
+    });
+    if (!post) return res.status(404).json({ msg: 'Post not found' });
+    res.json({ data: post.edits });
   })
 );
 
@@ -178,8 +257,19 @@ router.put(
     if (!isOwner && !(await isModerator(req, res)))
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await updatePost(id, req.user.id, post.body, body);
-    res.json(updated);
+    await updatePost(id, req.user.id, post.body, body);
+
+    const updated = await prisma.forumPost.findFirst({
+      where: {
+        id,
+        forumTopicId,
+        deletedAt: null,
+        forumTopic: { forumId, deletedAt: null }
+      },
+      include: publicPostInclude
+    });
+    if (!updated) return res.status(404).json({ msg: 'Post not found' });
+    res.json(serializeForumPost(updated));
   })
 );
 

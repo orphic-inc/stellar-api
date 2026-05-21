@@ -108,9 +108,23 @@ describe('API forum flows', () => {
   });
 
   it('updates a forum post for the owner', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue(
-      makeForumPost({ id: 21, forumTopicId: 44, authorId: 7, body: 'Old body' })
-    );
+    prismaMock.forumPost.findFirst
+      .mockResolvedValueOnce(
+        makeForumPost({
+          id: 21,
+          forumTopicId: 44,
+          authorId: 7,
+          body: 'Old body'
+        })
+      )
+      .mockResolvedValueOnce(
+        makeForumPost({
+          id: 21,
+          forumTopicId: 44,
+          authorId: 7,
+          body: 'New body'
+        })
+      );
     updatePostMock.mockResolvedValue({
       id: 21,
       forumTopicId: 44,
@@ -675,10 +689,21 @@ describe('DELETE /api/forums/:forumId/topics/:forumTopicId — success', () => {
 // ─── GET /api/forums/:forumId/topics/:forumTopicId/posts ─────────────────────
 
 describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
-  it('returns paginated list of posts', async () => {
+  it('returns paginated list of posts with public last-edit metadata only', async () => {
     prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
     prismaMock.forumPost.findMany.mockResolvedValue([
-      makeForumPost({ id: 21, body: 'Post body' })
+      {
+        ...makeForumPost({ id: 21, body: 'Post body' }),
+        edits: [
+          {
+            id: 5,
+            forumPostId: 21,
+            editorId: 11,
+            editedAt: new Date('2024-03-04T00:00:00Z'),
+            editor: { id: 11, username: 'mod' }
+          }
+        ]
+      } as never
     ]);
     prismaMock.forumPost.count.mockResolvedValue(1);
 
@@ -686,6 +711,13 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].edits).toBeUndefined();
+    expect(res.body.data[0].lastEdit).toMatchObject({
+      id: 5,
+      forumPostId: 21,
+      editorId: 11,
+      editor: { id: 11, username: 'mod' }
+    });
     expect(res.body.meta.total).toBe(1);
   });
 
@@ -714,14 +746,25 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
 describe('GET /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
   it('returns a single post', async () => {
     prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
-    prismaMock.forumPost.findFirst.mockResolvedValue(
-      makeForumPost({ id: 21, body: 'Post body' })
-    );
+    prismaMock.forumPost.findFirst.mockResolvedValue({
+      ...makeForumPost({ id: 21, body: 'Post body' }),
+      edits: [
+        {
+          id: 5,
+          forumPostId: 21,
+          editorId: 11,
+          editedAt: new Date('2024-03-04T00:00:00Z'),
+          editor: { id: 11, username: 'mod' }
+        }
+      ]
+    } as never);
 
     const res = await request(app).get('/api/forums/9/topics/44/posts/21');
 
     expect(res.status).toBe(200);
     expect(res.body.body).toBe('Post body');
+    expect(res.body.edits).toBeUndefined();
+    expect(res.body.lastEdit.editor.username).toBe('mod');
   });
 
   it('returns 404 when forum does not exist', async () => {
@@ -752,6 +795,57 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('Post not found');
+  });
+});
+
+describe('GET /api/forums/:forumId/topics/:forumTopicId/posts/:id/edits', () => {
+  it('returns moderator edit history newest first', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ forums_moderate: true })
+    );
+    prismaMock.forumPost.findFirst.mockResolvedValue({
+      ...makeForumPost({ id: 21, body: 'Current body' }),
+      edits: [
+        {
+          id: 6,
+          forumPostId: 21,
+          editorId: 12,
+          previousBody: 'Second draft',
+          editedAt: new Date('2024-03-05T00:00:00Z'),
+          editor: { id: 12, username: 'charlie' }
+        },
+        {
+          id: 5,
+          forumPostId: 21,
+          editorId: 11,
+          previousBody: 'Original body',
+          editedAt: new Date('2024-03-04T00:00:00Z'),
+          editor: { id: 11, username: 'mod' }
+        }
+      ]
+    } as never);
+
+    const res = await request(app).get(
+      '/api/forums/9/topics/44/posts/21/edits'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data[0].previousBody).toBe('Second draft');
+    expect(res.body.data[1].previousBody).toBe('Original body');
+  });
+
+  it('returns 403 for non-moderators', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app).get(
+      '/api/forums/9/topics/44/posts/21/edits'
+    );
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe('Insufficient permission to view edit history');
   });
 });
 
@@ -803,9 +897,26 @@ describe('PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ forums_moderate: true })
     );
-    prismaMock.forumPost.findFirst.mockResolvedValue(
-      makeForumPost({ id: 21, authorId: 99, body: 'Old body' })
-    );
+    prismaMock.forumPost.findFirst
+      .mockResolvedValueOnce(
+        makeForumPost({ id: 21, authorId: 99, body: 'Old body' })
+      )
+      .mockResolvedValueOnce({
+        ...makeForumPost({
+          id: 21,
+          authorId: 99,
+          body: 'Edited by mod'
+        }),
+        edits: [
+          {
+            id: 8,
+            forumPostId: 21,
+            editorId: 7,
+            editedAt: new Date('2024-03-06T00:00:00Z'),
+            editor: { id: 7, username: 'testuser' }
+          }
+        ]
+      } as never);
     updatePostMock.mockResolvedValue(
       makeForumPost({
         id: 21,
@@ -825,6 +936,8 @@ describe('PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
       'Old body',
       'Edited by mod'
     );
+    expect(res.body.lastEdit.editor.username).toBe('testuser');
+    expect(res.body.edits).toBeUndefined();
   });
 
   it('returns 403 when user is not the post author', async () => {

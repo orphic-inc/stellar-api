@@ -1269,6 +1269,17 @@ const ForumPostEdit = registry.register(
   })
 );
 
+const ForumPostLastEdit = registry.register(
+  'ForumPostLastEdit',
+  z.object({
+    id: z.number(),
+    forumPostId: z.number(),
+    editorId: z.number(),
+    editedAt: z.string(),
+    editor: z.object({ id: z.number(), username: z.string() }).optional()
+  })
+);
+
 const ForumPost = registry.register(
   'ForumPost',
   z.object({
@@ -1276,7 +1287,7 @@ const ForumPost = registry.register(
     forumTopicId: z.number(),
     authorId: z.number(),
     body: z.string(),
-    edits: z.array(ForumPostEdit),
+    lastEdit: ForumPostLastEdit.optional(),
     author: z
       .object({
         id: z.number(),
@@ -1620,6 +1631,39 @@ registry.registerPath({
     200: {
       description: 'Post',
       content: { 'application/json': { schema: ForumPost } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/{forumId}/topics/{topicId}/posts/{id}/edits',
+  tags: ['Forums'],
+  request: {
+    params: z.object({
+      forumId: z.string(),
+      topicId: z.string(),
+      id: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Moderator edit history',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(ForumPostEdit)
+          })
+        }
+      }
+    },
+    403: {
+      description: 'Insufficient permission',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
