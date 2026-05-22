@@ -46,6 +46,10 @@ jest.mock('../modules/linkHealthJob', () => ({
   startLinkHealthJob: jest.fn()
 }));
 
+jest.mock('../modules/statsJob', () => ({
+  startStatsJob: jest.fn()
+}));
+
 jest.mock('../modules/artist', () => ({
   createArtist: jest.fn(),
   updateArtist: jest.fn(),

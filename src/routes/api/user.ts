@@ -8,14 +8,16 @@ import {
   createUser
 } from '../../modules/user';
 import { requireAuth } from '../../middleware/auth';
-import { requirePermission } from '../../middleware/permissions';
+import { requirePermission, isModerator } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedBody,
-  parsedParams
+  parsedParams,
+  parsedQuery
 } from '../../middleware/validate';
-import { Prisma } from '@prisma/client';
+import { Prisma, StatSnapshotPeriod } from '@prisma/client';
 import {
   adminCreateUserSchema,
   userSettingsSchema,
@@ -36,6 +38,11 @@ import { audit } from '../../lib/audit';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
 import { sendRecoveryEmail } from '../../lib/mailer';
 import { email as emailConfig } from '../../modules/config';
+import {
+  statsPeriodQuerySchema,
+  type StatsPeriodQuery
+} from '../../schemas/statsHistory';
+import { getUserStatHistory } from '../../modules/statsHistory';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -282,6 +289,33 @@ router.delete(
       reqId
     );
     res.json({ msg: 'Recovery request revoked' });
+  })
+);
+
+// GET /api/users/:id/stats/history — user historical stats (own or staff)
+router.get(
+  '/:id/stats/history',
+  requireAuth,
+  validateParams(userIdParamsSchema),
+  validateQuery(statsPeriodQuerySchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { period } = parsedQuery<StatsPeriodQuery>(res);
+    const isStaff = await isModerator(req, res);
+    const userAndSettings = await prisma.user.findUnique({
+      where: { id },
+      include: { userSettings: true }
+    });
+    if (!userAndSettings)
+      return res.status(404).json({ msg: 'User not found' });
+    const history = await getUserStatHistory(
+      id,
+      period as StatSnapshotPeriod,
+      req.user.id,
+      isStaff,
+      userAndSettings
+    );
+    res.json(history);
   })
 );
 

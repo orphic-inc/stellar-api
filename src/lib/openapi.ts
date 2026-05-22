@@ -966,6 +966,41 @@ const SiteStats = registry.register(
   })
 );
 
+const SiteStatSnapshot = registry.register(
+  'SiteStatSnapshot',
+  z.object({
+    id: z.number(),
+    capturedAt: z.string(),
+    maxUsers: z.number(),
+    totalUsers: z.number(),
+    enabledUsers: z.number(),
+    activeToday: z.number(),
+    activeThisWeek: z.number(),
+    activeThisMonth: z.number(),
+    communities: z.number(),
+    releases: z.number(),
+    artists: z.number(),
+    blogPosts: z.number(),
+    announcements: z.number(),
+    comments: z.number(),
+    contributedLinks: z.number(),
+    contributedLinkDownloads: z.number()
+  })
+);
+
+const UserStatSnapshot = registry.register(
+  'UserStatSnapshot',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    period: z.enum(['Daily', 'Monthly', 'Yearly']),
+    capturedAt: z.string(),
+    contributed: z.string().nullable(),
+    consumed: z.string().nullable(),
+    contributionCount: z.number()
+  })
+);
+
 const Notification = registry.register(
   'Notification',
   z.object({
@@ -1118,6 +1153,58 @@ registry.registerPath({
     200: {
       description: 'Site statistics',
       content: { 'application/json': { schema: SiteStats } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/history',
+  summary: 'Site-wide historical stat snapshots',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Historical site stat snapshots (ascending by capturedAt)',
+      content: { 'application/json': { schema: z.array(SiteStatSnapshot) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/stats/snapshot',
+  summary: 'Manually trigger a site stat snapshot (admin only)',
+  tags: ['Stats'],
+  responses: {
+    204: { description: 'Snapshot captured' },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/stats/history',
+  summary: 'User historical stat snapshots',
+  tags: ['Users'],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({ period: z.enum(['Daily', 'Monthly', 'Yearly']) })
+  },
+  responses: {
+    200: {
+      description: 'Historical user stat snapshots (ascending by capturedAt)',
+      content: { 'application/json': { schema: z.array(UserStatSnapshot) } }
+    },
+    403: {
+      description: 'Stats are private',
+      content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
     }
   }
 });

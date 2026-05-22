@@ -10,6 +10,7 @@ import { getLogger } from './modules/logging';
 import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
 import { startLinkHealthJob } from './modules/linkHealthJob';
+import { startStatsJob } from './modules/statsJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -140,6 +141,7 @@ export const createApp = () => {
   );
 
   startLinkHealthJob();
+  startStatsJob();
 
   return app;
 };

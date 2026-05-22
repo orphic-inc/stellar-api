@@ -405,6 +405,7 @@ model User {
   wikiPagesAuthored         WikiPage[]     @relation("WikiPageAuthor")
   wikiRevisionsAuthored     WikiRevision[] @relation("WikiRevisionAuthor")
   wikiAliasesCreated        WikiAlias[]    @relation("WikiAliasCreator")
+  userStatSnapshots         UserStatSnapshot[]
 
   @@index([userRankId])
   @@map("users")
@@ -1995,6 +1996,12 @@ enum Top10SnapshotType {
   Weekly
 }
 
+enum StatSnapshotPeriod {
+  Daily
+  Monthly
+  Yearly
+}
+
 model Top10Snapshot {
   id        Int               @id @default(autoincrement())
   type      Top10SnapshotType
@@ -2018,4 +2025,44 @@ model Top10SnapshotEntry {
   @@index([snapshotId])
   @@index([releaseId])
   @@map("top10_snapshot_entries")
+}
+
+model UserStatSnapshot {
+  id                Int               @id @default(autoincrement())
+  userId            Int
+  period            StatSnapshotPeriod
+  bucketAt          DateTime
+  capturedAt        DateTime          @default(now())
+  contributed       BigInt            @default(0)
+  consumed          BigInt            @default(0)
+  contributionCount Int               @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, bucketAt])
+  @@index([userId, period, capturedAt])
+  @@map("user_stat_snapshots")
+}
+
+model SiteStatSnapshot {
+  id                       Int      @id @default(autoincrement())
+  bucketAt                 DateTime @unique
+  capturedAt               DateTime @default(now())
+  maxUsers                 Int      @default(0)
+  totalUsers               Int      @default(0)
+  enabledUsers             Int      @default(0)
+  activeToday              Int      @default(0)
+  activeThisWeek           Int      @default(0)
+  activeThisMonth          Int      @default(0)
+  communities              Int      @default(0)
+  releases                 Int      @default(0)
+  artists                  Int      @default(0)
+  blogPosts                Int      @default(0)
+  announcements            Int      @default(0)
+  comments                 Int      @default(0)
+  contributedLinks         Int      @default(0)
+  contributedLinkDownloads Int      @default(0)
+
+  @@index([capturedAt])
+  @@map("site_stat_snapshots")
 }
