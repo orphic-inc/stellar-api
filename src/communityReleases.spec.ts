@@ -430,6 +430,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       type: FileType.flac,
       release: { id: 3, title: 'Kind of Blue', communityId: 1, artistId: 5 }
     } as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease() as never
+    );
 
     const res = await request(app)
       .post('/api/communities/1/releases/3/contributions')
@@ -466,6 +469,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
     prismaMock.artistSubscription.findMany.mockResolvedValue([
       { userId: 99 }
     ] as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease() as never
+    );
 
     const res = await request(app)
       .post('/api/communities/1/releases/3/contributions')
@@ -584,6 +590,16 @@ describe('POST /api/communities/:communityId/releases/:releaseId/tags', () => {
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
     prismaMock.tag.upsert.mockResolvedValue({ id: 9, name: 'fusion' } as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue({
+      id: 3,
+      title: 'Kind of Blue',
+      description: 'Classic',
+      image: null,
+      year: 1959,
+      isEdition: false,
+      edition: null,
+      releaseTags: []
+    } as never);
     prismaMock.releaseTag.create.mockResolvedValue({
       id: 19,
       positiveVotes: 3,
@@ -709,6 +725,9 @@ describe('DELETE /api/communities/:communityId/releases/:releaseId/tags/:tagId',
     prismaMock.tag.findUnique.mockResolvedValue({ name: 'jazz' } as never);
     prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease() as never
     );
     prismaMock.release.update.mockResolvedValue(makeRelease() as never);
     prismaMock.tag.update.mockResolvedValue({ id: 9 } as never);
