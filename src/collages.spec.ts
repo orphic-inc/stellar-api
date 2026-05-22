@@ -118,6 +118,75 @@ describe('POST /api/collages', () => {
     expect(res.status).toBe(409);
     expect(prismaMock.collage.create).not.toHaveBeenCalled();
   });
+
+  it('blocks personal collage creation when user is at their rank limit', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      personalCollageLimit: 1
+    } as never);
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.count.mockResolvedValue(1);
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'My Personal Collage',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/Personal collage limit reached/);
+    expect(prismaMock.collage.create).not.toHaveBeenCalled();
+  });
+
+  it('allows personal collage creation when personalCollageLimit is 0 (unlimited)', async () => {
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.create.mockResolvedValue(makeCollage({ categoryId: 0 }));
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'Unlimited Personal',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.collage.count).not.toHaveBeenCalled();
+  });
+
+  it('staff (staff perm) bypass: creates personal collage even when count is at limit', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank({ staff: true }),
+      personalCollageLimit: 1
+    } as never);
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.create.mockResolvedValue(makeCollage({ categoryId: 0 }));
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'Staff Personal Collage',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.collage.count).not.toHaveBeenCalled();
+  });
+
+  it('collages_moderate perm does not bypass the personal collage limit', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank({ collages_moderate: true }),
+      personalCollageLimit: 1
+    } as never);
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.count.mockResolvedValue(1);
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'Mod Personal Collage',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/Personal collage limit reached/);
+  });
 });
 
 describe('GET /api/collages/:id', () => {

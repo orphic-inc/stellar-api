@@ -30,7 +30,8 @@ export const authUserSelect = {
       name: true,
       color: true,
       badge: true,
-      permissions: true
+      permissions: true,
+      personalCollageLimit: true
     }
   }
 } as const;
