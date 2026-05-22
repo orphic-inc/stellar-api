@@ -147,6 +147,22 @@ describe('GET /api/communities/:communityId/releases/:releaseId', () => {
       myVotes: { up: true, down: false }
     });
     expect(res.body.historyEntries[0].summary).toBe('Tag "jazz" added');
+    expect(res.body.isContributor).toBe(false);
+  });
+
+  it('returns isContributor true when the current user has a contribution', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue(
+      makeRelease({
+        contributions: [{ id: 5, userId: 7 }]
+      }) as never
+    );
+    prismaMock.releaseVote.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/releases/3');
+
+    expect(res.status).toBe(200);
+    expect(res.body.isContributor).toBe(true);
   });
 });
 
@@ -334,6 +350,35 @@ describe('PUT /api/communities/:communityId/releases/:releaseId', () => {
         changedFields: ['title']
       })
     });
+  });
+
+  it('returns 403 when caller has no communities_manage and no contribution', async () => {
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.contribution.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).put('/api/communities/1/releases/3').send({
+      title: 'Unauthorized Update'
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('allows a contributor without communities_manage to edit the release', async () => {
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.contribution.findFirst.mockResolvedValue({ id: 5 } as never);
+    prismaMock.release.update.mockResolvedValue(
+      makeRelease({ title: 'Updated by Contributor' }) as never
+    );
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease({ title: 'Updated by Contributor' }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/communities/1/releases/3')
+      .send({ title: 'Updated by Contributor' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe('Updated by Contributor');
   });
 });
 
@@ -749,6 +794,165 @@ describe('DELETE /api/communities/:communityId/releases/:releaseId/tags/:tagId',
         releaseId: 3,
         actorId: 7,
         action: 'tag_removed'
+      })
+    });
+  });
+});
+
+describe('GET /api/communities/:communityId/releases/:releaseId/history', () => {
+  const makeHistoryEntry = (overrides: Record<string, unknown> = {}) => ({
+    id: 91,
+    releaseId: 3,
+    actorId: 7,
+    action: 'edit',
+    summary: 'Title changed',
+    changedFields: ['title'],
+    before: { title: 'Old Title' },
+    after: { title: 'New Title' },
+    snapshot: null,
+    createdAt: new Date('2024-06-01T00:00:00Z'),
+    actor: { id: 7, username: 'user' },
+    ...overrides
+  });
+
+  it('returns paginated history entries', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.releaseHistory.findMany.mockResolvedValue([
+      makeHistoryEntry()
+    ] as never);
+    prismaMock.releaseHistory.count.mockResolvedValue(1);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/3/history?page=1'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].summary).toBe('Title changed');
+    expect(res.body.meta.total).toBe(1);
+    expect(prismaMock.releaseHistory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { releaseId: 3 },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      })
+    );
+  });
+
+  it('returns 404 when the release does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/999/history'
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when the user is not a member of a restricted community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
+    );
+    prismaMock.consumer.findFirst.mockResolvedValue(null);
+    prismaMock.contributor.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/releases/3/history');
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/communities/:communityId/releases/:releaseId/history/:historyId/revert', () => {
+  const editEntry = {
+    id: 91,
+    releaseId: 3,
+    action: 'edit',
+    summary: 'Title changed',
+    changedFields: ['title'],
+    before: {
+      title: 'Old Title',
+      description: 'Classic',
+      image: null,
+      year: 1959,
+      isEdition: false,
+      edition: null,
+      tagIds: [],
+      tagNames: []
+    },
+    after: null,
+    snapshot: null,
+    createdAt: new Date('2024-06-01T00:00:00Z'),
+    actorId: 7
+  };
+
+  it('requires communities_manage permission', async () => {
+    const res = await request(app).post(
+      '/api/communities/1/releases/3/history/91/revert'
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when the history entry is not found', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.releaseHistory.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).post(
+      '/api/communities/1/releases/3/history/91/revert'
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 422 when the history entry is not an edit action', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.releaseHistory.findFirst.mockResolvedValue({
+      ...editEntry,
+      action: 'created'
+    } as never);
+
+    const res = await request(app).post(
+      '/api/communities/1/releases/3/history/91/revert'
+    );
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toBe('Only edit revisions can be reverted');
+  });
+
+  it('reverts the release to the before-snapshot and writes a revert history entry', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.releaseHistory.findFirst.mockResolvedValue(editEntry as never);
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease({ title: 'Old Title' }) as never
+    );
+
+    const res = await request(app).post(
+      '/api/communities/1/releases/3/history/91/revert'
+    );
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.release.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 3 },
+        data: expect.objectContaining({ title: 'Old Title' })
+      })
+    );
+    expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        releaseId: 3,
+        actorId: 7,
+        action: 'edit',
+        summary: expect.stringContaining('Reverted to revision from')
       })
     });
   });

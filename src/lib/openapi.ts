@@ -2126,7 +2126,8 @@ const Release = registry.register(
       })
       .nullable()
       .optional(),
-    contributions: z.array(ReleaseContribution).optional()
+    contributions: z.array(ReleaseContribution).optional(),
+    isContributor: z.boolean().optional()
   })
 );
 

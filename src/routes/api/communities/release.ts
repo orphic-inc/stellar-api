@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { requirePermission } from '../../../middleware/permissions';
+import {
+  requirePermission,
+  loadPermissions
+} from '../../../middleware/permissions';
 import { isCommunityMember } from './communities';
 import {
   validate,
@@ -502,11 +505,16 @@ router.get(
       }))
     );
 
+    const isContributor = release.contributions.some(
+      (c) => c.userId === req.user.id
+    );
+
     res.json({
       ...release,
       tags: buildPlainTags(release.releaseTags),
       myVote,
-      releaseTags
+      releaseTags,
+      isContributor
     });
   })
 );
@@ -593,14 +601,13 @@ router.post(
   })
 );
 
-// PUT /api/communities/:communityId/releases/:releaseId — requires communities_manage
+// PUT /api/communities/:communityId/releases/:releaseId — contributor or communities_manage
 router.put(
   '/:releaseId',
-  ...requirePermission('communities_manage'),
+  requireAuth,
   validateParams(releaseParamsSchema),
   validate(updateGroupSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ msg: 'Unauthorized' });
+  authHandler(async (req, res) => {
     const actorId = req.user.id;
     const { communityId, releaseId: id } = parsedParams<{
       communityId: number;
@@ -614,6 +621,24 @@ router.put(
       }
     });
     if (!existing) return res.status(404).json({ msg: 'Release not found' });
+
+    const perms = await loadPermissions(req, res);
+    const canManage = !!(
+      perms['communities_manage'] ||
+      perms['admin'] ||
+      perms['staff']
+    );
+    if (!canManage) {
+      const contribution = await prisma.contribution.findFirst({
+        where: { releaseId: id, userId: actorId },
+        select: { id: true }
+      });
+      if (!contribution) {
+        return res
+          .status(403)
+          .json({ msg: 'Must be a contributor or staff to edit this release' });
+      }
+    }
 
     const {
       title,
