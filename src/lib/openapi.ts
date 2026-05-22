@@ -2046,6 +2046,45 @@ const Contribution = registry.register(
   })
 );
 
+const ReleaseTagEnriched = registry.register(
+  'ReleaseTagEnriched',
+  z.object({
+    id: z.number(),
+    tagId: z.number(),
+    name: z.string(),
+    occurrences: z.number(),
+    score: z.number(),
+    positiveVotes: z.number(),
+    negativeVotes: z.number(),
+    addedBy: z
+      .object({ id: z.number(), username: z.string() })
+      .nullable()
+      .optional(),
+    createdAt: z.string().nullable().optional(),
+    myVotes: z.object({ up: z.boolean(), down: z.boolean() }).optional()
+  })
+);
+
+const ReleaseHistoryEntry = registry.register(
+  'ReleaseHistoryEntry',
+  z.object({
+    id: z.number(),
+    action: z.enum([
+      'created',
+      'edit',
+      'tag_added',
+      'tag_removed',
+      'contribution_added'
+    ]),
+    summary: z.string(),
+    changedFields: z.array(z.string()),
+    before: z.record(z.string(), z.unknown()).nullable().optional(),
+    after: z.record(z.string(), z.unknown()).nullable().optional(),
+    createdAt: z.string(),
+    actor: z.object({ id: z.number(), username: z.string() })
+  })
+);
+
 const Release = registry.register(
   'Release',
   z.object({
@@ -2054,11 +2093,24 @@ const Release = registry.register(
     communityId: z.number().nullable(),
     year: z.number().nullable().optional(),
     type: z.string().nullable().optional(),
+    releaseType: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
+    isEdition: z.boolean().optional(),
+    edition: z.unknown().nullable().optional(),
     createdAt: z.string().optional(),
     artist: ReleaseArtist.optional(),
     tags: z.array(ReleaseTag).optional(),
+    releaseTags: z.array(ReleaseTagEnriched).optional(),
+    myVote: z.enum(['up', 'down']).nullable().optional(),
+    voteAggregate: z
+      .object({
+        ups: z.number(),
+        total: z.number(),
+        score: z.number()
+      })
+      .nullable()
+      .optional(),
     contributions: z.array(ReleaseContribution).optional()
   })
 );
@@ -2147,6 +2199,110 @@ registry.registerPath({
     200: {
       description: 'Release',
       content: { 'application/json': { schema: Release } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{communityId}/releases/{releaseId}/history',
+  tags: ['Communities'],
+  request: {
+    params: z.object({ communityId: z.string(), releaseId: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Paginated release history',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(ReleaseHistoryEntry),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    403: {
+      description: 'Not a community member',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/tags',
+  tags: ['Communities'],
+  request: {
+    params: z.object({ communityId: z.string(), releaseId: z.string() }),
+    body: {
+      content: {
+        'application/json': { schema: z.object({ name: z.string() }) }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Tag added',
+      content: { 'application/json': { schema: ReleaseTag } }
+    },
+    409: {
+      description: 'Release already has this tag',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{communityId}/releases/{releaseId}/tags/{tagId}',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string(),
+      tagId: z.string()
+    })
+  },
+  responses: {
+    204: { description: 'Tag removed' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/tags/{tagId}/vote',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string(),
+      tagId: z.string()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ direction: z.enum(['up', 'down']) })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated tag with vote counts',
+      content: { 'application/json': { schema: ReleaseTagEnriched } }
     },
     404: {
       description: 'Not found',
