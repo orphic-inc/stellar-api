@@ -2065,6 +2065,20 @@ const ReleaseTagEnriched = registry.register(
   })
 );
 
+const ReleaseSnapshot = registry.register(
+  'ReleaseSnapshot',
+  z.object({
+    title: z.string(),
+    description: z.string(),
+    image: z.string().nullable(),
+    year: z.number(),
+    isEdition: z.boolean(),
+    edition: z.unknown().nullable(),
+    tagIds: z.array(z.number()),
+    tagNames: z.array(z.string())
+  })
+);
+
 const ReleaseHistoryEntry = registry.register(
   'ReleaseHistoryEntry',
   z.object({
@@ -2080,6 +2094,7 @@ const ReleaseHistoryEntry = registry.register(
     changedFields: z.array(z.string()),
     before: z.record(z.string(), z.unknown()).nullable().optional(),
     after: z.record(z.string(), z.unknown()).nullable().optional(),
+    snapshot: ReleaseSnapshot.nullable().optional(),
     createdAt: z.string(),
     actor: z.object({ id: z.number(), username: z.string() })
   })
@@ -2232,6 +2247,33 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/history/{historyId}/revert',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string(),
+      historyId: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Release after revert',
+      content: { 'application/json': { schema: Release } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Not an edit revision',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
