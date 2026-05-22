@@ -99,6 +99,11 @@ jest.mock('../modules/staffInbox', () => ({
   deleteResponse: jest.fn()
 }));
 
+jest.mock('../lib/mailer', () => ({
+  sendInviteEmail: jest.fn().mockResolvedValue(true),
+  sendRecoveryEmail: jest.fn().mockResolvedValue(true)
+}));
+
 jest.mock('../modules/staffPm', () => ({
   createTicket: jest.fn(),
   listMyTickets: jest.fn(),

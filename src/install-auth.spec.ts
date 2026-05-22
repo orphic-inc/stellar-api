@@ -16,6 +16,9 @@ import {
 } from './test/apiTestHarness';
 import { makeUser, asUserMock } from './test/factories';
 import { updateProfile } from './modules/profile';
+import { sendRecoveryEmail } from './lib/mailer';
+
+const sendRecoveryEmailMock = sendRecoveryEmail as jest.Mock;
 
 describe('API auth/profile/user flows', () => {
   beforeEach(() => {
@@ -419,22 +422,23 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('handles recovery requests and reset flows', async () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    prismaMock.user.findUnique.mockResolvedValueOnce({ id: 7 } as never);
-    prismaMock.accountRecovery.create.mockResolvedValueOnce({ id: 1 } as never);
+    sendRecoveryEmailMock.mockResolvedValue(true);
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      email: 'kai@example.com'
+    } as never);
+    prismaMock.$transaction.mockResolvedValueOnce([{}, { id: 1 }] as never);
 
     const requestRes = await request(app)
       .post('/api/auth/recovery/request')
       .send({ email: 'kai@example.com' });
 
     expect(requestRes.status).toBe(200);
-    expect(prismaMock.accountRecovery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        userId: 7,
-        token: expect.any(String),
-        expiresAt: expect.any(Date)
-      })
-    });
+    expect(sendRecoveryEmailMock).toHaveBeenCalledWith(
+      'kai@example.com',
+      expect.stringContaining('/recovery?token=')
+    );
 
     prismaMock.accountRecovery.findFirst.mockResolvedValueOnce(null);
     const invalidReset = await request(app)
@@ -470,8 +474,22 @@ describe('API auth/profile/user flows', () => {
       where: { userId: 7, revokedAt: null },
       data: { revokedAt: expect.any(Date) }
     });
+  });
 
-    logSpy.mockRestore();
+  it('skips token creation when sendRecoveryEmail returns false (SMTP off)', async () => {
+    sendRecoveryEmailMock.mockResolvedValueOnce(false);
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      email: 'kai@example.com'
+    } as never);
+
+    const res = await request(app)
+      .post('/api/auth/recovery/request')
+      .send({ email: 'kai@example.com' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('lists and revokes the current user sessions', async () => {

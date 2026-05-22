@@ -33,6 +33,10 @@ import {
   type GrantDonorInput
 } from '../../schemas/user';
 import { audit } from '../../lib/audit';
+import { parsePage, paginatedResponse } from '../../lib/pagination';
+import { sendRecoveryEmail } from '../../lib/mailer';
+import { email as emailConfig } from '../../modules/config';
+import crypto from 'crypto';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -49,6 +53,12 @@ const warningParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   warnId: z.coerce.number().int().positive()
 });
+const reqIdParamsSchema = z.object({
+  reqId: z.coerce.number().int().positive()
+});
+const recoveryStatusSchema = z
+  .enum(['pending', 'used', 'expired'])
+  .default('pending');
 
 // ─── Donor ranks (static paths — must come before /:id) ──────────────────────
 
@@ -201,6 +211,80 @@ router.put(
   })
 );
 
+// ─── Staff recovery tools (static paths — must be before /:id) ───────────────
+
+// GET /api/users/recovery-requests
+router.get(
+  '/recovery-requests',
+  ...requirePermission('users_edit'),
+  authHandler(async (req, res) => {
+    const rawStatus = req.query.status as string | undefined;
+    const statusResult = recoveryStatusSchema.safeParse(rawStatus ?? 'pending');
+    const status = statusResult.success ? statusResult.data : 'pending';
+
+    const now = new Date();
+    const where =
+      status === 'pending'
+        ? { usedAt: null, expiresAt: { gt: now } }
+        : status === 'used'
+        ? { usedAt: { not: null } }
+        : { usedAt: null, expiresAt: { lte: now } };
+
+    const pg = parsePage(req);
+    const [records, total] = await Promise.all([
+      prisma.accountRecovery.findMany({
+        where,
+        include: { user: { select: { username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.accountRecovery.count({ where })
+    ]);
+
+    const data = records.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      username: r.user.username,
+      email: r.user.email,
+      status,
+      createdAt: r.createdAt,
+      expiresAt: r.expiresAt,
+      usedAt: r.usedAt
+    }));
+
+    paginatedResponse(res, data, total, pg);
+  })
+);
+
+// DELETE /api/users/recovery-requests/:reqId
+router.delete(
+  '/recovery-requests/:reqId',
+  ...requirePermission('users_edit'),
+  validateParams(reqIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { reqId } = parsedParams<{ reqId: number }>(res);
+    const record = await prisma.accountRecovery.findUnique({
+      where: { id: reqId }
+    });
+    if (!record)
+      return res.status(404).json({ msg: 'Recovery request not found' });
+    if (record.usedAt)
+      return res
+        .status(409)
+        .json({ msg: 'Cannot revoke a used recovery token' });
+    await prisma.accountRecovery.delete({ where: { id: reqId } });
+    await audit(
+      prisma,
+      req.user.id,
+      'recovery.revoked',
+      'AccountRecovery',
+      reqId
+    );
+    res.json({ msg: 'Recovery request revoked' });
+  })
+);
+
 // GET /api/users/:id — get user by id (public profile)
 router.get(
   '/:id',
@@ -251,6 +335,47 @@ router.post(
 );
 
 // ─── User moderation routes (after /:id) ─────────────────────────────────────
+
+// POST /api/users/:id/recovery — admin-triggered recovery email
+router.post(
+  '/:id/recovery',
+  ...requirePermission('users_edit'),
+  validateParams(userIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, disabled: true }
+    });
+    if (!user || user.disabled)
+      return res.status(404).json({ msg: 'User not found' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const resetUrl = `${emailConfig.siteUrl}/recovery?token=${token}`;
+
+    // Send email first — only touch DB if delivery succeeds
+    const sent = await sendRecoveryEmail(user.email, resetUrl);
+    if (!sent) {
+      return res.status(502).json({ msg: 'Email delivery is not configured' });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    await prisma.$transaction([
+      prisma.accountRecovery.updateMany({
+        where: { userId: id, usedAt: null, expiresAt: { gt: now } },
+        data: { expiresAt: now }
+      }),
+      prisma.accountRecovery.create({
+        data: { userId: id, token, expiresAt }
+      })
+    ]);
+
+    await audit(prisma, req.user.id, 'recovery.admin_triggered', 'User', id);
+    res.json({ msg: 'Recovery email sent' });
+  })
+);
 
 // GET /api/users/:id/warnings
 router.get(
