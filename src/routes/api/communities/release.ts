@@ -187,7 +187,8 @@ const attachTagWithVotes = async (
   releaseId: number,
   actorId: number,
   tag: { id: number; name: string },
-  writeHistory: boolean
+  writeHistory: boolean,
+  snapshot?: ReleaseSnapshot
 ): Promise<void> => {
   const releaseTag = await tx.releaseTag.create({
     data: {
@@ -214,7 +215,8 @@ const attachTagWithVotes = async (
         summary: `Tag "${tag.name}" added`,
         changedFields: ['tags'],
         before: { tagId: tag.id, name: tag.name, score: 0 } as never,
-        after: { tagId: tag.id, name: tag.name, score: 2 } as never
+        after: { tagId: tag.id, name: tag.name, score: 2 } as never,
+        ...(snapshot !== undefined && { snapshot: snapshot as never })
       }
     });
   }
@@ -224,7 +226,8 @@ const detachTag = async (
   tx: Prisma.TransactionClient,
   releaseId: number,
   actorId: number,
-  tag: { id: number; name?: string }
+  tag: { id: number; name?: string },
+  snapshot?: ReleaseSnapshot
 ): Promise<void> => {
   await tx.releaseTag.deleteMany({ where: { releaseId, tagId: tag.id } });
   await tx.tag.update({
@@ -240,7 +243,8 @@ const detachTag = async (
       changedFields: ['tags'],
       before: tag.name
         ? ({ tagId: tag.id, name: tag.name } as never)
-        : undefined
+        : undefined,
+      ...(snapshot !== undefined && { snapshot: snapshot as never })
     }
   });
 };
@@ -326,6 +330,100 @@ router.get(
       prisma.releaseHistory.count({ where: { releaseId: id } })
     ]);
     paginatedResponse(res, entries, total, pg);
+  })
+);
+
+// POST /api/communities/:communityId/releases/:releaseId/history/:historyId/revert — requires communities_manage or staff/admin
+const revertParamsSchema = z.object({
+  communityId: z.coerce.number().int().positive(),
+  releaseId: z.coerce.number().int().positive(),
+  historyId: z.coerce.number().int().positive()
+});
+
+router.post(
+  '/:releaseId/history/:historyId/revert',
+  ...requirePermission('communities_manage', 'admin'),
+  validateParams(revertParamsSchema),
+  authHandler(async (req, res) => {
+    const {
+      communityId,
+      releaseId: id,
+      historyId
+    } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+      historyId: number;
+    }>(res);
+    const community = await getAccessibleCommunity(communityId, req.user.id);
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (community === 'forbidden') {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
+
+    const targetEntry = await prisma.releaseHistory.findFirst({
+      where: { id: historyId, releaseId: id }
+    });
+    if (!targetEntry)
+      return res.status(404).json({ msg: 'History entry not found' });
+    if (targetEntry.action !== ReleaseHistoryAction.edit) {
+      return res
+        .status(422)
+        .json({ msg: 'Only edit revisions can be reverted' });
+    }
+
+    const restoreState = targetEntry.before as unknown as ReleaseSnapshot;
+
+    const existing = await prisma.release.findFirst({
+      where: { id, communityId },
+      include: { releaseTags: { include: { tag: true } } }
+    });
+    if (!existing) return res.status(404).json({ msg: 'Release not found' });
+
+    const currentSnapshot = snapshotRelease(existing);
+
+    const release = await prisma.$transaction(async (tx) => {
+      await tx.release.update({
+        where: { id },
+        data: {
+          title: restoreState.title,
+          description: restoreState.description,
+          image: restoreState.image,
+          year: restoreState.year,
+          isEdition: restoreState.isEdition,
+          edition: (restoreState.edition ?? undefined) as never
+        }
+      });
+
+      const changedFields = changedReleaseFields(
+        currentSnapshot,
+        restoreState
+      ).filter((f) => f !== 'tags');
+
+      await tx.releaseHistory.create({
+        data: {
+          releaseId: id,
+          actorId: req.user.id,
+          action: ReleaseHistoryAction.edit,
+          summary: `Reverted to revision from ${targetEntry.createdAt.toISOString()}`,
+          changedFields,
+          before: currentSnapshot as never,
+          after: restoreState as never,
+          snapshot: restoreState as never
+        }
+      });
+
+      const refreshed = await tx.release.findUniqueOrThrow({
+        where: { id },
+        include: { artist: true, releaseTags: { include: { tag: true } } }
+      });
+
+      return {
+        ...refreshed,
+        tags: buildPlainTags(refreshed.releaseTags)
+      };
+    });
+
+    res.json(release);
   })
 );
 
@@ -474,6 +572,7 @@ router.post(
         where: { id: created.id },
         include: { artist: true, releaseTags: { include: { tag: true } } }
       });
+      const createdSnapshot = snapshotRelease(release);
       await tx.releaseHistory.create({
         data: {
           releaseId: release.id,
@@ -481,14 +580,8 @@ router.post(
           action: ReleaseHistoryAction.created,
           summary: 'Release created',
           changedFields: [],
-          after: {
-            title: release.title,
-            artistName: release.artist.name,
-            type: release.type,
-            releaseType: release.releaseType,
-            year: release.year,
-            tagIds: uniqueTagIds
-          } as never
+          after: createdSnapshot as never,
+          snapshot: createdSnapshot as never
         }
       });
       return {
@@ -559,15 +652,26 @@ router.put(
         include: { artist: true, releaseTags: { include: { tag: true } } }
       });
 
+      let runningSnapshot = { ...before };
+
       if (removedTagIds.length > 0) {
         const existingTagMap = new Map(
           existing.releaseTags.map((rt) => [rt.tag.id, rt.tag])
         );
         for (const tagId of removedTagIds) {
-          await detachTag(tx, id, actorId, {
-            id: tagId,
-            name: existingTagMap.get(tagId)?.name
-          });
+          const tagName = existingTagMap.get(tagId)?.name;
+          runningSnapshot = {
+            ...runningSnapshot,
+            tagIds: runningSnapshot.tagIds.filter((tid) => tid !== tagId),
+            tagNames: runningSnapshot.tagNames.filter((n) => n !== tagName)
+          };
+          await detachTag(
+            tx,
+            id,
+            actorId,
+            { id: tagId, name: tagName },
+            runningSnapshot
+          );
         }
       }
 
@@ -581,7 +685,12 @@ router.put(
             where: { id: tag.id },
             data: { occurrences: { increment: 1 } }
           });
-          await attachTagWithVotes(tx, id, actorId, tag, true);
+          runningSnapshot = {
+            ...runningSnapshot,
+            tagIds: [...runningSnapshot.tagIds, tag.id].sort((a, b) => a - b),
+            tagNames: [...runningSnapshot.tagNames, tag.name].sort()
+          };
+          await attachTagWithVotes(tx, id, actorId, tag, true, runningSnapshot);
         }
       }
 
@@ -607,7 +716,8 @@ router.put(
               editSummary?.trim() || summarizeReleaseChanges(changedFields),
             changedFields,
             before: before as never,
-            after: after as never
+            after: after as never,
+            snapshot: after as never
           }
         });
       }
@@ -689,6 +799,10 @@ router.post(
           pageId: contribution.id
         });
       }
+      const releaseWithTags = await tx.release.findUniqueOrThrow({
+        where: { id: contribution.release.id },
+        include: { releaseTags: { include: { tag: true } } }
+      });
       await tx.releaseHistory.create({
         data: {
           releaseId: contribution.release.id,
@@ -701,7 +815,8 @@ router.post(
             type: contribution.type,
             sizeInBytes: contribution.sizeInBytes ?? null,
             contributor: contribution.user?.username ?? null
-          } as never
+          } as never,
+          snapshot: snapshotRelease(releaseWithTags) as never
         }
       });
     });
@@ -829,7 +944,22 @@ router.post(
         create: { name, occurrences: 1 },
         update: { occurrences: { increment: 1 } }
       });
-      await attachTagWithVotes(tx, id, req.user.id, t, true);
+      const currentRelease = await tx.release.findUniqueOrThrow({
+        where: { id },
+        include: { releaseTags: { include: { tag: true } } }
+      });
+      const postAddSnapshot: ReleaseSnapshot = {
+        ...snapshotRelease(currentRelease),
+        tagIds: [
+          ...currentRelease.releaseTags.map((rt) => rt.tag.id),
+          t.id
+        ].sort((a, b) => a - b),
+        tagNames: [
+          ...currentRelease.releaseTags.map((rt) => rt.tag.name),
+          t.name
+        ].sort()
+      };
+      await attachTagWithVotes(tx, id, req.user.id, t, true, postAddSnapshot);
       return t;
     });
 
@@ -991,6 +1121,21 @@ router.delete(
     });
 
     await prisma.$transaction(async (tx) => {
+      const currentRelease = await tx.release.findUniqueOrThrow({
+        where: { id },
+        include: { releaseTags: { include: { tag: true } } }
+      });
+      const postRemovalSnapshot: ReleaseSnapshot = {
+        ...snapshotRelease(currentRelease),
+        tagIds: currentRelease.releaseTags
+          .filter((rt) => rt.tag.id !== tagId)
+          .map((rt) => rt.tag.id)
+          .sort((a, b) => a - b),
+        tagNames: currentRelease.releaseTags
+          .filter((rt) => rt.tag.id !== tagId)
+          .map((rt) => rt.tag.name)
+          .sort()
+      };
       await tx.releaseTag.deleteMany({
         where: { releaseId: id, tagId }
       });
@@ -1005,7 +1150,8 @@ router.delete(
           action: ReleaseHistoryAction.tag_removed,
           summary: `Tag "${tag?.name ?? `#${tagId}`}" removed`,
           changedFields: ['tags'],
-          before: tag ? ({ tagId, name: tag.name } as never) : undefined
+          before: tag ? ({ tagId, name: tag.name } as never) : undefined,
+          snapshot: postRemovalSnapshot as never
         }
       });
     });

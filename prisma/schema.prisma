@@ -1438,6 +1438,7 @@ model ReleaseHistory {
   changedFields String[]
   before        Json?
   after         Json?
+  snapshot      Json?
   createdAt     DateTime             @default(now())
 
   @@index([releaseId, createdAt])
