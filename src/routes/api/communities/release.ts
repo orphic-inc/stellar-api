@@ -33,6 +33,7 @@ import { recomputeVoteAggregate } from '../../../modules/top10';
 import { getSettings } from '../../../modules/settings';
 import {
   FileType,
+  Prisma,
   RegistrationStatus,
   ReleaseHistoryAction,
   ReleaseTagVoteDirection
@@ -181,6 +182,69 @@ const buildPlainTags = (
     .map((releaseTag) => releaseTag.tag)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+const attachTagWithVotes = async (
+  tx: Prisma.TransactionClient,
+  releaseId: number,
+  actorId: number,
+  tag: { id: number; name: string },
+  writeHistory: boolean
+): Promise<void> => {
+  const releaseTag = await tx.releaseTag.create({
+    data: {
+      releaseId,
+      tagId: tag.id,
+      userId: actorId,
+      positiveVotes: 3,
+      negativeVotes: 1
+    }
+  });
+  await tx.releaseTagVote.create({
+    data: {
+      releaseTagId: releaseTag.id,
+      userId: actorId,
+      direction: ReleaseTagVoteDirection.up
+    }
+  });
+  if (writeHistory) {
+    await tx.releaseHistory.create({
+      data: {
+        releaseId,
+        actorId,
+        action: ReleaseHistoryAction.tag_added,
+        summary: `Tag "${tag.name}" added`,
+        changedFields: ['tags'],
+        before: { tagId: tag.id, name: tag.name, score: 0 } as never,
+        after: { tagId: tag.id, name: tag.name, score: 2 } as never
+      }
+    });
+  }
+};
+
+const detachTag = async (
+  tx: Prisma.TransactionClient,
+  releaseId: number,
+  actorId: number,
+  tag: { id: number; name?: string }
+): Promise<void> => {
+  await tx.releaseTag.deleteMany({ where: { releaseId, tagId: tag.id } });
+  await tx.tag.update({
+    where: { id: tag.id },
+    data: { occurrences: { decrement: 1 } }
+  });
+  await tx.releaseHistory.create({
+    data: {
+      releaseId,
+      actorId,
+      action: ReleaseHistoryAction.tag_removed,
+      summary: `Tag "${tag.name ?? `#${tag.id}`}" removed`,
+      changedFields: ['tags'],
+      before: tag.name
+        ? ({ tagId: tag.id, name: tag.name } as never)
+        : undefined
+    }
+  });
+};
+
 // GET /api/communities/:communityId/releases
 router.get(
   '/',
@@ -229,6 +293,42 @@ router.get(
   })
 );
 
+// GET /api/communities/:communityId/releases/:releaseId/history
+router.get(
+  '/:releaseId/history',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId: id } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const community = await getAccessibleCommunity(communityId, req.user.id);
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (community === 'forbidden') {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
+    const release = await prisma.release.findFirst({
+      where: { id, communityId },
+      select: { id: true }
+    });
+    if (!release) return res.status(404).json({ msg: 'Release not found' });
+
+    const pg = parsePage(req);
+    const [entries, total] = await Promise.all([
+      prisma.releaseHistory.findMany({
+        where: { releaseId: id },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: pg.skip,
+        take: pg.limit,
+        include: { actor: { select: { id: true, username: true } } }
+      }),
+      prisma.releaseHistory.count({ where: { releaseId: id } })
+    ]);
+    paginatedResponse(res, entries, total, pg);
+  })
+);
+
 // GET /api/communities/:communityId/releases/:releaseId
 router.get(
   '/:releaseId',
@@ -257,12 +357,6 @@ router.get(
                 select: { direction: true }
               },
               user: { select: { id: true, username: true } }
-            }
-          },
-          historyEntries: {
-            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-            include: {
-              actor: { select: { id: true, username: true } }
             }
           },
           voteAggregate: true,
@@ -314,8 +408,7 @@ router.get(
       ...release,
       tags: buildPlainTags(release.releaseTags),
       myVote,
-      releaseTags,
-      historyEntries: release.historyEntries
+      releaseTags
     });
   })
 );
@@ -364,20 +457,17 @@ router.post(
       });
 
       if (uniqueTagIds.length > 0) {
-        await tx.releaseTag.createMany({
-          data: uniqueTagIds.map((tagId) => ({
-            releaseId: created.id,
-            tagId
-          }))
+        const tags = await tx.tag.findMany({
+          where: { id: { in: uniqueTagIds } },
+          select: { id: true, name: true }
         });
-        await Promise.all(
-          uniqueTagIds.map((tagId) =>
-            tx.tag.update({
-              where: { id: tagId },
-              data: { occurrences: { increment: 1 } }
-            })
-          )
-        );
+        for (const tag of tags) {
+          await tx.tag.update({
+            where: { id: tag.id },
+            data: { occurrences: { increment: 1 } }
+          });
+          await attachTagWithVotes(tx, created.id, req.user!.id, tag, false);
+        }
       }
 
       const release = await tx.release.findUniqueOrThrow({
@@ -470,34 +560,29 @@ router.put(
       });
 
       if (removedTagIds.length > 0) {
-        await tx.releaseTag.deleteMany({
-          where: { releaseId: id, tagId: { in: removedTagIds } }
-        });
-        await Promise.all(
-          removedTagIds.map((tagId) =>
-            tx.tag.update({
-              where: { id: tagId },
-              data: { occurrences: { decrement: 1 } }
-            })
-          )
+        const existingTagMap = new Map(
+          existing.releaseTags.map((rt) => [rt.tag.id, rt.tag])
         );
+        for (const tagId of removedTagIds) {
+          await detachTag(tx, id, actorId, {
+            id: tagId,
+            name: existingTagMap.get(tagId)?.name
+          });
+        }
       }
 
       if (addedTagIds.length > 0) {
-        await tx.releaseTag.createMany({
-          data: addedTagIds.map((tagId) => ({
-            releaseId: id,
-            tagId
-          }))
+        const addedTags = await tx.tag.findMany({
+          where: { id: { in: addedTagIds } },
+          select: { id: true, name: true }
         });
-        await Promise.all(
-          addedTagIds.map((tagId) =>
-            tx.tag.update({
-              where: { id: tagId },
-              data: { occurrences: { increment: 1 } }
-            })
-          )
-        );
+        for (const tag of addedTags) {
+          await tx.tag.update({
+            where: { id: tag.id },
+            data: { occurrences: { increment: 1 } }
+          });
+          await attachTagWithVotes(tx, id, actorId, tag, true);
+        }
       }
 
       const refreshed = await tx.release.findUniqueOrThrow({
@@ -506,7 +591,11 @@ router.put(
       });
 
       const after = snapshotRelease(refreshed);
-      const changedFields = changedReleaseFields(before, after);
+      // Tags are already covered by per-tag history entries; exclude from the
+      // edit entry so the summary reflects only metadata field changes.
+      const changedFields = changedReleaseFields(before, after).filter(
+        (f) => f !== 'tags'
+      );
 
       if (changedFields.length > 0) {
         await tx.releaseHistory.create({
@@ -740,37 +829,7 @@ router.post(
         create: { name, occurrences: 1 },
         update: { occurrences: { increment: 1 } }
       });
-      const releaseTag = await tx.releaseTag.create({
-        data: {
-          releaseId: id,
-          tagId: t.id,
-          userId: req.user.id,
-          positiveVotes: 3,
-          negativeVotes: 1
-        },
-        include: {
-          tag: true,
-          user: { select: { id: true, username: true } }
-        }
-      });
-      await tx.releaseTagVote.create({
-        data: {
-          releaseTagId: releaseTag.id,
-          userId: req.user.id,
-          direction: ReleaseTagVoteDirection.up
-        }
-      });
-      await tx.releaseHistory.create({
-        data: {
-          releaseId: id,
-          actorId: req.user.id,
-          action: ReleaseHistoryAction.tag_added,
-          summary: `Tag "${t.name}" added`,
-          changedFields: ['tags'],
-          before: { tagId: t.id, name: t.name, score: 0 } as never,
-          after: { tagId: t.id, name: t.name, score: 2 } as never
-        }
-      });
+      await attachTagWithVotes(tx, id, req.user.id, t, true);
       return t;
     });
 

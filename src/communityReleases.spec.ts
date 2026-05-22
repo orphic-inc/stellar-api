@@ -191,6 +191,11 @@ describe('POST /api/communities/:communityId/releases', () => {
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
     prismaMock.release.create.mockResolvedValue(makeRelease() as never);
+    prismaMock.tag.findMany.mockResolvedValue([
+      { id: 7, name: 'jazz' },
+      { id: 9, name: 'fusion' }
+    ] as never);
+    prismaMock.releaseTag.create.mockResolvedValue({ id: 99 } as never);
     prismaMock.release.findUniqueOrThrow.mockResolvedValue(
       makeRelease() as never
     );
@@ -215,11 +220,18 @@ describe('POST /api/communities/:communityId/releases', () => {
         image: null
       })
     });
-    expect(prismaMock.releaseTag.createMany).toHaveBeenCalledWith({
-      data: [
-        { releaseId: 3, tagId: 7 },
-        { releaseId: 3, tagId: 9 }
-      ]
+    expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [7, 9] } },
+      select: { id: true, name: true }
+    });
+    expect(prismaMock.releaseTag.create).toHaveBeenCalledWith({
+      data: {
+        releaseId: 3,
+        tagId: 7,
+        userId: 7,
+        positiveVotes: 3,
+        negativeVotes: 1
+      }
     });
     expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -265,6 +277,10 @@ describe('PUT /api/communities/:communityId/releases/:releaseId', () => {
         ]
       }) as never
     );
+    prismaMock.tag.findMany.mockResolvedValue([
+      { id: 8, name: 'fusion' }
+    ] as never);
+    prismaMock.releaseTag.create.mockResolvedValue({ id: 99 } as never);
     prismaMock.release.findUniqueOrThrow.mockResolvedValue(
       makeRelease({
         title: 'Updated',
@@ -299,17 +315,23 @@ describe('PUT /api/communities/:communityId/releases/:releaseId', () => {
       include: { artist: true, releaseTags: { include: { tag: true } } }
     });
     expect(prismaMock.releaseTag.deleteMany).toHaveBeenCalledWith({
-      where: { releaseId: 3, tagId: { in: [7] } }
+      where: { releaseId: 3, tagId: 7 }
     });
-    expect(prismaMock.releaseTag.createMany).toHaveBeenCalledWith({
-      data: [{ releaseId: 3, tagId: 8 }]
+    expect(prismaMock.releaseTag.create).toHaveBeenCalledWith({
+      data: {
+        releaseId: 3,
+        tagId: 8,
+        userId: 7,
+        positiveVotes: 3,
+        negativeVotes: 1
+      }
     });
     expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         releaseId: 3,
         actorId: 7,
         action: 'edit',
-        changedFields: expect.arrayContaining(['title', 'tags'])
+        changedFields: ['title']
       })
     });
   });
@@ -588,10 +610,6 @@ describe('POST /api/communities/:communityId/releases/:releaseId/tags', () => {
         userId: 7,
         positiveVotes: 3,
         negativeVotes: 1
-      },
-      include: {
-        tag: true,
-        user: { select: { id: true, username: true } }
       }
     });
     expect(prismaMock.releaseTagVote.create).toHaveBeenCalledWith({
