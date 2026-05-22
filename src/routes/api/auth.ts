@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import { auth as authConfig } from '../../modules/config';
+import { auth as authConfig, email as emailConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -35,6 +35,7 @@ import {
   toAuthUser
 } from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
+import { sendRecoveryEmail } from '../../lib/mailer';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -255,22 +256,37 @@ router.post(
   validate(recoveryRequestSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { email } = parsedBody<RecoveryRequestInput>(res);
+    const genericMsg = 'If that email exists, a recovery link has been sent';
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
-      select: { id: true }
+      select: { id: true, email: true }
     });
 
     if (user) {
       const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
-      await prisma.accountRecovery.create({
-        data: { userId: user.id, token, expiresAt }
-      });
-      console.log(`[recovery] token for user ${user.id}: ${token}`);
+      const resetUrl = `${emailConfig.siteUrl}/recovery?token=${token}`;
+
+      // Only write to DB if email delivery succeeds — avoids dead rows when SMTP is off
+      const sent = await sendRecoveryEmail(user.email, resetUrl);
+      if (sent) {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+        // Enforce single-active-token: expire any pending tokens before creating a new one
+        await prisma.$transaction([
+          prisma.accountRecovery.updateMany({
+            where: { userId: user.id, usedAt: null, expiresAt: { gt: now } },
+            data: { expiresAt: now }
+          }),
+          prisma.accountRecovery.create({
+            data: { userId: user.id, token, expiresAt }
+          })
+        ]);
+      }
     }
 
-    res.json({ msg: 'If that email exists, a recovery link has been sent' });
+    res.json({ msg: genericMsg });
   })
 );
 
