@@ -9,6 +9,9 @@ import {
   createUserMock
 } from './test/apiTestHarness';
 import { makeUser } from './test/factories';
+import { sendRecoveryEmail } from './lib/mailer';
+
+const sendRecoveryEmailMock = sendRecoveryEmail as jest.Mock;
 
 beforeEach(() => resetApiTestState());
 
@@ -1037,5 +1040,125 @@ describe('POST /api/users/:id/donor with expiresAt', () => {
       .send({ donorRankId: 3, expiresAt: '2027-01-01T00:00:00.000Z' });
 
     expect(res.status).toBe(201);
+  });
+});
+
+// ─── Staff recovery queue ─────────────────────────────────────────────────────
+
+const setUsersEdit = () =>
+  prismaMock.userRank.findUnique.mockResolvedValue(
+    makeUserRank({ users_edit: true, staff: true, admin: true })
+  );
+
+describe('GET /api/users/recovery-requests', () => {
+  beforeEach(() => setUsersEdit());
+
+  it('returns paginated pending recovery requests', async () => {
+    prismaMock.accountRecovery.findMany.mockResolvedValue([
+      {
+        id: 1,
+        userId: 9,
+        token: 'abc',
+        expiresAt: new Date(Date.now() + 3600000),
+        usedAt: null,
+        createdAt: new Date(),
+        user: { username: 'alice', email: 'alice@example.com' }
+      }
+    ] as never);
+    prismaMock.accountRecovery.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/users/recovery-requests');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].username).toBe('alice');
+    expect(res.body.meta.total).toBe(1);
+  });
+
+  it('returns 403 without users_edit permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    const res = await request(app).get('/api/users/recovery-requests');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('DELETE /api/users/recovery-requests/:reqId', () => {
+  beforeEach(() => setUsersEdit());
+
+  it('deletes a pending recovery request and audits', async () => {
+    prismaMock.accountRecovery.findUnique.mockResolvedValue({
+      id: 5,
+      usedAt: null
+    } as never);
+    prismaMock.accountRecovery.delete.mockResolvedValue({} as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app).delete('/api/users/recovery-requests/5');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ msg: 'Recovery request revoked' });
+  });
+
+  it('returns 404 for an unknown request', async () => {
+    prismaMock.accountRecovery.findUnique.mockResolvedValue(null);
+    const res = await request(app).delete('/api/users/recovery-requests/99');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 409 when token has already been used', async () => {
+    prismaMock.accountRecovery.findUnique.mockResolvedValue({
+      id: 5,
+      usedAt: new Date()
+    } as never);
+    const res = await request(app).delete('/api/users/recovery-requests/5');
+    expect(res.status).toBe(409);
+  });
+
+  it('returns 403 without users_edit permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    const res = await request(app).delete('/api/users/recovery-requests/5');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/users/:id/recovery', () => {
+  beforeEach(() => setUsersEdit());
+
+  it('sends a recovery email and audits', async () => {
+    sendRecoveryEmailMock.mockResolvedValue(true);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ id: 9, email: 'target@example.com', disabled: false }) as never
+    );
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app).post('/api/users/9/recovery');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ msg: 'Recovery email sent' });
+    expect(sendRecoveryEmailMock).toHaveBeenCalledWith(
+      'target@example.com',
+      expect.stringContaining('/recovery?token=')
+    );
+  });
+
+  it('returns 404 for an unknown user', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    const res = await request(app).post('/api/users/999/recovery');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a disabled user', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeUser({ id: 9, disabled: true }) as never
+    );
+    const res = await request(app).post('/api/users/9/recovery');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 without users_edit permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    const res = await request(app).post('/api/users/9/recovery');
+    expect(res.status).toBe(403);
   });
 });

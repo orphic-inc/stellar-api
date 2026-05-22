@@ -640,6 +640,102 @@ registry.registerPath({
   }
 });
 
+// ─── Staff recovery queue ─────────────────────────────────────────────────────
+
+const RecoveryRequestItem = registry.register(
+  'RecoveryRequestItem',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    username: z.string(),
+    email: z.string(),
+    status: z.enum(['pending', 'used', 'expired']),
+    createdAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+    usedAt: z.string().datetime().nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/recovery-requests',
+  tags: ['Users'],
+  request: {
+    query: z.object({
+      status: z.enum(['pending', 'used', 'expired']).optional(),
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated list of account recovery requests',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(RecoveryRequestItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/users/recovery-requests/{reqId}',
+  tags: ['Users'],
+  request: { params: z.object({ reqId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Recovery request revoked',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Token already used',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/recovery',
+  tags: ['Users'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Recovery email sent',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    502: {
+      description: 'Email delivery not configured',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 registry.registerPath({
