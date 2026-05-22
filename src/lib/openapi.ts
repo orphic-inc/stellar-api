@@ -122,7 +122,8 @@ const AuthUser = registry.register(
       name: z.string(),
       color: z.string(),
       badge: z.string().optional(),
-      permissions: z.record(z.string(), z.boolean()).optional()
+      permissions: z.record(z.string(), z.boolean()).optional(),
+      personalCollageLimit: z.number().int().optional()
     })
   })
 );
@@ -2071,6 +2072,7 @@ const UserRank = registry.register(
     permissions: z.record(z.string(), z.boolean()).optional(),
     color: z.string().optional(),
     badge: z.string().optional(),
+    personalCollageLimit: z.number().int().optional(),
     userCount: z.number().optional()
   })
 );

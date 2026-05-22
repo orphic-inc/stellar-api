@@ -13,6 +13,7 @@ const makeRank = (overrides: Record<string, unknown> = {}) => ({
   permissions: {},
   color: '#fff',
   badge: '',
+  personalCollageLimit: 0,
   _count: { users: 5 },
   ...overrides
 });

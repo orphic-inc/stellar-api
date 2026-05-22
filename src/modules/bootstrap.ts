@@ -10,6 +10,7 @@ export const DEFAULT_RANKS = [
     name: 'User',
     color: '',
     badge: '',
+    personalCollageLimit: 1,
     permissions: { forums_read: true, forums_post: true }
   },
   {
@@ -17,6 +18,7 @@ export const DEFAULT_RANKS = [
     name: 'Power User',
     color: '#e2a822',
     badge: '',
+    personalCollageLimit: 2,
     permissions: { forums_read: true, forums_post: true }
   },
   {
@@ -24,6 +26,7 @@ export const DEFAULT_RANKS = [
     name: 'Staff',
     color: '#e22a2a',
     badge: '',
+    personalCollageLimit: 3,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -43,6 +46,7 @@ export const DEFAULT_RANKS = [
     name: 'SysOp',
     color: '#a0d468',
     badge: '',
+    personalCollageLimit: 4,
     permissions: {
       forums_read: true,
       forums_post: true,

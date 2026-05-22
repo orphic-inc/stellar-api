@@ -39,7 +39,8 @@ export function makeUserRank(
     color: '',
     badge: '',
     permissions,
-    uploadRequired: 0
+    uploadRequired: 0,
+    personalCollageLimit: 0
   };
 }
 

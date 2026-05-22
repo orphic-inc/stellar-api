@@ -39,6 +39,7 @@ router.get(
         permissions: r.permissions,
         color: r.color,
         badge: r.badge,
+        personalCollageLimit: r.personalCollageLimit,
         userCount: r._count.users
       }))
     );
@@ -69,7 +70,7 @@ router.post(
   ...requirePermission('admin'),
   validate(createRankSchema),
   authHandler(async (req, res) => {
-    const { name, level, permissions, color, badge } =
+    const { name, level, permissions, color, badge, personalCollageLimit } =
       parsedBody<CreateRankInput>(res);
 
     const rank = await prisma.userRank.create({
@@ -78,7 +79,8 @@ router.post(
         level,
         permissions: permissions ?? {},
         color: color ?? '',
-        badge: badge ?? ''
+        badge: badge ?? '',
+        personalCollageLimit: personalCollageLimit ?? 0
       }
     });
 
@@ -99,7 +101,7 @@ router.put(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    const { name, level, permissions, color, badge } =
+    const { name, level, permissions, color, badge, personalCollageLimit } =
       parsedBody<UpdateRankInput>(res);
     const rank = await prisma.userRank.update({
       where: { id },
@@ -108,7 +110,8 @@ router.put(
         ...(level !== undefined && { level }),
         ...(permissions !== undefined && { permissions }),
         ...(color !== undefined && { color }),
-        ...(badge !== undefined && { badge })
+        ...(badge !== undefined && { badge }),
+        ...(personalCollageLimit !== undefined && { personalCollageLimit })
       }
     });
 

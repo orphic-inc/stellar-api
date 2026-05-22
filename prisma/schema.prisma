@@ -260,14 +260,15 @@ enum ReleaseReportCategory {
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
 model UserRank {
-  id             Int    @id @default(autoincrement())
-  level          Int
-  name           String
-  permissions    Json
-  color          String @default("")
-  badge          String @default("")
-  uploadRequired Int    @default(0)
-  users          User[]
+  id                   Int    @id @default(autoincrement())
+  level                Int
+  name                 String
+  permissions          Json
+  color                String @default("")
+  badge                String @default("")
+  uploadRequired       Int    @default(0)
+  personalCollageLimit Int    @default(0)
+  users                User[]
 
   @@map("user_ranks")
 }

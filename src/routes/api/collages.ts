@@ -207,6 +207,27 @@ router.post(
         .json({ msg: 'A collage with this name already exists' });
     }
 
+    if (isPersonal(categoryId)) {
+      const perms = await loadPermissions(req, res);
+      const isSiteStaff = !!(perms['staff'] || perms['admin']);
+      if (!isSiteStaff) {
+        const rank = await prisma.userRank.findUnique({
+          where: { id: req.user.userRankId },
+          select: { personalCollageLimit: true }
+        });
+        if (rank && rank.personalCollageLimit > 0) {
+          const count = await prisma.collage.count({
+            where: { userId, categoryId: 0, isDeleted: false }
+          });
+          if (count >= rank.personalCollageLimit) {
+            return res.status(400).json({
+              msg: `Personal collage limit reached (${rank.personalCollageLimit})`
+            });
+          }
+        }
+      }
+    }
+
     const collage = await prisma.collage.create({
       data: {
         name,
