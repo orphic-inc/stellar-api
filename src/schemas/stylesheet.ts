@@ -1,8 +1,24 @@
 import { z } from 'zod';
 
 export const stylesheetSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  cssUrl: z.string().url('CSS URL must be a valid URL')
+  name: z.string().min(1),
+  description: z.string().optional().default(''),
+  cssUrl: z.string().min(1, 'CSS URL is required'),
+  isDefault: z.boolean().optional().default(false)
 });
 
+// Defined independently so no defaults carry through — empty body is a validation error.
+export const stylesheetUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    cssUrl: z.string().min(1, 'CSS URL is required').optional(),
+    isDefault: z.boolean().optional()
+  })
+  .refine(
+    (data) => Object.values(data).some((v) => v !== undefined),
+    'At least one field must be provided'
+  );
+
 export type StylesheetInput = z.infer<typeof stylesheetSchema>;
+export type StylesheetUpdateInput = z.infer<typeof stylesheetUpdateSchema>;

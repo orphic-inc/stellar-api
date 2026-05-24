@@ -74,6 +74,21 @@ export const requirePermission = (
   }
 ];
 
+// Returns [requireAuth, permissionCheck] — admits only users with the literal 'admin' permission.
+// Staff alone does not pass (unlike requirePermission('admin') which treats staff ≡ admin).
+export const requireStrictAdmin = (): RequestHandler[] => [
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const perms = await loadPermissions(req as AuthenticatedRequest, res);
+      if (perms['admin']) return next();
+      res.status(403).json({ msg: 'Permission denied' });
+    } catch (err) {
+      next(err);
+    }
+  }
+];
+
 // Passes if req.user owns the resource OR has the given permission.
 // getOwnerId receives req and should return the resource owner's userId synchronously.
 export const requireOwnerOrPermission = (

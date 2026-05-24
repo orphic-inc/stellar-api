@@ -31,7 +31,10 @@ import {
   artistAliasSchema,
   artistTagSchema
 } from '../schemas/artist';
-import { stylesheetSchema } from '../schemas/stylesheet';
+import {
+  stylesheetSchema,
+  stylesheetUpdateSchema
+} from '../schemas/stylesheet';
 import {
   subscribeSchema,
   subscribeCommentsSchema
@@ -1052,8 +1055,19 @@ const Stylesheet = registry.register(
   z.object({
     id: z.number(),
     name: z.string(),
+    description: z.string(),
     cssUrl: z.string(),
+    isDefault: z.boolean(),
     createdAt: z.string()
+  })
+);
+
+const StylesheetStat = registry.register(
+  'StylesheetStat',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    userCount: z.number()
   })
 );
 
@@ -1216,9 +1230,19 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Available stylesheets',
-      content: {
-        'application/json': { schema: z.array(Stylesheet) }
-      }
+      content: { 'application/json': { schema: z.array(Stylesheet) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/admin/stats',
+  tags: ['Stylesheets'],
+  responses: {
+    200: {
+      description: 'Stylesheet user counts (admin only)',
+      content: { 'application/json': { schema: z.array(StylesheetStat) } }
     }
   }
 });
@@ -1260,6 +1284,32 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'put',
+  path: '/stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: stylesheetUpdateSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Stylesheet updated',
+      content: { 'application/json': { schema: Stylesheet } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'delete',
   path: '/stylesheet/{id}',
   tags: ['Stylesheets'],
@@ -1267,6 +1317,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Stylesheet removed'
+    },
+    400: {
+      description: 'Cannot delete the default stylesheet',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',

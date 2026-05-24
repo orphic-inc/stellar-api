@@ -17,6 +17,7 @@ import { getSettings } from '../../modules/settings';
 import { seedRanks, seedForums } from '../../modules/bootstrap';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
+import { getDefaultStylesheetName } from '../../modules/stylesheet';
 
 const TOKEN_TTL_SECONDS = 3600;
 const STARTUP_BUFFER = 5_368_709_120n; // 5 GiB — matches self-registration buffer
@@ -187,7 +188,10 @@ router.post(
     );
 
     const rawUser = await prisma.$transaction(async (tx) => {
-      const settings = await tx.userSettings.create({ data: {} });
+      const defaultTheme = await getDefaultStylesheetName(tx);
+      const settings = await tx.userSettings.create({
+        data: { siteAppearance: defaultTheme }
+      });
       const profile = await tx.profile.create({ data: {} });
       return tx.user.create({
         data: {

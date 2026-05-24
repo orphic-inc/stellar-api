@@ -275,7 +275,7 @@ model UserRank {
 
 model UserSettings {
   id                   Int                @id @default(autoincrement())
-  siteAppearance       String             @default("cayer_make")
+  siteAppearance       String             @default("sublime")
   externalStylesheet   String?
   styledTooltips       Boolean            @default(true)
   paranoia             Int                @default(0)
@@ -462,11 +462,16 @@ model Profile {
   @@map("profiles")
 }
 
+/// A partial unique index enforces exactly one default stylesheet at the DB level.
+/// This index is not representable in Prisma DSL and is created in raw SQL migration:
+/// CREATE UNIQUE INDEX "stylesheets_one_default" ON "stylesheets"("isDefault") WHERE "isDefault" = true;
 model Stylesheet {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  cssUrl    String
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String   @default("")
+  cssUrl      String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@map("stylesheets")
 }
