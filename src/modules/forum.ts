@@ -87,6 +87,8 @@ export const createPost = async (
   body: string
 ) =>
   prisma.$transaction(async (tx) => {
+    const sanitizedBody = sanitizeHtml(body);
+
     // If the last post in this topic was made by the same author, append to it
     // instead of creating a new post (prevents consecutive double-posting).
     const topic = await tx.forumTopic.findUnique({
@@ -101,14 +103,24 @@ export const createPost = async (
       if (lastPost && lastPost.authorId === authorId) {
         const merged = await tx.forumPost.update({
           where: { id: lastPost.id },
-          data: { body: sanitizeHtml(lastPost.body + '\n\n' + body) }
+          data: { body: `${lastPost.body}\n\n${sanitizedBody}` }
         });
+
+        await tx.forumTopic.update({
+          where: { id: forumTopicId },
+          data: { lastPostId: lastPost.id }
+        });
+        await tx.forum.update({
+          where: { id: forumId },
+          data: { lastTopicId: forumTopicId }
+        });
+
         return merged;
       }
     }
 
     const post = await tx.forumPost.create({
-      data: { forumTopicId, authorId, body: sanitizeHtml(body) }
+      data: { forumTopicId, authorId, body: sanitizedBody }
     });
     await tx.forumTopic.update({
       where: { id: forumTopicId },

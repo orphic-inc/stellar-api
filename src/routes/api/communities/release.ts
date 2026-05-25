@@ -131,6 +131,14 @@ const summarizeReleaseChanges = (fields: string[]): string => {
   return `Updated ${labels.join(', ')}`;
 };
 
+const extractRevisionSnapshot = (
+  entry: { snapshot: Prisma.JsonValue | null; after: Prisma.JsonValue | null }
+): ReleaseSnapshot | null => {
+  const candidate = entry.snapshot ?? entry.after;
+  if (!candidate || typeof candidate !== 'object') return null;
+  return candidate as unknown as ReleaseSnapshot;
+};
+
 const buildReleaseTagPayload = (
   tags: Array<{ id: number; name: string; occurrences: number }>,
   releaseTags: Array<{
@@ -374,7 +382,12 @@ router.post(
         .json({ msg: 'Only edit revisions can be reverted' });
     }
 
-    const restoreState = targetEntry.before as unknown as ReleaseSnapshot;
+    const restoreState = extractRevisionSnapshot(targetEntry);
+    if (!restoreState) {
+      return res
+        .status(422)
+        .json({ msg: 'History entry does not contain a restorable snapshot' });
+    }
 
     const existing = await prisma.release.findFirst({
       where: { id, communityId },

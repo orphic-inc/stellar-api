@@ -231,15 +231,26 @@ describe('createPost', () => {
     });
     mockTx.forumPost.update.mockResolvedValue({
       id: 31,
-      body: '[html]Previous\n\nReply'
+      body: '[html]Previous\n\n[html]Reply'
     });
+    mockTx.forumTopic.update.mockResolvedValue(undefined);
+    mockTx.forum.update.mockResolvedValue(undefined);
 
     const result = await createPost(9, 44, 7, 'Reply');
 
     expect(mockTx.forumPost.update).toHaveBeenCalledWith({
       where: { id: 31 },
-      data: { body: '[html][html]Previous\n\nReply' }
+      data: { body: '[html]Previous\n\n[html]Reply' }
     });
+    expect(mockTx.forumTopic.update).toHaveBeenCalledWith({
+      where: { id: 44 },
+      data: { lastPostId: 31 }
+    });
+    expect(mockTx.forum.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { lastTopicId: 44 }
+    });
+    expect(mockTx.notification.createMany).not.toHaveBeenCalled();
     expect(mockTx.forumPost.create).not.toHaveBeenCalled();
     expect(result.id).toBe(31);
   });

@@ -880,8 +880,26 @@ describe('POST /api/communities/:communityId/releases/:releaseId/history/:histor
       tagIds: [],
       tagNames: []
     },
-    after: null,
-    snapshot: null,
+    after: {
+      title: 'Revision Title',
+      description: 'Classic',
+      image: null,
+      year: 1959,
+      isEdition: false,
+      edition: null,
+      tagIds: [],
+      tagNames: []
+    },
+    snapshot: {
+      title: 'Revision Title',
+      description: 'Classic',
+      image: null,
+      year: 1959,
+      isEdition: false,
+      edition: null,
+      tagIds: [],
+      tagNames: []
+    },
     createdAt: new Date('2024-06-01T00:00:00Z'),
     actorId: 7
   };
@@ -925,7 +943,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/history/:histor
     expect(res.body.msg).toBe('Only edit revisions can be reverted');
   });
 
-  it('reverts the release to the before-snapshot and writes a revert history entry', async () => {
+  it('reverts the release to the selected revision snapshot and writes a revert history entry', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -933,7 +951,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/history/:histor
     prismaMock.releaseHistory.findFirst.mockResolvedValue(editEntry as never);
     prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
     prismaMock.release.findUniqueOrThrow.mockResolvedValue(
-      makeRelease({ title: 'Old Title' }) as never
+      makeRelease({ title: 'Revision Title' }) as never
     );
 
     const res = await request(app).post(
@@ -944,7 +962,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/history/:histor
     expect(prismaMock.release.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 3 },
-        data: expect.objectContaining({ title: 'Old Title' })
+        data: expect.objectContaining({ title: 'Revision Title' })
       })
     );
     expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({
@@ -952,6 +970,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/history/:histor
         releaseId: 3,
         actorId: 7,
         action: 'edit',
+        after: expect.objectContaining({ title: 'Revision Title' }),
         summary: expect.stringContaining('Reverted to revision from')
       })
     });

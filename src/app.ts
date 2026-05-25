@@ -50,6 +50,9 @@ import dnuRouter from './routes/api/communities/dnu';
 import searchRouter from './routes/api/search';
 import randomRouter from './routes/api/random';
 import top10Router from './routes/api/top10';
+import ipBansRouter from './routes/api/ipBans';
+import emailBlacklistRouter from './routes/api/emailBlacklist';
+import donationsRouter from './routes/api/donations';
 
 const log = getLogger('app');
 
@@ -111,6 +114,9 @@ export const createApp = () => {
   app.use('/api/search', searchRouter);
   app.use('/api/random', randomRouter);
   app.use('/api/top10', top10Router);
+  app.use('/api/ip-bans', ipBansRouter);
+  app.use('/api/email-blacklist', emailBlacklistRouter);
+  app.use('/api/donations', donationsRouter);
 
   app.use(
     (
