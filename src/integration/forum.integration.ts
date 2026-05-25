@@ -70,6 +70,7 @@ describe('createTopic', () => {
 describe('createPost + deletePost', () => {
   it('increments and decrements counters correctly', async () => {
     const author = await createAuthor();
+    const replier = await createAuthor();
     const forum = await createForum();
     const topic = await createTopic(forum.id, author.id, {
       title: 'Counter test',
@@ -86,7 +87,7 @@ describe('createPost + deletePost', () => {
     const reply = await createPost(
       forum.id,
       topic.id,
-      author.id,
+      replier.id,
       '<p>reply</p>'
     );
 
@@ -100,7 +101,7 @@ describe('createPost + deletePost', () => {
     });
     expect(forumAfterCreate.numPosts).toBe(forumBefore.numPosts + 1);
 
-    await deletePost(reply.id, topic.id, forum.id, author.id, false);
+    await deletePost(reply.id, topic.id, forum.id, replier.id, false);
 
     const topicAfterDelete = await testPrisma.forumTopic.findUniqueOrThrow({
       where: { id: topic.id }
