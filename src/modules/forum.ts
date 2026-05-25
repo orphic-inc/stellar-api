@@ -87,6 +87,26 @@ export const createPost = async (
   body: string
 ) =>
   prisma.$transaction(async (tx) => {
+    // If the last post in this topic was made by the same author, append to it
+    // instead of creating a new post (prevents consecutive double-posting).
+    const topic = await tx.forumTopic.findUnique({
+      where: { id: forumTopicId },
+      select: { lastPostId: true }
+    });
+    if (topic?.lastPostId) {
+      const lastPost = await tx.forumPost.findUnique({
+        where: { id: topic.lastPostId, deletedAt: null },
+        select: { id: true, authorId: true, body: true }
+      });
+      if (lastPost && lastPost.authorId === authorId) {
+        const merged = await tx.forumPost.update({
+          where: { id: lastPost.id },
+          data: { body: sanitizeHtml(lastPost.body + '\n\n' + body) }
+        });
+        return merged;
+      }
+    }
+
     const post = await tx.forumPost.create({
       data: { forumTopicId, authorId, body: sanitizeHtml(body) }
     });

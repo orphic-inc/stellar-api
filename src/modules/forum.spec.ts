@@ -2,11 +2,13 @@ const mockTx = {
   forumTopic: {
     create: jest.fn(),
     update: jest.fn(),
-    updateMany: jest.fn()
+    updateMany: jest.fn(),
+    findUnique: jest.fn()
   },
   forumPost: {
     create: jest.fn(),
     update: jest.fn(),
+    findUnique: jest.fn(),
     count: jest.fn()
   },
   forum: {
@@ -169,6 +171,7 @@ describe('createPost', () => {
   });
 
   it('creates notifications for subscribers other than the author', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
     mockTx.forumPost.create.mockResolvedValue({ id: 31, forumTopicId: 44 });
     mockTx.forumTopic.update.mockResolvedValue(undefined);
     mockTx.forum.update.mockResolvedValue(undefined);
@@ -208,6 +211,7 @@ describe('createPost', () => {
   });
 
   it('skips notification writes when no other subscribers exist', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
     mockTx.forumPost.create.mockResolvedValue({ id: 32, forumTopicId: 44 });
     mockTx.forumTopic.update.mockResolvedValue(undefined);
     mockTx.forum.update.mockResolvedValue(undefined);
@@ -216,6 +220,45 @@ describe('createPost', () => {
     await createPost(9, 44, 7, 'Reply');
 
     expect(mockTx.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('merges into last post when last post is by the same author', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: 31 });
+    mockTx.forumPost.findUnique.mockResolvedValue({
+      id: 31,
+      authorId: 7,
+      body: '[html]Previous'
+    });
+    mockTx.forumPost.update.mockResolvedValue({
+      id: 31,
+      body: '[html]Previous\n\nReply'
+    });
+
+    const result = await createPost(9, 44, 7, 'Reply');
+
+    expect(mockTx.forumPost.update).toHaveBeenCalledWith({
+      where: { id: 31 },
+      data: { body: '[html][html]Previous\n\nReply' }
+    });
+    expect(mockTx.forumPost.create).not.toHaveBeenCalled();
+    expect(result.id).toBe(31);
+  });
+
+  it('creates a new post when last post is by a different author', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: 30 });
+    mockTx.forumPost.findUnique.mockResolvedValue({
+      id: 30,
+      authorId: 99,
+      body: '[html]Other'
+    });
+    mockTx.forumPost.create.mockResolvedValue({ id: 31, forumTopicId: 44 });
+    mockTx.forumTopic.update.mockResolvedValue(undefined);
+    mockTx.forum.update.mockResolvedValue(undefined);
+    mockTx.subscription.findMany.mockResolvedValue([]);
+
+    await createPost(9, 44, 7, 'Reply');
+
+    expect(mockTx.forumPost.create).toHaveBeenCalled();
   });
 });
 

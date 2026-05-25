@@ -34,6 +34,8 @@ export const grantDownloadAccess = async (
       }
     });
     if (!contribution) throw new AppError(404, 'Contribution not found');
+    if (contribution.userId === consumerId)
+      throw new AppError(403, 'You cannot consume your own contribution');
 
     const consumer = await tx.user.findUnique({
       where: { id: consumerId },
