@@ -131,9 +131,10 @@ const summarizeReleaseChanges = (fields: string[]): string => {
   return `Updated ${labels.join(', ')}`;
 };
 
-const extractRevisionSnapshot = (
-  entry: { snapshot: Prisma.JsonValue | null; after: Prisma.JsonValue | null }
-): ReleaseSnapshot | null => {
+const extractRevisionSnapshot = (entry: {
+  snapshot: Prisma.JsonValue | null;
+  after: Prisma.JsonValue | null;
+}): ReleaseSnapshot | null => {
   const candidate = entry.snapshot ?? entry.after;
   if (!candidate || typeof candidate !== 'object') return null;
   return candidate as unknown as ReleaseSnapshot;

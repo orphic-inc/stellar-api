@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import { validate, parsedBody, validateParams, parsedParams } from '../../middleware/validate';
+import {
+  validate,
+  parsedBody,
+  validateParams,
+  parsedParams
+} from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
 
@@ -65,10 +70,17 @@ router.post(
       },
       include: { user: { select: { id: true, username: true } } }
     });
-    await audit(prisma, req.user.id, 'donation.create', 'Donation', donation.id, {
-      userId: input.userId,
-      amount: input.amount
-    });
+    await audit(
+      prisma,
+      req.user.id,
+      'donation.create',
+      'Donation',
+      donation.id,
+      {
+        userId: input.userId,
+        amount: input.amount
+      }
+    );
     res.status(201).json(donation);
   })
 );

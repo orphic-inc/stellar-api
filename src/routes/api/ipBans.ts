@@ -26,7 +26,7 @@ const parseIpv4ToInt = (ip: string): number | null => {
   if (octets.some((octet) => octet < 0 || octet > 255)) return null;
 
   const [a, b, c, d] = octets;
-  return ((a * 16777216 + b * 65536 + c * 256 + d) | 0);
+  return (a * 16777216 + b * 65536 + c * 256 + d) | 0;
 };
 
 const ipBanSchema = z
@@ -45,7 +45,7 @@ const ipBanSchema = z
     const fromInt = parseIpv4ToInt(value.fromIp);
     const toInt = parseIpv4ToInt(value.toIp ?? value.fromIp);
     if (fromInt === null || toInt === null) return;
-    if ((fromInt >>> 0) > (toInt >>> 0)) {
+    if (fromInt >>> 0 > toInt >>> 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['toIp'],
