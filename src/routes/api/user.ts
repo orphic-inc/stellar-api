@@ -292,6 +292,64 @@ router.delete(
   })
 );
 
+// GET /api/users/duplicate-ips — users sharing the same last-seen IP (must be before /:id)
+router.get(
+  '/duplicate-ips',
+  ...requirePermission('staff'),
+  authHandler(async (_req, res) => {
+    const dupes = await prisma.user.groupBy({
+      by: ['lastIp'],
+      where: { lastIp: { not: null } },
+      _count: { lastIp: true },
+      having: { lastIp: { _count: { gt: 1 } } },
+      orderBy: { _count: { lastIp: 'desc' } }
+    });
+    const result = await Promise.all(
+      dupes.map(async (d) => {
+        const users = await prisma.user.findMany({
+          where: { lastIp: d.lastIp! },
+          select: {
+            id: true,
+            username: true,
+            dateRegistered: true,
+            disabled: true,
+            lastLogin: true
+          }
+        });
+        return { ip: d.lastIp!, count: d._count.lastIp, users };
+      })
+    );
+    res.json(result);
+  })
+);
+
+// GET /api/users/registration-log — users ordered by registration date (must be before /:id)
+router.get(
+  '/registration-log',
+  ...requirePermission('staff'),
+  authHandler(async (req, res) => {
+    const pg = parsePage(req);
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        orderBy: { dateRegistered: 'desc' },
+        skip: pg.skip,
+        take: pg.limit,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          dateRegistered: true,
+          disabled: true,
+          lastIp: true,
+          userRank: { select: { id: true, name: true } }
+        }
+      }),
+      prisma.user.count()
+    ]);
+    paginatedResponse(res, users, total, pg);
+  })
+);
+
 // GET /api/users/:id/stats/history — user historical stats (own or staff)
 router.get(
   '/:id/stats/history',
