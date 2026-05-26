@@ -31,8 +31,8 @@ describe('sessions list (login watch)', () => {
     const user = await createUser('a');
     await testPrisma.userSession.createMany({
       data: [
-        { userId: user.id, ipAddress: '1.1.1.1', token: 'tok-a1' },
-        { userId: user.id, ipAddress: '2.2.2.2', token: 'tok-a2' }
+        { userId: user.id, ipAddress: '1.1.1.1' },
+        { userId: user.id, ipAddress: '2.2.2.2' }
       ]
     });
 
@@ -50,8 +50,8 @@ describe('sessions list (login watch)', () => {
     const u2 = await createUser('c');
     await testPrisma.userSession.createMany({
       data: [
-        { userId: u1.id, ipAddress: '1.1.1.1', token: 'tok-b1' },
-        { userId: u2.id, ipAddress: '2.2.2.2', token: 'tok-c1' }
+        { userId: u1.id, ipAddress: '1.1.1.1' },
+        { userId: u2.id, ipAddress: '2.2.2.2' }
       ]
     });
 
@@ -114,22 +114,21 @@ describe('invites list (invite pool)', () => {
           inviteKey: `sk-pending-${Date.now()}`,
           email: 'p@x.com',
           expires: new Date(),
-          reason: '',
-          status: 'PENDING'
+          reason: ''
         },
         {
           inviterId: inviter.id,
-          inviteKey: `sk-expired-${Date.now()}`,
+          inviteKey: `sk-rejected-${Date.now()}`,
           email: 'q@x.com',
           expires: new Date(),
           reason: '',
-          status: 'EXPIRED'
+          status: 'rejected'
         }
       ]
     });
 
     const pending = await testPrisma.invite.findMany({
-      where: { status: 'PENDING' }
+      where: { status: 'pending' }
     });
     expect(pending).toHaveLength(1);
     expect(pending[0].email).toBe('p@x.com');
@@ -142,14 +141,11 @@ describe('ratio watch list', () => {
     const u2 = await createUser('g');
     const u3 = await createUser('h');
 
-    const policy = await testPrisma.ratioPolicy.findFirst();
-    if (!policy) return;
-
     await testPrisma.ratioPolicyState.createMany({
       data: [
-        { userId: u1.id, ratioPolicyId: policy.id, status: 'WATCH' },
-        { userId: u2.id, ratioPolicyId: policy.id, status: 'LEECH_DISABLED' },
-        { userId: u3.id, ratioPolicyId: policy.id, status: 'OK' }
+        { userId: u1.id, status: 'WATCH' },
+        { userId: u2.id, status: 'LEECH_DISABLED' },
+        { userId: u3.id, status: 'OK' }
       ]
     });
 
