@@ -7,7 +7,9 @@ import {
   validate,
   parsedBody,
   validateParams,
-  parsedParams
+  parsedParams,
+  validateQuery,
+  parsedQuery
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
@@ -15,6 +17,12 @@ import { parsePage, paginatedResponse } from '../../lib/pagination';
 const router = express.Router();
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+
+const donationsQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional()
+});
+
+type DonationsQuery = z.infer<typeof donationsQuerySchema>;
 
 const createDonationSchema = z.object({
   userId: z.number().int().positive(),
@@ -32,10 +40,14 @@ type CreateDonationInput = z.infer<typeof createDonationSchema>;
 router.get(
   '/',
   ...requirePermission('admin'),
+  validateQuery(donationsQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = parsedQuery<DonationsQuery>(res);
+    const where = userId ? { userId } : undefined;
     const pg = parsePage(req);
     const [rows, total] = await Promise.all([
       prisma.donation.findMany({
+        where,
         orderBy: { donatedAt: 'desc' },
         skip: pg.skip,
         take: pg.limit,
@@ -43,7 +55,7 @@ router.get(
           user: { select: { id: true, username: true } }
         }
       }),
-      prisma.donation.count()
+      prisma.donation.count({ where })
     ]);
     paginatedResponse(res, rows, total, pg);
   })

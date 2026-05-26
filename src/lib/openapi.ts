@@ -4,7 +4,12 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { profileUpdateSchema, inviteSchema } from '../schemas/profile';
+import {
+  profileUpdateSchema,
+  inviteSchema,
+  donorRewardUpdateSchema,
+  donorForumTitleUpdateSchema
+} from '../schemas/profile';
 import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
 import {
   createContributionSchema,
@@ -431,6 +436,8 @@ const DonorPresentation = registry.register(
     customIcon: z.string().nullable(),
     customIconLink: z.string().nullable(),
     secondAvatar: z.string().nullable(),
+    iconMouseOverText: z.string().nullable(),
+    avatarMouseOverText: z.string().nullable(),
     profileBlocks: z.array(
       z.object({
         title: z.string(),
@@ -858,6 +865,124 @@ registry.registerPath({
     },
     409: {
       description: 'Invite already exists',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Donor rewards (self-service) ────────────────────────────────────────────
+
+const DonorRewardsSchema = registry.register(
+  'DonorRewards',
+  z.object({
+    rewards: z.object({
+      iconMouseOverText: z.string(),
+      avatarMouseOverText: z.string(),
+      customIcon: z.string(),
+      customIconLink: z.string(),
+      secondAvatar: z.string(),
+      profileInfoTitle1: z.string(),
+      profileInfo1: z.string(),
+      profileInfoTitle2: z.string(),
+      profileInfo2: z.string(),
+      profileInfoTitle3: z.string(),
+      profileInfo3: z.string(),
+      profileInfoTitle4: z.string(),
+      profileInfo4: z.string()
+    }),
+    perks: z.record(z.string(), z.boolean()),
+    forumTitle: z
+      .object({
+        prefix: z.string(),
+        suffix: z.string(),
+        useComma: z.boolean()
+      })
+      .nullable()
+  })
+);
+
+const DonorForumTitleSchema = registry.register(
+  'DonorForumTitle',
+  z.object({
+    prefix: z.string(),
+    suffix: z.string(),
+    useComma: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/donor-rewards',
+  tags: ['Profile'],
+  responses: {
+    200: {
+      description: 'Donor reward settings and active perks',
+      content: { 'application/json': { schema: DonorRewardsSchema } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'No active donor rank',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/profile/me/donor-rewards',
+  tags: ['Profile'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: donorRewardUpdateSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated donor reward settings',
+      content: { 'application/json': { schema: DonorRewardsSchema } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'No active donor rank',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/profile/me/donor-title',
+  tags: ['Profile'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: donorForumTitleUpdateSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated forum title',
+      content: { 'application/json': { schema: DonorForumTitleSchema } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Perk not enabled for this rank',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }

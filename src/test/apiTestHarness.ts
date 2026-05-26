@@ -50,6 +50,16 @@ jest.mock('../modules/statsJob', () => ({
   startStatsJob: jest.fn()
 }));
 
+jest.mock('../modules/donorExpiryJob', () => ({
+  startDonorExpiryJob: jest.fn()
+}));
+
+jest.mock('../modules/donor', () => ({
+  getDonorSettings: jest.fn(),
+  updateDonorRewards: jest.fn(),
+  updateDonorForumTitle: jest.fn()
+}));
+
 jest.mock('../modules/artist', () => ({
   createArtist: jest.fn(),
   updateArtist: jest.fn(),
@@ -230,6 +240,7 @@ import {
 } from '../modules/downloads';
 import { fileReport } from '../modules/reports';
 import { recordContributionReport } from '../modules/linkHealth';
+import * as donorModule from '../modules/donor';
 
 const gravatar = jest.requireMock('gravatar') as { url: jest.Mock };
 import * as pmModule from '../modules/pm';
@@ -332,6 +343,7 @@ export const staffInboxMock = staffInboxModule as jest.Mocked<
   typeof staffInboxModule
 >;
 export const staffPmMock = staffPmModule as jest.Mocked<typeof staffPmModule>;
+export const donorMock = donorModule as jest.Mocked<typeof donorModule>;
 
 export const setCurrentUserRankLevel = (level: number): void => {
   currentUserRankLevel = level;

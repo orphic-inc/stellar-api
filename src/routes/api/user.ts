@@ -726,6 +726,13 @@ router.post(
     if (!donorRank)
       return res.status(404).json({ msg: 'Donor rank not found' });
 
+    // Explicit expiresAt wins; fall back to the rank's expiresAfterDays if set
+    const computedExpiresAt = expiresAt
+      ? new Date(expiresAt)
+      : donorRank.expiresAfterDays != null
+      ? new Date(Date.now() + donorRank.expiresAfterDays * 86_400_000)
+      : null;
+
     await prisma.$transaction([
       prisma.userDonorRank.upsert({
         where: { userId: id },
@@ -733,15 +740,13 @@ router.post(
           userId: id,
           donorRankId,
           grantedById: req.user.id,
-          ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {})
+          ...(computedExpiresAt ? { expiresAt: computedExpiresAt } : {})
         },
         update: {
           donorRankId,
           grantedAt: new Date(),
           grantedById: req.user.id,
-          ...(expiresAt
-            ? { expiresAt: new Date(expiresAt) }
-            : { expiresAt: null })
+          expiresAt: computedExpiresAt
         }
       }),
       prisma.user.update({ where: { id }, data: { isDonor: true } })

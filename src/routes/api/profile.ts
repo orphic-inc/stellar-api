@@ -15,9 +15,18 @@ import { validate, parsedBody } from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
+  donorRewardUpdateSchema,
+  donorForumTitleUpdateSchema,
   type ProfileUpdateInput,
-  type InviteInput
+  type InviteInput,
+  type DonorRewardUpdateInput,
+  type DonorForumTitleUpdateInput
 } from '../../schemas/profile';
+import {
+  getDonorSettings,
+  updateDonorRewards,
+  updateDonorForumTitle
+} from '../../modules/donor';
 
 const router = express.Router();
 // GET /api/profile/me
@@ -109,6 +118,41 @@ router.delete(
     );
     res.clearCookie('token');
     res.status(204).send();
+  })
+);
+
+// GET /api/profile/me/donor-rewards
+router.get(
+  '/me/donor-rewards',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const settings = await getDonorSettings(req.user.id);
+    if (!settings) return res.status(404).json({ msg: 'No active donor rank' });
+    res.json(settings);
+  })
+);
+
+// PUT /api/profile/me/donor-rewards
+router.put(
+  '/me/donor-rewards',
+  requireAuth,
+  validate(donorRewardUpdateSchema),
+  authHandler(async (req, res) => {
+    const fields = parsedBody<DonorRewardUpdateInput>(res);
+    const settings = await updateDonorRewards(req.user.id, fields);
+    res.json(settings);
+  })
+);
+
+// PUT /api/profile/me/donor-title
+router.put(
+  '/me/donor-title',
+  requireAuth,
+  validate(donorForumTitleUpdateSchema),
+  authHandler(async (req, res) => {
+    const data = parsedBody<DonorForumTitleUpdateInput>(res);
+    const title = await updateDonorForumTitle(req.user.id, data);
+    res.json(title);
   })
 );
 

@@ -9,6 +9,7 @@ import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
+import { parsePerks, type PerksMap } from './donor';
 
 const log = getLogger('profile');
 
@@ -89,6 +90,8 @@ type DonorPresentation = {
   customIcon: string | null;
   customIconLink: string | null;
   secondAvatar: string | null;
+  iconMouseOverText: string | null;
+  avatarMouseOverText: string | null;
   profileBlocks: Array<{ title: string; body: string }>;
 };
 
@@ -169,7 +172,8 @@ const PROFILE_BASE_SELECT = {
         select: {
           name: true,
           badge: true,
-          color: true
+          color: true,
+          perks: true
         }
       }
     }
@@ -179,6 +183,8 @@ const PROFILE_BASE_SELECT = {
       customIcon: true,
       customIconLink: true,
       secondAvatar: true,
+      iconMouseOverText: true,
+      avatarMouseOverText: true,
       profileInfoTitle1: true,
       profileInfo1: true,
       profileInfoTitle2: true,
@@ -485,40 +491,82 @@ const buildDonorPresentation = (
   const donorRank = user.donorRank;
   const donorReward = user.donorReward;
 
-  const profileBlocks = donorReward
-    ? [
-        {
-          title: donorReward.profileInfoTitle1,
-          body: donorReward.profileInfo1
-        },
-        {
-          title: donorReward.profileInfoTitle2,
-          body: donorReward.profileInfo2
-        },
-        {
-          title: donorReward.profileInfoTitle3,
-          body: donorReward.profileInfo3
-        },
-        {
-          title: donorReward.profileInfoTitle4,
-          body: donorReward.profileInfo4
-        }
-      ].filter((block) => block.title.trim() || block.body.trim())
-    : [];
+  // Enforce expiry: treat an expired grant as absent so stale rewards never
+  // render while the hourly sweep hasn't fired yet.
+  const now = new Date();
+  const activeRank =
+    donorRank && (donorRank.expiresAt === null || donorRank.expiresAt > now)
+      ? donorRank
+      : null;
+
+  const perks: PerksMap = activeRank
+    ? parsePerks(activeRank.donorRank.perks)
+    : {};
+
+  // Profile blocks filtered by per-block perks
+  const profileBlocks =
+    donorReward && activeRank
+      ? (
+          [
+            perks.profileInfo1
+              ? {
+                  title: donorReward.profileInfoTitle1,
+                  body: donorReward.profileInfo1
+                }
+              : null,
+            perks.profileInfo2
+              ? {
+                  title: donorReward.profileInfoTitle2,
+                  body: donorReward.profileInfo2
+                }
+              : null,
+            perks.profileInfo3
+              ? {
+                  title: donorReward.profileInfoTitle3,
+                  body: donorReward.profileInfo3
+                }
+              : null,
+            perks.profileInfo4
+              ? {
+                  title: donorReward.profileInfoTitle4,
+                  body: donorReward.profileInfo4
+                }
+              : null
+          ] as Array<{ title: string; body: string } | null>
+        ).filter(
+          (b): b is { title: string; body: string } =>
+            b !== null && !!(b.title.trim() || b.body.trim())
+        )
+      : [];
 
   const presentation: DonorPresentation = {
-    rank: donorRank
+    rank: activeRank
       ? {
-          name: donorRank.donorRank.name,
-          badge: donorRank.donorRank.badge,
-          color: donorRank.donorRank.color,
-          grantedAt: donorRank.grantedAt.toISOString(),
-          expiresAt: donorRank.expiresAt?.toISOString() ?? null
+          name: activeRank.donorRank.name,
+          badge: activeRank.donorRank.badge,
+          color: activeRank.donorRank.color,
+          grantedAt: activeRank.grantedAt.toISOString(),
+          expiresAt: activeRank.expiresAt?.toISOString() ?? null
         }
       : null,
-    customIcon: donorReward?.customIcon || null,
-    customIconLink: donorReward?.customIconLink || null,
-    secondAvatar: donorReward?.secondAvatar || null,
+    customIcon:
+      donorReward && perks.customIcon ? donorReward.customIcon || null : null,
+    customIconLink:
+      donorReward && perks.customIconLink
+        ? donorReward.customIconLink || null
+        : null,
+    secondAvatar:
+      donorReward && perks.secondAvatar
+        ? donorReward.secondAvatar || null
+        : null,
+    iconMouseOverText:
+      donorReward && perks.iconMouseOverText
+        ? donorReward.iconMouseOverText || null
+        : null,
+    avatarMouseOverText:
+      donorReward && perks.avatarMouseOverText
+        ? donorReward.avatarMouseOverText || null
+        : null,
     profileBlocks
   };
 
@@ -527,6 +575,8 @@ const buildDonorPresentation = (
     !presentation.customIcon &&
     !presentation.customIconLink &&
     !presentation.secondAvatar &&
+    !presentation.iconMouseOverText &&
+    !presentation.avatarMouseOverText &&
     !presentation.profileBlocks.length
   ) {
     return null;
