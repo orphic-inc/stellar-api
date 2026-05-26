@@ -31,9 +31,9 @@ describe('stats/economy DB query', () => {
     const user = await createUser('a');
     await testPrisma.economyTransaction.createMany({
       data: [
-        { userId: user.id, amount: 100, reason: 'DONATE' },
-        { userId: user.id, amount: 200, reason: 'DONATE' },
-        { userId: user.id, amount: 50, reason: 'BONUS' }
+        { userId: user.id, amount: 100, reason: 'REQUEST_CREATE' },
+        { userId: user.id, amount: 200, reason: 'REQUEST_CREATE' },
+        { userId: user.id, amount: 50, reason: 'DOWNLOAD_DEBIT' }
       ]
     });
 
@@ -43,20 +43,20 @@ describe('stats/economy DB query', () => {
       _count: true
     });
 
-    const donate = grouped.find((g) => g.reason === 'DONATE');
-    const bonus = grouped.find((g) => g.reason === 'BONUS');
+    const creates = grouped.find((g) => g.reason === 'REQUEST_CREATE');
+    const debits = grouped.find((g) => g.reason === 'DOWNLOAD_DEBIT');
 
-    expect(donate).toBeDefined();
-    expect(donate!._count).toBe(2);
-    expect(Number(donate!._sum.amount)).toBe(300);
-    expect(bonus!._count).toBe(1);
-    expect(Number(bonus!._sum.amount)).toBe(50);
+    expect(creates).toBeDefined();
+    expect(creates!._count).toBe(2);
+    expect(Number(creates!._sum.amount)).toBe(300);
+    expect(debits!._count).toBe(1);
+    expect(Number(debits!._sum.amount)).toBe(50);
   });
 
   it('recent transactions include user relation', async () => {
     const user = await createUser('b');
     await testPrisma.economyTransaction.create({
-      data: { userId: user.id, amount: 42, reason: 'TEST' }
+      data: { userId: user.id, amount: 42, reason: 'STAFF_REVERSAL' }
     });
 
     const recent = await testPrisma.economyTransaction.findMany({
@@ -99,24 +99,9 @@ describe('stats/clients DB query', () => {
     const user = await createUser('f');
     await testPrisma.userSession.createMany({
       data: [
-        {
-          userId: user.id,
-          ipAddress: '1.1.1.1',
-          userAgent: 'Mozilla/5.0',
-          token: 'tok1'
-        },
-        {
-          userId: user.id,
-          ipAddress: '1.1.1.1',
-          userAgent: 'Mozilla/5.0',
-          token: 'tok2'
-        },
-        {
-          userId: user.id,
-          ipAddress: '1.1.1.1',
-          userAgent: 'curl/7.0',
-          token: 'tok3'
-        }
+        { userId: user.id, ipAddress: '1.1.1.1', userAgent: 'Mozilla/5.0' },
+        { userId: user.id, ipAddress: '1.1.1.1', userAgent: 'Mozilla/5.0' },
+        { userId: user.id, ipAddress: '1.1.1.1', userAgent: 'curl/7.0' }
       ]
     });
 
@@ -152,7 +137,7 @@ describe('stats/user-flow DB query', () => {
           email: 'b@x.com',
           expires: new Date(),
           reason: 'test',
-          status: 'PENDING'
+          status: 'pending'
         }
       ]
     });
