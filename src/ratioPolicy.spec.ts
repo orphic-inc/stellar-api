@@ -2,8 +2,8 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock,
-  makeUserRank
+  makeUserRank,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 import * as ratioPolicyModule from './modules/ratioPolicy';
 
@@ -17,9 +17,11 @@ const ratioPolicyMock = ratioPolicyModule as jest.Mocked<
   typeof ratioPolicyModule
 >;
 
-const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true })
+const setManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      ratio_policy_manage: true
+    }).permissions as Record<string, boolean>
   );
 
 const POLICY_VIEW = {
@@ -35,13 +37,13 @@ beforeEach(() => resetApiTestState());
 // ─── GET /api/ratio-policy/:userId ────────────────────────────────────────────
 
 describe('GET /api/ratio-policy/:userId', () => {
-  it('returns 403 without staff permission', async () => {
+  it('returns 403 without ratio_policy_manage permission', async () => {
     const res = await request(app).get('/api/ratio-policy/9');
     expect(res.status).toBe(403);
   });
 
   it('returns the policy state for a user', async () => {
-    setStaff();
+    setManager();
     ratioPolicyMock.getPolicyState.mockResolvedValue(POLICY_VIEW);
 
     const res = await request(app).get('/api/ratio-policy/9');
@@ -55,7 +57,7 @@ describe('GET /api/ratio-policy/:userId', () => {
 // ─── POST /api/ratio-policy/:userId/override ──────────────────────────────────
 
 describe('POST /api/ratio-policy/:userId/override', () => {
-  it('returns 403 without staff permission', async () => {
+  it('returns 403 without ratio_policy_manage permission', async () => {
     const res = await request(app)
       .post('/api/ratio-policy/9/override')
       .send({ status: 'OK' });
@@ -63,7 +65,7 @@ describe('POST /api/ratio-policy/:userId/override', () => {
   });
 
   it('overrides the policy status and returns the new state', async () => {
-    setStaff();
+    setManager();
     const updated = { ...POLICY_VIEW, status: 'WATCH' as const };
     ratioPolicyMock.overridePolicyStatus.mockResolvedValue(updated);
 
@@ -80,7 +82,7 @@ describe('POST /api/ratio-policy/:userId/override', () => {
   });
 
   it('returns 400 for an invalid status value', async () => {
-    setStaff();
+    setManager();
 
     const res = await request(app)
       .post('/api/ratio-policy/9/override')

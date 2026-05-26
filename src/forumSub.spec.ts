@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock,
   makeUserRank,
+  setCurrentUserPermissions,
   createPollMock,
   closePollMock,
   castVoteMock
@@ -12,8 +13,11 @@ import {
 beforeEach(() => resetApiTestState());
 
 const setForumAdmin = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ forums_manage: true, staff: true })
+  setCurrentUserPermissions(
+    makeUserRank({
+      forums_manage: true,
+      staff: true
+    }).permissions as Record<string, boolean>
   );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -45,6 +49,7 @@ describe('GET /api/forums/categories', () => {
   });
 
   it('returns all categories when ?all=true is passed', async () => {
+    setForumAdmin();
     prismaMock.forumCategory.findMany.mockResolvedValue([
       { id: 1, name: 'Hidden', sort: 0, forums: [] }
     ] as never);
@@ -126,7 +131,9 @@ describe('POST /api/forums/categories', () => {
   });
 
   it('returns 403 without forums_manage permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app)
       .post('/api/forums/categories')
       .send({ name: 'New' });

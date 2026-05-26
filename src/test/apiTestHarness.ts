@@ -153,9 +153,10 @@ jest.mock('../modules/config', () => ({
 let currentUserRankLevel = 1000;
 let currentUserPermissions: Record<string, boolean> = {};
 let currentPermittedForumIds: number[] = [];
+let hasExplicitCurrentUserPermissions = false;
 
 jest.mock('../middleware/auth', () => ({
-  requireAuth: (
+  requireAuth: async (
     req: {
       user?: {
         id: number;
@@ -168,11 +169,24 @@ jest.mock('../middleware/auth', () => ({
     _res: unknown,
     next: () => void
   ) => {
+    let permissions = currentUserPermissions;
+    if (!hasExplicitCurrentUserPermissions) {
+      const currentRank = await prisma.userRank.findUnique({
+        where: { id: 1 }
+      });
+      permissions = normalizePermissions(
+        (currentRank?.permissions as
+          | Record<string, boolean>
+          | null
+          | undefined) ?? {}
+      ) as Record<string, boolean>;
+    }
+
     req.user = {
       id: 7,
       userRankLevel: currentUserRankLevel,
       userRankId: 1,
-      permissions: currentUserPermissions,
+      permissions,
       permittedForumIds: currentPermittedForumIds
     };
     next();
@@ -260,6 +274,10 @@ import { recordContributionReport } from '../modules/linkHealth';
 import * as donorModule from '../modules/donor';
 
 const gravatar = jest.requireMock('gravatar') as { url: jest.Mock };
+const sanitize = jest.requireMock('../lib/sanitize') as {
+  sanitizeHtml: ((value: string) => string) | jest.Mock;
+  sanitizePlain: ((value: string) => string) | jest.Mock;
+};
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
 import * as staffPmModule from '../modules/staffPm';
@@ -369,6 +387,7 @@ export const setCurrentUserRankLevel = (level: number): void => {
 export const setCurrentUserPermissions = (
   permissions: Record<string, boolean>
 ): void => {
+  hasExplicitCurrentUserPermissions = true;
   currentUserPermissions = normalizePermissions(permissions) as Record<
     string,
     boolean
@@ -380,9 +399,10 @@ export const setCurrentPermittedForumIds = (forumIds: number[]): void => {
 };
 
 export const resetApiTestState = (): void => {
-  jest.clearAllMocks();
+  jest.resetAllMocks();
   mockedIsInstalled.mockResolvedValue(true);
   currentUserRankLevel = 1000;
+  hasExplicitCurrentUserPermissions = false;
   currentUserPermissions = normalizePermissions(
     makeUserRank().permissions as Record<string, boolean>
   ) as Record<string, boolean>;
@@ -393,6 +413,16 @@ export const resetApiTestState = (): void => {
   (gravatar.url as jest.Mock).mockReturnValue(
     'https://gravatar.test/avatar.png'
   );
+  if ('mockImplementation' in sanitize.sanitizeHtml) {
+    sanitize.sanitizeHtml.mockImplementation((value: string) => value);
+  } else {
+    sanitize.sanitizeHtml = (value: string) => value;
+  }
+  if ('mockImplementation' in sanitize.sanitizePlain) {
+    sanitize.sanitizePlain.mockImplementation((value: string) => value);
+  } else {
+    sanitize.sanitizePlain = (value: string) => value;
+  }
   (jwt.sign as jest.Mock).mockImplementation(
     (
       _payload: unknown,

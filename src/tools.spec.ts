@@ -31,13 +31,25 @@ const makeGroup = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
+const setRankPermissionsManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      rank_permissions_manage: true
+    }).permissions as Record<string, boolean>
+  );
+
+const setStaffGroupsManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      staff_groups_manage: true
+    }).permissions as Record<string, boolean>
+  );
+
 beforeEach(() => resetApiTestState());
 
 describe('GET /api/tools/user-ranks', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('returns list of user ranks with user counts', async () => {
@@ -51,7 +63,7 @@ describe('GET /api/tools/user-ranks', () => {
     expect(res.body[0].userCount).toBe(5);
   });
 
-  it('returns 403 without admin permission', async () => {
+  it('returns 403 without rank_permissions_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -64,9 +76,7 @@ describe('GET /api/tools/user-ranks', () => {
 
 describe('GET /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('returns a single rank', async () => {
@@ -89,9 +99,7 @@ describe('GET /api/tools/user-ranks/:id', () => {
 
 describe('POST /api/tools/user-ranks', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('creates a rank and returns 201', async () => {
@@ -139,9 +147,7 @@ describe('POST /api/tools/user-ranks', () => {
 
 describe('PUT /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('updates a rank and returns it', async () => {
@@ -172,9 +178,7 @@ describe('PUT /api/tools/user-ranks/:id', () => {
 
 describe('DELETE /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('deletes a rank and returns 204 when no users assigned', async () => {
@@ -202,9 +206,7 @@ describe('DELETE /api/tools/user-ranks/:id', () => {
 
 describe('GET /api/tools/staff-groups', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setStaffGroupsManager();
   });
 
   it('returns list of staff groups', async () => {
@@ -218,7 +220,7 @@ describe('GET /api/tools/staff-groups', () => {
     expect(res.body[0].rankCount).toBe(0);
   });
 
-  it('returns 403 for staff (not strict admin)', async () => {
+  it('returns 403 without staff_groups_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank({ staff: true }).permissions as Record<string, boolean>
     );
@@ -231,9 +233,7 @@ describe('GET /api/tools/staff-groups', () => {
 
 describe('POST /api/tools/staff-groups', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setStaffGroupsManager();
   });
 
   it('creates a staff group and returns 201', async () => {
@@ -259,9 +259,7 @@ describe('POST /api/tools/staff-groups', () => {
 
 describe('POST /api/tools/user-ranks', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setRankPermissionsManager();
   });
 
   it('clears staffGroupId when displayStaff is false on create', async () => {
@@ -292,9 +290,7 @@ describe('POST /api/tools/user-ranks', () => {
 
 describe('PUT /api/tools/staff-groups/:id', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setStaffGroupsManager();
   });
 
   it('updates a staff group and returns it', async () => {
@@ -324,9 +320,7 @@ describe('PUT /api/tools/staff-groups/:id', () => {
 
 describe('DELETE /api/tools/staff-groups/:id', () => {
   beforeEach(() => {
-    setCurrentUserPermissions(
-      makeUserRank({ admin: true }).permissions as Record<string, boolean>
-    );
+    setStaffGroupsManager();
   });
 
   it('deletes a group and returns 204 when no ranks assigned', async () => {

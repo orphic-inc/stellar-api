@@ -29,6 +29,14 @@ const setStaff = () =>
     }).permissions as Record<string, boolean>
   );
 
+const setUserHistoryViewer = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      users_view_ips: true,
+      users_view_email: true
+    }).permissions as Record<string, boolean>
+  );
+
 const setAdmin = () =>
   setCurrentUserPermissions(
     makeUserRank({
@@ -37,6 +45,20 @@ const setAdmin = () =>
       users_warn: true,
       users_disable: true,
       users_edit: true
+    }).permissions as Record<string, boolean>
+  );
+
+const setDonorRankManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      donor_ranks_manage: true
+    }).permissions as Record<string, boolean>
+  );
+
+const setRecoveryManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      recovery_manage: true
     }).permissions as Record<string, boolean>
   );
 
@@ -282,7 +304,7 @@ describe('PUT /api/users/:id/rank', () => {
     expect(res.body.msg).toBe('Rank updated');
   });
 
-  it('returns 403 without admin permission', async () => {
+  it('returns 403 without users_edit permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -301,7 +323,7 @@ describe('PUT /api/users/:id/rank', () => {
 // ─── IP history ───────────────────────────────────────────────────────────────
 
 describe('GET /api/users/:id/ip-history', () => {
-  beforeEach(() => setStaff());
+  beforeEach(() => setUserHistoryViewer());
 
   it('returns session IP history for the target user', async () => {
     prismaMock.userSession.findMany.mockResolvedValue([
@@ -386,7 +408,7 @@ describe('GET /api/users/:id/ip-history', () => {
     expect(res.body).toHaveLength(1);
   });
 
-  it('returns 403 without staff permission', async () => {
+  it('returns 403 without users_view_ips permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -396,7 +418,7 @@ describe('GET /api/users/:id/ip-history', () => {
 });
 
 describe('GET /api/users/:id/email-history', () => {
-  beforeEach(() => setStaff());
+  beforeEach(() => setUserHistoryViewer());
 
   it('returns email history entries in the frontend contract shape', async () => {
     prismaMock.userEmailHistory.findMany.mockResolvedValue([
@@ -419,6 +441,14 @@ describe('GET /api/users/:id/email-history', () => {
         changedAt: '2026-05-01T00:00:00.000Z'
       }
     ]);
+  });
+
+  it('returns 403 without users_view_email permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
+    const res = await request(app).get('/api/users/9/email-history');
+    expect(res.status).toBe(403);
   });
 });
 
@@ -444,7 +474,7 @@ describe('GET /api/users/donor-ranks', () => {
 });
 
 describe('POST /api/users/donor-ranks', () => {
-  beforeEach(() => setAdmin());
+  beforeEach(() => setDonorRankManager());
 
   it('creates a donor rank and returns 201', async () => {
     prismaMock.donorRank.create.mockResolvedValue({
@@ -491,7 +521,7 @@ describe('POST /api/users/donor-ranks', () => {
     expect(res.body.badge).toBe('plat');
   });
 
-  it('returns 403 without admin permission', async () => {
+  it('returns 403 without donor_ranks_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -773,7 +803,7 @@ describe('DELETE /api/users/:id/warnings/:warnId', () => {
 // ─── Donor rank update and deletion ──────────────────────────────────────────
 
 describe('PUT /api/users/donor-ranks/:rankId', () => {
-  beforeEach(() => setAdmin());
+  beforeEach(() => setDonorRankManager());
 
   it('updates a donor rank and returns it', async () => {
     const existing = { id: 2, name: 'Silver', minDonation: 2000 };
@@ -828,7 +858,7 @@ describe('PUT /api/users/donor-ranks/:rankId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 403 without admin permission', async () => {
+  it('returns 403 without donor_ranks_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -842,7 +872,7 @@ describe('PUT /api/users/donor-ranks/:rankId', () => {
 });
 
 describe('DELETE /api/users/donor-ranks/:rankId', () => {
-  beforeEach(() => setAdmin());
+  beforeEach(() => setDonorRankManager());
 
   it('deletes a donor rank and returns 204', async () => {
     prismaMock.donorRank.findUnique.mockResolvedValue({ id: 2 } as never);
@@ -1092,14 +1122,8 @@ describe('POST /api/users/:id/donor with expiresAt', () => {
 
 // ─── Staff recovery queue ─────────────────────────────────────────────────────
 
-const setUsersEdit = () =>
-  setCurrentUserPermissions(
-    makeUserRank({ users_edit: true, staff: true, admin: true })
-      .permissions as Record<string, boolean>
-  );
-
 describe('GET /api/users/recovery-requests', () => {
-  beforeEach(() => setUsersEdit());
+  beforeEach(() => setRecoveryManager());
 
   it('returns paginated pending recovery requests', async () => {
     prismaMock.accountRecovery.findMany.mockResolvedValue([
@@ -1123,7 +1147,7 @@ describe('GET /api/users/recovery-requests', () => {
     expect(res.body.meta.total).toBe(1);
   });
 
-  it('returns 403 without users_edit permission', async () => {
+  it('returns 403 without recovery_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -1133,7 +1157,7 @@ describe('GET /api/users/recovery-requests', () => {
 });
 
 describe('DELETE /api/users/recovery-requests/:reqId', () => {
-  beforeEach(() => setUsersEdit());
+  beforeEach(() => setRecoveryManager());
 
   it('deletes a pending recovery request and audits', async () => {
     prismaMock.accountRecovery.findUnique.mockResolvedValue({
@@ -1164,7 +1188,7 @@ describe('DELETE /api/users/recovery-requests/:reqId', () => {
     expect(res.status).toBe(409);
   });
 
-  it('returns 403 without users_edit permission', async () => {
+  it('returns 403 without recovery_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );
@@ -1174,7 +1198,7 @@ describe('DELETE /api/users/recovery-requests/:reqId', () => {
 });
 
 describe('POST /api/users/:id/recovery', () => {
-  beforeEach(() => setUsersEdit());
+  beforeEach(() => setRecoveryManager());
 
   it('sends a recovery email and audits', async () => {
     sendRecoveryEmailMock.mockResolvedValue(true);
@@ -1208,7 +1232,7 @@ describe('POST /api/users/:id/recovery', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 403 without users_edit permission', async () => {
+  it('returns 403 without recovery_manage permission', async () => {
     setCurrentUserPermissions(
       makeUserRank().permissions as Record<string, boolean>
     );

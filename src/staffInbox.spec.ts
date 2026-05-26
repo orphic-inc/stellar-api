@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock,
   makeUserRank,
+  setCurrentUserPermissions,
   staffInboxMock,
   staffPmMock
 } from './test/apiTestHarness';
@@ -11,8 +12,11 @@ import type { StaffResponse } from './modules/staffInbox';
 import type { StaffInboxStatus } from '@prisma/client';
 
 const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true, staff_inbox_manage: true })
+  setCurrentUserPermissions(
+    makeUserRank({
+      staff: true,
+      staff_inbox_manage: true
+    }).permissions as Record<string, boolean>
   );
 
 const makeResponse = (
