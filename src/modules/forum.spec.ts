@@ -325,8 +325,7 @@ describe('createPost', () => {
     // createMany is called but with empty recipients (emitNotifications filters out actorId=7)
     const calls = mockTx.notification.createMany.mock.calls;
     const quoteCalls = calls.filter(
-      (c: { data: { type: string }[] }[]) =>
-        c[0]?.data?.some((d: { type: string }) => d.type === 'forum_quote')
+      (c) => c[0]?.data?.some((d: { type: string }) => d.type === 'forum_quote')
     );
     expect(quoteCalls).toHaveLength(0);
   });
