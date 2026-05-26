@@ -428,6 +428,7 @@ model User {
   wikiAliasesCreated        WikiAlias[]    @relation("WikiAliasCreator")
   rulesPagesAuthored        RulesPage[]    @relation("RulesPageAuthor")
   userStatSnapshots         UserStatSnapshot[]
+  tagAliasesCreated         TagAlias[]     @relation("TagAliasCreator")
 
   @@index([userRankId])
   @@map("users")
@@ -1438,8 +1439,22 @@ model Tag {
   occurrences Int         @default(0)
   artistTags  ArtistTag[]
   releaseTags ReleaseTag[]
+  aliases     TagAlias[]
 
   @@map("tags")
+}
+
+model TagAlias {
+  id          Int      @id @default(autoincrement())
+  badTag      String   @unique
+  goodTagId   Int
+  goodTag     Tag      @relation(fields: [goodTagId], references: [id], onDelete: Cascade)
+  createdById Int
+  createdBy   User     @relation("TagAliasCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([goodTagId])
+  @@map("tag_aliases")
 }
 
 enum ReleaseHistoryAction {

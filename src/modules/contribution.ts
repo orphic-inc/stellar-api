@@ -2,6 +2,7 @@ import { FileType, Prisma, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
 import { checkContributionLink } from './linkHealth';
+import { resolveTagNames } from './tag';
 import type {
   AddContributionToReleaseInput,
   CreateContributionInput
@@ -51,6 +52,7 @@ export const createContributionSubmission = async ({
   if (!community) return null;
 
   const normalizedTags = normalizeTags(tags);
+  const canonicalTags = await resolveTagNames(normalizedTags);
 
   const contribution = await prisma.$transaction(async (tx) => {
     const contributor = await tx.contributor.upsert({
@@ -87,9 +89,9 @@ export const createContributionSubmission = async ({
     );
     const primaryArtist = collaboratorRecords[0];
     const tagRecords =
-      normalizedTags.length > 0
+      canonicalTags.length > 0
         ? await Promise.all(
-            normalizedTags.map((name) =>
+            canonicalTags.map((name) =>
               tx.tag.upsert({
                 where: { name },
                 create: { name, occurrences: 1 },
@@ -124,7 +126,8 @@ export const createContributionSubmission = async ({
         data: tagRecords.map((tag) => ({
           releaseId: release.id,
           tagId: tag.id
-        }))
+        })),
+        skipDuplicates: true
       });
     }
 

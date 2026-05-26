@@ -129,14 +129,12 @@ router.delete(
   })
 );
 
-// GET /api/announcements/global-notices — list active global notices (staff)
+// GET /api/announcements/global-notices — list all global notices (staff)
 router.get(
   '/global-notices',
   ...requirePermission('news_manage'),
   asyncHandler(async (_req: Request, res: Response) => {
-    const now = new Date();
     const notices = await prisma.globalNotice.findMany({
-      where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
       orderBy: { createdAt: 'desc' },
       include: { createdBy: { select: { id: true, username: true } } }
     });

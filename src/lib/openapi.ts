@@ -41,8 +41,15 @@ import {
   subscribeSchema,
   subscribeCommentsSchema
 } from '../schemas/subscription';
-import { announcementSchema } from '../schemas/announcement';
+import {
+  announcementSchema,
+  globalNoticeSchema
+} from '../schemas/announcement';
 import { createRulesPageSchema, updateRulesPageSchema } from '../schemas/rules';
+import {
+  createTagAliasSchema,
+  updateTagAliasSchema
+} from '../schemas/tagAliases';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
 import {
   createStaffGroupSchema,
@@ -90,6 +97,8 @@ const PaginationMeta = registry.register(
     totalPages: z.number()
   })
 );
+
+const StaffUserRef = z.object({ id: z.number(), username: z.string() });
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -726,6 +735,44 @@ registry.registerPath({
   }
 });
 
+const UserWarningItem = registry.register(
+  'UserWarningItem',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    user: StaffUserRef,
+    reason: z.string(),
+    expiresAt: z.string().nullable(),
+    createdAt: z.string(),
+    warnedBy: StaffUserRef.nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/warnings',
+  tags: ['Users'],
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      userId: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated staff warning log',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(UserWarningItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'post',
   path: '/users/{id}/recovery',
@@ -1270,6 +1317,67 @@ registry.registerPath({
     204: {
       description: 'Blog post deleted'
     },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+const GlobalNotice = registry.register(
+  'GlobalNotice',
+  z.object({
+    id: z.number(),
+    message: z.string(),
+    url: z.string().nullable(),
+    expiresAt: z.string().nullable(),
+    createdAt: z.string(),
+    createdBy: StaffUserRef
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/announcements/global-notices',
+  tags: ['Announcements'],
+  responses: {
+    200: {
+      description: 'All global notices',
+      content: {
+        'application/json': { schema: z.array(GlobalNotice) }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/announcements/global-notice',
+  tags: ['Announcements'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: globalNoticeSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Global notice created',
+      content: { 'application/json': { schema: GlobalNotice } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/announcements/global-notice/{id}',
+  tags: ['Announcements'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Notice deleted' },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4998,6 +5106,102 @@ registry.registerPath({
     },
     404: {
       description: 'Friend not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Tag Aliases ──────────────────────────────────────────────────────────────
+
+const TagAliasItem = registry.register(
+  'TagAliasItem',
+  z.object({
+    id: z.number(),
+    badTag: z.string(),
+    goodTag: z.object({ id: z.number(), name: z.string() }),
+    createdBy: StaffUserRef,
+    createdAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/tag-aliases',
+  tags: ['TagAliases'],
+  request: {
+    query: z.object({ page: z.string().optional() })
+  },
+  responses: {
+    200: {
+      description: 'Paginated tag alias list',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(TagAliasItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/tag-aliases',
+  tags: ['TagAliases'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createTagAliasSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Tag alias created',
+      content: { 'application/json': { schema: TagAliasItem } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Canonical tag not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/tag-aliases/{id}',
+  tags: ['TagAliases'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateTagAliasSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Tag alias updated',
+      content: { 'application/json': { schema: TagAliasItem } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/tag-aliases/{id}',
+  tags: ['TagAliases'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Tag alias deleted' },
+    404: {
+      description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
