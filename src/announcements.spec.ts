@@ -169,3 +169,173 @@ describe('DELETE /api/announcements/blog/:id', () => {
     expect(prismaMock.blog.delete).toHaveBeenCalledWith({ where: { id: 1 } });
   });
 });
+
+describe('POST /api/announcements — site_news notification', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('emits site_news notifications to all active users on creation', async () => {
+    prismaMock.news.create.mockResolvedValue(makeNews({ id: 5 }) as never);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 10 },
+      { id: 11 }
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/announcements')
+      .send({ title: 'Big news', body: 'Details here.' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: 10,
+            type: 'site_news',
+            page: 'news',
+            pageId: 5
+          }),
+          expect.objectContaining({
+            userId: 11,
+            type: 'site_news',
+            page: 'news',
+            pageId: 5
+          })
+        ])
+      })
+    );
+  });
+});
+
+const makeGlobalNotice = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  message: 'Scheduled maintenance tonight at midnight.',
+  url: null,
+  expiresAt: null,
+  createdById: 7,
+  createdAt: new Date('2026-01-01'),
+  ...overrides
+});
+
+describe('POST /api/announcements/global-notice', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('creates a global notice and emits notifications to all active users', async () => {
+    prismaMock.globalNotice.create.mockResolvedValue(
+      makeGlobalNotice({ id: 3 }) as never
+    );
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 10 },
+      { id: 11 }
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/announcements/global-notice')
+      .send({ message: 'Maintenance tonight at midnight.' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.globalNotice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          message: 'Maintenance tonight at midnight.'
+        })
+      })
+    );
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: 10,
+            type: 'global_notice',
+            page: 'global_notices',
+            pageId: 3
+          })
+        ])
+      })
+    );
+  });
+
+  it('returns 400 when message exceeds 500 characters', async () => {
+    const res = await request(app)
+      .post('/api/announcements/global-notice')
+      .send({ message: 'x'.repeat(501) });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.globalNotice.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when url is not a valid URL', async () => {
+    const res = await request(app)
+      .post('/api/announcements/global-notice')
+      .send({ message: 'Notice', url: 'not-a-url' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 without news_manage permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app)
+      .post('/api/announcements/global-notice')
+      .send({ message: 'Notice' });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/announcements/global-notices', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('returns active (non-expired) global notices', async () => {
+    prismaMock.globalNotice.findMany.mockResolvedValue([
+      { ...makeGlobalNotice(), createdBy: { id: 7, username: 'admin' } }
+    ] as never);
+
+    const res = await request(app).get('/api/announcements/global-notices');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].message).toBe(
+      'Scheduled maintenance tonight at midnight.'
+    );
+  });
+});
+
+describe('DELETE /api/announcements/global-notice/:id', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('deletes a global notice and returns 204', async () => {
+    prismaMock.globalNotice.delete.mockResolvedValue(
+      makeGlobalNotice() as never
+    );
+
+    const res = await request(app).delete('/api/announcements/global-notice/1');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.globalNotice.delete).toHaveBeenCalledWith({
+      where: { id: 1 }
+    });
+  });
+
+  it('returns 400 for non-numeric id', async () => {
+    const res = await request(app).delete(
+      '/api/announcements/global-notice/abc'
+    );
+
+    expect(res.status).toBe(400);
+  });
+});

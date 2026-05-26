@@ -1,5 +1,10 @@
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
+import {
+  emitNotifications,
+  extractMentionedUsernames,
+  extractNewMentionedUsernames
+} from '../lib/notifications';
 
 type DeleteForumResult =
   | { ok: true }
@@ -152,6 +157,25 @@ export const createPost = async (
       });
     }
 
+    const quotedUsernames = extractMentionedUsernames(body);
+    if (quotedUsernames.length > 0) {
+      const quotedUsers = await tx.user.findMany({
+        where: {
+          username: { in: quotedUsernames, mode: 'insensitive' },
+          disabled: false
+        },
+        select: { id: true }
+      });
+      await emitNotifications(tx, {
+        userIds: quotedUsers.map((u) => u.id),
+        type: 'forum_quote',
+        actorId: authorId,
+        page: 'forums',
+        pageId: forumTopicId,
+        postId: post.id
+      });
+    }
+
     return post;
   });
 
@@ -159,7 +183,8 @@ export const updatePost = async (
   id: number,
   editorId: number,
   currentBody: string,
-  newBody: string
+  newBody: string,
+  forumTopicId: number
 ) =>
   prisma.$transaction(async (tx) => {
     const post = await tx.forumPost.update({
@@ -169,6 +194,29 @@ export const updatePost = async (
     await tx.forumPostEdit.create({
       data: { forumPostId: id, editorId, previousBody: currentBody }
     });
+
+    const newlyQuotedUsernames = extractNewMentionedUsernames(
+      currentBody,
+      newBody
+    );
+    if (newlyQuotedUsernames.length > 0) {
+      const quotedUsers = await tx.user.findMany({
+        where: {
+          username: { in: newlyQuotedUsernames, mode: 'insensitive' },
+          disabled: false
+        },
+        select: { id: true }
+      });
+      await emitNotifications(tx, {
+        userIds: quotedUsers.map((u) => u.id),
+        type: 'forum_quote',
+        actorId: editorId,
+        page: 'forums',
+        pageId: forumTopicId,
+        postId: id
+      });
+    }
+
     return post;
   });
 

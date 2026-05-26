@@ -2,7 +2,11 @@ import express, { Request, Response } from 'express';
 import { CommentPage, SubscriptionPage } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { emitNotifications } from '../../lib/notifications';
+import {
+  emitNotifications,
+  extractMentionedUsernames,
+  extractNewMentionedUsernames
+} from '../../lib/notifications';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { isModerator } from '../../middleware/permissions';
@@ -149,6 +153,27 @@ router.post(
             pageId: subTarget.pageId
           });
         }
+
+        const quotedUsernames = extractMentionedUsernames(body);
+        if (quotedUsernames.length > 0) {
+          const quotedUsers = await tx.user.findMany({
+            where: {
+              username: { in: quotedUsernames, mode: 'insensitive' },
+              disabled: false
+            },
+            select: { id: true }
+          });
+          // postId stores the comment id for potential future deep-link use;
+          // the UI only uses postId for forum-page anchors so this is safe for all other pages.
+          await emitNotifications(tx, {
+            userIds: quotedUsers.map((u) => u.id),
+            type: 'forum_quote',
+            actorId: req.user.id,
+            page: subTarget.subPage,
+            pageId: subTarget.pageId,
+            postId: created.id
+          });
+        }
       }
 
       return created;
@@ -172,14 +197,70 @@ router.put(
     if (comment.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await prisma.comment.update({
-      where: { id },
-      data: {
-        body: sanitizeHtml(body),
-        editedUserId: req.user.id,
-        editedAt: new Date()
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.comment.update({
+        where: { id },
+        data: {
+          body: sanitizeHtml(body),
+          editedUserId: req.user.id,
+          editedAt: new Date()
+        }
+      });
+
+      const subPageMap: Partial<
+        Record<
+          CommentPage,
+          { subPage: SubscriptionPage; pageId: number | undefined }
+        >
+      > = {
+        release: { subPage: 'release', pageId: comment.releaseId ?? undefined },
+        requests: {
+          subPage: 'requests',
+          pageId: comment.requestId ?? undefined
+        },
+        artist: { subPage: 'artist', pageId: comment.artistId ?? undefined },
+        collages: {
+          subPage: 'collages',
+          pageId: comment.collageId ?? undefined
+        },
+        communities: {
+          subPage: 'communities',
+          pageId: comment.communityId ?? undefined
+        },
+        contributions: {
+          subPage: 'contributions',
+          pageId: comment.contributionId ?? undefined
+        }
+      };
+      const subTarget = subPageMap[comment.page as CommentPage];
+
+      if (subTarget?.pageId) {
+        const newlyQuotedUsernames = extractNewMentionedUsernames(
+          comment.body,
+          body
+        );
+        if (newlyQuotedUsernames.length > 0) {
+          const quotedUsers = await tx.user.findMany({
+            where: {
+              username: { in: newlyQuotedUsernames, mode: 'insensitive' },
+              disabled: false
+            },
+            select: { id: true }
+          });
+          await emitNotifications(tx, {
+            userIds: quotedUsers.map((u) => u.id),
+            type: 'forum_quote',
+            actorId: req.user.id,
+            page: subTarget.subPage,
+            pageId: subTarget.pageId,
+            postId: id
+          });
+        }
       }
+
+      return result;
     });
+
     res.json(updated);
   })
 );

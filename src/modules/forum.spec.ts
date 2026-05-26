@@ -29,6 +29,9 @@ const mockTx = {
   },
   auditLog: {
     create: jest.fn()
+  },
+  user: {
+    findMany: jest.fn()
   }
 };
 
@@ -271,6 +274,74 @@ describe('createPost', () => {
 
     expect(mockTx.forumPost.create).toHaveBeenCalled();
   });
+
+  it('emits forum_quote notifications for quoted users in a new post', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
+    mockTx.forumPost.create.mockResolvedValue({ id: 31, forumTopicId: 44 });
+    mockTx.forumTopic.update.mockResolvedValue(undefined);
+    mockTx.forum.update.mockResolvedValue(undefined);
+    mockTx.subscription.findMany.mockResolvedValue([]);
+    mockTx.user.findMany.mockResolvedValue([{ id: 20 }]);
+    mockTx.notification.createMany.mockResolvedValue({ count: 1 });
+
+    await createPost(9, 44, 7, '[quote=alice]great post[/quote]');
+
+    expect(mockTx.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          username: { in: ['alice'], mode: 'insensitive' },
+          disabled: false
+        })
+      })
+    );
+    expect(mockTx.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: 20,
+            type: 'forum_quote',
+            actorId: 7,
+            page: 'forums',
+            pageId: 44,
+            postId: 31
+          })
+        ])
+      })
+    );
+  });
+
+  it('does not emit forum_quote when the author quotes themselves', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
+    mockTx.forumPost.create.mockResolvedValue({ id: 31, forumTopicId: 44 });
+    mockTx.forumTopic.update.mockResolvedValue(undefined);
+    mockTx.forum.update.mockResolvedValue(undefined);
+    mockTx.subscription.findMany.mockResolvedValue([]);
+    // user.findMany returns the author themselves (id=7, same as authorId)
+    mockTx.user.findMany.mockResolvedValue([{ id: 7 }]);
+    mockTx.notification.createMany.mockResolvedValue({ count: 0 });
+
+    await createPost(9, 44, 7, '[quote=self]my own earlier post[/quote]');
+
+    // createMany is called but with empty recipients (emitNotifications filters out actorId=7)
+    const calls = mockTx.notification.createMany.mock.calls;
+    const quoteCalls = calls.filter(
+      (c: { data: { type: string }[] }[]) =>
+        c[0]?.data?.some((d: { type: string }) => d.type === 'forum_quote')
+    );
+    expect(quoteCalls).toHaveLength(0);
+  });
+
+  it('skips forum_quote lookup when no [quote=] tags are present', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
+    mockTx.forumPost.create.mockResolvedValue({ id: 33, forumTopicId: 44 });
+    mockTx.forumTopic.update.mockResolvedValue(undefined);
+    mockTx.forum.update.mockResolvedValue(undefined);
+    mockTx.subscription.findMany.mockResolvedValue([]);
+
+    await createPost(9, 44, 7, 'Just a plain reply');
+
+    expect(mockTx.user.findMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('updatePost', () => {
@@ -286,12 +357,60 @@ describe('updatePost', () => {
     mockTx.forumPost.update.mockResolvedValue({ id: 21, body: '[html]New' });
     mockTx.forumPostEdit.create.mockResolvedValue(undefined);
 
-    const result = await updatePost(21, 7, 'Old', 'New');
+    const result = await updatePost(21, 7, 'Old', 'New', 44);
 
     expect(result.body).toBe('[html]New');
     expect(mockTx.forumPostEdit.create).toHaveBeenCalledWith({
       data: { forumPostId: 21, editorId: 7, previousBody: 'Old' }
     });
+  });
+
+  it('emits forum_quote for newly introduced quotes on edit', async () => {
+    mockTx.forumPost.update.mockResolvedValue({
+      id: 21,
+      body: '[html]Updated'
+    });
+    mockTx.forumPostEdit.create.mockResolvedValue(undefined);
+    mockTx.user.findMany.mockResolvedValue([{ id: 30 }]);
+    mockTx.notification.createMany.mockResolvedValue({ count: 1 });
+
+    await updatePost(
+      21,
+      7,
+      'Old body with no quotes',
+      '[quote=bob]Nice[/quote]',
+      44
+    );
+
+    expect(mockTx.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          username: { in: ['bob'], mode: 'insensitive' }
+        })
+      })
+    );
+    expect(mockTx.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 30, type: 'forum_quote' })
+        ])
+      })
+    );
+  });
+
+  it('does not re-notify for quotes that were already in the original body', async () => {
+    mockTx.forumPost.update.mockResolvedValue({ id: 21, body: '[html]Same' });
+    mockTx.forumPostEdit.create.mockResolvedValue(undefined);
+
+    await updatePost(
+      21,
+      7,
+      '[quote=alice]already here[/quote]',
+      '[quote=alice]still here[/quote] with more text',
+      44
+    );
+
+    expect(mockTx.user.findMany).not.toHaveBeenCalled();
   });
 });
 

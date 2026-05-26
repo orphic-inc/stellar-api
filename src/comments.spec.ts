@@ -303,6 +303,94 @@ describe('POST /api/comments', () => {
       expect.objectContaining({ where: { page: 'release', pageId: 9 } })
     );
   });
+
+  it('emits forum_quote notifications when comment body contains a quote', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({ id: 40, page: 'requests' as never, requestId: 14 }) as never
+    );
+    prismaMock.commentSubscription.findMany.mockResolvedValue([]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: 25 }] as never);
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'requests',
+      body: '[quote=bob]Great request[/quote] Seconded.',
+      requestId: 14
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          username: { in: ['bob'], mode: 'insensitive' },
+          disabled: false
+        })
+      })
+    );
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: 25,
+            type: 'forum_quote',
+            page: 'requests',
+            pageId: 14
+          })
+        ])
+      })
+    );
+  });
+
+  it('does not emit forum_quote when no quotes are present in comment', async () => {
+    prismaMock.comment.create.mockResolvedValue(
+      makeComment({ id: 41, page: 'artist' as never, artistId: 3 }) as never
+    );
+    prismaMock.commentSubscription.findMany.mockResolvedValue([]);
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'artist',
+      body: 'Just a plain comment.',
+      artistId: 3
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('emits forum_quote for newly introduced quotes on comment edit', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({
+        id: 42,
+        authorId: 7,
+        page: 'collages' as never,
+        collageId: 5,
+        body: 'Original comment'
+      }) as never
+    );
+    prismaMock.comment.update.mockResolvedValue(
+      makeComment({ id: 42 }) as never
+    );
+    prismaMock.user.findMany.mockResolvedValue([{ id: 30 }] as never);
+
+    const res = await request(app).put('/api/comments/42').send({
+      body: '[quote=carol]nice collage[/quote] Agreed.'
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          username: { in: ['carol'], mode: 'insensitive' }
+        })
+      })
+    );
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 30, type: 'forum_quote' })
+        ])
+      })
+    );
+  });
 });
 
 // ─── PUT /api/comments/:id ────────────────────────────────────────────────────

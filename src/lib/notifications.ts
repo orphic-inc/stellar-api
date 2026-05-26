@@ -2,6 +2,25 @@ import { Prisma, NotificationType, SubscriptionPage } from '@prisma/client';
 
 type TxClient = Prisma.TransactionClient;
 
+export function extractMentionedUsernames(body: string): string[] {
+  const matches = body.matchAll(/\[quote=([^\]]+)\]/gi);
+  return [...new Set([...matches].map((m) => m[1].trim()))];
+}
+
+// Returns usernames present in newBody but not in currentBody (case-insensitive).
+// Used for edit-path quote notifications to avoid re-notifying for existing quotes.
+export function extractNewMentionedUsernames(
+  currentBody: string,
+  newBody: string
+): string[] {
+  const existing = new Set(
+    extractMentionedUsernames(currentBody).map((u) => u.toLowerCase())
+  );
+  return extractMentionedUsernames(newBody).filter(
+    (u) => !existing.has(u.toLowerCase())
+  );
+}
+
 export async function emitNotifications(
   tx: TxClient,
   opts: {

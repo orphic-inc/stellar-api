@@ -11,9 +11,12 @@ import {
 } from '../../middleware/validate';
 import {
   announcementSchema,
-  type AnnouncementInput
+  globalNoticeSchema,
+  type AnnouncementInput,
+  type GlobalNoticeInput
 } from '../../schemas/announcement';
 import { sanitizePlain } from '../../lib/sanitize';
+import { emitNotifications } from '../../lib/notifications';
 
 const router = express.Router();
 const idParamsSchema = z.object({
@@ -36,15 +39,28 @@ router.get(
   })
 );
 
-// POST /api/announcements — create news item (staff)
+// POST /api/announcements — create news item (staff); notifies all active users
 router.post(
   '/',
   ...requirePermission('news_manage'),
   validate(announcementSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req: Request, res: Response) => {
     const { title, body } = parsedBody<AnnouncementInput>(res);
-    const news = await prisma.news.create({
-      data: { title: sanitizePlain(title), body: sanitizePlain(body) }
+    const news = await prisma.$transaction(async (tx) => {
+      const created = await tx.news.create({
+        data: { title: sanitizePlain(title), body: sanitizePlain(body) }
+      });
+      const recipients = await tx.user.findMany({
+        where: { disabled: false },
+        select: { id: true }
+      });
+      await emitNotifications(tx, {
+        userIds: recipients.map((u) => u.id),
+        type: 'site_news',
+        page: 'news',
+        pageId: created.id
+      });
+      return created;
     });
     res.status(201).json(news);
   })
@@ -109,6 +125,66 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     await prisma.blog.delete({ where: { id } });
+    res.status(204).send();
+  })
+);
+
+// GET /api/announcements/global-notices — list active global notices (staff)
+router.get(
+  '/global-notices',
+  ...requirePermission('news_manage'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const now = new Date();
+    const notices = await prisma.globalNotice.findMany({
+      where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      orderBy: { createdAt: 'desc' },
+      include: { createdBy: { select: { id: true, username: true } } }
+    });
+    res.json(notices);
+  })
+);
+
+// POST /api/announcements/global-notice — broadcast a notice to all active users (staff)
+router.post(
+  '/global-notice',
+  ...requirePermission('news_manage'),
+  validate(globalNoticeSchema),
+  authHandler(async (req, res) => {
+    const { message, url, expiresAt } = parsedBody<GlobalNoticeInput>(res);
+    const notice = await prisma.$transaction(async (tx) => {
+      const created = await tx.globalNotice.create({
+        data: {
+          message: sanitizePlain(message),
+          url: url ?? null,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          createdById: req.user.id
+        }
+      });
+      const recipients = await tx.user.findMany({
+        where: { disabled: false },
+        select: { id: true }
+      });
+      await emitNotifications(tx, {
+        userIds: recipients.map((u) => u.id),
+        type: 'global_notice',
+        actorId: req.user.id,
+        page: 'global_notices',
+        pageId: created.id
+      });
+      return created;
+    });
+    res.status(201).json(notice);
+  })
+);
+
+// DELETE /api/announcements/global-notice/:id — remove a global notice (staff)
+router.delete(
+  '/global-notice/:id',
+  ...requirePermission('news_manage'),
+  validateParams(idParamsSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    await prisma.globalNotice.delete({ where: { id } });
     res.status(204).send();
   })
 );
