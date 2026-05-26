@@ -18,6 +18,7 @@ import {
 } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { parsePage, paginatedResponse } from '../../lib/pagination';
+import { hasPermission } from '../../lib/rankPermissions';
 import {
   createCollageSchema,
   updateCollageSchema,
@@ -221,6 +222,11 @@ router.post(
     // Personal collage: reset featured if this is the new featured one
     // (handled at update time; creation doesn't set featured)
 
+    const perms = await loadPermissions(req, res);
+    if (!hasPermission(perms, 'collages_create')) {
+      return res.status(403).json({ msg: 'Permission denied' });
+    }
+
     const existingName = await prisma.collage.findFirst({
       where: { name, isDeleted: false }
     });
@@ -231,7 +237,6 @@ router.post(
     }
 
     if (isPersonal(categoryId)) {
-      const perms = await loadPermissions(req, res);
       const isSiteStaff = !!(perms['staff'] || perms['admin']);
       if (!isSiteStaff) {
         const rank = await prisma.userRank.findUnique({

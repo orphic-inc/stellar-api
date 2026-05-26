@@ -20,6 +20,7 @@ import {
 } from '../../../schemas/forum';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
 import { sanitizePlain } from '../../../lib/sanitize';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
@@ -46,7 +47,7 @@ router.get(
       select: { minClassRead: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -98,7 +99,7 @@ router.get(
       })
     ]);
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -122,7 +123,7 @@ router.post(
       select: { id: true, minClassCreate: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassCreate ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassCreate)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to create topics in this forum' });

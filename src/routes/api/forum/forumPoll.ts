@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authHandler } from '../../../modules/asyncHandler';
 import { createPoll, closePoll } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
@@ -37,6 +38,7 @@ router.get(
         votes: true,
         forumTopic: {
           select: {
+            forumId: true,
             deletedAt: true,
             forum: { select: { minClassRead: true } }
           }
@@ -49,7 +51,13 @@ router.get(
       return res.status(404).json({ msg: 'Poll not found' });
     }
 
-    if (req.user.userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0)) {
+    if (
+      !canAccessForumLevel(
+        req.user,
+        poll.forumTopic?.forumId ?? 0,
+        poll.forumTopic?.forum.minClassRead
+      )
+    ) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });

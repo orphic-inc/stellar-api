@@ -48,7 +48,7 @@ const reportIdSchema = z.object({
 // GET /api/reports/counts — open + claimed counts (staff)
 router.get(
   '/counts',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   authHandler(async (_req, res) => {
     const counts = await getReportCounts();
     res.json(counts);
@@ -58,7 +58,7 @@ router.get(
 // GET /api/reports/stats — resolution statistics (staff)
 router.get(
   '/stats',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   authHandler(async (_req, res) => {
     const stats = await getReportStats();
     res.json(stats);
@@ -80,7 +80,7 @@ router.get(
 // GET /api/reports — staff queue
 router.get(
   '/',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   validateQuery(reportListQuerySchema),
   authHandler(async (req, res) => {
     const { page, status, targetType, claimedByMe, reporterUsername } =
@@ -143,7 +143,7 @@ router.get(
 // POST /api/reports/:id/claim — claim a report (staff)
 router.post(
   '/:id/claim',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   validateParams(reportIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -165,7 +165,7 @@ router.post(
 // POST /api/reports/:id/unclaim — unclaim a report (staff)
 router.post(
   '/:id/unclaim',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   validateParams(reportIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -187,7 +187,7 @@ router.post(
 // POST /api/reports/:id/resolve — resolve a report (staff)
 router.post(
   '/:id/resolve',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   validateParams(reportIdSchema),
   validate(resolveReportSchema),
   authHandler(async (req, res) => {
@@ -216,7 +216,7 @@ router.post(
 // POST /api/reports/:id/notes — add a moderator note (staff)
 router.post(
   '/:id/notes',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('reports_manage'),
   validateParams(reportIdSchema),
   validate(addNoteSchema),
   authHandler(async (req, res) => {

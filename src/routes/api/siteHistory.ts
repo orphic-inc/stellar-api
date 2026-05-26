@@ -34,7 +34,7 @@ router.get(
 // POST /api/site-history
 router.post(
   '/',
-  ...requirePermission('admin'),
+  ...requirePermission('site_history_manage'),
   validate(siteHistorySchema),
   authHandler(async (req, res) => {
     const { title, body } = parsedBody<SiteHistoryInput>(res);
@@ -48,7 +48,7 @@ router.post(
 // PUT /api/site-history/:id
 router.put(
   '/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('site_history_manage'),
   validateParams(siteHistoryIdParams),
   validate(siteHistorySchema),
   authHandler(async (_req, res) => {
@@ -67,7 +67,7 @@ router.put(
 // DELETE /api/site-history/:id
 router.delete(
   '/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('site_history_manage'),
   validateParams(siteHistoryIdParams),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

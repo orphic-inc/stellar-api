@@ -3,27 +3,48 @@
  * Each function is a no-op when the relevant rows already exist.
  */
 import { PrismaClient } from '@prisma/client';
+import { ALL_PERMISSIONS } from '../lib/rankPermissions';
 
 export const DEFAULT_RANKS = [
   {
     level: 100,
     name: 'User',
+    secondary: false,
+    permittedForumIds: [],
     color: '',
     badge: '',
     personalCollageLimit: 1,
-    permissions: { forums_read: true, forums_post: true }
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      collages_create: true,
+      requests_create: true,
+      wiki_edit: true
+    }
   },
   {
     level: 200,
     name: 'Power User',
+    secondary: false,
+    permittedForumIds: [],
     color: '#e2a822',
     badge: '',
     personalCollageLimit: 2,
-    permissions: { forums_read: true, forums_post: true }
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      collages_create: true,
+      collages_manage: true,
+      requests_create: true,
+      wiki_edit: true
+    }
   },
   {
     level: 500,
     name: 'Staff',
+    secondary: false,
+    permittedForumIds: [],
     color: '#e22a2a',
     badge: '',
     personalCollageLimit: 3,
@@ -33,34 +54,35 @@ export const DEFAULT_RANKS = [
       forums_moderate: true,
       forums_manage: true,
       communities_manage: true,
+      contributions_manage: true,
+      collages_create: true,
+      collages_manage: true,
+      collages_moderate: true,
       news_manage: true,
+      requests_create: true,
+      requests_moderate: true,
+      reports_manage: true,
+      staff_inbox_manage: true,
+      tags_manage: true,
       invites_manage: true,
+      recovery_manage: true,
       users_edit: true,
       users_warn: true,
       users_disable: true,
+      users_view_ips: true,
+      users_view_email: true,
       staff: true
     }
   },
   {
     level: 1000,
     name: 'SysOp',
+    secondary: false,
+    permittedForumIds: [],
     color: '#a0d468',
     badge: '',
     personalCollageLimit: 4,
-    permissions: {
-      forums_read: true,
-      forums_post: true,
-      forums_moderate: true,
-      forums_manage: true,
-      communities_manage: true,
-      news_manage: true,
-      invites_manage: true,
-      users_edit: true,
-      users_warn: true,
-      users_disable: true,
-      staff: true,
-      admin: true
-    }
+    permissions: ALL_PERMISSIONS
   }
 ] as const;
 
@@ -254,10 +276,35 @@ type ForumEntry = {
 };
 
 export async function seedRanks(client: PrismaClient): Promise<void> {
-  const existing = await client.userRank.count();
-  if (existing > 0) return;
   for (const rank of DEFAULT_RANKS) {
-    await client.userRank.create({ data: rank });
+    const existing = await client.userRank.findUnique({
+      where: { level: rank.level }
+    });
+
+    if (!existing) {
+      await client.userRank.create({
+        data: {
+          ...rank,
+          permittedForumIds: [...rank.permittedForumIds]
+        }
+      });
+      continue;
+    }
+
+    if (existing.name !== rank.name) continue;
+
+    await client.userRank.update({
+      where: { id: existing.id },
+      data: {
+        name: rank.name,
+        secondary: rank.secondary,
+        permittedForumIds: [...rank.permittedForumIds],
+        color: rank.color,
+        badge: rank.badge,
+        personalCollageLimit: rank.personalCollageLimit,
+        permissions: rank.permissions
+      }
+    });
   }
 }
 

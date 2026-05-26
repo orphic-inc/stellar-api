@@ -278,6 +278,8 @@ model UserRank {
   level                Int
   name                 String
   permissions          Json
+  secondary            Boolean     @default(false)
+  permittedForumIds    Int[]       @default([])
   color                String      @default("")
   badge                String      @default("")
   uploadRequired       Int         @default(0)
@@ -286,9 +288,12 @@ model UserRank {
   staffGroupId         Int?
   staffGroup           StaffGroup? @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
   users                User[]
+  secondaryUsers       UserSecondaryRank[]
 
   @@index([displayStaff])
   @@index([staffGroupId])
+  @@unique([level])
+  @@unique([name])
   @@map("user_ranks")
 }
 
@@ -317,6 +322,7 @@ model User {
   avatar             String?
   userRankId         Int
   userRank           UserRank     @relation(fields: [userRankId], references: [id])
+  secondaryRanks     UserSecondaryRank[]
   userSettingsId     Int          @unique
   userSettings       UserSettings @relation(fields: [userSettingsId], references: [id])
   profileId          Int          @unique
@@ -414,6 +420,7 @@ model User {
   warningsIssued            UserWarning[]                    @relation("UserWarnedBy")
   moderationNotes           UserModerationNote[]             @relation("UserModerationNotes")
   moderationNotesAuthored   UserModerationNote[]             @relation("ModerationNoteAuthor")
+  secondaryRankAssignments  UserSecondaryRank[]              @relation("UserSecondaryRankAssignedBy")
   pmDrafts                  PmDraft[]
   massMessagesSent          MassMessage[]                    @relation("MassMessageSender")
   siteHistoryEntries        SiteHistory[]
@@ -432,6 +439,21 @@ model User {
 
   @@index([userRankId])
   @@map("users")
+}
+
+model UserSecondaryRank {
+  userId       Int
+  userRankId   Int
+  assignedById Int?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userRank     UserRank @relation(fields: [userRankId], references: [id], onDelete: Cascade)
+  assignedBy   User?    @relation("UserSecondaryRankAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@id([userId, userRankId])
+  @@index([userRankId])
+  @@index([assignedById])
+  @@map("user_secondary_ranks")
 }
 
 model Invite {

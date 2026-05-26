@@ -12,6 +12,7 @@ import {
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import * as requestModule from '../../modules/requests';
 import { prisma } from '../../lib/prisma';
+import { hasPermission } from '../../lib/rankPermissions';
 import {
   createRequestSchema,
   updateRequestSchema,
@@ -58,6 +59,10 @@ router.post(
   requireAuth,
   validate(createRequestSchema),
   authHandler(async (req, res) => {
+    const perms = await loadPermissions(req, res);
+    if (!hasPermission(perms, 'requests_create')) {
+      throw new AppError(403, 'Permission denied');
+    }
     const request = await requestModule.createRequest(
       req.user.id,
       parsedBody(res)
@@ -232,7 +237,7 @@ router.put(
       throw new AppError(422, 'Only open requests can be edited');
 
     const perms = await loadPermissions(req, res);
-    const isStaff = !!(perms['staff'] || perms['admin']);
+    const isStaff = hasPermission(perms, 'requests_moderate');
     if (existing.userId !== req.user.id && !isStaff)
       throw new AppError(403, 'Permission denied');
 
@@ -276,7 +281,7 @@ router.post(
       throw new AppError(422, 'Request is not filled');
 
     const perms = await loadPermissions(req, res);
-    const isStaff = !!(perms['staff'] || perms['admin']);
+    const isStaff = hasPermission(perms, 'requests_moderate');
     const isOwner = existing.userId === req.user.id;
     const isFiller = existing.fillerId === req.user.id;
 
@@ -304,7 +309,7 @@ router.delete(
     if (!existing) throw new AppError(404, 'Request not found');
 
     const perms = await loadPermissions(req, res);
-    const isStaff = !!(perms['staff'] || perms['admin']);
+    const isStaff = hasPermission(perms, 'requests_moderate');
     const isOwner = existing.userId === req.user.id;
 
     if (!isOwner && !isStaff) throw new AppError(403, 'Permission denied');

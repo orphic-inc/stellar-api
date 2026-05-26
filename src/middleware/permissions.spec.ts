@@ -5,12 +5,10 @@
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-const findUniqueMock = jest.fn();
+const getUserRankAccessMock = jest.fn();
 
-jest.mock('../lib/prisma', () => ({
-  prisma: {
-    userRank: { findUnique: (...args: unknown[]) => findUniqueMock(...args) }
-  }
+jest.mock('../lib/userRankAccess', () => ({
+  getUserRankAccess: (...args: unknown[]) => getUserRankAccessMock(...args)
 }));
 
 const requireAuthMock = jest.fn(
@@ -62,7 +60,9 @@ describe('requirePermission', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('calls next() when user has the required permission', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { wiki_edit: true } });
+    getUserRankAccessMock.mockResolvedValue({
+      permissions: { wiki_edit: true }
+    });
     const [req, res, next] = makeReqRes();
     const [, checkMw] = requirePermission('wiki_edit');
     await checkMw(req, res as unknown as Response, next);
@@ -71,7 +71,7 @@ describe('requirePermission', () => {
   });
 
   it('returns 403 when user lacks the required permission', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: {} });
+    getUserRankAccessMock.mockResolvedValue({ permissions: {} });
     const [req, res, next] = makeReqRes();
     const [, checkMw] = requirePermission('wiki_edit');
     await checkMw(req, res as unknown as Response, next);
@@ -80,25 +80,36 @@ describe('requirePermission', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('staff permission satisfies admin gate', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { staff: true } });
+  it('admin permission satisfies any delegated gate', async () => {
+    getUserRankAccessMock.mockResolvedValue({ permissions: { admin: true } });
     const [req, res, next] = makeReqRes();
-    const [, checkMw] = requirePermission('admin');
+    const [, checkMw] = requirePermission('rank_permissions_manage');
     await checkMw(req, res as unknown as Response, next);
     expect(next).toHaveBeenCalledWith();
   });
 
   it('accepts any of multiple permissions (first match)', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { forums_manage: true } });
+    getUserRankAccessMock.mockResolvedValue({
+      permissions: { forums_manage: true }
+    });
     const [req, res, next] = makeReqRes();
     const [, checkMw] = requirePermission('admin', 'forums_manage');
     await checkMw(req, res as unknown as Response, next);
     expect(next).toHaveBeenCalledWith();
   });
 
+  it('does not treat staff as an implicit login-watch permission', async () => {
+    getUserRankAccessMock.mockResolvedValue({ permissions: { staff: true } });
+    const [req, res, next] = makeReqRes();
+    const [, checkMw] = requirePermission('login_watch_view');
+    await checkMw(req, res as unknown as Response, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('propagates errors from loadPermissions via next(err)', async () => {
     const dbError = new Error('DB connection lost');
-    findUniqueMock.mockRejectedValue(dbError);
+    getUserRankAccessMock.mockRejectedValue(dbError);
     const [req, res, next] = makeReqRes();
     const [, checkMw] = requirePermission('admin');
     await checkMw(req, res as unknown as Response, next);
@@ -121,11 +132,11 @@ describe('requireOwnerOrPermission', () => {
     const [, checkMw] = requireOwnerOrPermission(getOwnerId, 'admin');
     await checkMw(req, res as unknown as Response, next);
     expect(next).toHaveBeenCalledWith();
-    expect(findUniqueMock).not.toHaveBeenCalled();
+    expect(getUserRankAccessMock).not.toHaveBeenCalled();
   });
 
   it('calls next() when user has the required permission (non-owner)', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { admin: true } });
+    getUserRankAccessMock.mockResolvedValue({ permissions: { admin: true } });
     const [req, res, next] = makeReqRes(7);
     (req as unknown as { ownerId: number }).ownerId = 99; // different owner
     const [, checkMw] = requireOwnerOrPermission(getOwnerId, 'admin');
@@ -134,7 +145,7 @@ describe('requireOwnerOrPermission', () => {
   });
 
   it('returns 403 when non-owner lacks permission', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: {} });
+    getUserRankAccessMock.mockResolvedValue({ permissions: {} });
     const [req, res, next] = makeReqRes(7);
     (req as unknown as { ownerId: number }).ownerId = 99;
     const [, checkMw] = requireOwnerOrPermission(getOwnerId, 'admin');
@@ -145,7 +156,7 @@ describe('requireOwnerOrPermission', () => {
 
   it('propagates errors via next(err)', async () => {
     const dbError = new Error('DB down');
-    findUniqueMock.mockRejectedValue(dbError);
+    getUserRankAccessMock.mockRejectedValue(dbError);
     const [req, res, next] = makeReqRes(7);
     (req as unknown as { ownerId: number }).ownerId = 99;
     const [, checkMw] = requireOwnerOrPermission(getOwnerId, 'admin');
@@ -154,7 +165,7 @@ describe('requireOwnerOrPermission', () => {
   });
 
   it('treats null ownerId as non-owner and falls through to permission check', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { admin: true } });
+    getUserRankAccessMock.mockResolvedValue({ permissions: { admin: true } });
     const getOwnerNull = (_req: Request) => null;
     const [req, res, next] = makeReqRes(7);
     const [, checkMw] = requireOwnerOrPermission(getOwnerNull, 'admin');
@@ -169,7 +180,7 @@ describe('isModerator', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('returns true when user has forums_moderate permission', async () => {
-    findUniqueMock.mockResolvedValue({
+    getUserRankAccessMock.mockResolvedValue({
       permissions: { forums_moderate: true }
     });
     const [req, res] = makeReqRes();
@@ -181,7 +192,7 @@ describe('isModerator', () => {
   });
 
   it('returns true when user has staff permission', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: { staff: true } });
+    getUserRankAccessMock.mockResolvedValue({ permissions: { staff: true } });
     const [req, res] = makeReqRes();
     const result = await isModerator(
       req as unknown as AuthenticatedRequest,
@@ -191,7 +202,7 @@ describe('isModerator', () => {
   });
 
   it('returns false when user has no moderator permissions', async () => {
-    findUniqueMock.mockResolvedValue({ permissions: {} });
+    getUserRankAccessMock.mockResolvedValue({ permissions: {} });
     const [req, res] = makeReqRes();
     const result = await isModerator(
       req as unknown as AuthenticatedRequest,

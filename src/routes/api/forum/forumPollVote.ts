@@ -14,12 +14,7 @@ router.post(
   validate(pollVoteSchema),
   authHandler(async (req, res) => {
     const { forumPollId, vote } = parsedBody<PollVoteInput>(res);
-    const result = await castVote(
-      forumPollId,
-      req.user.id,
-      req.user.userRankLevel,
-      vote
-    );
+    const result = await castVote(forumPollId, req.user, vote);
     if (!result.ok) {
       if (result.reason === 'not_found')
         return res.status(404).json({ msg: 'Poll not found' });

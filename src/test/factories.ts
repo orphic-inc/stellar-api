@@ -38,7 +38,16 @@ export function makeUserRank(
     level: 1000,
     color: '',
     badge: '',
-    permissions,
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      collages_create: true,
+      requests_create: true,
+      wiki_edit: true,
+      ...permissions
+    },
+    secondary: false,
+    permittedForumIds: [],
     uploadRequired: 0,
     personalCollageLimit: 0,
     displayStaff: false,

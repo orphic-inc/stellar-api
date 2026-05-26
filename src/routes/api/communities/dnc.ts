@@ -51,7 +51,7 @@ router.get(
 // POST /api/communities/:communityId/dnc
 router.post(
   '/',
-  ...requirePermission('communities_manage'),
+  ...requirePermission('dnc_manage'),
   validateParams(communityIdParams),
   validate(dncSchema),
   authHandler(async (req, res) => {
@@ -73,7 +73,7 @@ router.post(
 // DELETE /api/communities/:communityId/dnc/:dncId
 router.delete(
   '/:dncId',
-  ...requirePermission('communities_manage'),
+  ...requirePermission('dnc_manage'),
   validateParams(dncIdParams),
   authHandler(async (_req, res) => {
     const { communityId, dncId } = parsedParams<{

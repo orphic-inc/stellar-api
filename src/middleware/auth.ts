@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { auth as authConfig } from '../modules/config';
 import { prisma } from '../lib/prisma';
+import { computeUserRankAccess } from '../lib/userRankAccess';
 
 interface JwtPayload {
   user: { id: number; sessionId?: string };
@@ -25,7 +26,27 @@ export const requireAuth = async (
         id: true,
         userRankId: true,
         disabled: true,
-        userRank: { select: { level: true } }
+        userRank: {
+          select: {
+            id: true,
+            level: true,
+            permissions: true,
+            permittedForumIds: true
+          }
+        },
+        secondaryRanks: {
+          select: {
+            userRankId: true,
+            userRank: {
+              select: {
+                id: true,
+                level: true,
+                permissions: true,
+                permittedForumIds: true
+              }
+            }
+          }
+        }
       }
     });
     if (!user || user.disabled) {
@@ -60,10 +81,15 @@ export const requireAuth = async (
         .catch(() => undefined);
     }
 
+    const rankAccess = computeUserRankAccess(user);
+
     req.user = {
       id: user.id,
       userRankId: user.userRankId,
-      userRankLevel: user.userRank?.level ?? 0
+      userRankLevel: rankAccess.effectiveLevel,
+      secondaryRankIds: rankAccess.secondaryRankIds,
+      permittedForumIds: rankAccess.permittedForumIds,
+      permissions: rankAccess.permissions as Record<string, boolean>
     };
     next();
   } catch {

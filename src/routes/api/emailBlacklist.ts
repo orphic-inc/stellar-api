@@ -25,7 +25,7 @@ type EmailBlacklistInput = z.infer<typeof emailBlacklistSchema>;
 // GET /api/email-blacklist
 router.get(
   '/',
-  ...requirePermission('admin'),
+  ...requirePermission('email_blacklist_manage'),
   authHandler(async (_req, res) => {
     const entries = await prisma.emailBlacklist.findMany({
       orderBy: { addedAt: 'desc' }
@@ -37,7 +37,7 @@ router.get(
 // POST /api/email-blacklist
 router.post(
   '/',
-  ...requirePermission('admin'),
+  ...requirePermission('email_blacklist_manage'),
   validate(emailBlacklistSchema),
   authHandler(async (req, res) => {
     const { email, comment } = parsedBody<EmailBlacklistInput>(res);
@@ -64,7 +64,7 @@ router.post(
 // DELETE /api/email-blacklist/:id
 router.delete(
   '/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('email_blacklist_manage'),
   validateParams(idParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

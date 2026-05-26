@@ -76,7 +76,7 @@ const makeReport = (): ReportRow => ({
 
 const setStaff = () =>
   prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true })
+    makeUserRank({ staff: true, reports_manage: true })
   );
 
 beforeEach(() => resetApiTestState());

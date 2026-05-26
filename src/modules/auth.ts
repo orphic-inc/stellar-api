@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { computeRatio } from './ratio';
+import { computeUserRankAccess } from '../lib/userRankAccess';
 
 export const isPasswordBanned = async (password: string): Promise<boolean> => {
   const found = await prisma.badPassword.findFirst({ where: { password } });
@@ -26,12 +27,27 @@ export const authUserSelect = {
   ratio: true,
   userRank: {
     select: {
+      id: true,
       level: true,
       name: true,
       color: true,
       badge: true,
       permissions: true,
       personalCollageLimit: true
+    }
+  },
+  secondaryRanks: {
+    select: {
+      userRankId: true,
+      userRank: {
+        select: {
+          id: true,
+          level: true,
+          permissions: true,
+          permittedForumIds: true,
+          personalCollageLimit: true
+        }
+      }
     }
   }
 } as const;
@@ -45,6 +61,33 @@ export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
   ...raw,
+  userRank: {
+    ...raw.userRank,
+    permissions: computeUserRankAccess({
+      userRankId: raw.userRank.id,
+      userRank: {
+        id: raw.userRank.id,
+        level: raw.userRank.level,
+        permissions: raw.userRank.permissions,
+        permittedForumIds: []
+      },
+      secondaryRanks: raw.secondaryRanks.map((entry) => ({
+        userRankId: entry.userRankId,
+        userRank: {
+          id: entry.userRank.id,
+          level: entry.userRank.level,
+          permissions: entry.userRank.permissions,
+          permittedForumIds: entry.userRank.permittedForumIds
+        }
+      }))
+    }).permissions,
+    personalCollageLimit: Math.max(
+      raw.userRank.personalCollageLimit ?? 0,
+      ...raw.secondaryRanks.map(
+        (entry) => entry.userRank.personalCollageLimit ?? 0
+      )
+    )
+  },
   ratio: computeRatio(raw.contributed, raw.consumed),
   contributed: raw.contributed.toString(),
   consumed: raw.consumed.toString()

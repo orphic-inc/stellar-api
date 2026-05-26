@@ -5,6 +5,7 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { deleteForum } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import {
   parsedBody,
   validate,
@@ -32,7 +33,6 @@ router.get(
   requireAuth,
   authHandler(async (req, res) => {
     const forums = await prisma.forum.findMany({
-      where: { minClassRead: { lte: req.user.userRankLevel } },
       orderBy: { sort: 'asc' },
       include: {
         forumCategory: { select: { id: true, name: true } },
@@ -41,7 +41,11 @@ router.get(
         }
       }
     });
-    res.json(forums);
+    res.json(
+      forums.filter((forum) =>
+        canAccessForumLevel(req.user, forum.id, forum.minClassRead)
+      )
+    );
   })
 );
 
@@ -60,7 +64,7 @@ router.get(
       }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forum.id, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -78,7 +82,7 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const forum = await prisma.forum.findUnique({ where: { id } });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forum.id, forum.minClassRead)) {
       return res.status(403).json({ msg: 'Insufficient class' });
     }
 

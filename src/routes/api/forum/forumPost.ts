@@ -19,6 +19,7 @@ import {
   type UpdatePostInput
 } from '../../../schemas/forum';
 import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
@@ -87,7 +88,7 @@ router.get(
       select: { minClassRead: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -140,7 +141,7 @@ router.get(
       select: { minClassRead: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
@@ -177,7 +178,7 @@ router.get(
       select: { minClassRead: true }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (req.user.userRankLevel < (forum.minClassRead ?? 0)) {
+    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });

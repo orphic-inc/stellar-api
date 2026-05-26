@@ -92,7 +92,7 @@ router.get(
 // POST /api/users/donor-ranks
 router.post(
   '/donor-ranks',
-  ...requirePermission('admin'),
+  ...requirePermission('donor_ranks_manage'),
   validate(donorRankSchema),
   authHandler(async (_req, res) => {
     const { name, minDonation, expiresAfterDays, perks, color, badge } =
@@ -114,7 +114,7 @@ router.post(
 // PUT /api/users/donor-ranks/:rankId
 router.put(
   '/donor-ranks/:rankId',
-  ...requirePermission('admin'),
+  ...requirePermission('donor_ranks_manage'),
   validateParams(rankIdParamsSchema),
   validate(donorRankSchema),
   authHandler(async (_req, res) => {
@@ -143,7 +143,7 @@ router.put(
 // DELETE /api/users/donor-ranks/:rankId
 router.delete(
   '/donor-ranks/:rankId',
-  ...requirePermission('admin'),
+  ...requirePermission('donor_ranks_manage'),
   validateParams(rankIdParamsSchema),
   authHandler(async (_req, res) => {
     const { rankId } = parsedParams<{ rankId: number }>(res);
@@ -231,7 +231,7 @@ router.put(
 // GET /api/users/recovery-requests
 router.get(
   '/recovery-requests',
-  ...requirePermission('users_edit'),
+  ...requirePermission('recovery_manage'),
   authHandler(async (req, res) => {
     const rawStatus = req.query.status as string | undefined;
     const statusResult = recoveryStatusSchema.safeParse(rawStatus ?? 'pending');
@@ -275,7 +275,7 @@ router.get(
 // DELETE /api/users/recovery-requests/:reqId
 router.delete(
   '/recovery-requests/:reqId',
-  ...requirePermission('users_edit'),
+  ...requirePermission('recovery_manage'),
   validateParams(reqIdParamsSchema),
   authHandler(async (req, res) => {
     const { reqId } = parsedParams<{ reqId: number }>(res);
@@ -310,7 +310,7 @@ type SessionsQuery = z.infer<typeof sessionsQuerySchema>;
 // GET /api/users/sessions — login watch (must be before /:id)
 router.get(
   '/sessions',
-  ...requirePermission('admin'),
+  ...requirePermission('login_watch_view'),
   validateQuery(sessionsQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsePage(req);
@@ -338,7 +338,7 @@ type InvitesQuery = z.infer<typeof invitesQuerySchema>;
 // GET /api/users/invites — invite pool (must be before /:id)
 router.get(
   '/invites',
-  ...requirePermission('admin'),
+  ...requirePermission('invites_manage'),
   validateQuery(invitesQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsePage(req);
@@ -362,7 +362,7 @@ router.get(
 // GET /api/users/invite-tree — site-wide invite tree (must be before /:id)
 router.get(
   '/invite-tree',
-  ...requirePermission('admin'),
+  ...requirePermission('invites_manage'),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsePage(req);
     const [trees, total] = await Promise.all([
@@ -395,7 +395,7 @@ router.get(
 // GET /api/users/ratio-watch — users on ratio watch or leech-disabled (must be before /:id)
 router.get(
   '/ratio-watch',
-  ...requirePermission('admin'),
+  ...requirePermission('ratio_policy_manage'),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsePage(req);
     const where = {
@@ -446,7 +446,7 @@ router.get(
 // GET /api/users/duplicate-ips — users sharing the same last-seen IP (must be before /:id)
 router.get(
   '/duplicate-ips',
-  ...requirePermission('staff'),
+  ...requirePermission('duplicate_ips_view'),
   authHandler(async (_req, res) => {
     const dupes = await prisma.user.groupBy({
       by: ['lastIp'],
@@ -477,7 +477,7 @@ router.get(
 // GET /api/users/registration-log — users ordered by registration date (must be before /:id)
 router.get(
   '/registration-log',
-  ...requirePermission('staff'),
+  ...requirePermission('registration_log_view'),
   authHandler(async (req, res) => {
     const pg = parsePage(req);
     const [users, total] = await Promise.all([
@@ -631,7 +631,7 @@ router.put(
 // POST /api/users/:id/recovery — admin-triggered recovery email
 router.post(
   '/:id/recovery',
-  ...requirePermission('users_edit'),
+  ...requirePermission('recovery_manage'),
   validateParams(userIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -672,7 +672,7 @@ router.post(
 // GET /api/users/:id/warnings
 router.get(
   '/:id/warnings',
-  ...requirePermission('staff'),
+  ...requirePermission('users_warn'),
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -746,7 +746,7 @@ router.delete(
 // GET /api/users/:id/notes
 router.get(
   '/:id/notes',
-  ...requirePermission('staff'),
+  ...requirePermission('users_edit'),
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -762,7 +762,7 @@ router.get(
 // POST /api/users/:id/notes
 router.post(
   '/:id/notes',
-  ...requirePermission('staff'),
+  ...requirePermission('users_edit'),
   validateParams(userIdParamsSchema),
   validate(moderationNoteSchema),
   authHandler(async (req, res) => {
@@ -782,7 +782,7 @@ router.post(
 // DELETE /api/users/:id/notes/:noteId
 router.delete(
   '/:id/notes/:noteId',
-  ...requirePermission('staff'),
+  ...requirePermission('users_edit'),
   validateParams(noteParamsSchema),
   authHandler(async (_req, res) => {
     const { id, noteId } = parsedParams<{ id: number; noteId: number }>(res);
@@ -825,30 +825,90 @@ router.post(
   })
 );
 
+// GET /api/users/:id/rank
+router.get(
+  '/:id/rank',
+  ...requirePermission('users_edit'),
+  validateParams(userIdParamsSchema),
+  authHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        userRankId: true,
+        secondaryRanks: {
+          select: { userRankId: true },
+          orderBy: { userRankId: 'asc' }
+        }
+      }
+    });
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    res.json({
+      userRankId: user.userRankId,
+      secondaryRankIds: user.secondaryRanks.map((entry) => entry.userRankId)
+    });
+  })
+);
+
 // PUT /api/users/:id/rank
 router.put(
   '/:id/rank',
-  ...requirePermission('admin'),
+  ...requirePermission('users_edit'),
   validateParams(userIdParamsSchema),
   validate(setRankSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { userRankId } = parsedBody<SetRankInput>(res);
+    const { userRankId, secondaryRankIds } = parsedBody<SetRankInput>(res);
 
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const rank = await prisma.userRank.findUnique({
-      where: { id: userRankId }
+    const uniqueSecondaryRankIds = [...new Set(secondaryRankIds)];
+    const ranks = await prisma.userRank.findMany({
+      where: { id: { in: [userRankId, ...uniqueSecondaryRankIds] } },
+      select: { id: true, secondary: true }
     });
-    if (!rank) return res.status(404).json({ msg: 'Rank not found' });
+    const rankMap = new Map(ranks.map((rank) => [rank.id, rank]));
+    const primaryRank = rankMap.get(userRankId);
+    if (!primaryRank) return res.status(404).json({ msg: 'Rank not found' });
+    if (primaryRank.secondary) {
+      return res
+        .status(422)
+        .json({ msg: 'Primary rank cannot be a secondary class' });
+    }
+    for (const secondaryRankId of uniqueSecondaryRankIds) {
+      const secondaryRank = rankMap.get(secondaryRankId);
+      if (!secondaryRank) {
+        return res.status(404).json({ msg: 'Secondary rank not found' });
+      }
+      if (!secondaryRank.secondary) {
+        return res.status(422).json({
+          msg: 'Only secondary-class ranks can be assigned as secondary classes'
+        });
+      }
+    }
 
-    await prisma.user.update({
-      where: { id },
-      data: { userRankId }
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: { userRankId }
+      }),
+      prisma.userSecondaryRank.deleteMany({ where: { userId: id } }),
+      ...(uniqueSecondaryRankIds.length > 0
+        ? [
+            prisma.userSecondaryRank.createMany({
+              data: uniqueSecondaryRankIds.map((secondaryRankId) => ({
+                userId: id,
+                userRankId: secondaryRankId,
+                assignedById: req.user.id
+              }))
+            })
+          ]
+        : [])
+    ]);
     await audit(prisma, req.user.id, 'user.rank_changed', 'User', id, {
-      userRankId
+      userRankId,
+      secondaryRankIds: uniqueSecondaryRankIds
     });
     res.json({ msg: 'Rank updated' });
   })
@@ -857,7 +917,7 @@ router.put(
 // POST /api/users/:id/donor
 router.post(
   '/:id/donor',
-  ...requirePermission('staff'),
+  ...requirePermission('donor_ranks_manage'),
   validateParams(userIdParamsSchema),
   validate(grantDonorSchema),
   authHandler(async (req, res) => {
@@ -907,7 +967,7 @@ router.post(
 // DELETE /api/users/:id/donor
 router.delete(
   '/:id/donor',
-  ...requirePermission('staff'),
+  ...requirePermission('donor_ranks_manage'),
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -925,7 +985,7 @@ router.delete(
 // GET /api/users/:id/ip-history
 router.get(
   '/:id/ip-history',
-  ...requirePermission('staff'),
+  ...requirePermission('users_view_ips'),
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -962,7 +1022,7 @@ router.get(
 // GET /api/users/:id/email-history
 router.get(
   '/:id/email-history',
-  ...requirePermission('staff'),
+  ...requirePermission('users_view_email'),
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

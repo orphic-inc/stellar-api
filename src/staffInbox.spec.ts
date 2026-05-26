@@ -12,7 +12,7 @@ import type { StaffInboxStatus } from '@prisma/client';
 
 const setStaff = () =>
   prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true })
+    makeUserRank({ staff: true, staff_inbox_manage: true })
   );
 
 const makeResponse = (

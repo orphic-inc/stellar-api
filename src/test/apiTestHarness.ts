@@ -151,14 +151,30 @@ jest.mock('../modules/config', () => ({
 }));
 
 let currentUserRankLevel = 1000;
+let currentUserPermissions: Record<string, boolean> = {};
+let currentPermittedForumIds: number[] = [];
 
 jest.mock('../middleware/auth', () => ({
   requireAuth: (
-    req: { user?: { id: number; userRankLevel: number; userRankId: number } },
+    req: {
+      user?: {
+        id: number;
+        userRankLevel: number;
+        userRankId: number;
+        permissions?: Record<string, boolean>;
+        permittedForumIds?: number[];
+      };
+    },
     _res: unknown,
     next: () => void
   ) => {
-    req.user = { id: 7, userRankLevel: currentUserRankLevel, userRankId: 1 };
+    req.user = {
+      id: 7,
+      userRankLevel: currentUserRankLevel,
+      userRankId: 1,
+      permissions: currentUserPermissions,
+      permittedForumIds: currentPermittedForumIds
+    };
     next();
   }
 }));
@@ -199,6 +215,7 @@ import jwt from 'jsonwebtoken';
 import { type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
 import app from '../app';
+import { normalizePermissions } from '../lib/rankPermissions';
 import { isInstalled } from '../modules/installState';
 import { prisma } from '../lib/prisma';
 import {
@@ -349,10 +366,27 @@ export const setCurrentUserRankLevel = (level: number): void => {
   currentUserRankLevel = level;
 };
 
+export const setCurrentUserPermissions = (
+  permissions: Record<string, boolean>
+): void => {
+  currentUserPermissions = normalizePermissions(permissions) as Record<
+    string,
+    boolean
+  >;
+};
+
+export const setCurrentPermittedForumIds = (forumIds: number[]): void => {
+  currentPermittedForumIds = forumIds;
+};
+
 export const resetApiTestState = (): void => {
   jest.clearAllMocks();
   mockedIsInstalled.mockResolvedValue(true);
   currentUserRankLevel = 1000;
+  currentUserPermissions = normalizePermissions(
+    makeUserRank().permissions as Record<string, boolean>
+  ) as Record<string, boolean>;
+  currentPermittedForumIds = [];
   // Restore implementations cleared by resetMocks: true
   (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt');
   (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');

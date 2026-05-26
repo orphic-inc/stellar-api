@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { requirePermission } from '../../../middleware/permissions';
+import {
+  requirePermission,
+  loadPermissions
+} from '../../../middleware/permissions';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import {
   parsedBody,
   validate,
@@ -28,13 +32,20 @@ router.get(
   requireAuth,
   authHandler(async (req, res) => {
     const showAll = req.query.all === 'true';
+    if (showAll) {
+      const perms = await loadPermissions(req, res);
+      if (
+        !perms['forums_manage'] &&
+        !perms['rank_permissions_manage'] &&
+        !perms['admin']
+      ) {
+        return res.status(403).json({ msg: 'Permission denied' });
+      }
+    }
     const categories = await prisma.forumCategory.findMany({
       orderBy: { sort: 'asc' },
       include: {
         forums: {
-          where: showAll
-            ? {}
-            : { minClassRead: { lte: req.user.userRankLevel } },
           orderBy: { sort: 'asc' },
           include: {
             lastTopic: { select: { id: true, title: true } }
@@ -42,9 +53,17 @@ router.get(
         }
       }
     });
-    res.json(
-      showAll ? categories : categories.filter((c) => c.forums.length > 0)
-    );
+    const visibleCategories = categories
+      .map((category) => ({
+        ...category,
+        forums: showAll
+          ? category.forums
+          : category.forums.filter((forum) =>
+              canAccessForumLevel(req.user, forum.id, forum.minClassRead)
+            )
+      }))
+      .filter((category) => showAll || category.forums.length > 0);
+    res.json(visibleCategories);
   })
 );
 
@@ -59,7 +78,6 @@ router.get(
       where: { id },
       include: {
         forums: {
-          where: { minClassRead: { lte: req.user.userRankLevel } },
           orderBy: { sort: 'asc' },
           include: {
             lastTopic: { select: { id: true, title: true } }
@@ -68,7 +86,12 @@ router.get(
       }
     });
     if (!category) return res.status(404).json({ msg: 'Category not found' });
-    res.json(category);
+    res.json({
+      ...category,
+      forums: category.forums.filter((forum) =>
+        canAccessForumLevel(req.user, forum.id, forum.minClassRead)
+      )
+    });
   })
 );
 

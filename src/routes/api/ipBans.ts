@@ -71,7 +71,7 @@ const serializeBan = (ban: { id: number; fromIp: number; toIp: number }) => ({
 // GET /api/ip-bans
 router.get(
   '/',
-  ...requirePermission('admin'),
+  ...requirePermission('ip_bans_manage'),
   authHandler(async (_req, res) => {
     const bans = await prisma.ipBan.findMany({ orderBy: { id: 'asc' } });
     res.json(bans.map(serializeBan));
@@ -81,7 +81,7 @@ router.get(
 // POST /api/ip-bans
 router.post(
   '/',
-  ...requirePermission('admin'),
+  ...requirePermission('ip_bans_manage'),
   validate(ipBanSchema),
   authHandler(async (req, res) => {
     const { fromIp, toIp } = parsedBody<IpBanInput>(res);
@@ -104,7 +104,7 @@ router.post(
 // DELETE /api/ip-bans/:id
 router.delete(
   '/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('ip_bans_manage'),
   validateParams(ipBanIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

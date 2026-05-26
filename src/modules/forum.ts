@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
+import { canAccessForumLevel } from '../lib/userRankAccess';
 import {
   emitNotifications,
   extractMentionedUsernames,
@@ -319,21 +320,34 @@ export const closePoll = async (id: number) =>
 
 export const castVote = async (
   forumPollId: number,
-  userId: number,
-  userRankLevel: number,
+  user: {
+    id: number;
+    userRankLevel: number;
+    permittedForumIds?: number[];
+  },
   vote: number
 ): Promise<CastVoteResult> => {
   const poll = await prisma.forumPoll.findUnique({
     where: { id: forumPollId },
     include: {
       forumTopic: {
-        select: { deletedAt: true, forum: { select: { minClassRead: true } } }
+        select: {
+          deletedAt: true,
+          forumId: true,
+          forum: { select: { minClassRead: true } }
+        }
       }
     }
   });
   if (!poll || poll.forumTopic?.deletedAt)
     return { ok: false, reason: 'not_found' };
-  if (userRankLevel < (poll.forumTopic?.forum.minClassRead ?? 0))
+  if (
+    !canAccessForumLevel(
+      user,
+      poll.forumTopic?.forumId ?? 0,
+      poll.forumTopic?.forum.minClassRead
+    )
+  )
     return { ok: false, reason: 'insufficient_class' };
   if (poll.closed) return { ok: false, reason: 'closed' };
 
@@ -347,8 +361,8 @@ export const castVote = async (
     return { ok: false, reason: 'invalid_vote' };
 
   const result = await prisma.forumPollVote.upsert({
-    where: { forumPollId_userId: { forumPollId, userId } },
-    create: { forumPollId, userId, vote },
+    where: { forumPollId_userId: { forumPollId, userId: user.id } },
+    create: { forumPollId, userId: user.id, vote },
     update: { vote }
   });
   return { ok: true, vote: result };

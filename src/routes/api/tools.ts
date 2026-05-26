@@ -3,10 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import {
-  requirePermission,
-  requireAdminOnly
-} from '../../middleware/permissions';
+import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -14,6 +11,7 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
+import { normalizePermissions } from '../../lib/rankPermissions';
 import {
   createRankSchema,
   updateRankSchema,
@@ -38,29 +36,37 @@ const staffGroupIdParamsSchema = z.object({
 
 const formatRank = (
   r: Prisma.UserRankGetPayload<{
-    include: { _count: { select: { users: true } } };
+    include: {
+      _count: { select: { users: true; secondaryUsers: true } };
+    };
   }>
 ) => ({
   id: r.id,
   name: r.name,
   level: r.level,
-  permissions: r.permissions,
+  permissions: normalizePermissions(
+    r.permissions as Record<string, boolean> | null | undefined
+  ),
+  secondary: r.secondary,
+  permittedForumIds: r.permittedForumIds,
   color: r.color,
   badge: r.badge,
   personalCollageLimit: r.personalCollageLimit,
   displayStaff: r.displayStaff,
   staffGroupId: r.staffGroupId,
-  userCount: r._count.users
+  primaryUserCount: r._count.users,
+  secondaryUserCount: r._count.secondaryUsers,
+  userCount: r._count.users + r._count.secondaryUsers
 });
 
 // GET /api/tools/user-ranks — list all user ranks
 router.get(
   '/user-ranks',
-  ...requirePermission('admin'),
+  ...requirePermission('rank_permissions_manage'),
   asyncHandler(async (_req: Request, res: Response) => {
     const ranks = await prisma.userRank.findMany({
       orderBy: { level: 'asc' },
-      include: { _count: { select: { users: true } } }
+      include: { _count: { select: { users: true, secondaryUsers: true } } }
     });
     res.json(ranks.map(formatRank));
   })
@@ -69,14 +75,14 @@ router.get(
 // GET /api/tools/user-ranks/:id — get single rank
 router.get(
   '/user-ranks/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('rank_permissions_manage'),
   validateParams(userRankIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
 
     const rank = await prisma.userRank.findUnique({
       where: { id },
-      include: { _count: { select: { users: true } } }
+      include: { _count: { select: { users: true, secondaryUsers: true } } }
     });
     if (!rank) return res.status(404).json({ msg: 'Rank not found' });
 
@@ -87,13 +93,15 @@ router.get(
 // POST /api/tools/user-ranks — create rank
 router.post(
   '/user-ranks',
-  ...requirePermission('admin'),
+  ...requirePermission('rank_permissions_manage'),
   validate(createRankSchema),
   authHandler(async (req, res) => {
     const {
       name,
       level,
       permissions,
+      secondary,
+      permittedForumIds,
       color,
       badge,
       personalCollageLimit,
@@ -108,6 +116,17 @@ router.post(
       if (!group) return res.status(422).json({ msg: 'Staff group not found' });
     }
 
+    if ((permittedForumIds?.length ?? 0) > 0) {
+      const forumCount = await prisma.forum.count({
+        where: { id: { in: permittedForumIds } }
+      });
+      if (forumCount !== permittedForumIds!.length) {
+        return res
+          .status(422)
+          .json({ msg: 'One or more permitted forums do not exist' });
+      }
+    }
+
     const groupId = staffGroupId ?? null;
     const effectiveStaffGroupId = displayStaff ? groupId : null;
 
@@ -116,19 +135,25 @@ router.post(
         data: {
           name,
           level,
-          permissions: permissions ?? {},
+          permissions: normalizePermissions(permissions),
+          secondary: secondary ?? false,
+          permittedForumIds: permittedForumIds ?? [],
           color: color ?? '',
           badge: badge ?? '',
           personalCollageLimit: personalCollageLimit ?? 0,
           displayStaff: displayStaff ?? false,
           staffGroupId: effectiveStaffGroupId
         },
-        include: { _count: { select: { users: true } } }
+        include: {
+          _count: { select: { users: true, secondaryUsers: true } }
+        }
       });
 
       await audit(prisma, req.user.id, 'rank.create', 'UserRank', rank.id, {
         name,
         level,
+        secondary,
+        permittedForumIds,
         displayStaff,
         staffGroupId: effectiveStaffGroupId
       });
@@ -150,7 +175,7 @@ router.post(
 // PUT /api/tools/user-ranks/:id — update rank
 router.put(
   '/user-ranks/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('rank_permissions_manage'),
   validateParams(userRankIdParamsSchema),
   validate(updateRankSchema),
   authHandler(async (req, res) => {
@@ -163,6 +188,8 @@ router.put(
       name,
       level,
       permissions,
+      secondary,
+      permittedForumIds,
       color,
       badge,
       personalCollageLimit,
@@ -177,6 +204,17 @@ router.put(
       if (!group) return res.status(422).json({ msg: 'Staff group not found' });
     }
 
+    if ((permittedForumIds?.length ?? 0) > 0) {
+      const forumCount = await prisma.forum.count({
+        where: { id: { in: permittedForumIds } }
+      });
+      if (forumCount !== permittedForumIds!.length) {
+        return res
+          .status(422)
+          .json({ msg: 'One or more permitted forums do not exist' });
+      }
+    }
+
     // Clear group assignment when staff display is turned off
     const effectiveStaffGroupId = displayStaff === false ? null : staffGroupId;
 
@@ -186,7 +224,11 @@ router.put(
         data: {
           ...(name !== undefined && { name }),
           ...(level !== undefined && { level }),
-          ...(permissions !== undefined && { permissions }),
+          ...(permissions !== undefined && {
+            permissions: normalizePermissions(permissions)
+          }),
+          ...(secondary !== undefined && { secondary }),
+          ...(permittedForumIds !== undefined && { permittedForumIds }),
           ...(color !== undefined && { color }),
           ...(badge !== undefined && { badge }),
           ...(personalCollageLimit !== undefined && { personalCollageLimit }),
@@ -195,13 +237,17 @@ router.put(
             staffGroupId: effectiveStaffGroupId
           })
         },
-        include: { _count: { select: { users: true } } }
+        include: {
+          _count: { select: { users: true, secondaryUsers: true } }
+        }
       });
 
       await audit(prisma, req.user.id, 'rank.update', 'UserRank', id, {
         name,
         level,
         permissions,
+        secondary,
+        permittedForumIds,
         displayStaff,
         staffGroupId: effectiveStaffGroupId
       });
@@ -223,15 +269,19 @@ router.put(
 // DELETE /api/tools/user-ranks/:id — delete rank (blocks if users are assigned)
 router.delete(
   '/user-ranks/:id',
-  ...requirePermission('admin'),
+  ...requirePermission('rank_permissions_manage'),
   validateParams(userRankIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    const userCount = await prisma.user.count({ where: { userRankId: id } });
-    if (userCount > 0) {
+    const [userCount, secondaryUserCount] = await Promise.all([
+      prisma.user.count({ where: { userRankId: id } }),
+      prisma.userSecondaryRank.count({ where: { userRankId: id } })
+    ]);
+    const totalAssigned = userCount + secondaryUserCount;
+    if (totalAssigned > 0) {
       return res.status(409).json({
-        msg: `Cannot delete rank: ${userCount} user(s) currently assigned to it`
+        msg: `Cannot delete rank: ${totalAssigned} user(s) currently assigned to it`
       });
     }
 
@@ -255,7 +305,7 @@ router.delete(
 // GET /api/tools/staff-groups — list all staff groups (admin only)
 router.get(
   '/staff-groups',
-  ...requireAdminOnly(),
+  ...requirePermission('staff_groups_manage'),
   asyncHandler(async (_req: Request, res: Response) => {
     const groups = await prisma.staffGroup.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -275,7 +325,7 @@ router.get(
 // POST /api/tools/staff-groups — create staff group (admin only)
 router.post(
   '/staff-groups',
-  ...requireAdminOnly(),
+  ...requirePermission('staff_groups_manage'),
   validate(createStaffGroupSchema),
   authHandler(async (req, res) => {
     const { name, sortOrder } = parsedBody<CreateStaffGroupInput>(res);
@@ -315,7 +365,7 @@ router.post(
 // PUT /api/tools/staff-groups/:id — update staff group (admin only)
 router.put(
   '/staff-groups/:id',
-  ...requireAdminOnly(),
+  ...requirePermission('staff_groups_manage'),
   validateParams(staffGroupIdParamsSchema),
   validate(updateStaffGroupSchema),
   authHandler(async (req, res) => {
@@ -362,7 +412,7 @@ router.put(
 // DELETE /api/tools/staff-groups/:id — delete staff group (admin only, blocks if ranks assigned)
 router.delete(
   '/staff-groups/:id',
-  ...requireAdminOnly(),
+  ...requirePermission('staff_groups_manage'),
   validateParams(staffGroupIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

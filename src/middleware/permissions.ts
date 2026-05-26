@@ -1,51 +1,30 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { prisma } from '../lib/prisma';
 import { requireAuth } from './auth';
 import type { AuthenticatedRequest } from '../types/auth';
+import {
+  type Permission,
+  hasPermission,
+  normalizePermissions,
+  VALID_PERMISSIONS
+} from '../lib/rankPermissions';
+import { getUserRankAccess } from '../lib/userRankAccess';
 
-export const VALID_PERMISSIONS = [
-  'forums_read',
-  'forums_post',
-  'forums_moderate',
-  'forums_manage',
-  'communities_manage',
-  'collages_manage',
-  'collages_moderate',
-  'news_manage',
-  'invites_manage',
-  'users_edit',
-  'users_warn',
-  'users_disable',
-  'wiki_edit',
-  'wiki_manage',
-  'rules_manage',
-  'advanced_search',
-  'users_search',
-  'staff',
-  'admin'
-] as const;
-
-export type Permission = (typeof VALID_PERMISSIONS)[number];
-
-const hasPermission = (
-  perms: Record<string, boolean>,
-  permission: Permission
-): boolean => {
-  // staff permission also satisfies admin gates
-  if (permission === 'admin') return !!(perms['admin'] || perms['staff']);
-  return !!perms[permission];
-};
+export { VALID_PERMISSIONS };
+export type { Permission };
 
 export const loadPermissions = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<Record<string, boolean>> => {
   if (res.locals.userPerms) return res.locals.userPerms;
-  const rank = await prisma.userRank.findUnique({
-    where: { id: req.user.userRankId },
-    select: { permissions: true }
-  });
-  res.locals.userPerms = (rank?.permissions ?? {}) as Record<string, boolean>;
+  if (req.user.permissions) {
+    res.locals.userPerms = req.user.permissions;
+    return res.locals.userPerms;
+  }
+
+  const access = await getUserRankAccess(req.user.id);
+  res.locals.userPerms = (access?.permissions ??
+    normalizePermissions(null)) as Record<string, boolean>;
   return res.locals.userPerms;
 };
 

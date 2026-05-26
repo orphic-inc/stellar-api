@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock,
   makeUserRank,
+  setCurrentUserPermissions,
   getUserSettingsMock,
   updateUserSettingsMock,
   createUserMock
@@ -18,19 +19,25 @@ beforeEach(() => resetApiTestState());
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true, users_warn: true, users_disable: true })
+  setCurrentUserPermissions(
+    makeUserRank({
+      staff: true,
+      users_warn: true,
+      users_disable: true,
+      users_edit: true,
+      donor_ranks_manage: true
+    }).permissions as Record<string, boolean>
   );
 
 const setAdmin = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
+  setCurrentUserPermissions(
     makeUserRank({
       admin: true,
       staff: true,
       users_warn: true,
       users_disable: true,
       users_edit: true
-    })
+    }).permissions as Record<string, boolean>
   );
 
 const mockTargetUser = (overrides = {}) =>
@@ -64,7 +71,9 @@ describe('GET /api/users/:id/warnings', () => {
   });
 
   it('returns 403 without staff permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).get('/api/users/9/warnings');
     expect(res.status).toBe(403);
   });
@@ -251,23 +260,32 @@ describe('PUT /api/users/:id/rank', () => {
 
   it('updates the user rank and returns a msg', async () => {
     mockTargetUser();
-    // Second findUnique call is for the rank lookup
     prismaMock.userRank.findUnique
       .mockResolvedValueOnce(makeUserRank({ admin: true })) // permission check
-      .mockResolvedValueOnce(makeUserRank()); // rank existence check
-    prismaMock.user.update.mockResolvedValue(makeUser());
+      .mockResolvedValueOnce(null);
+    prismaMock.userRank.findMany.mockResolvedValue([
+      { id: 2, secondary: false },
+      { id: 5, secondary: true }
+    ] as never);
+    prismaMock.$transaction.mockResolvedValue([
+      makeUser(),
+      {},
+      { count: 1 }
+    ] as never);
     prismaMock.auditLog.create.mockResolvedValue({} as never);
 
     const res = await request(app)
       .put('/api/users/9/rank')
-      .send({ userRankId: 2 });
+      .send({ userRankId: 2, secondaryRankIds: [5] });
 
     expect(res.status).toBe(200);
     expect(res.body.msg).toBe('Rank updated');
   });
 
   it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app)
       .put('/api/users/9/rank')
       .send({ userRankId: 2 });
@@ -369,7 +387,9 @@ describe('GET /api/users/:id/ip-history', () => {
   });
 
   it('returns 403 without staff permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).get('/api/users/9/ip-history');
     expect(res.status).toBe(403);
   });
@@ -472,7 +492,9 @@ describe('POST /api/users/donor-ranks', () => {
   });
 
   it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app)
       .post('/api/users/donor-ranks')
       .send({ name: 'Gold', minDonation: 5000 });
@@ -668,7 +690,9 @@ describe('POST /api/users', () => {
   });
 
   it('returns 403 without users_edit permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app).post('/api/users').send({
       username: 'newuser',
@@ -805,7 +829,9 @@ describe('PUT /api/users/donor-ranks/:rankId', () => {
   });
 
   it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app)
       .put('/api/users/donor-ranks/2')
@@ -935,7 +961,9 @@ describe('GET /api/users/:id/snatch-list', () => {
   });
 
   it('returns 403 without staff permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).get('/api/users/9/snatch-list');
     expect(res.status).toBe(403);
   });
@@ -1002,7 +1030,8 @@ describe('PUT /api/users/:id/rank — rank not found', () => {
     prismaMock.user.findUnique.mockResolvedValue(makeUser({ id: 9 }) as never);
     prismaMock.userRank.findUnique
       .mockResolvedValueOnce(makeUserRank({ admin: true, users_edit: true })) // permission check
-      .mockResolvedValueOnce(null); // rank existence check → not found
+      .mockResolvedValueOnce(null);
+    prismaMock.userRank.findMany.mockResolvedValue([] as never);
 
     const res = await request(app)
       .put('/api/users/9/rank')
@@ -1021,6 +1050,24 @@ describe('PUT /api/users/:id/rank — rank not found', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('User not found');
+  });
+
+  it('returns 422 when a non-secondary rank is assigned as a secondary class', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(makeUser({ id: 9 }) as never);
+    prismaMock.userRank.findUnique
+      .mockResolvedValueOnce(makeUserRank({ admin: true, users_edit: true }))
+      .mockResolvedValueOnce(null);
+    prismaMock.userRank.findMany.mockResolvedValue([
+      { id: 2, secondary: false },
+      { id: 6, secondary: false }
+    ] as never);
+
+    const res = await request(app)
+      .put('/api/users/9/rank')
+      .send({ userRankId: 2, secondaryRankIds: [6] });
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toMatch(/secondary-class ranks/);
   });
 });
 
@@ -1046,8 +1093,9 @@ describe('POST /api/users/:id/donor with expiresAt', () => {
 // ─── Staff recovery queue ─────────────────────────────────────────────────────
 
 const setUsersEdit = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
+  setCurrentUserPermissions(
     makeUserRank({ users_edit: true, staff: true, admin: true })
+      .permissions as Record<string, boolean>
   );
 
 describe('GET /api/users/recovery-requests', () => {
@@ -1076,7 +1124,9 @@ describe('GET /api/users/recovery-requests', () => {
   });
 
   it('returns 403 without users_edit permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).get('/api/users/recovery-requests');
     expect(res.status).toBe(403);
   });
@@ -1115,7 +1165,9 @@ describe('DELETE /api/users/recovery-requests/:reqId', () => {
   });
 
   it('returns 403 without users_edit permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).delete('/api/users/recovery-requests/5');
     expect(res.status).toBe(403);
   });
@@ -1157,7 +1209,9 @@ describe('POST /api/users/:id/recovery', () => {
   });
 
   it('returns 403 without users_edit permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).post('/api/users/9/recovery');
     expect(res.status).toBe(403);
   });
@@ -1180,9 +1234,12 @@ describe('PUT /api/users/:id/staff-bio', () => {
   });
 
   it('allows a staff-listed user to edit their own bio', async () => {
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank() as never)
-      .mockResolvedValueOnce({ displayStaff: true } as never);
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
+    prismaMock.userRank.findUnique.mockResolvedValueOnce({
+      displayStaff: true
+    } as never);
     prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
     prismaMock.user.update.mockResolvedValue(makeUser({ id: 7 }) as never);
     prismaMock.auditLog.create.mockResolvedValue({} as never);
@@ -1199,9 +1256,12 @@ describe('PUT /api/users/:id/staff-bio', () => {
   });
 
   it('returns 403 when a non-staff-listed user edits their own bio', async () => {
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank() as never)
-      .mockResolvedValueOnce({ displayStaff: false } as never);
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
+    prismaMock.userRank.findUnique.mockResolvedValueOnce({
+      displayStaff: false
+    } as never);
 
     const res = await request(app)
       .put('/api/users/7/staff-bio')
@@ -1211,7 +1271,9 @@ describe('PUT /api/users/:id/staff-bio', () => {
   });
 
   it('returns 403 when a non-admin edits another user bio', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app)
       .put('/api/users/9/staff-bio')

@@ -24,7 +24,7 @@ const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
 // GET /api/tag-aliases
 router.get(
   '/',
-  ...requirePermission('staff'),
+  ...requirePermission('tags_manage'),
   asyncHandler(async (req, res) => {
     const pg = parsePage(req);
     const [aliases, total] = await Promise.all([
@@ -46,7 +46,7 @@ router.get(
 // POST /api/tag-aliases
 router.post(
   '/',
-  ...requirePermission('staff'),
+  ...requirePermission('tags_manage'),
   validate(createTagAliasSchema),
   authHandler(async (req, res) => {
     const { badTag, goodTag: goodTagName } =
@@ -69,7 +69,7 @@ router.post(
 // PUT /api/tag-aliases/:id
 router.put(
   '/:id',
-  ...requirePermission('staff'),
+  ...requirePermission('tags_manage'),
   validateParams(idParamsSchema),
   validate(updateTagAliasSchema),
   authHandler(async (req, res) => {
@@ -97,7 +97,7 @@ router.put(
 // DELETE /api/tag-aliases/:id
 router.delete(
   '/:id',
-  ...requirePermission('staff'),
+  ...requirePermission('tags_manage'),
   validateParams(idParamsSchema),
   asyncHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);

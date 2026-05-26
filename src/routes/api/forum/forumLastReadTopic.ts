@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../../../lib/prisma';
+import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { validate, parsedBody } from '../../../middleware/validate';
@@ -38,6 +39,7 @@ router.post(
       include: {
         forumTopic: {
           select: {
+            forumId: true,
             forum: { select: { minClassRead: true } }
           }
         }
@@ -46,7 +48,13 @@ router.post(
     if (!post) {
       return res.status(404).json({ msg: 'Forum post not found' });
     }
-    if (req.user.userRankLevel < (post.forumTopic?.forum.minClassRead ?? 0)) {
+    if (
+      !canAccessForumLevel(
+        req.user,
+        post.forumTopic?.forumId ?? 0,
+        post.forumTopic?.forum.minClassRead
+      )
+    ) {
       return res
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });

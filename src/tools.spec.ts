@@ -3,7 +3,8 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeUserRank,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 
 const makeRank = (overrides: Record<string, unknown> = {}) => ({
@@ -13,10 +14,12 @@ const makeRank = (overrides: Record<string, unknown> = {}) => ({
   permissions: {},
   color: '#fff',
   badge: '',
+  secondary: false,
+  permittedForumIds: [],
   personalCollageLimit: 0,
   displayStaff: false,
   staffGroupId: null,
-  _count: { users: 5 },
+  _count: { users: 5, secondaryUsers: 0 },
   ...overrides
 });
 
@@ -32,8 +35,8 @@ beforeEach(() => resetApiTestState());
 
 describe('GET /api/tools/user-ranks', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
@@ -49,7 +52,9 @@ describe('GET /api/tools/user-ranks', () => {
   });
 
   it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app).get('/api/tools/user-ranks');
 
@@ -59,15 +64,13 @@ describe('GET /api/tools/user-ranks', () => {
 
 describe('GET /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
   it('returns a single rank', async () => {
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank({ admin: true }) as never)
-      .mockResolvedValueOnce(makeRank() as never);
+    prismaMock.userRank.findUnique.mockResolvedValue(makeRank() as never);
 
     const res = await request(app).get('/api/tools/user-ranks/1');
 
@@ -76,9 +79,7 @@ describe('GET /api/tools/user-ranks/:id', () => {
   });
 
   it('returns 404 when rank does not exist', async () => {
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank({ admin: true }) as never)
-      .mockResolvedValueOnce(null);
+    prismaMock.userRank.findUnique.mockResolvedValue(null);
 
     const res = await request(app).get('/api/tools/user-ranks/999');
 
@@ -88,21 +89,35 @@ describe('GET /api/tools/user-ranks/:id', () => {
 
 describe('POST /api/tools/user-ranks', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
   it('creates a rank and returns 201', async () => {
+    prismaMock.forum.count.mockResolvedValue(1);
     prismaMock.userRank.create.mockResolvedValue(makeRank() as never);
     prismaMock.auditLog.create.mockResolvedValue({} as never);
 
     const res = await request(app)
       .post('/api/tools/user-ranks')
-      .send({ name: 'Member', level: 100 });
+      .send({
+        name: 'Member',
+        level: 100,
+        secondary: true,
+        permittedForumIds: [1]
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Member');
+    expect(prismaMock.userRank.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          secondary: true,
+          permittedForumIds: [1]
+        })
+      })
+    );
   });
 
   it('returns 400 when name is missing', async () => {
@@ -124,31 +139,28 @@ describe('POST /api/tools/user-ranks', () => {
 
 describe('PUT /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
   it('updates a rank and returns it', async () => {
     const updated = makeRank({ name: 'Elite Member' });
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank({ admin: true }) as never)
-      .mockResolvedValueOnce(makeRank() as never);
+    prismaMock.userRank.findUnique.mockResolvedValue(makeRank() as never);
+    prismaMock.forum.count.mockResolvedValue(1);
     prismaMock.userRank.update.mockResolvedValue(updated as never);
     prismaMock.auditLog.create.mockResolvedValue({} as never);
 
     const res = await request(app)
       .put('/api/tools/user-ranks/1')
-      .send({ name: 'Elite Member' });
+      .send({ name: 'Elite Member', permittedForumIds: [1] });
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Elite Member');
   });
 
   it('returns 404 when rank does not exist', async () => {
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(makeUserRank({ admin: true }) as never)
-      .mockResolvedValueOnce(null);
+    prismaMock.userRank.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
       .put('/api/tools/user-ranks/999')
@@ -160,13 +172,14 @@ describe('PUT /api/tools/user-ranks/:id', () => {
 
 describe('DELETE /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
   it('deletes a rank and returns 204 when no users assigned', async () => {
     prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.userSecondaryRank.count.mockResolvedValue(0);
     prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
 
     const res = await request(app).delete('/api/tools/user-ranks/1');
@@ -175,7 +188,8 @@ describe('DELETE /api/tools/user-ranks/:id', () => {
   });
 
   it('returns 409 when users are still assigned to the rank', async () => {
-    prismaMock.user.count.mockResolvedValue(3);
+    prismaMock.user.count.mockResolvedValue(2);
+    prismaMock.userSecondaryRank.count.mockResolvedValue(1);
 
     const res = await request(app).delete('/api/tools/user-ranks/1');
 
@@ -188,8 +202,8 @@ describe('DELETE /api/tools/user-ranks/:id', () => {
 
 describe('GET /api/tools/staff-groups', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
@@ -205,8 +219,8 @@ describe('GET /api/tools/staff-groups', () => {
   });
 
   it('returns 403 for staff (not strict admin)', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ staff: true })
+    setCurrentUserPermissions(
+      makeUserRank({ staff: true }).permissions as Record<string, boolean>
     );
 
     const res = await request(app).get('/api/tools/staff-groups');
@@ -217,8 +231,8 @@ describe('GET /api/tools/staff-groups', () => {
 
 describe('POST /api/tools/staff-groups', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
@@ -245,8 +259,8 @@ describe('POST /api/tools/staff-groups', () => {
 
 describe('POST /api/tools/user-ranks', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
@@ -278,8 +292,8 @@ describe('POST /api/tools/user-ranks', () => {
 
 describe('PUT /api/tools/staff-groups/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 
@@ -310,8 +324,8 @@ describe('PUT /api/tools/staff-groups/:id', () => {
 
 describe('DELETE /api/tools/staff-groups/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({ admin: true }).permissions as Record<string, boolean>
     );
   });
 

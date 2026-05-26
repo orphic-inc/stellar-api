@@ -64,7 +64,7 @@ const ticketIdSchema = z.object({
 // GET /api/staff-inbox/responses — list canned responses (staff)
 router.get(
   '/responses',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   authHandler(async (_req, res) => {
     const responses = await listResponses();
     res.json(responses);
@@ -74,7 +74,7 @@ router.get(
 // POST /api/staff-inbox/responses — create canned response (staff)
 router.post(
   '/responses',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validate(createResponseSchema),
   authHandler(async (_req, res) => {
     const { name, body } = parsedBody<CreateResponseInput>(res);
@@ -86,7 +86,7 @@ router.post(
 // PUT /api/staff-inbox/responses/:id — update canned response (staff)
 router.put(
   '/responses/:id',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validateParams(responseIdSchema),
   validate(updateResponseSchema),
   authHandler(async (_req, res) => {
@@ -101,7 +101,7 @@ router.put(
 // DELETE /api/staff-inbox/responses/:id — delete canned response (staff)
 router.delete(
   '/responses/:id',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validateParams(responseIdSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -152,7 +152,7 @@ router.post(
 // GET /api/staff-inbox/queue — staff ticket queue
 router.get(
   '/queue',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validateQuery(queueQuerySchema),
   authHandler(async (req, res) => {
     const { page, status, assignedToMe, unassigned } =
@@ -171,7 +171,7 @@ router.get(
 // GET /api/staff-inbox/queue/count — unresolved ticket count for badge
 router.get(
   '/queue/count',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   authHandler(async (_req, res) => {
     const count = await getQueueCount();
     res.json({ count });
@@ -181,7 +181,7 @@ router.get(
 // POST /api/staff-inbox/bulk-resolve — batch resolve tickets (staff)
 router.post(
   '/bulk-resolve',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validate(bulkResolveSchema),
   authHandler(async (_req, res) => {
     const { ids } = parsedBody<BulkResolveInput>(res);
@@ -247,7 +247,7 @@ router.post(
 // POST /api/staff-inbox/tickets/:id/unresolve (staff only)
 router.post(
   '/tickets/:id/unresolve',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validateParams(ticketIdSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
@@ -263,7 +263,7 @@ router.post(
 // POST /api/staff-inbox/tickets/:id/assign (staff only)
 router.post(
   '/tickets/:id/assign',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('staff_inbox_manage'),
   validateParams(ticketIdSchema),
   validate(assignSchema),
   authHandler(async (req, res) => {

@@ -27,7 +27,7 @@ const overrideSchema = z.object({
 // GET /api/ratio-policy/:userId — staff: view a user's policy state
 router.get(
   '/:userId',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('ratio_policy_manage'),
   validateParams(userIdParamsSchema),
   asyncHandler(async (_req, res) => {
     const { userId } = parsedParams<{ userId: number }>(res);
@@ -39,7 +39,7 @@ router.get(
 // POST /api/ratio-policy/:userId/override — staff: set policy status
 router.post(
   '/:userId/override',
-  ...requirePermission('staff', 'admin'),
+  ...requirePermission('ratio_policy_manage'),
   validateParams(userIdParamsSchema),
   validate(overrideSchema),
   asyncHandler(async (_req, res) => {

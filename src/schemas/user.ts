@@ -33,7 +33,8 @@ export const moderationNoteSchema = z.object({
 });
 
 export const setRankSchema = z.object({
-  userRankId: z.number().int().positive()
+  userRankId: z.number().int().positive(),
+  secondaryRankIds: z.array(z.number().int().positive()).default([])
 });
 
 export const donorRankSchema = z.object({
