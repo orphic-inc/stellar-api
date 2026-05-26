@@ -108,7 +108,8 @@ router.post(
       if (!group) return res.status(422).json({ msg: 'Staff group not found' });
     }
 
-    const effectiveStaffGroupId = displayStaff ? staffGroupId ?? null : null;
+    const groupId = staffGroupId ?? null;
+    const effectiveStaffGroupId = displayStaff ? groupId : null;
 
     try {
       const rank = await prisma.userRank.create({
