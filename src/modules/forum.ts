@@ -320,13 +320,27 @@ export const closePoll = async (id: number) =>
 
 export const castVote = async (
   forumPollId: number,
-  user: {
-    id: number;
-    userRankLevel: number;
-    permittedForumIds?: number[];
-  },
-  vote: number
+  userOrId:
+    | {
+        id: number;
+        userRankLevel: number;
+        permittedForumIds?: number[];
+      }
+    | number,
+  userRankLevelOrVote: number,
+  maybeVote?: number
 ): Promise<CastVoteResult> => {
+  const user =
+    typeof userOrId === 'number'
+      ? {
+          id: userOrId,
+          userRankLevel: userRankLevelOrVote,
+          permittedForumIds: []
+        }
+      : userOrId;
+  const vote =
+    typeof userOrId === 'number' ? maybeVote ?? 0 : userRankLevelOrVote;
+
   const poll = await prisma.forumPoll.findUnique({
     where: { id: forumPollId },
     include: {

@@ -10,11 +10,15 @@ beforeEach(() => resetApiTestState());
 // Shared mock setup for a successful install with pre-seeded ranks/forums.
 // seedRanks/seedForums both no-op when counts > 0.
 function mockPreseededBootstrap() {
-  prismaMock.userRank.count.mockResolvedValue(4);
   prismaMock.forumCategory.count.mockResolvedValue(7);
   prismaMock.userRank.findFirst.mockResolvedValue({
     id: 13,
     level: 1000
+  } as never);
+  prismaMock.userRank.findUnique.mockResolvedValue({
+    id: 13,
+    level: 1000,
+    name: 'SysOp'
   } as never);
 }
 
@@ -38,12 +42,15 @@ function mockSysopTransaction() {
       consumed: 0n,
       ratio: 0,
       userRank: {
+        id: 13,
         level: 1000,
         name: 'SysOp',
         color: '#a0d468',
         badge: '',
-        permissions: { admin: true }
-      }
+        permissions: { admin: true },
+        personalCollageLimit: 0
+      },
+      secondaryRanks: []
     } as never);
     return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
   });
@@ -232,8 +239,12 @@ describe('POST /api/install', () => {
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
 
-    // seedRanks: no existing ranks → creates 4
-    prismaMock.userRank.count.mockResolvedValue(0);
+    // seedRanks checks canonical levels individually.
+    prismaMock.userRank.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
     prismaMock.userRank.create
       .mockResolvedValueOnce({ id: 10, level: 100 } as never)
       .mockResolvedValueOnce({ id: 11, level: 200 } as never)

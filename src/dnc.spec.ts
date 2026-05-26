@@ -3,14 +3,15 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeUserRank,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
 
 const setManager = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ communities_manage: true })
+  setCurrentUserPermissions(
+    makeUserRank({ dnc_manage: true }).permissions as Record<string, boolean>
   );
 
 const BASE = '/api/communities/5/dnc';
@@ -89,8 +90,10 @@ describe('POST /api/communities/:communityId/dnc', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 403 without communities_manage permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  it('returns 403 without dnc_manage permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app)
       .post(BASE)
       .send({ name: 'Bad Label', comment: 'Do not contribute' });
@@ -127,8 +130,10 @@ describe('DELETE /api/communities/:communityId/dnc/:dncId', () => {
     expect(res.body.msg).toBe('DNC entry not found');
   });
 
-  it('returns 403 without communities_manage permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  it('returns 403 without dnc_manage permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
     const res = await request(app).delete(`${BASE}/3`);
     expect(res.status).toBe(403);
   });

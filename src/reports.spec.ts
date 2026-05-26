@@ -3,7 +3,8 @@ import {
   request,
   prismaMock,
   makeUserRank,
-  resetApiTestState
+  resetApiTestState,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 import * as reportsModule from './modules/reports';
 import type {
@@ -75,8 +76,10 @@ const makeReport = (): ReportRow => ({
 });
 
 const setStaff = () =>
-  prismaMock.userRank.findUnique.mockResolvedValue(
-    makeUserRank({ staff: true, reports_manage: true })
+  setCurrentUserPermissions(
+    makeUserRank({
+      reports_manage: true
+    }).permissions as Record<string, boolean>
   );
 
 beforeEach(() => resetApiTestState());

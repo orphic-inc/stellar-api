@@ -3,13 +3,21 @@ import {
   app,
   prismaMock,
   makeUserRank,
-  resetApiTestState
+  resetApiTestState,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
+
+const setIpBanManager = () =>
+  setCurrentUserPermissions(
+    makeUserRank({
+      ip_bans_manage: true
+    }).permissions as Record<string, boolean>
+  );
 
 beforeEach(() => resetApiTestState());
 
 describe('POST /api/ip-bans', () => {
-  it('requires admin permission', async () => {
+  it('requires ip_bans_manage permission', async () => {
     const res = await request(app).post('/api/ip-bans').send({
       fromIp: '1.2.3.4'
     });
@@ -18,9 +26,7 @@ describe('POST /api/ip-bans', () => {
   });
 
   it('rejects invalid IPv4 octets', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
-    );
+    setIpBanManager();
 
     const res = await request(app).post('/api/ip-bans').send({
       fromIp: '999.2.3.4'
@@ -31,9 +37,7 @@ describe('POST /api/ip-bans', () => {
   });
 
   it('rejects inverted ranges', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
-    );
+    setIpBanManager();
 
     const res = await request(app).post('/api/ip-bans').send({
       fromIp: '10.0.0.10',
@@ -45,9 +49,7 @@ describe('POST /api/ip-bans', () => {
   });
 
   it('stores valid ranges and serializes them back to dotted IPv4', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
-    );
+    setIpBanManager();
     prismaMock.ipBan.create.mockResolvedValue({
       id: 5,
       fromIp: 167772161,

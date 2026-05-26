@@ -3,7 +3,8 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeUserRank,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 
 const makeEntry = (overrides: Record<string, unknown> = {}) => ({
@@ -50,8 +51,10 @@ describe('GET /api/site-history', () => {
 
 describe('POST /api/site-history', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({
+        site_history_manage: true
+      }).permissions as Record<string, boolean>
     );
   });
 
@@ -78,8 +81,10 @@ describe('POST /api/site-history', () => {
     expect(prismaMock.siteHistory.create).not.toHaveBeenCalled();
   });
 
-  it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  it('returns 403 without site_history_manage permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app)
       .post('/api/site-history')
@@ -91,8 +96,10 @@ describe('POST /api/site-history', () => {
 
 describe('PUT /api/site-history/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({
+        site_history_manage: true
+      }).permissions as Record<string, boolean>
     );
   });
 
@@ -130,8 +137,10 @@ describe('PUT /api/site-history/:id', () => {
 
 describe('DELETE /api/site-history/:id', () => {
   beforeEach(() => {
-    prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ admin: true })
+    setCurrentUserPermissions(
+      makeUserRank({
+        site_history_manage: true
+      }).permissions as Record<string, boolean>
     );
   });
 
@@ -155,8 +164,10 @@ describe('DELETE /api/site-history/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 403 without admin permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  it('returns 403 without site_history_manage permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
 
     const res = await request(app).delete('/api/site-history/1');
 

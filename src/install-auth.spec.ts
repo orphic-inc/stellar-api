@@ -147,12 +147,15 @@ describe('API auth/profile/user flows', () => {
         dateRegistered: '2026-04-24T00:00:00.000Z',
         lastLogin: '2026-04-24T00:00:00.000Z',
         userRank: {
+          id: 1,
           level: 100,
           name: 'User',
           color: '',
           badge: '',
-          permissions: {}
-        }
+          permissions: {},
+          personalCollageLimit: 0
+        },
+        secondaryRanks: []
       })
     );
     prismaMock.invite.update.mockResolvedValueOnce({} as never);
@@ -201,12 +204,15 @@ describe('API auth/profile/user flows', () => {
       dateRegistered: '2026-04-24T00:00:00.000Z',
       lastLogin: '2026-04-24T00:00:00.000Z',
       userRank: {
+        id: 1,
         level: 100,
         name: 'User',
         color: '',
         badge: '',
-        permissions: {}
-      }
+        permissions: {},
+        personalCollageLimit: 0
+      },
+      secondaryRanks: []
     };
     prismaMock.user.findUnique.mockResolvedValue(
       makeUser({ password: 'hashed-password', disabled: false })
@@ -274,12 +280,15 @@ describe('API auth/profile/user flows', () => {
         dateRegistered: '2026-04-24T00:00:00.000Z',
         lastLogin: '2026-04-24T00:00:00.000Z',
         userRank: {
+          id: 1,
           level: 100,
           name: 'User',
           color: '',
           badge: '',
-          permissions: {}
-        }
+          permissions: {},
+          personalCollageLimit: 0
+        },
+        secondaryRanks: []
       })
     );
 
