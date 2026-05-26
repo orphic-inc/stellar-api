@@ -1162,3 +1162,61 @@ describe('POST /api/users/:id/recovery', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('PUT /api/users/:id/staff-bio', () => {
+  beforeEach(() => setAdmin());
+
+  it('allows an admin to edit another user bio', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: 9 } as never);
+    prismaMock.user.update.mockResolvedValue(makeUser({ id: 9 }) as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .put('/api/users/9/staff-bio')
+      .send({ staffBio: 'Admin-updated bio' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ msg: 'Staff bio updated' });
+  });
+
+  it('allows a staff-listed user to edit their own bio', async () => {
+    prismaMock.userRank.findUnique
+      .mockResolvedValueOnce(makeUserRank() as never)
+      .mockResolvedValueOnce({ displayStaff: true } as never);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
+    prismaMock.user.update.mockResolvedValue(makeUser({ id: 7 }) as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .put('/api/users/7/staff-bio')
+      .send({ staffBio: 'My [b]bio[/b]' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { staffBio: 'My [b]bio[/b]' }
+    });
+  });
+
+  it('returns 403 when a non-staff-listed user edits their own bio', async () => {
+    prismaMock.userRank.findUnique
+      .mockResolvedValueOnce(makeUserRank() as never)
+      .mockResolvedValueOnce({ displayStaff: false } as never);
+
+    const res = await request(app)
+      .put('/api/users/7/staff-bio')
+      .send({ staffBio: 'Nope' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 403 when a non-admin edits another user bio', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app)
+      .put('/api/users/9/staff-bio')
+      .send({ staffBio: 'Nope' });
+
+    expect(res.status).toBe(403);
+  });
+});

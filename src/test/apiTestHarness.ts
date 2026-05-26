@@ -103,6 +103,10 @@ jest.mock('../modules/staffInbox', () => ({
   deleteResponse: jest.fn()
 }));
 
+jest.mock('../modules/staff', () => ({
+  getStaffList: jest.fn()
+}));
+
 jest.mock('../lib/mailer', () => ({
   sendInviteEmail: jest.fn().mockResolvedValue(true),
   sendRecoveryEmail: jest.fn().mockResolvedValue(true)

@@ -38,6 +38,10 @@ import {
 } from '../schemas/subscription';
 import { announcementSchema } from '../schemas/announcement';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
+import {
+  createStaffGroupSchema,
+  updateStaffGroupSchema
+} from '../schemas/staff';
 import { postSchema, postCommentSchema } from '../schemas/post';
 import {
   commentQuerySchema,
@@ -297,7 +301,8 @@ const UserRankSummary = registry.register(
   z.object({
     name: z.string(),
     color: z.string(),
-    badge: z.string().optional()
+    badge: z.string().optional(),
+    displayStaff: z.boolean().optional()
   })
 );
 
@@ -507,6 +512,7 @@ const PublicProfile = registry.register(
     disabled: z.boolean(),
     warned: z.string().nullable(),
     inviteCount: z.number().nullable(),
+    staffBio: z.string().nullable(),
     stats: ProfileStats,
     userRank: UserRankSummary.extend({
       id: z.number()
@@ -2228,7 +2234,41 @@ const UserRank = registry.register(
     color: z.string().optional(),
     badge: z.string().optional(),
     personalCollageLimit: z.number().int().optional(),
+    displayStaff: z.boolean().optional(),
+    staffGroupId: z.number().int().nullable().optional(),
     userCount: z.number().optional()
+  })
+);
+
+const StaffGroup = registry.register(
+  'StaffGroup',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    sortOrder: z.number(),
+    rankCount: z.number().optional()
+  })
+);
+
+const StaffMember = registry.register(
+  'StaffMember',
+  z.object({
+    userId: z.number(),
+    username: z.string(),
+    rankName: z.string(),
+    rankColor: z.string(),
+    lastSeen: z.string().nullable(),
+    staffBio: z.string().nullable()
+  })
+);
+
+const StaffGroupWithMembers = registry.register(
+  'StaffGroupWithMembers',
+  z.object({
+    id: z.number().nullable(),
+    name: z.string(),
+    sortOrder: z.number(),
+    members: z.array(StaffMember)
   })
 );
 
@@ -2572,6 +2612,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    409: {
+      description: 'Duplicate rank name or level',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Staff group not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2593,6 +2641,14 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Duplicate rank name or level',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Staff group not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -2641,6 +2697,139 @@ registry.registerPath({
     },
     409: {
       description: 'Rank still assigned to users',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Staff Groups ──────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/staff-groups',
+  tags: ['Tools'],
+  responses: {
+    200: {
+      description: 'Staff groups',
+      content: { 'application/json': { schema: z.array(StaffGroup) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/tools/staff-groups',
+  tags: ['Tools'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createStaffGroupSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Staff group created',
+      content: { 'application/json': { schema: StaffGroup } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    409: {
+      description: 'Duplicate name',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/tools/staff-groups/{id}',
+  tags: ['Tools'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateStaffGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Staff group updated',
+      content: { 'application/json': { schema: StaffGroup } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Duplicate name',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/tools/staff-groups/{id}',
+  tags: ['Tools'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Staff group deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Ranks still assigned',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Staff page ────────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff',
+  tags: ['Staff'],
+  responses: {
+    200: {
+      description: 'Staff listing grouped by staff group',
+      content: {
+        'application/json': {
+          schema: z.object({ groups: z.array(StaffGroupWithMembers) })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Staff bio ────────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/{id}/staff-bio',
+  tags: ['Users'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ staffBio: z.string().max(500).nullable() })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Staff bio updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -3638,6 +3827,20 @@ registry.registerPath({
     201: {
       description: 'Ticket created',
       content: { 'application/json': { schema: StaffInboxTicket } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/staff-inbox/tickets/count',
+  tags: ['StaffInbox'],
+  responses: {
+    200: {
+      description: 'Count of tickets with unread staff replies',
+      content: {
+        'application/json': { schema: z.object({ count: z.number() }) }
+      }
     }
   }
 });

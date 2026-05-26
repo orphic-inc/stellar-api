@@ -40,7 +40,9 @@ export function makeUserRank(
     badge: '',
     permissions,
     uploadRequired: 0,
-    personalCollageLimit: 0
+    personalCollageLimit: 0,
+    displayStaff: false,
+    staffGroupId: null
   };
 }
 
@@ -69,6 +71,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     isDonor: false,
     canDownload: true,
     adminComment: null,
+    staffBio: null,
     banDate: null,
     banReason: null,
     warned: null,

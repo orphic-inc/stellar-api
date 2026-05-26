@@ -259,17 +259,32 @@ enum ReleaseReportCategory {
 
 // ─── User & Auth ──────────────────────────────────────────────────────────────
 
+model StaffGroup {
+  id        Int        @id @default(autoincrement())
+  sortOrder Int
+  name      String     @unique
+  userRanks UserRank[]
+
+  @@index([sortOrder])
+  @@map("staff_groups")
+}
+
 model UserRank {
-  id                   Int    @id @default(autoincrement())
+  id                   Int         @id @default(autoincrement())
   level                Int
   name                 String
   permissions          Json
-  color                String @default("")
-  badge                String @default("")
-  uploadRequired       Int    @default(0)
-  personalCollageLimit Int    @default(0)
+  color                String      @default("")
+  badge                String      @default("")
+  uploadRequired       Int         @default(0)
+  personalCollageLimit Int         @default(0)
+  displayStaff         Boolean     @default(false)
+  staffGroupId         Int?
+  staffGroup           StaffGroup? @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
   users                User[]
 
+  @@index([displayStaff])
+  @@index([staffGroupId])
   @@map("user_ranks")
 }
 
@@ -315,6 +330,7 @@ model User {
   isDonor            Boolean      @default(false)
   canDownload        Boolean      @default(true)
   adminComment       String?
+  staffBio           String?  @db.VarChar(500)
   banDate            DateTime?
   banReason          String?
   warned             DateTime?

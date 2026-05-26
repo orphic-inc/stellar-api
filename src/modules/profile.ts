@@ -147,10 +147,19 @@ const PROFILE_BASE_SELECT = {
   disabled: true,
   warned: true,
   inviteCount: true,
+  staffBio: true,
   contributed: true,
   consumed: true,
   ratio: true,
-  userRank: { select: { id: true, name: true, color: true, badge: true } },
+  userRank: {
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      badge: true,
+      displayStaff: true
+    }
+  },
   profile: true,
   donorRank: {
     select: {
@@ -751,6 +760,7 @@ const buildProfileView = async (
     disabled: user.disabled,
     warned: user.warned?.toISOString() ?? null,
     inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
+    staffBio: user.staffBio ?? null,
     stats: {
       contributed: canSeeUploaded ? user.contributed.toString() : null,
       consumed: canSeeDownloaded ? user.consumed.toString() : null,
@@ -765,13 +775,15 @@ const buildProfileView = async (
           id: user.userRank.id,
           name: user.userRank.name,
           color: user.userRank.color,
-          badge: user.userRank.badge
+          badge: user.userRank.badge,
+          displayStaff: user.userRank.displayStaff
         }
       : {
           id: 0,
           name: '',
           color: '',
-          badge: ''
+          badge: '',
+          displayStaff: false
         },
     profile,
     userSettings: viewer.isOwner

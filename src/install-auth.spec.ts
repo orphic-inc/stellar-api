@@ -584,7 +584,13 @@ describe('API auth/profile/user flows', () => {
         showConsumedStats: true,
         showRatioStats: true
       },
-      userRank: { id: 1, name: 'User', color: '', badge: '' },
+      userRank: {
+        id: 1,
+        name: 'User',
+        color: '',
+        badge: '',
+        displayStaff: false
+      },
       inviteTree: [],
       email: null,
       dateRegistered: '2026-04-24T00:00:00.000Z',
@@ -623,6 +629,7 @@ describe('API auth/profile/user flows', () => {
         publicCollages: []
       },
       staffPmOverview: null,
+      staffBio: null,
       recentContributions: [],
       recentSnatches: []
     } as Awaited<ReturnType<typeof updateProfile>>);
@@ -659,7 +666,13 @@ describe('API auth/profile/user flows', () => {
         ratio: '2.00',
         buffer: '50'
       },
-      userRank: { id: 1, name: 'User', color: '', badge: '' },
+      userRank: {
+        id: 1,
+        name: 'User',
+        color: '',
+        badge: '',
+        displayStaff: false
+      },
       profile: {
         id: 3,
         avatar: null,
@@ -703,6 +716,7 @@ describe('API auth/profile/user flows', () => {
         publicCollages: []
       },
       staffPmOverview: null,
+      staffBio: null,
       recentContributions: [],
       recentSnatches: [],
       inviteTree: []
@@ -734,7 +748,13 @@ describe('API auth/profile/user flows', () => {
         ratio: null,
         buffer: null
       },
-      userRank: { id: 1, name: 'User', color: '', badge: '' },
+      userRank: {
+        id: 1,
+        name: 'User',
+        color: '',
+        badge: '',
+        displayStaff: false
+      },
       profile: {
         id: 5,
         avatar: null,
@@ -765,6 +785,7 @@ describe('API auth/profile/user flows', () => {
         publicCollages: []
       },
       staffPmOverview: null,
+      staffBio: null,
       recentContributions: [],
       recentSnatches: [],
       userSettings: undefined,

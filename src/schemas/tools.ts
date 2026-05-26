@@ -6,7 +6,9 @@ export const createRankSchema = z.object({
   permissions: z.record(z.string(), z.boolean()).optional(),
   color: z.string().optional(),
   badge: z.string().optional(),
-  personalCollageLimit: z.number().int().min(0).optional()
+  personalCollageLimit: z.number().int().min(0).optional(),
+  displayStaff: z.boolean().optional(),
+  staffGroupId: z.number().int().positive().nullable().optional()
 });
 
 export const updateRankSchema = z
@@ -16,7 +18,9 @@ export const updateRankSchema = z
     permissions: z.record(z.string(), z.boolean()).optional(),
     color: z.string().optional(),
     badge: z.string().optional(),
-    personalCollageLimit: z.number().int().min(0).optional()
+    personalCollageLimit: z.number().int().min(0).optional(),
+    displayStaff: z.boolean().optional(),
+    staffGroupId: z.number().int().positive().nullable().optional()
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'At least one field required'

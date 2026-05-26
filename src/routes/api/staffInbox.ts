@@ -113,6 +113,18 @@ router.delete(
 
 // ─── Staff Inbox Tickets ───────────────────────────────────────────────────────
 
+// GET /api/staff-inbox/tickets/count — count of tickets with unread staff replies
+router.get(
+  '/tickets/count',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const count = await prisma.staffInboxConversation.count({
+      where: { userId: req.user.id, status: 'Open' }
+    });
+    res.json({ count });
+  })
+);
+
 // GET /api/staff-inbox/tickets — user's own tickets
 router.get(
   '/tickets',

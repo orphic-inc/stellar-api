@@ -8,7 +8,11 @@ import {
   createUser
 } from '../../modules/user';
 import { requireAuth } from '../../middleware/auth';
-import { requirePermission, isModerator } from '../../middleware/permissions';
+import {
+  requirePermission,
+  isModerator,
+  loadPermissions
+} from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -427,6 +431,55 @@ router.post(
 );
 
 // ─── User moderation routes (after /:id) ─────────────────────────────────────
+
+const staffBioSchema = z.object({
+  staffBio: z.string().max(500).nullable()
+});
+
+// PUT /api/users/:id/staff-bio — set staff page bio
+// Allows admins to edit any user, and staff-displayed users to edit their own.
+router.put(
+  '/:id/staff-bio',
+  requireAuth,
+  validateParams(userIdParamsSchema),
+  validate(staffBioSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { staffBio } = parsedBody<{ staffBio: string | null }>(res);
+
+    const perms = await loadPermissions(req, res);
+    const isAdmin = !!perms['admin'];
+    const isSelf = req.user.id === id;
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ msg: 'Permission denied' });
+    }
+
+    if (isSelf && !isAdmin) {
+      const ownRank = await prisma.userRank.findUnique({
+        where: { id: req.user.userRankId },
+        select: { displayStaff: true }
+      });
+      if (!ownRank?.displayStaff) {
+        return res.status(403).json({ msg: 'Permission denied' });
+      }
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+
+    // Normalize empty string to null
+    const normalized = staffBio?.trim() || null;
+    await prisma.user.update({ where: { id }, data: { staffBio: normalized } });
+    await audit(prisma, req.user.id, 'user.staffBio_updated', 'User', id, {
+      staffBio: normalized
+    });
+    res.json({ msg: 'Staff bio updated' });
+  })
+);
 
 // POST /api/users/:id/recovery — admin-triggered recovery email
 router.post(

@@ -56,6 +56,21 @@ export const isModerator = async (
   return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
 };
 
+// Like requirePermission('admin') but does NOT let staff satisfy the gate.
+// Use for routes that must be restricted to full admins only.
+export const requireAdminOnly = (): RequestHandler[] => [
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const perms = await loadPermissions(req as AuthenticatedRequest, res);
+      if (perms['admin']) return next();
+      res.status(403).json({ msg: 'Permission denied' });
+    } catch (err) {
+      next(err);
+    }
+  }
+];
+
 // Returns [requireAuth, permissionCheck] — spread into route definitions:
 //   router.post('/', ...requirePermission('admin'), asyncHandler(...))
 export const requirePermission = (

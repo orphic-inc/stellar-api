@@ -53,6 +53,7 @@ import top10Router from './routes/api/top10';
 import ipBansRouter from './routes/api/ipBans';
 import emailBlacklistRouter from './routes/api/emailBlacklist';
 import donationsRouter from './routes/api/donations';
+import staffRouter from './routes/api/staff';
 
 const log = getLogger('app');
 
@@ -117,6 +118,7 @@ export const createApp = () => {
   app.use('/api/ip-bans', ipBansRouter);
   app.use('/api/email-blacklist', emailBlacklistRouter);
   app.use('/api/donations', donationsRouter);
+  app.use('/api/staff', staffRouter);
 
   app.use(
     (
