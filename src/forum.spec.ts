@@ -139,7 +139,13 @@ describe('API forum flows', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(updatePostMock).toHaveBeenCalledWith(21, 7, 'Old body', 'New body', 44);
+    expect(updatePostMock).toHaveBeenCalledWith(
+      21,
+      7,
+      'Old body',
+      'New body',
+      44
+    );
     expect(res.body.body).toBe('New body');
   });
 
