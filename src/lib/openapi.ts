@@ -4751,6 +4751,133 @@ registry.registerPath({
   }
 });
 
+// ─── Friends ──────────────────────────────────────────────────────────────────
+
+const FriendEntry = registry.register(
+  'FriendEntry',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    friendId: z.number(),
+    comment: z.string(),
+    friend: z.object({
+      id: z.number(),
+      username: z.string(),
+      avatar: z.string().nullable()
+    })
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/friends',
+  tags: ['Friends'],
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated friends list',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(FriendEntry), meta: PaginationMeta })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/friends/status/{userId}',
+  tags: ['Friends'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Friend status',
+      content: {
+        'application/json': {
+          schema: z.object({ isFriend: z.boolean() })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/friends/{userId}',
+  tags: ['Friends'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    201: { description: 'Friend added' },
+    400: {
+      description: 'Cannot add self',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Already friends',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/friends/{userId}',
+  tags: ['Friends'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    204: { description: 'Friend removed' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/friends/{userId}/comment',
+  tags: ['Friends'],
+  request: {
+    params: z.object({ userId: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ comment: z.string().max(500) })
+        }
+      }
+    }
+  },
+  responses: {
+    200: { description: 'Comment updated' },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Friend not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Document builder ─────────────────────────────────────────────────────────
 
 export function buildOpenApiDocument() {
