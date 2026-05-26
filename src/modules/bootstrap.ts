@@ -73,7 +73,8 @@ export const FORUM_STRUCTURE = [
       {
         sort: 10,
         name: 'Announcements',
-        description: 'There are a terrible lot of lies going about the world and the worst of it is that half of them are true.'
+        description:
+          'There are a terrible lot of lies going about the world and the worst of it is that half of them are true.'
       },
       {
         sort: 20,
@@ -93,18 +94,21 @@ export const FORUM_STRUCTURE = [
       {
         sort: 50,
         name: 'The Laboratory',
-        description: 'I was working in the lab late one night when my eyes beheld an eerie sight.'
+        description:
+          'I was working in the lab late one night when my eyes beheld an eerie sight.'
       },
       {
         sort: 60,
         name: 'Suggestions/Ideas',
-        description: 'Daring ideas are like chessmen moved forward, they may be beaten, but you may start a winning game.'
+        description:
+          'Daring ideas are like chessmen moved forward, they may be beaten, but you may start a winning game.'
       },
       {
         sort: 70,
         name: 'Bugs',
-        description: 'Some days you are the bug and some days you are the windshield.'
-      },
+        description:
+          'Some days you are the bug and some days you are the windshield.'
+      }
     ]
   },
   {
@@ -114,7 +118,8 @@ export const FORUM_STRUCTURE = [
       {
         sort: 10,
         name: 'The Lounge',
-        description: 'The only normal people you know are the ones you don\'t know very well.'
+        description:
+          "The only normal people you know are the ones you don't know very well."
       },
       {
         sort: 20,
@@ -124,31 +129,36 @@ export const FORUM_STRUCTURE = [
       {
         sort: 30,
         name: 'The Library',
-        description: 'The first sign of maturity is the discovery that the volume knob also turns to the left.'
+        description:
+          'The first sign of maturity is the discovery that the volume knob also turns to the left.'
       },
       {
         sort: 40,
         name: 'Concerts, Events & Meets',
-        description: 'No, it\'s just pure noise for the hell of it. The fun is in watching people\'s faces. That\'s why we light the audience up, to see their discomfort.'
+        description:
+          "No, it's just pure noise for the hell of it. The fun is in watching people's faces. That's why we light the audience up, to see their discomfort."
       },
       {
         sort: 50,
         name: 'Power User',
-        description: 'Destiny is not a matter of chance, it is a matter of choice. It is not a thing to be waited for, it is a thing to be achieved.',
+        description:
+          'Destiny is not a matter of chance, it is a matter of choice. It is not a thing to be waited for, it is a thing to be achieved.',
         minClassRead: 200,
         minClassWrite: 200
       },
       {
         sort: 60,
         name: 'Elite',
-        description: 'I don\'t believe in elitism, I don\'t think the audience is this dumb person lower than me. I am the audience.',
+        description:
+          "I don't believe in elitism, I don't think the audience is this dumb person lower than me. I am the audience.",
         minClassRead: 300,
         minClassWrite: 300
       },
       {
         sort: 70,
         name: 'Technology',
-        description: 'The real danger is not that computers will begin to think like men, but men will begin to think like computers.'
+        description:
+          'The real danger is not that computers will begin to think like men, but men will begin to think like computers.'
       }
     ]
   },
@@ -156,7 +166,12 @@ export const FORUM_STRUCTURE = [
     name: 'Music',
     sort: 30,
     forums: [
-      { sort: 10, name: 'Music', description: 'This witty remark only works with accompanied by the sweet harmonies of acoustic guitars.' },
+      {
+        sort: 10,
+        name: 'Music',
+        description:
+          'This witty remark only works with accompanied by the sweet harmonies of acoustic guitars.'
+      },
       {
         sort: 20,
         name: 'Vanity House',
@@ -175,7 +190,8 @@ export const FORUM_STRUCTURE = [
       {
         sort: 50,
         name: 'Vinyl',
-        description: 'I don\'t think it\'s real unless you put it on an LP. CDs aren\'t real. Anybody can do that.'
+        description:
+          "I don't think it's real unless you put it on an LP. CDs aren't real. Anybody can do that."
       }
     ]
   },
@@ -186,12 +202,14 @@ export const FORUM_STRUCTURE = [
       {
         sort: 10,
         name: 'Help',
-        description: 'In helping others we shall help ourselves, for whatever good we give out completes the circle and comes back to us.'
+        description:
+          'In helping others we shall help ourselves, for whatever good we give out completes the circle and comes back to us.'
       },
       {
         sort: 20,
         name: 'Tutorials',
-        description: 'He that gives good advice works with one hand, he who gives counsel and example builds with both.'
+        description:
+          'He that gives good advice works with one hand, he who gives counsel and example builds with both.'
       }
     ]
   },
