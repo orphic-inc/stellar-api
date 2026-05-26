@@ -73,7 +73,7 @@ export const FORUM_STRUCTURE = [
       {
         sort: 10,
         name: 'Announcements',
-        description: 'Official site announcements.'
+        description: 'There are a terrible lot of lies going about the world and the worst of it is that half of them are true.'
       },
       {
         sort: 20,
@@ -82,80 +82,81 @@ export const FORUM_STRUCTURE = [
       },
       {
         sort: 30,
-        name: 'Bugs',
-        description: 'Report bugs and technical issues.'
-      },
-      {
-        sort: 40,
-        name: 'Projects',
-        description: 'Ongoing and upcoming projects.'
-      }
-    ]
-  },
-  {
-    name: 'Suggestions',
-    sort: 20,
-    forums: [
-      {
-        sort: 10,
-        name: 'The Laboratory',
-        description: 'Experimental ideas and early proposals.'
-      },
-      {
-        sort: 20,
-        name: 'Suggestions/Ideas',
-        description: 'Feature requests and suggestions.'
-      },
-      {
-        sort: 30,
         name: 'Contests & Designs',
         description: 'Community contests and design submissions.'
       },
       {
         sort: 40,
-        name: 'First Line Support',
-        description: 'Peer-to-peer support from the community.'
-      }
+        name: 'Projects',
+        description: 'Ongoing and upcoming projects.'
+      },
+      {
+        sort: 50,
+        name: 'The Laboratory',
+        description: 'I was working in the lab late one night when my eyes beheld an eerie sight.'
+      },
+      {
+        sort: 60,
+        name: 'Suggestions/Ideas',
+        description: 'Daring ideas are like chessmen moved forward, they may be beaten, but you may start a winning game.'
+      },
+      {
+        sort: 70,
+        name: 'Bugs',
+        description: 'Some days you are the bug and some days you are the windshield.'
+      },
     ]
   },
   {
     name: 'Community',
-    sort: 30,
+    sort: 20,
     forums: [
       {
         sort: 10,
         name: 'The Lounge',
-        description: 'General off-topic discussion.'
+        description: 'The only normal people you know are the ones you don\'t know very well.'
       },
       {
         sort: 20,
-        name: 'The Library',
-        description: 'Books, articles, and reading recommendations.'
+        name: 'The Lounge+',
+        description: 'There are points to be scored. There are games to be won.'
       },
       {
         sort: 30,
+        name: 'The Library',
+        description: 'The first sign of maturity is the discovery that the volume knob also turns to the left.'
+      },
+      {
+        sort: 40,
+        name: 'Concerts, Events & Meets',
+        description: 'No, it\'s just pure noise for the hell of it. The fun is in watching people\'s faces. That\'s why we light the audience up, to see their discomfort.'
+      },
+      {
+        sort: 50,
         name: 'Power User',
-        description: 'Power User discussion area.',
+        description: 'Destiny is not a matter of chance, it is a matter of choice. It is not a thing to be waited for, it is a thing to be achieved.',
         minClassRead: 200,
         minClassWrite: 200
       },
       {
-        sort: 40,
-        name: 'Technology',
-        description: 'Technology, software, and hardware.'
+        sort: 60,
+        name: 'Elite',
+        description: 'I don\'t believe in elitism, I don\'t think the audience is this dumb person lower than me. I am the audience.',
+        minClassRead: 300,
+        minClassWrite: 300
       },
       {
-        sort: 50,
-        name: 'Concerts & Events',
-        description: 'Live events, concerts, and meetups.'
+        sort: 70,
+        name: 'Technology',
+        description: 'The real danger is not that computers will begin to think like men, but men will begin to think like computers.'
       }
     ]
   },
   {
     name: 'Music',
-    sort: 40,
+    sort: 30,
     forums: [
-      { sort: 10, name: 'Music', description: 'General music discussion.' },
+      { sort: 10, name: 'Music', description: 'This witty remark only works with accompanied by the sweet harmonies of acoustic guitars.' },
       {
         sort: 20,
         name: 'Vanity House',
@@ -170,17 +171,27 @@ export const FORUM_STRUCTURE = [
         sort: 40,
         name: 'Offered',
         description: 'Share and exchange music recommendations.'
+      },
+      {
+        sort: 50,
+        name: 'Vinyl',
+        description: 'I don\'t think it\'s real unless you put it on an LP. CDs aren\'t real. Anybody can do that.'
       }
     ]
   },
   {
     name: 'Help',
-    sort: 50,
+    sort: 40,
     forums: [
       {
         sort: 10,
         name: 'Help',
-        description: 'Get help with site usage and your account.'
+        description: 'In helping others we shall help ourselves, for whatever good we give out completes the circle and comes back to us.'
+      },
+      {
+        sort: 20,
+        name: 'Tutorials',
+        description: 'He that gives good advice works with one hand, he who gives counsel and example builds with both.'
       }
     ]
   },

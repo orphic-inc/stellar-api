@@ -18,6 +18,7 @@ export const VALID_PERMISSIONS = [
   'users_disable',
   'wiki_edit',
   'wiki_manage',
+  'rules_manage',
   'advanced_search',
   'users_search',
   'staff',

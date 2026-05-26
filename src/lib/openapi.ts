@@ -37,6 +37,7 @@ import {
   subscribeCommentsSchema
 } from '../schemas/subscription';
 import { announcementSchema } from '../schemas/announcement';
+import { createRulesPageSchema, updateRulesPageSchema } from '../schemas/rules';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
 import {
   createStaffGroupSchema,
@@ -4631,6 +4632,121 @@ registry.registerPath({
     200: {
       description: 'Snapshot created',
       content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    }
+  }
+});
+
+// ─── Rules ────────────────────────────────────────────────────────────────────
+
+const RulesPage = registry.register(
+  'RulesPage',
+  z.object({
+    id: z.number(),
+    slug: z.string(),
+    title: z.string(),
+    body: z.string(),
+    isMain: z.boolean(),
+    sortOrder: z.number(),
+    authorId: z.number(),
+    author: z.object({ id: z.number(), username: z.string() }),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/rules',
+  tags: ['Rules'],
+  responses: {
+    200: {
+      description: 'Main rules page and sub-pages',
+      content: {
+        'application/json': {
+          schema: z.object({
+            main: RulesPage.nullable(),
+            pages: z.array(RulesPage)
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/rules/{slug}',
+  tags: ['Rules'],
+  request: { params: z.object({ slug: z.string() }) },
+  responses: {
+    200: {
+      description: 'Single rules page',
+      content: { 'application/json': { schema: RulesPage } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rules',
+  tags: ['Rules'],
+  request: {
+    body: { content: { 'application/json': { schema: createRulesPageSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Page created',
+      content: { 'application/json': { schema: RulesPage } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    409: {
+      description: 'Conflict',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/rules/{id}',
+  tags: ['Rules'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateRulesPageSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Page updated',
+      content: { 'application/json': { schema: RulesPage } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/rules/{id}',
+  tags: ['Rules'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Page deleted' },
+    400: {
+      description: 'Cannot delete main page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

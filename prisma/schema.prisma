@@ -421,6 +421,7 @@ model User {
   wikiPagesAuthored         WikiPage[]     @relation("WikiPageAuthor")
   wikiRevisionsAuthored     WikiRevision[] @relation("WikiRevisionAuthor")
   wikiAliasesCreated        WikiAlias[]    @relation("WikiAliasCreator")
+  rulesPagesAuthored        RulesPage[]    @relation("RulesPageAuthor")
   userStatSnapshots         UserStatSnapshot[]
 
   @@index([userRankId])
@@ -1974,6 +1975,28 @@ model WikiAlias {
 
   @@index([pageId])
   @@map("wiki_aliases")
+}
+
+// ─── Rules ────────────────────────────────────────────────────────────────────
+
+model RulesPage {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique @db.VarChar(100)
+  title     String   @db.VarChar(200)
+  body      String   @db.Text
+  // Only one row may have isMain = true; enforced at API layer within a transaction.
+  // Add DB-level partial unique after migration:
+  //   CREATE UNIQUE INDEX rules_pages_one_main ON rules_pages (is_main) WHERE is_main = true;
+  isMain    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  authorId  Int
+  author    User     @relation("RulesPageAuthor", fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isMain])
+  @@index([sortOrder])
+  @@map("rules_pages")
 }
 
 // ─── Top 10 ───────────────────────────────────────────────────────────────────
