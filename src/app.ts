@@ -57,6 +57,7 @@ import donationsRouter from './routes/api/donations';
 import staffRouter from './routes/api/staff';
 import rulesRouter from './routes/api/rules';
 import friendsRouter from './routes/api/friends';
+import tagAliasesRouter from './routes/api/tagAliases';
 
 const log = getLogger('app');
 
@@ -124,6 +125,7 @@ export const createApp = () => {
   app.use('/api/staff', staffRouter);
   app.use('/api/rules', rulesRouter);
   app.use('/api/friends', friendsRouter);
+  app.use('/api/tag-aliases', tagAliasesRouter);
 
   app.use(
     (

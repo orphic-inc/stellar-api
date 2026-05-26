@@ -31,6 +31,7 @@ import {
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { addContributionToRelease } from '../../../modules/contribution';
+import { resolveTagName } from '../../../modules/tag';
 import { emitNotifications } from '../../../lib/notifications';
 import { recomputeVoteAggregate } from '../../../modules/top10';
 import { getSettings } from '../../../modules/settings';
@@ -959,12 +960,14 @@ router.post(
       communityId: number;
       releaseId: number;
     }>(res);
-    const { name } = parsedBody<ReleaseTagInput>(res);
+    const { name: submittedName } = parsedBody<ReleaseTagInput>(res);
     const community = await getAccessibleCommunity(communityId, req.user.id);
     if (!community) return res.status(404).json({ msg: 'Community not found' });
     if (community === 'forbidden') {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
+
+    const name = await resolveTagName(submittedName);
 
     const release = await prisma.release.findFirst({
       where: { id, communityId },

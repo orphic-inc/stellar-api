@@ -70,6 +70,10 @@ const reqIdParamsSchema = z.object({
 const recoveryStatusSchema = z
   .enum(['pending', 'used', 'expired'])
   .default('pending');
+const warningsQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional()
+});
+type WarningsQuery = z.infer<typeof warningsQuerySchema>;
 
 // ─── Donor ranks (static paths — must come before /:id) ──────────────────────
 
@@ -293,6 +297,32 @@ router.delete(
       reqId
     );
     res.json({ msg: 'Recovery request revoked' });
+  })
+);
+
+// GET /api/users/warnings — site-wide staff warning log (must be before /:id)
+router.get(
+  '/warnings',
+  ...requirePermission('staff'),
+  validateQuery(warningsQuerySchema),
+  authHandler(async (req, res) => {
+    const pg = parsePage(req);
+    const { userId } = parsedQuery<WarningsQuery>(res);
+    const where = userId ? { userId } : {};
+    const [warnings, total] = await Promise.all([
+      prisma.userWarning.findMany({
+        where,
+        include: {
+          user: { select: { id: true, username: true } },
+          warnedBy: { select: { id: true, username: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.userWarning.count({ where })
+    ]);
+    paginatedResponse(res, warnings, total, pg);
   })
 );
 
