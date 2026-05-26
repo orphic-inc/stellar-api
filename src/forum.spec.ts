@@ -139,7 +139,7 @@ describe('API forum flows', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(updatePostMock).toHaveBeenCalledWith(21, 7, 'Old body', 'New body');
+    expect(updatePostMock).toHaveBeenCalledWith(21, 7, 'Old body', 'New body', 44);
     expect(res.body.body).toBe('New body');
   });
 
@@ -934,7 +934,8 @@ describe('PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id', () => {
       21,
       7,
       'Old body',
-      'Edited by mod'
+      'Edited by mod',
+      44
     );
     expect(res.body.lastEdit.editor.username).toBe('testuser');
     expect(res.body.edits).toBeUndefined();

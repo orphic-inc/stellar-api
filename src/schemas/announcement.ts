@@ -6,3 +6,11 @@ export const announcementSchema = z.object({
 });
 
 export type AnnouncementInput = z.infer<typeof announcementSchema>;
+
+export const globalNoticeSchema = z.object({
+  message: z.string().min(1, 'Message is required').max(500),
+  url: z.string().url('Must be a valid URL').optional(),
+  expiresAt: z.string().datetime({ offset: true }).optional()
+});
+
+export type GlobalNoticeInput = z.infer<typeof globalNoticeSchema>;

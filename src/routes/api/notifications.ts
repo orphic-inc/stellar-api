@@ -15,6 +15,7 @@ type NotificationSource = {
   forumId?: number;
   releaseId?: number;
   communityId?: number;
+  url?: string;
 } | null;
 
 function groupIds(
@@ -74,6 +75,8 @@ router.get(
     const communityIds = groupIds(notifications, 'communities');
     const contributionIds = groupIds(notifications, 'contributions');
     const releaseIds = groupIds(notifications, 'release');
+    const newsIds = groupIds(notifications, 'news');
+    const globalNoticeIds = groupIds(notifications, 'global_notices');
 
     const [
       topics,
@@ -82,7 +85,9 @@ router.get(
       requests,
       communities,
       contributions,
-      releases
+      releases,
+      newsItems,
+      globalNotices
     ] = await Promise.all([
       forumIds.length > 0
         ? prisma.forumTopic.findMany({
@@ -130,6 +135,18 @@ router.get(
             where: { id: { in: releaseIds } },
             select: { id: true, title: true, communityId: true }
           })
+        : [],
+      newsIds.length > 0
+        ? prisma.news.findMany({
+            where: { id: { in: newsIds } },
+            select: { id: true, title: true }
+          })
+        : [],
+      globalNoticeIds.length > 0
+        ? prisma.globalNotice.findMany({
+            where: { id: { in: globalNoticeIds } },
+            select: { id: true, message: true, url: true }
+          })
         : []
     ]);
 
@@ -150,6 +167,14 @@ router.get(
       (
         releases as { id: number; title: string; communityId: number | null }[]
       ).map((r) => [r.id, r])
+    );
+    const newsMap = new Map(
+      (newsItems as { id: number; title: string }[]).map((n) => [n.id, n])
+    );
+    const globalNoticeMap = new Map(
+      (
+        globalNotices as { id: number; message: string; url: string | null }[]
+      ).map((g) => [g.id, g])
     );
 
     const enriched = notifications.map((n) => {
@@ -187,6 +212,12 @@ router.get(
               communityId: r.communityId ?? undefined
             }
           : null;
+      } else if (n.page === 'news') {
+        const item = newsMap.get(n.pageId);
+        source = item ? { title: item.title } : null;
+      } else if (n.page === 'global_notices') {
+        const g = globalNoticeMap.get(n.pageId);
+        source = g ? { title: g.message, url: g.url ?? undefined } : null;
       }
       return { ...n, source };
     });

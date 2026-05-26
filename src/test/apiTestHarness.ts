@@ -373,6 +373,7 @@ export const resetApiTestState = (): void => {
   prismaMock.artistSubscription.findMany.mockResolvedValue([]);
   prismaMock.artistSubscription.findUnique.mockResolvedValue(null);
   prismaMock.notification.createMany.mockResolvedValue({ count: 0 });
+  prismaMock.user.findMany.mockResolvedValue([]);
   prismaMock.siteSettings.upsert.mockResolvedValue({
     id: 1,
     approvedDomains: [],

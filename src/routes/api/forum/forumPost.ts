@@ -257,7 +257,7 @@ router.put(
     if (!isOwner && !(await isModerator(req, res)))
       return res.status(403).json({ msg: 'Not authorized' });
 
-    await updatePost(id, req.user.id, post.body, body);
+    await updatePost(id, req.user.id, post.body, body, forumTopicId);
 
     const updated = await prisma.forumPost.findFirst({
       where: {

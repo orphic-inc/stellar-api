@@ -102,6 +102,8 @@ enum SubscriptionPage {
   communities
   contributions
   release
+  news
+  global_notices
 }
 
 enum NotificationType {
@@ -111,6 +113,8 @@ enum NotificationType {
   collage_updated
   comment_sub
   artist_release
+  site_news
+  global_notice
 }
 
 enum ThreadType {
@@ -366,6 +370,7 @@ model User {
   artistSubscriptions   ArtistSubscription[]
   notifications         Notification[]        @relation("NotificationUser")
   actedNotifications    Notification[]        @relation("NotificationActor")
+  globalNotices         GlobalNotice[]
   blogs                 Blog[]
   posts                 Post[]
   apiApplications       ApiApplication[]
@@ -1498,6 +1503,18 @@ model News {
   createdAt DateTime @default(now())
 
   @@map("news")
+}
+
+model GlobalNotice {
+  id          Int       @id @default(autoincrement())
+  message     String    @db.VarChar(500)
+  url         String?
+  createdById Int
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("global_notices")
 }
 
 // ─── Applications ─────────────────────────────────────────────────────────────
