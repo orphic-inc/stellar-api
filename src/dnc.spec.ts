@@ -13,15 +13,13 @@ const setManager = () =>
     makeUserRank({ communities_manage: true })
   );
 
-const BASE = '/api/communities/5/dnu';
+const BASE = '/api/communities/5/dnc';
 
-// ─── GET /api/communities/:communityId/dnu ─────────────────────────────────────
+// ─── GET /api/communities/:communityId/dnc ─────────────────────────────────────
 
-describe('GET /api/communities/:communityId/dnu', () => {
-  beforeEach(() => setManager());
-
-  it('returns the DNU list for the community', async () => {
-    prismaMock.doNotUpload.findMany.mockResolvedValue([
+describe('GET /api/communities/:communityId/dnc', () => {
+  it('returns the DNC list for any authenticated user', async () => {
+    prismaMock.doNotContribute.findMany.mockResolvedValue([
       {
         id: 1,
         communityId: 5,
@@ -31,6 +29,7 @@ describe('GET /api/communities/:communityId/dnu', () => {
         createdAt: new Date('2026-01-01')
       }
     ] as never);
+    prismaMock.user.findMany.mockResolvedValue([] as never);
 
     const res = await request(app).get(BASE);
 
@@ -38,42 +37,36 @@ describe('GET /api/communities/:communityId/dnu', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe('Pirate Label');
   });
-
-  it('returns 403 without communities_manage permission', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
-    const res = await request(app).get(BASE);
-    expect(res.status).toBe(403);
-  });
 });
 
-// ─── POST /api/communities/:communityId/dnu ────────────────────────────────────
+// ─── POST /api/communities/:communityId/dnc ────────────────────────────────────
 
-describe('POST /api/communities/:communityId/dnu', () => {
+describe('POST /api/communities/:communityId/dnc', () => {
   beforeEach(() => setManager());
 
-  it('creates a DNU entry and returns 201', async () => {
+  it('creates a DNC entry and returns 201', async () => {
     prismaMock.community.findUnique.mockResolvedValue({ id: 5 } as never);
-    prismaMock.doNotUpload.create.mockResolvedValue({
+    prismaMock.doNotContribute.create.mockResolvedValue({
       id: 2,
       communityId: 5,
       name: 'Bad Label',
-      comment: 'Do not upload',
+      comment: 'Do not contribute',
       userId: 7,
       createdAt: new Date('2026-01-01')
     } as never);
 
     const res = await request(app)
       .post(BASE)
-      .send({ name: 'Bad Label', comment: 'Do not upload' });
+      .send({ name: 'Bad Label', comment: 'Do not contribute' });
 
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Bad Label');
-    expect(prismaMock.doNotUpload.create).toHaveBeenCalledWith(
+    expect(prismaMock.doNotContribute.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           communityId: 5,
           name: 'Bad Label',
-          comment: 'Do not upload',
+          comment: 'Do not contribute',
           userId: 7
         })
       })
@@ -85,14 +78,14 @@ describe('POST /api/communities/:communityId/dnu', () => {
 
     const res = await request(app)
       .post(BASE)
-      .send({ name: 'Bad Label', comment: 'Do not upload' });
+      .send({ name: 'Bad Label', comment: 'Do not contribute' });
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('Community not found');
   });
 
-  it('returns 400 when required fields are missing', async () => {
-    const res = await request(app).post(BASE).send({ name: 'Bad Label' });
+  it('returns 400 when name is missing', async () => {
+    const res = await request(app).post(BASE).send({ comment: 'No name' });
     expect(res.status).toBe(400);
   });
 
@@ -100,38 +93,38 @@ describe('POST /api/communities/:communityId/dnu', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
       .post(BASE)
-      .send({ name: 'Bad Label', comment: 'Do not upload' });
+      .send({ name: 'Bad Label', comment: 'Do not contribute' });
     expect(res.status).toBe(403);
   });
 });
 
-// ─── DELETE /api/communities/:communityId/dnu/:dnuId ──────────────────────────
+// ─── DELETE /api/communities/:communityId/dnc/:dncId ──────────────────────────
 
-describe('DELETE /api/communities/:communityId/dnu/:dnuId', () => {
+describe('DELETE /api/communities/:communityId/dnc/:dncId', () => {
   beforeEach(() => setManager());
 
-  it('deletes a DNU entry and returns 204', async () => {
-    prismaMock.doNotUpload.findFirst.mockResolvedValue({
+  it('deletes a DNC entry and returns 204', async () => {
+    prismaMock.doNotContribute.findFirst.mockResolvedValue({
       id: 3,
       communityId: 5
     } as never);
-    prismaMock.doNotUpload.delete.mockResolvedValue({} as never);
+    prismaMock.doNotContribute.delete.mockResolvedValue({} as never);
 
     const res = await request(app).delete(`${BASE}/3`);
 
     expect(res.status).toBe(204);
-    expect(prismaMock.doNotUpload.delete).toHaveBeenCalledWith({
+    expect(prismaMock.doNotContribute.delete).toHaveBeenCalledWith({
       where: { id: 3 }
     });
   });
 
   it('returns 404 when the entry does not exist for this community', async () => {
-    prismaMock.doNotUpload.findFirst.mockResolvedValue(null);
+    prismaMock.doNotContribute.findFirst.mockResolvedValue(null);
 
     const res = await request(app).delete(`${BASE}/99`);
 
     expect(res.status).toBe(404);
-    expect(res.body.msg).toBe('DNU entry not found');
+    expect(res.body.msg).toBe('DNC entry not found');
   });
 
   it('returns 403 without communities_manage permission', async () => {

@@ -47,7 +47,7 @@ import settingsRouter from './routes/api/settings';
 import bookmarksRouter from './routes/api/bookmarks';
 import siteHistoryRouter from './routes/api/siteHistory';
 import wikiRouter from './routes/api/wiki';
-import dnuRouter from './routes/api/communities/dnu';
+import dncRouter from './routes/api/communities/dnc';
 import searchRouter from './routes/api/search';
 import randomRouter from './routes/api/random';
 import top10Router from './routes/api/top10';
@@ -115,7 +115,7 @@ export const createApp = () => {
   app.use('/api/bookmarks', bookmarksRouter);
   app.use('/api/site-history', siteHistoryRouter);
   app.use('/api/wiki', wikiRouter);
-  app.use('/api/communities/:communityId/dnu', dnuRouter);
+  app.use('/api/communities/:communityId/dnc', dncRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/random', randomRouter);
   app.use('/api/top10', top10Router);

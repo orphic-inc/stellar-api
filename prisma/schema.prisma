@@ -820,7 +820,7 @@ model Community {
   releases           Release[]
   comments           Comment[]
   staff              User[]              @relation("CommunityStaff")
-  doNotUpload        DoNotUpload[]
+  doNotContribute    DoNotContribute[]
   bookmarks          BookmarkCommunity[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -929,7 +929,7 @@ model Contribution {
   @@map("contributions")
 }
 
-model DoNotUpload {
+model DoNotContribute {
   id          Int       @id @default(autoincrement())
   name        String
   comment     String    @db.Text
@@ -938,7 +938,7 @@ model DoNotUpload {
   userId      Int
   createdAt   DateTime  @default(now())
 
-  @@map("do_not_upload")
+  @@map("do_not_contribute")
 }
 
 // ─── Comment ──────────────────────────────────────────────────────────────────

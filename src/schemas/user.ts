@@ -68,9 +68,9 @@ export const siteHistorySchema = z.object({
   body: z.string().min(1, 'Body is required')
 });
 
-export const dnuSchema = z.object({
+export const dncSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  comment: z.string().min(1, 'Comment is required')
+  comment: z.string().optional().default('')
 });
 
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
@@ -83,4 +83,4 @@ export type GrantDonorInput = z.infer<typeof grantDonorSchema>;
 export type PmDraftInput = z.infer<typeof pmDraftSchema>;
 export type MassPmInput = z.infer<typeof massPmSchema>;
 export type SiteHistoryInput = z.infer<typeof siteHistorySchema>;
-export type DnuInput = z.infer<typeof dnuSchema>;
+export type DncInput = z.infer<typeof dncSchema>;

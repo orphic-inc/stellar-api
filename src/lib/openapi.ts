@@ -50,6 +50,7 @@ import {
   createTagAliasSchema,
   updateTagAliasSchema
 } from '../schemas/tagAliases';
+import { featuredAlbumSchema } from '../schemas/featuredAlbum';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
 import {
   createStaffGroupSchema,
@@ -5205,6 +5206,523 @@ registry.registerPath({
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
+});
+
+// ─── Login Watch / Sessions ───────────────────────────────────────────────────
+
+const SessionItem = registry.register(
+  'SessionItem',
+  z.object({
+    id: z.string(),
+    user: StaffUserRef,
+    ipAddress: z.string(),
+    userAgent: z.string().nullable(),
+    createdAt: z.string(),
+    lastActiveAt: z.string(),
+    revokedAt: z.string().nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/sessions',
+  tags: ['Staff'],
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      userId: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated session list',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(SessionItem), meta: PaginationMeta })
+        }
+      }
+    }
+  }
+});
+
+// ─── Invite Pool ──────────────────────────────────────────────────────────────
+
+const InviteItem = registry.register(
+  'InviteItem',
+  z.object({
+    id: z.number(),
+    inviter: StaffUserRef,
+    email: z.string(),
+    expires: z.string(),
+    reason: z.string(),
+    status: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/invites',
+  tags: ['Staff'],
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      status: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated invite list',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(InviteItem), meta: PaginationMeta })
+        }
+      }
+    }
+  }
+});
+
+// ─── Invite Tree ──────────────────────────────────────────────────────────────
+
+const InviteTreeItem = registry.register(
+  'InviteTreeItem',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    user: StaffUserRef,
+    inviterId: z.number(),
+    inviter: StaffUserRef.nullable(),
+    treeId: z.number(),
+    treeLevel: z.number(),
+    treePosition: z.number()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/invite-tree',
+  tags: ['Staff'],
+  request: { query: z.object({ page: z.string().optional() }) },
+  responses: {
+    200: {
+      description: 'Paginated invite tree',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(InviteTreeItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Ratio Watch ──────────────────────────────────────────────────────────────
+
+const RatioWatchItem = registry.register(
+  'RatioWatchItem',
+  z.object({
+    userId: z.number(),
+    user: StaffUserRef,
+    status: z.string(),
+    watchStartedAt: z.string().nullable(),
+    watchExpiresAt: z.string().nullable(),
+    leechDisabledAt: z.string().nullable(),
+    lastEvaluatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/ratio-watch',
+  tags: ['Staff'],
+  request: { query: z.object({ page: z.string().optional() }) },
+  responses: {
+    200: {
+      description: 'Paginated ratio watch list',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(RatioWatchItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Vanity House ─────────────────────────────────────────────────────────────
+
+const VanityHouseArtist = registry.register(
+  'VanityHouseArtist',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    vanityHouse: z.boolean(),
+    _count: z.object({ releases: z.number() })
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/artists/vanity-house',
+  tags: ['Staff'],
+  request: { query: z.object({ page: z.string().optional() }) },
+  responses: {
+    200: {
+      description: 'Paginated vanity house artists',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(VanityHouseArtist),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/artists/{id}/vanity-house',
+  tags: ['Staff'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': { schema: z.object({ vanityHouse: z.boolean() }) }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Artist updated',
+      content: { 'application/json': { schema: VanityHouseArtist } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Album of the Month ───────────────────────────────────────────────────────
+
+const FeaturedAlbumItem = registry.register(
+  'FeaturedAlbumItem',
+  z.object({
+    id: z.number(),
+    groupId: z.number(),
+    threadId: z.number(),
+    title: z.string(),
+    started: z.string(),
+    ended: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/announcements/album-of-month',
+  tags: ['Announcements'],
+  responses: {
+    200: {
+      description: 'Featured album list',
+      content: { 'application/json': { schema: z.array(FeaturedAlbumItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/announcements/album-of-month',
+  tags: ['Announcements'],
+  request: {
+    body: { content: { 'application/json': { schema: featuredAlbumSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Created',
+      content: { 'application/json': { schema: FeaturedAlbumItem } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/announcements/album-of-month/{albumId}',
+  tags: ['Announcements'],
+  request: { params: z.object({ albumId: z.string() }) },
+  responses: {
+    204: { description: 'Deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Deleted Collages ─────────────────────────────────────────────────────────
+
+const DeletedCollageItem = registry.register(
+  'DeletedCollageItem',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    user: StaffUserRef,
+    deletedAt: z.string().nullable(),
+    createdAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/collages/deleted',
+  tags: ['Collages'],
+  request: { query: z.object({ page: z.string().optional() }) },
+  responses: {
+    200: {
+      description: 'Paginated deleted collages',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(DeletedCollageItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Stats: Economy ───────────────────────────────────────────────────────────
+
+const EconomyGroupedItem = registry.register(
+  'EconomyGroupedItem',
+  z.object({
+    reason: z.string(),
+    _sum: z.object({ amount: z.string().nullable() }),
+    _count: z.number()
+  })
+);
+
+const EconomyTransactionItem = registry.register(
+  'EconomyTransactionItem',
+  z.object({
+    id: z.number(),
+    user: StaffUserRef,
+    amount: z.string(),
+    reason: z.string(),
+    createdAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/economy',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Economy stats',
+      content: {
+        'application/json': {
+          schema: z.object({
+            grouped: z.array(EconomyGroupedItem),
+            recent: z.array(EconomyTransactionItem)
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Stats: Releases ──────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/releases',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Release and contribution counts',
+      content: {
+        'application/json': {
+          schema: z.object({
+            releases: z.number(),
+            contributions: z.number(),
+            artists: z.number(),
+            byType: z.array(z.object({ type: z.string(), _count: z.number() })),
+            byLinkStatus: z.array(
+              z.object({ linkStatus: z.string(), _count: z.number() })
+            )
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Stats: Clients ───────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/clients',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Top user agent strings',
+      content: {
+        'application/json': {
+          schema: z.array(
+            z.object({ userAgent: z.string().nullable(), count: z.number() })
+          )
+        }
+      }
+    }
+  }
+});
+
+// ─── Stats: User Flow ─────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/user-flow',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Invite funnel and snapshot trend',
+      content: {
+        'application/json': {
+          schema: z.object({
+            inviteFunnel: z.array(
+              z.object({ status: z.string(), _count: z.number() })
+            ),
+            snapshots: z.array(
+              z.object({
+                bucketAt: z.string(),
+                totalUsers: z.number(),
+                activeThisMonth: z.number()
+              })
+            )
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── Stats: Site Info ─────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/stats/site-info',
+  tags: ['Stats'],
+  responses: {
+    200: {
+      description: 'Aggregate DB counts',
+      content: {
+        'application/json': {
+          schema: z.object({
+            totalUsers: z.number(),
+            enabledUsers: z.number(),
+            disabledUsers: z.number(),
+            releases: z.number(),
+            artists: z.number(),
+            contributions: z.number(),
+            communities: z.number(),
+            forumTopics: z.number(),
+            forumPosts: z.number(),
+            collages: z.number(),
+            wikiPages: z.number()
+          })
+        }
+      }
+    }
+  }
+});
+
+// ─── DNC (Do Not Contribute) ──────────────────────────────────────────────────
+
+const DncEntrySchema = registry.register(
+  'DncEntry',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    comment: z.string(),
+    communityId: z.number(),
+    userId: z.number(),
+    createdAt: z.string(),
+    addedBy: z.object({ id: z.number(), username: z.string() }).nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{communityId}/dnc',
+  tags: ['Communities'],
+  security: [{ cookieAuth: [] }],
+  parameters: [
+    {
+      name: 'communityId',
+      in: 'path',
+      required: true,
+      schema: { type: 'integer' }
+    }
+  ],
+  responses: {
+    200: {
+      description: 'DNC list for the community',
+      content: { 'application/json': { schema: z.array(DncEntrySchema) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/dnc',
+  tags: ['Communities'],
+  security: [{ cookieAuth: [] }],
+  parameters: [
+    {
+      name: 'communityId',
+      in: 'path',
+      required: true,
+      schema: { type: 'integer' }
+    }
+  ],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ name: z.string(), comment: z.string() })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Created DNC entry',
+      content: { 'application/json': { schema: DncEntrySchema } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{communityId}/dnc/{dncId}',
+  tags: ['Communities'],
+  security: [{ cookieAuth: [] }],
+  parameters: [
+    {
+      name: 'communityId',
+      in: 'path',
+      required: true,
+      schema: { type: 'integer' }
+    },
+    { name: 'dncId', in: 'path', required: true, schema: { type: 'integer' } }
+  ],
+  responses: { 204: { description: 'Deleted' } }
 });
 
 // ─── Document builder ─────────────────────────────────────────────────────────

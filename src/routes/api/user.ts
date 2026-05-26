@@ -21,7 +21,7 @@ import {
   parsedParams,
   parsedQuery
 } from '../../middleware/validate';
-import { Prisma, StatSnapshotPeriod } from '@prisma/client';
+import { Prisma, StatSnapshotPeriod, RatioPolicyStatus } from '@prisma/client';
 import {
   adminCreateUserSchema,
   userSettingsSchema,
@@ -300,10 +300,127 @@ router.delete(
   })
 );
 
+// ─── Login Watch / Invite Pool / Invite Tree / Ratio Watch (static — before /:id) ───
+
+const sessionsQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional()
+});
+type SessionsQuery = z.infer<typeof sessionsQuerySchema>;
+
+// GET /api/users/sessions — login watch (must be before /:id)
+router.get(
+  '/sessions',
+  ...requirePermission('admin'),
+  validateQuery(sessionsQuerySchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const { userId } = parsedQuery<SessionsQuery>(res);
+    const where = userId ? { userId } : {};
+    const [sessions, total] = await Promise.all([
+      prisma.userSession.findMany({
+        where,
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.userSession.count({ where })
+    ]);
+    paginatedResponse(res, sessions, total, pg);
+  })
+);
+
+const invitesQuerySchema = z.object({
+  status: z.string().optional()
+});
+type InvitesQuery = z.infer<typeof invitesQuerySchema>;
+
+// GET /api/users/invites — invite pool (must be before /:id)
+router.get(
+  '/invites',
+  ...requirePermission('admin'),
+  validateQuery(invitesQuerySchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const { status } = parsedQuery<InvitesQuery>(res);
+    const where = status ? { status: status as never } : {};
+    const [invites, total] = await Promise.all([
+      prisma.invite.findMany({
+        where,
+        include: { inviter: { select: { id: true, username: true } } },
+        orderBy: { expires: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.invite.count({ where })
+    ]);
+    const safe = invites.map(({ inviteKey: _k, ...rest }) => rest);
+    paginatedResponse(res, safe, total, pg);
+  })
+);
+
+// GET /api/users/invite-tree — site-wide invite tree (must be before /:id)
+router.get(
+  '/invite-tree',
+  ...requirePermission('admin'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const [trees, total] = await Promise.all([
+      prisma.inviteTree.findMany({
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: [
+          { treeId: 'asc' },
+          { treeLevel: 'asc' },
+          { treePosition: 'asc' }
+        ],
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.inviteTree.count()
+    ]);
+    const inviterIds = [...new Set(trees.map((t) => t.inviterId))];
+    const inviters = await prisma.user.findMany({
+      where: { id: { in: inviterIds } },
+      select: { id: true, username: true }
+    });
+    const inviterMap = new Map(inviters.map((u) => [u.id, u]));
+    const rows = trees.map((t) => ({
+      ...t,
+      inviter: inviterMap.get(t.inviterId) ?? null
+    }));
+    paginatedResponse(res, rows, total, pg);
+  })
+);
+
+// GET /api/users/ratio-watch — users on ratio watch or leech-disabled (must be before /:id)
+router.get(
+  '/ratio-watch',
+  ...requirePermission('admin'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const where = {
+      status: {
+        in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.LEECH_DISABLED]
+      }
+    };
+    const [entries, total] = await Promise.all([
+      prisma.ratioPolicyState.findMany({
+        where,
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: { watchStartedAt: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.ratioPolicyState.count({ where })
+    ]);
+    paginatedResponse(res, entries, total, pg);
+  })
+);
+
 // GET /api/users/warnings — site-wide staff warning log (must be before /:id)
 router.get(
   '/warnings',
-  ...requirePermission('staff'),
+  ...requirePermission('admin'),
   validateQuery(warningsQuerySchema),
   authHandler(async (req, res) => {
     const pg = parsePage(req);

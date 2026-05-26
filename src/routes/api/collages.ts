@@ -58,6 +58,29 @@ const collageInclude = {
 // Personal collages: categoryId === 0
 const isPersonal = (categoryId: number) => categoryId === 0;
 
+// ─── GET /api/collages/deleted — staff recovery list (before /:id) ───────────
+
+router.get(
+  '/deleted',
+  ...requirePermission('collages_moderate'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const [collages, total] = await Promise.all([
+      prisma.collage.findMany({
+        where: { isDeleted: true, categoryId: { gt: 0 } },
+        skip: pg.skip,
+        take: pg.limit,
+        orderBy: { deletedAt: 'desc' },
+        include: { user: { select: { id: true, username: true } } }
+      }),
+      prisma.collage.count({
+        where: { isDeleted: true, categoryId: { gt: 0 } }
+      })
+    ]);
+    paginatedResponse(res, collages, total, pg);
+  })
+);
+
 // ─── GET /api/collages ────────────────────────────────────────────────────────
 
 router.get(

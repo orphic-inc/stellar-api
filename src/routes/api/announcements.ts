@@ -15,6 +15,10 @@ import {
   type AnnouncementInput,
   type GlobalNoticeInput
 } from '../../schemas/announcement';
+import {
+  featuredAlbumSchema,
+  type FeaturedAlbumInput
+} from '../../schemas/featuredAlbum';
 import { sanitizePlain } from '../../lib/sanitize';
 import { emitNotifications } from '../../lib/notifications';
 
@@ -63,6 +67,60 @@ router.post(
       return created;
     });
     res.status(201).json(news);
+  })
+);
+
+// GET /api/announcements/album-of-month — list all featured albums (staff)
+router.get(
+  '/album-of-month',
+  ...requirePermission('news_manage'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const albums = await prisma.featuredAlbum.findMany({
+      orderBy: { started: 'desc' }
+    });
+    res.json(albums);
+  })
+);
+
+// POST /api/announcements/album-of-month — create featured album entry (staff)
+router.post(
+  '/album-of-month',
+  ...requirePermission('news_manage'),
+  validate(featuredAlbumSchema),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const { groupId, threadId, title, started, ended } =
+      parsedBody<FeaturedAlbumInput>(res);
+    const album = await prisma.featuredAlbum.create({
+      data: {
+        groupId,
+        threadId,
+        title,
+        started: new Date(started),
+        ended: new Date(ended)
+      }
+    });
+    res.status(201).json(album);
+  })
+);
+
+const albumIdParamsSchema = z.object({
+  albumId: z.coerce.number().int().positive()
+});
+
+// DELETE /api/announcements/album-of-month/:albumId — delete featured album (staff)
+router.delete(
+  '/album-of-month/:albumId',
+  ...requirePermission('news_manage'),
+  validateParams(albumIdParamsSchema),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const { albumId } = parsedParams<{ albumId: number }>(res);
+    const existing = await prisma.featuredAlbum.findUnique({
+      where: { id: albumId }
+    });
+    if (!existing)
+      return res.status(404).json({ msg: 'Featured album not found' });
+    await prisma.featuredAlbum.delete({ where: { id: albumId } });
+    res.status(204).send();
   })
 );
 

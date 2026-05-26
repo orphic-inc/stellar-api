@@ -60,6 +60,49 @@ router.get(
   })
 );
 
+// GET /api/artists/vanity-house — paginated list of vanity house artists (staff)
+router.get(
+  '/vanity-house',
+  ...requirePermission('admin'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pg = parsePage(req);
+    const [artists, total] = await Promise.all([
+      prisma.artist.findMany({
+        where: { vanityHouse: true },
+        skip: pg.skip,
+        take: pg.limit,
+        include: { _count: { select: { releases: true } } },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.artist.count({ where: { vanityHouse: true } })
+    ]);
+    paginatedResponse(res, artists, total, pg);
+  })
+);
+
+const vanityHouseBodySchema = z.object({ vanityHouse: z.boolean() });
+
+// PUT /api/artists/:id/vanity-house — toggle vanity house status (news_manage)
+router.put(
+  '/:id/vanity-house',
+  ...requirePermission('news_manage'),
+  validateParams(artistIdParamsSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const parsed = vanityHouseBodySchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ msg: 'vanityHouse (boolean) required' });
+    const artist = await prisma.artist.findUnique({ where: { id } });
+    if (!artist) return res.status(404).json({ msg: 'Artist not found' });
+    const updated = await prisma.artist.update({
+      where: { id },
+      data: { vanityHouse: parsed.data.vanityHouse },
+      include: { _count: { select: { releases: true } } }
+    });
+    res.json(updated);
+  })
+);
+
 // Static-segment routes MUST come before /:id to avoid being shadowed
 
 // GET /api/artists/history/:artistId
