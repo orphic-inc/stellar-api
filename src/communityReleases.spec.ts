@@ -274,73 +274,33 @@ describe('PUT /api/communities/:communityId/releases/:releaseId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('updates mutable fields and tag sets', async () => {
+  it('updates mutable metadata fields', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
-    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.findFirst
+      .mockResolvedValueOnce(makeRelease() as never)
+      .mockResolvedValueOnce(
+        makeRelease({ title: 'Updated', releaseTags: [] }) as never
+      );
     prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
     prismaMock.release.update.mockResolvedValue(
-      makeRelease({
-        title: 'Updated',
-        releaseTags: [
-          {
-            tagId: 8,
-            tag: { id: 8, name: 'fusion', occurrences: 1 }
-          }
-        ]
-      }) as never
+      makeRelease({ title: 'Updated', releaseTags: [] }) as never
     );
-    prismaMock.tag.findMany.mockResolvedValue([
-      { id: 8, name: 'fusion' }
-    ] as never);
-    prismaMock.releaseTag.create.mockResolvedValue({ id: 99 } as never);
     prismaMock.release.findUniqueOrThrow.mockResolvedValue(
-      makeRelease({
-        title: 'Updated',
-        releaseTags: [
-          {
-            id: 81,
-            tagId: 8,
-            positiveVotes: 3,
-            negativeVotes: 1,
-            createdAt: new Date('2024-01-01T00:00:00Z'),
-            tag: { id: 8, name: 'fusion', occurrences: 1 },
-            user: { id: 7, username: 'user' },
-            votes: []
-          }
-        ]
-      }) as never
+      makeRelease({ title: 'Updated', releaseTags: [] }) as never
     );
 
     const res = await request(app)
       .put('/api/communities/1/releases/3')
-      .send({
-        title: 'Updated',
-        tagIds: [8]
-      });
+      .send({ title: 'Updated' });
 
     expect(res.status).toBe(200);
     expect(prismaMock.release.update).toHaveBeenCalledWith({
       where: { id: 3 },
-      data: {
-        title: 'Updated'
-      },
-      include: { artist: true, releaseTags: { include: { tag: true } } }
-    });
-    expect(prismaMock.releaseTag.deleteMany).toHaveBeenCalledWith({
-      where: { releaseId: 3, tagId: 7 }
-    });
-    expect(prismaMock.releaseTag.create).toHaveBeenCalledWith({
-      data: {
-        releaseId: 3,
-        tagId: 8,
-        userId: 7,
-        positiveVotes: 3,
-        negativeVotes: 1
-      }
+      data: { title: 'Updated' }
     });
     expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -364,7 +324,11 @@ describe('PUT /api/communities/:communityId/releases/:releaseId', () => {
   });
 
   it('allows a contributor without communities_manage to edit the release', async () => {
-    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.findFirst
+      .mockResolvedValueOnce(makeRelease() as never)
+      .mockResolvedValueOnce(
+        makeRelease({ title: 'Updated by Contributor' }) as never
+      );
     prismaMock.contribution.findFirst.mockResolvedValue({ id: 5 } as never);
     prismaMock.release.update.mockResolvedValue(
       makeRelease({ title: 'Updated by Contributor' }) as never
@@ -766,7 +730,9 @@ describe('DELETE /api/communities/:communityId/releases/:releaseId/tags/:tagId',
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
-    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.release.findFirst
+      .mockResolvedValueOnce({ id: 3 } as never)
+      .mockResolvedValueOnce(makeRelease() as never);
     prismaMock.tag.findUnique.mockResolvedValue({ name: 'jazz' } as never);
     prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
