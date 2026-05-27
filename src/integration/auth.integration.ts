@@ -15,7 +15,12 @@ const registerFixtureUser = async (
   email: string,
   password: string
 ) => {
-  const result = await registerUser(username, email, password);
+  const result = await registerUser({
+    username,
+    email,
+    password,
+    registrationMode: 'open'
+  });
   expect(result.ok).toBe(true);
   if (!result.ok) {
     throw new Error('Failed to register fixture user');
@@ -25,11 +30,12 @@ const registerFixtureUser = async (
 
 describe('registerUser', () => {
   it('creates user, userSettings, and profile in a single transaction', async () => {
-    const result = await registerUser(
-      'alice',
-      'alice@example.com',
-      'password1'
-    );
+    const result = await registerUser({
+      username: 'alice',
+      email: 'alice@example.com',
+      password: 'password1',
+      registrationMode: 'open'
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -52,16 +58,22 @@ describe('registerUser', () => {
   it('returns user_exists when username or email is already taken', async () => {
     await registerFixtureUser('alice', 'alice@example.com', 'password1');
 
-    const result = await registerUser(
-      'alice',
-      'other@example.com',
-      'password1'
-    );
+    const result = await registerUser({
+      username: 'alice',
+      email: 'other@example.com',
+      password: 'password1',
+      registrationMode: 'open'
+    });
     expect(result).toEqual({ ok: false, reason: 'user_exists' });
   });
 
   it('stores password as a bcrypt hash, never plaintext', async () => {
-    const result = await registerUser('bob', 'bob@example.com', 'password2');
+    const result = await registerUser({
+      username: 'bob',
+      email: 'bob@example.com',
+      password: 'password2',
+      registrationMode: 'open'
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
