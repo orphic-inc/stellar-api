@@ -2159,3 +2159,61 @@ model SiteStatSnapshot {
   @@index([capturedAt])
   @@map("site_stat_snapshots")
 }
+
+// ─── Dev Tools ────────────────────────────────────────────────────────────────
+
+/// Tracks a single test-data generation run for cleanup and auditing.
+/// Only created in non-production environments.
+model DevSeedRun {
+  id                 String            @id @default(cuid())
+  label              String?
+  mode               String            // 'isolated' | 'integrated'
+  config             Json              // GenerateConfig snapshot
+  summary            Json              // Record<entityType, count>
+  warnings           Json?             // string[]
+  cleanupStatus      String            @default("active")
+  // active | cleaning | cleaned | partial | failed
+  reversibilityLevel String            @default("full")
+  // full | partial — set to partial if any non-reversible mutation was tracked
+  actorId            Int
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  records   DevSeedRecord[]
+  mutations DevSeedMutation[]
+
+  @@map("dev_seed_runs")
+}
+
+/// One row created by a DevSeedRun — pk is Json to support Int, String, and composite keys.
+model DevSeedRecord {
+  id         String     @id @default(cuid())
+  runId      String
+  run        DevSeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  entityType String     // e.g. "User", "WikiAlias", "UserSecondaryRank"
+  pk         Json       // { id: 7 } or { alias: "foo" } or { userId: 2, userRankId: 5 }
+  createdAt  DateTime   @default(now())
+
+  @@index([runId])
+  @@index([entityType])
+  @@map("dev_seed_records")
+}
+
+/// Mutation to a pre-existing shared row — tracked so cleanup can revert it.
+/// Used in integrated mode when existing forums, tags, etc. are mutated.
+model DevSeedMutation {
+  id         String     @id @default(cuid())
+  runId      String
+  run        DevSeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  entityType String
+  pk         Json
+  mutation   String     // e.g. "counter_increment", "field_update", "relation_connect"
+  before     Json?
+  after      Json?
+  reversible Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  @@index([runId])
+  @@index([entityType])
+  @@map("dev_seed_mutations")
+}

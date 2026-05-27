@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { type Router, Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -127,6 +127,13 @@ export const createApp = () => {
   app.use('/api/friends', friendsRouter);
   app.use('/api/tag-aliases', tagAliasesRouter);
 
+  // Dev tools — only mounted outside production
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const devToolsRouter: Router = require('./routes/api/devTools').default;
+    app.use('/api/dev', devToolsRouter);
+  }
+
   app.use(
     (
       err: Error & { statusCode?: number },
@@ -155,9 +162,11 @@ export const createApp = () => {
     }
   );
 
-  startLinkHealthJob();
-  startStatsJob();
-  startDonorExpiryJob();
+  if (process.env.DISABLE_BACKGROUND_JOBS !== '1') {
+    startLinkHealthJob();
+    startStatsJob();
+    startDonorExpiryJob();
+  }
 
   return app;
 };
