@@ -9,7 +9,7 @@ import {
 } from '../lib/rankPermissions';
 import { getUserRankAccess } from '../lib/userRankAccess';
 
-export { VALID_PERMISSIONS };
+export { VALID_PERMISSIONS, hasPermission };
 export type { Permission };
 
 export const loadPermissions = async (
@@ -26,14 +26,6 @@ export const loadPermissions = async (
   res.locals.userPerms = (access?.permissions ??
     normalizePermissions(null)) as Record<string, boolean>;
   return res.locals.userPerms;
-};
-
-export const isModerator = async (
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<boolean> => {
-  const perms = await loadPermissions(req, res);
-  return !!(perms['forums_moderate'] || perms['admin'] || perms['staff']);
 };
 
 // Like requirePermission('admin') but does NOT let staff satisfy the gate.

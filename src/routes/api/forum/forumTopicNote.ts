@@ -4,7 +4,10 @@ import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createTopicNote } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
-import { isModerator } from '../../../middleware/permissions';
+import {
+  loadPermissions,
+  hasPermission
+} from '../../../middleware/permissions';
 import type { AuthenticatedRequest } from '../../../types/auth';
 import {
   parsedBody,
@@ -27,7 +30,13 @@ const requireModerator = async (
   res: Response,
   next: NextFunction
 ) => {
-  if (await isModerator(req as AuthenticatedRequest, res)) return next();
+  if (
+    hasPermission(
+      await loadPermissions(req as AuthenticatedRequest, res),
+      'forums_moderate'
+    )
+  )
+    return next();
   res.status(403).json({ msg: 'Not authorized' });
 };
 

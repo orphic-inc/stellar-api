@@ -10,8 +10,8 @@ import {
 import { requireAuth } from '../../middleware/auth';
 import {
   requirePermission,
-  isModerator,
-  loadPermissions
+  loadPermissions,
+  hasPermission
 } from '../../middleware/permissions';
 import {
   validate,
@@ -510,7 +510,7 @@ router.get(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { period } = parsedQuery<StatsPeriodQuery>(res);
-    const isStaff = await isModerator(req, res);
+    const isStaff = hasPermission(await loadPermissions(req, res), 'staff');
     const userAndSettings = await prisma.user.findUnique({
       where: { id },
       include: { userSettings: true }

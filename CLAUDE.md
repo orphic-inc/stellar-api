@@ -193,8 +193,11 @@ Any static-segment route (`/history/:artistId`, `/settings`) must be registered 
 ```ts
 requireAuth                                // sets req.user or 401
 ...requirePermission('admin')              // spread — includes requireAuth
-await isModerator(req, res)                // boolean; uses cached userRankId
+// Inline permission branch — name the exact permission required:
+const perms = await loadPermissions(req, res);
+if (!hasPermission(perms, 'forums_moderate')) { ... }
 ```
+Do not introduce named role checks (`isModerator`, `isStaffUser`). See `docs/adr/0001-granular-permission-checks.md`.
 
 ### Pagination
 ```ts

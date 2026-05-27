@@ -2,7 +2,11 @@ import express from 'express';
 import { z } from 'zod';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { requirePermission, isModerator } from '../../middleware/permissions';
+import {
+  requirePermission,
+  loadPermissions,
+  hasPermission
+} from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -129,7 +133,10 @@ router.get(
   validateParams(reportIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const isStaff = await isModerator(req, res);
+    const isStaff = hasPermission(
+      await loadPermissions(req, res),
+      'reports_manage'
+    );
     const result = await getReport(id, req.user.id, isStaff);
     if (!result.ok) {
       if (result.reason === 'forbidden')

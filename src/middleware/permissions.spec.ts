@@ -26,12 +26,7 @@ jest.mock('./auth', () => ({
   requireAuth: (...args: Parameters<RequestHandler>) => requireAuthMock(...args)
 }));
 
-import {
-  requirePermission,
-  requireOwnerOrPermission,
-  isModerator
-} from './permissions';
-import type { AuthenticatedRequest } from '../types/auth';
+import { requirePermission, requireOwnerOrPermission } from './permissions';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -171,44 +166,6 @@ describe('requireOwnerOrPermission', () => {
     const [, checkMw] = requireOwnerOrPermission(getOwnerNull, 'admin');
     await checkMw(req, res as unknown as Response, next);
     expect(next).toHaveBeenCalledWith();
-  });
-});
-
-// ─── isModerator ──────────────────────────────────────────────────────────────
-
-describe('isModerator', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  it('returns true when user has forums_moderate permission', async () => {
-    getUserRankAccessMock.mockResolvedValue({
-      permissions: { forums_moderate: true }
-    });
-    const [req, res] = makeReqRes();
-    const result = await isModerator(
-      req as unknown as AuthenticatedRequest,
-      res as unknown as Response
-    );
-    expect(result).toBe(true);
-  });
-
-  it('returns true when user has staff permission', async () => {
-    getUserRankAccessMock.mockResolvedValue({ permissions: { staff: true } });
-    const [req, res] = makeReqRes();
-    const result = await isModerator(
-      req as unknown as AuthenticatedRequest,
-      res as unknown as Response
-    );
-    expect(result).toBe(true);
-  });
-
-  it('returns false when user has no moderator permissions', async () => {
-    getUserRankAccessMock.mockResolvedValue({ permissions: {} });
-    const [req, res] = makeReqRes();
-    const result = await isModerator(
-      req as unknown as AuthenticatedRequest,
-      res as unknown as Response
-    );
-    expect(result).toBe(false);
   });
 });
 

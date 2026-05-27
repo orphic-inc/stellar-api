@@ -4,7 +4,10 @@ import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import { createPost, updatePost, deletePost } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
-import { isModerator } from '../../../middleware/permissions';
+import {
+  loadPermissions,
+  hasPermission
+} from '../../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -183,7 +186,7 @@ router.get(
         .status(403)
         .json({ msg: 'Insufficient class to read this forum' });
     }
-    if (!(await isModerator(req, res))) {
+    if (!hasPermission(await loadPermissions(req, res), 'forums_moderate')) {
       return res
         .status(403)
         .json({ msg: 'Insufficient permission to view edit history' });
@@ -255,7 +258,10 @@ router.put(
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     const isOwner = post.authorId === req.user.id;
-    if (!isOwner && !(await isModerator(req, res)))
+    if (
+      !isOwner &&
+      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
+    )
       return res.status(403).json({ msg: 'Not authorized' });
 
     await updatePost(id, req.user.id, post.body, body, forumTopicId);
@@ -296,7 +302,10 @@ router.delete(
     if (!post) return res.status(404).json({ msg: 'Post not found' });
 
     const isOwner = post.authorId === req.user.id;
-    if (!isOwner && !(await isModerator(req, res))) {
+    if (
+      !isOwner &&
+      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
+    ) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 

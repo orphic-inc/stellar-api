@@ -9,7 +9,10 @@ import {
   trashTopic
 } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
-import { isModerator } from '../../../middleware/permissions';
+import {
+  loadPermissions,
+  hasPermission
+} from '../../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -163,7 +166,10 @@ router.put(
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
     const isOwner = topic.authorId === req.user.id;
-    if (!isOwner && !(await isModerator(req, res))) {
+    if (
+      !isOwner &&
+      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
+    ) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
@@ -189,7 +195,10 @@ router.delete(
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
     const isOwner = topic.authorId === req.user.id;
-    if (!isOwner && !(await isModerator(req, res))) {
+    if (
+      !isOwner &&
+      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
+    ) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
@@ -213,7 +222,7 @@ router.post(
     });
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
 
-    if (!(await isModerator(req, res))) {
+    if (!hasPermission(await loadPermissions(req, res), 'forums_moderate')) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 

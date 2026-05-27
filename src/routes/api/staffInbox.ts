@@ -1,7 +1,11 @@
 import express from 'express';
 import { z } from 'zod';
 import { authHandler } from '../../modules/asyncHandler';
-import { requirePermission, isModerator } from '../../middleware/permissions';
+import {
+  requirePermission,
+  loadPermissions,
+  hasPermission
+} from '../../middleware/permissions';
 import { requireAuth } from '../../middleware/auth';
 import { prisma } from '../../lib/prisma';
 import {
@@ -197,7 +201,10 @@ router.get(
   validateParams(ticketIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const isStaff = await isModerator(req, res);
+    const isStaff = hasPermission(
+      await loadPermissions(req, res),
+      'staff_inbox_manage'
+    );
     const result = await viewTicket(id, req.user.id, isStaff);
     if (!result.ok) return res.status(404).json({ msg: 'Ticket not found' });
     res.json(result.ticket);
@@ -213,7 +220,10 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { body } = parsedBody<ReplyInput>(res);
-    const isStaff = await isModerator(req, res);
+    const isStaff = hasPermission(
+      await loadPermissions(req, res),
+      'staff_inbox_manage'
+    );
     const result = await replyToTicket(id, req.user.id, body, isStaff);
     if (!result.ok) {
       let status = 404;
@@ -232,7 +242,10 @@ router.post(
   validateParams(ticketIdSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const isStaff = await isModerator(req, res);
+    const isStaff = hasPermission(
+      await loadPermissions(req, res),
+      'staff_inbox_manage'
+    );
     const result = await resolveTicket(id, req.user.id, isStaff);
     if (!result.ok) {
       let status = 404;

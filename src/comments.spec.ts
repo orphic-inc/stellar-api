@@ -468,7 +468,7 @@ describe('DELETE /api/comments/:id', () => {
 
   it("allows a moderator to delete another user's comment", async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ forums_moderate: true })
+      makeUserRank({ reports_manage: true })
     );
     prismaMock.comment.findUnique.mockResolvedValue(
       makeComment({ id: 12, authorId: 99 }) as never

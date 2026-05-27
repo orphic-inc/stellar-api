@@ -9,7 +9,7 @@ import {
 } from '../../lib/notifications';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { isModerator } from '../../middleware/permissions';
+import { loadPermissions, hasPermission } from '../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -277,7 +277,10 @@ router.delete(
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
 
     const isOwner = comment.authorId === req.user.id;
-    if (!isOwner && !(await isModerator(req, res))) {
+    if (
+      !isOwner &&
+      !hasPermission(await loadPermissions(req, res), 'reports_manage')
+    ) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 

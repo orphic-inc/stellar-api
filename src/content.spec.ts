@@ -499,7 +499,7 @@ describe('API content and shared flows', () => {
       makeComment({ id: 12, authorId: 99 })
     );
     prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ forums_moderate: true })
+      makeUserRank({ reports_manage: true })
     );
 
     const res = await request(app).delete('/api/comments/12');

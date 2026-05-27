@@ -378,7 +378,7 @@ describe('POST /api/forums/polls', () => {
       authorId: 99, // different user
       deletedAt: null
     } as never);
-    // isModerator checks userRank — default rank has no staff flag
+    // permission check: default rank has no forums_moderate flag
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
 
     const res = await request(app).post('/api/forums/polls').send({
