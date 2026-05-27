@@ -307,7 +307,7 @@ export async function generateUsers(
           data: {
             inviterId,
             inviteKey: `seed-${runId}-${i}`,
-            email: makeSeedEmail(`seed_invite_${i}`),
+            email: makeSeedEmail(`seed_invite_${i + runOffset}`),
             status: 'accepted',
             expires: now
           }

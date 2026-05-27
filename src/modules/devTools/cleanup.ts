@@ -356,8 +356,8 @@ export async function cleanupRun(
       if (contribIds.length > 0)
         orConditions.push({ contributionId: { in: contribIds } });
       if (userIds.length > 0) {
-        orConditions.push({ consumer: { userId: { in: userIds } } });
-        orConditions.push({ contributor: { userId: { in: userIds } } });
+        orConditions.push({ consumerId: { in: userIds } });
+        orConditions.push({ contributorId: { in: userIds } });
       }
       if (orConditions.length === 0) return Promise.resolve({ count: 0 });
       return prisma.downloadAccessGrant.deleteMany({
