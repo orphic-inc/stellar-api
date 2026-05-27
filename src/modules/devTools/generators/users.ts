@@ -125,21 +125,23 @@ export async function generateUsers(
     }
 
     // Transfer bytes
-    const contributed =
-      archetype === 'regular'
-        ? randBool(0.5, rng)
-          ? 0n
-          : makeTransferBytes(rng) / 10n
-        : archetype === 'active'
-        ? makeTransferBytes(rng) / 5n
-        : makeTransferBytes(rng);
+    let contributed: bigint;
+    if (archetype === 'regular') {
+      contributed = randBool(0.5, rng) ? 0n : makeTransferBytes(rng) / 10n;
+    } else if (archetype === 'active') {
+      contributed = makeTransferBytes(rng) / 5n;
+    } else {
+      contributed = makeTransferBytes(rng);
+    }
 
-    const consumed =
-      archetype === 'regular'
-        ? makeTransferBytes(rng) / 20n
-        : archetype === 'active'
-        ? makeTransferBytes(rng) / 10n
-        : makeTransferBytes(rng) / 5n;
+    let consumed: bigint;
+    if (archetype === 'regular') {
+      consumed = makeTransferBytes(rng) / 20n;
+    } else if (archetype === 'active') {
+      consumed = makeTransferBytes(rng) / 10n;
+    } else {
+      consumed = makeTransferBytes(rng) / 5n;
+    }
 
     const ratio =
       consumed === 0n ? 1.0 : Number(contributed) / Number(consumed);

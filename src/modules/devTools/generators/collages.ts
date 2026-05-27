@@ -91,12 +91,14 @@ export async function generateCollages(
       maxEntries > 0 ? Math.min(maxEntries, releases.length) : releases.length;
 
     // near-max for edge case collage
-    const entryCount =
-      config.includeEdgeCases && i === targetCount - 1
-        ? Math.min(effectiveMax, Math.max(effectiveMax - 2, 1))
-        : randBool(0.7, rng)
-        ? randInt(3, Math.min(20, effectiveMax), rng)
-        : randInt(1, Math.min(5, effectiveMax), rng);
+    let entryCount: number;
+    if (config.includeEdgeCases && i === targetCount - 1) {
+      entryCount = Math.min(effectiveMax, Math.max(effectiveMax - 2, 1));
+    } else if (randBool(0.7, rng)) {
+      entryCount = randInt(3, Math.min(20, effectiveMax), rng);
+    } else {
+      entryCount = randInt(1, Math.min(5, effectiveMax), rng);
+    }
 
     const selectedReleases = pickN(
       releases,

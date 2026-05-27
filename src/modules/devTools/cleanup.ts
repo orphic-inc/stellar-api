@@ -340,11 +340,30 @@ export async function cleanupRun(
   );
 
   // 7. Contributions, download grants
+  //
+  // DownloadAccessGrant has FKs to Consumer, Contributor, and Contribution.
+  // Deleting by tracked IDs alone can miss grants whose trackCreate call was
+  // swallowed by an outer try/catch in the generator. Use a belt-and-suspenders
+  // OR filter so any grant connected to a generated user or contribution is
+  // caught even if it was never individually tracked.
   deletedCounts['DownloadAccessGrant'] = await safeDeleteMany(
-    () =>
-      prisma.downloadAccessGrant.deleteMany({
-        where: { id: { in: getIds('DownloadAccessGrant') } }
-      }),
+    () => {
+      const orConditions: object[] = [];
+      const grantIds = getIds('DownloadAccessGrant');
+      const contribIds = getIds('Contribution');
+      const userIds = getIds('User');
+      if (grantIds.length > 0) orConditions.push({ id: { in: grantIds } });
+      if (contribIds.length > 0)
+        orConditions.push({ contributionId: { in: contribIds } });
+      if (userIds.length > 0) {
+        orConditions.push({ consumer: { userId: { in: userIds } } });
+        orConditions.push({ contributor: { userId: { in: userIds } } });
+      }
+      if (orConditions.length === 0) return Promise.resolve({ count: 0 });
+      return prisma.downloadAccessGrant.deleteMany({
+        where: { OR: orConditions }
+      });
+    },
     'DownloadAccessGrant',
     failedItems
   );
@@ -803,12 +822,14 @@ export async function cleanupRun(
     // Run may have been deleted already
   }
 
-  const status: CleanupResult['status'] =
-    failedItems.length === 0
-      ? 'cleaned'
-      : failedItems.length < 5
-      ? 'partial'
-      : 'failed';
+  let status: CleanupResult['status'];
+  if (failedItems.length === 0) {
+    status = 'cleaned';
+  } else if (failedItems.length < 5) {
+    status = 'partial';
+  } else {
+    status = 'failed';
+  }
 
   return {
     runId,

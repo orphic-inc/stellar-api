@@ -55,13 +55,15 @@ export async function generateWiki(
     const authorId = pick(users, rng);
     const createdAt = daysAgo(30, 3 * 365, rng);
 
-    // How many revisions this page will have
-    const revisionCount =
-      config.includeEdgeCases && i === 0
-        ? 1 // stub page with only 1 revision
-        : config.includeEdgeCases && i === 1
-        ? randInt(6, 8, rng) // large heavily-edited page
-        : randInt(1, 4, rng);
+    // How many revisions: stub (1), heavily-edited (6–8), or normal (1–4)
+    let revisionCount: number;
+    if (config.includeEdgeCases && i === 0) {
+      revisionCount = 1; // stub page with only 1 revision
+    } else if (config.includeEdgeCases && i === 1) {
+      revisionCount = randInt(6, 8, rng); // large heavily-edited page
+    } else {
+      revisionCount = randInt(1, 4, rng);
+    }
 
     // Access levels
     const minReadLevel =
