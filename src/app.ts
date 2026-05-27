@@ -1,4 +1,4 @@
-import express, { type Router, Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -58,6 +58,7 @@ import staffRouter from './routes/api/staff';
 import rulesRouter from './routes/api/rules';
 import friendsRouter from './routes/api/friends';
 import tagAliasesRouter from './routes/api/tagAliases';
+import devToolsRouter from './routes/api/devTools';
 
 const log = getLogger('app');
 
@@ -129,8 +130,6 @@ export const createApp = () => {
 
   // Dev tools — only mounted outside production
   if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const devToolsRouter: Router = require('./routes/api/devTools').default;
     app.use('/api/dev', devToolsRouter);
   }
 
