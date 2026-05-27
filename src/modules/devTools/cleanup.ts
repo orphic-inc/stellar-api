@@ -712,7 +712,28 @@ export async function cleanupRun(
     failedItems
   );
 
-  // 22. Tags (isolated mode — only seed.* tags)
+  // 22. DoNotContribute + Community
+  //     DoNotContribute references Community (no cascade) — must come first.
+  //     Community can only be deleted after Release (step 9), Contributor (step 21),
+  //     Request (step 6), and any direct child rows are gone.
+  deletedCounts['DoNotContribute'] = await safeDeleteMany(
+    () =>
+      prisma.doNotContribute.deleteMany({
+        where: { id: { in: getIds('DoNotContribute') } }
+      }),
+    'DoNotContribute',
+    failedItems
+  );
+  deletedCounts['Community'] = await safeDeleteMany(
+    () =>
+      prisma.community.deleteMany({
+        where: { id: { in: getIds('Community') } }
+      }),
+    'Community',
+    failedItems
+  );
+
+  // 23. Tags (isolated mode — only seed.* tags)
   if (getIds('Tag').length > 0) {
     deletedCounts['Tag'] = await safeDeleteMany(
       () =>
@@ -727,27 +748,15 @@ export async function cleanupRun(
     );
   }
 
-  // 23. User sessions, then user settings, profiles, users
+  // 24. User sessions, then users, then user settings + profiles.
+  //     User.userSettingsId and User.profileId are FKs pointing at UserSettings
+  //     and Profile, so the User row must be deleted BEFORE its settings/profile.
   deletedCounts['UserSession'] = await safeDeleteMany(
     () =>
       prisma.userSession.deleteMany({
         where: { userId: { in: getIds('User') } }
       }),
     'UserSession',
-    failedItems
-  );
-  deletedCounts['UserSettings'] = await safeDeleteMany(
-    () =>
-      prisma.userSettings.deleteMany({
-        where: { id: { in: getIds('UserSettings') } }
-      }),
-    'UserSettings',
-    failedItems
-  );
-  deletedCounts['Profile'] = await safeDeleteMany(
-    () =>
-      prisma.profile.deleteMany({ where: { id: { in: getIds('Profile') } } }),
-    'Profile',
     failedItems
   );
 
@@ -766,6 +775,21 @@ export async function cleanupRun(
       failedItems
     );
   }
+
+  deletedCounts['UserSettings'] = await safeDeleteMany(
+    () =>
+      prisma.userSettings.deleteMany({
+        where: { id: { in: getIds('UserSettings') } }
+      }),
+    'UserSettings',
+    failedItems
+  );
+  deletedCounts['Profile'] = await safeDeleteMany(
+    () =>
+      prisma.profile.deleteMany({ where: { id: { in: getIds('Profile') } } }),
+    'Profile',
+    failedItems
+  );
 
   // ─── Stage 2: Revert shared mutations (integrated mode) ───────────────────
 
