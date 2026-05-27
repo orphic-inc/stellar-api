@@ -279,6 +279,44 @@ export const updateTopic = async (
     }
   });
 
+type TrashTopicResult =
+  | { ok: true; topic: Awaited<ReturnType<typeof updateTopic>> }
+  | { ok: false; reason: 'not_found' | 'no_trash' | 'already_trash' };
+
+// Moves a topic to the designated Trash board, transferring topic/post
+// counters between the source forum and the trash forum.
+export const trashTopic = async (id: number): Promise<TrashTopicResult> => {
+  const topic = await prisma.forumTopic.findFirst({
+    where: { id, deletedAt: null }
+  });
+  if (!topic) return { ok: false, reason: 'not_found' };
+
+  const trash = await prisma.forum.findFirst({ where: { isTrash: true } });
+  if (!trash) return { ok: false, reason: 'no_trash' };
+  if (topic.forumId === trash.id) return { ok: false, reason: 'already_trash' };
+
+  const postCount = await prisma.forumPost.count({
+    where: { forumTopicId: id }
+  });
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.forum.update({
+      where: { id: topic.forumId },
+      data: { numTopics: { decrement: 1 }, numPosts: { decrement: postCount } }
+    });
+    await tx.forum.update({
+      where: { id: trash.id },
+      data: { numTopics: { increment: 1 }, numPosts: { increment: postCount } }
+    });
+    return tx.forumTopic.update({
+      where: { id },
+      data: { forumId: trash.id, isSticky: false }
+    });
+  });
+
+  return { ok: true, topic: updated };
+};
+
 export const deleteForum = async (id: number): Promise<DeleteForumResult> => {
   const forum = await prisma.forum.findUnique({ where: { id } });
   if (!forum) return { ok: false, reason: 'not_found' };

@@ -913,6 +913,17 @@ export const getProfileByLookup = async (
   return buildProfileView(user, viewer, viewer.isOwner || viewer.isStaff);
 };
 
+// Paranoia is the single privacy control. Each level hides progressively more:
+//   0 = fully visible; 1 = hide email + last-seen; 2 = also hide contributed/
+//   consumed stats; 3 = also hide ratio/buffer.
+const paranoiaToVisibility = (level: number) => ({
+  showEmail: level < 1,
+  showLastSeen: level < 1,
+  showContributedStats: level < 2,
+  showConsumedStats: level < 2,
+  showRatioStats: level < 3
+});
+
 export const updateProfile = async (
   userId: number,
   data: {
@@ -972,9 +983,6 @@ export const updateProfile = async (
         ...(data.styledTooltips !== undefined && {
           styledTooltips: data.styledTooltips
         }),
-        ...(data.paranoia !== undefined && {
-          paranoia: data.paranoia
-        }),
         ...(data.notificationMethod !== undefined && {
           notificationMethod: data.notificationMethod
         }),
@@ -990,6 +998,10 @@ export const updateProfile = async (
         }),
         ...(data.showRatioStats !== undefined && {
           showRatioStats: data.showRatioStats
+        }),
+        ...(data.paranoia !== undefined && {
+          paranoia: data.paranoia,
+          ...paranoiaToVisibility(data.paranoia)
         })
       }
     })
