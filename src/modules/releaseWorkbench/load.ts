@@ -14,7 +14,10 @@ const MAX_PAGE_SIZE = 100;
 
 const normalizePage = (page?: number, limit?: number) => {
   const safePage = Math.max(1, page ?? 1);
-  const safeLimit = Math.min(MAX_PAGE_SIZE, Math.max(1, limit ?? DEFAULT_PAGE_SIZE));
+  const safeLimit = Math.min(
+    MAX_PAGE_SIZE,
+    Math.max(1, limit ?? DEFAULT_PAGE_SIZE)
+  );
   return { page: safePage, limit: safeLimit, skip: (safePage - 1) * safeLimit };
 };
 
@@ -147,18 +150,15 @@ export const getReleaseWorkbenchView = async (
   const isContributor = contributions.some(
     (contribution) => contribution.userId === ref.actorId
   );
-  const {
-    releaseTags: _releaseTags,
-    contributions: _contributions,
-    voteAggregate,
-    ...releaseView
-  } = release;
+  const releaseView = { ...release };
+  delete (releaseView as { releaseTags?: unknown }).releaseTags;
+  delete (releaseView as { contributions?: unknown }).contributions;
 
   return {
     release: {
       ...releaseView,
       contributions,
-      voteAggregate: voteAggregate ?? null
+      voteAggregate: release.voteAggregate ?? null
     },
     tags,
     myVote,

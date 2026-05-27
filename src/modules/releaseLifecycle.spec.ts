@@ -20,7 +20,10 @@ jest.mock('../lib/prisma', () => ({
   prisma: prismaMock
 }));
 
-import { createCommunityRelease, deleteCommunityRelease } from './releaseLifecycle';
+import {
+  createCommunityRelease,
+  deleteCommunityRelease
+} from './releaseLifecycle';
 
 const makeRelease = (overrides: Record<string, unknown> = {}) => ({
   id: 3,
@@ -50,7 +53,9 @@ describe('releaseLifecycle', () => {
   it('creates community releases with initial tags and history', async () => {
     prismaMock.community.findUnique.mockResolvedValue({ id: 1 } as never);
     prismaMock.release.create.mockResolvedValue({ id: 3 } as never);
-    prismaMock.tag.findMany.mockResolvedValue([{ id: 7, name: 'jazz' }] as never);
+    prismaMock.tag.findMany.mockResolvedValue([
+      { id: 7, name: 'jazz' }
+    ] as never);
     prismaMock.releaseTag.create.mockResolvedValue({ id: 77 } as never);
     prismaMock.release.findUniqueOrThrow.mockResolvedValue(
       makeRelease({

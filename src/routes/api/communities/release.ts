@@ -88,7 +88,10 @@ router.get(
       communityId,
       releaseId
     });
-    const history = await session.getHistoryPage({ page: pg.page, limit: pg.limit });
+    const history = await session.getHistoryPage({
+      page: pg.page,
+      limit: pg.limit
+    });
     res.json({
       data: history.data,
       meta: {
@@ -276,7 +279,10 @@ router.delete(
       permissions: req.user.permissions
     });
     const view = await session.vote({ direction: 'clear' });
-    res.json({ myVote: view.myVote, voteAggregate: view.release.voteAggregate });
+    res.json({
+      myVote: view.myVote,
+      voteAggregate: view.release.voteAggregate
+    });
   })
 );
 

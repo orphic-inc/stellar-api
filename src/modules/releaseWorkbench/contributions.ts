@@ -6,10 +6,7 @@ import { addContributionToRelease } from '../contribution';
 import { getSettings } from '../settings';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { snapshotRelease } from './snapshot';
-import type {
-  ReleaseContributionView,
-  ReleaseWorkbenchRef
-} from './types';
+import type { ReleaseContributionView, ReleaseWorkbenchRef } from './types';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
 
 export const attachReleaseWorkbenchContribution = async (

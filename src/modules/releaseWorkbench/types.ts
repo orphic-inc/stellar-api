@@ -101,16 +101,25 @@ export type UpdateReleaseMetadataInput = {
 
 export type ReleaseWorkbenchSession = {
   getView(): Promise<ReleaseWorkbenchView>;
-  getHistoryPage(input: { page?: number; limit?: number }): Promise<ReleaseHistoryPage>;
-  updateMetadata(input: UpdateReleaseMetadataInput): Promise<ReleaseWorkbenchView>;
-  vote(input: { direction: 'up' | 'down' | 'clear' }): Promise<ReleaseWorkbenchView>;
+  getHistoryPage(input: {
+    page?: number;
+    limit?: number;
+  }): Promise<ReleaseHistoryPage>;
+  updateMetadata(
+    input: UpdateReleaseMetadataInput
+  ): Promise<ReleaseWorkbenchView>;
+  vote(input: {
+    direction: 'up' | 'down' | 'clear';
+  }): Promise<ReleaseWorkbenchView>;
   addTag(input: { name: string }): Promise<ReleaseWorkbenchView>;
   voteTag(input: {
     tagId: number;
     direction: 'up' | 'down';
   }): Promise<ReleaseTagView>;
   removeTag(input: { tagId: number }): Promise<ReleaseWorkbenchView>;
-  attachContribution(input: AddContributionToReleaseInput): Promise<ReleaseContributionView>;
+  attachContribution(
+    input: AddContributionToReleaseInput
+  ): Promise<ReleaseContributionView>;
   revertHistory(input: { historyId: number }): Promise<ReleaseWorkbenchView>;
 };
 

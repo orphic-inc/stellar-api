@@ -2,7 +2,11 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { getReleaseWorkbenchView } from './load';
-import { changedReleaseFields, snapshotRelease, summarizeReleaseChanges } from './snapshot';
+import {
+  changedReleaseFields,
+  snapshotRelease,
+  summarizeReleaseChanges
+} from './snapshot';
 import type {
   ReleaseWorkbenchRef,
   ReleaseWorkbenchView,
@@ -28,7 +32,10 @@ export const updateReleaseWorkbenchMetadata = async (
     requireCommunityAccess: false
   });
   if (!authority.canEditMetadata) {
-    throw new AppError(403, 'Must be a contributor or staff to edit this release');
+    throw new AppError(
+      403,
+      'Must be a contributor or staff to edit this release'
+    );
   }
 
   const before = snapshotRelease(existing);
@@ -38,7 +45,9 @@ export const updateReleaseWorkbenchMetadata = async (
       where: { id: ref.releaseId },
       data: {
         ...(input.title !== undefined && { title: input.title }),
-        ...(input.description !== undefined && { description: input.description }),
+        ...(input.description !== undefined && {
+          description: input.description
+        }),
         ...(input.image !== undefined && { image: input.image }),
         ...(input.year !== undefined && { year: input.year }),
         ...(input.isEdition !== undefined && { isEdition: input.isEdition }),
