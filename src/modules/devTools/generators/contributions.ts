@@ -192,14 +192,14 @@ export async function generateContributions(
           );
         }
 
-        // DownloadAccessGrant
+        // DownloadAccessGrant — consumerId/contributorId reference User.id (not Consumer/Contributor PK)
         try {
           const amountBytes = makeTransferBytes(rng) / 100n; // smaller portion
           const grantedAt = daysAgo(0, 365, rng);
           const grant = await prisma.downloadAccessGrant.create({
             data: {
-              consumerId: consumer.id,
-              contributorId: contributor.id,
+              consumerId: consumer.userId,
+              contributorId: contributor.userId,
               contributionId: contribution.id,
               amountBytes,
               status: 'COMPLETED',

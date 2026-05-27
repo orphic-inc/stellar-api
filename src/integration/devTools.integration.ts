@@ -157,6 +157,12 @@ describe('cleanupRun — isolated mode', () => {
 
     const cleanup = await cleanupRun(testPrisma, runId);
 
+    if (cleanup.failedItems.length > 0) {
+      console.error(
+        'Cleanup failedItems:',
+        JSON.stringify(cleanup.failedItems, null, 2)
+      );
+    }
     expect(cleanup.status).toBe('cleaned');
     expect(cleanup.failedItems).toHaveLength(0);
 
@@ -182,6 +188,12 @@ describe('cleanupRun — isolated mode', () => {
     const { runId } = result;
 
     const first = await cleanupRun(testPrisma, runId);
+    if (first.failedItems.length > 0) {
+      console.error(
+        'First cleanup failedItems:',
+        JSON.stringify(first.failedItems, null, 2)
+      );
+    }
     expect(first.status).toBe('cleaned');
 
     // Second cleanup — all rows already gone, should still succeed
