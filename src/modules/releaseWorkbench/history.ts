@@ -31,7 +31,10 @@ export const revertReleaseWorkbenchHistory = async (
 
   const restoreState = extractRevisionSnapshot(targetEntry);
   if (!restoreState) {
-    throw new AppError(422, 'History entry does not contain a restorable snapshot');
+    throw new AppError(
+      422,
+      'History entry does not contain a restorable snapshot'
+    );
   }
 
   const existing = await prisma.release.findFirst({

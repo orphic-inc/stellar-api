@@ -2,7 +2,10 @@ import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import type { CreateGroupInput } from '../schemas/community';
-import { snapshotRelease, type ReleaseSnapshot } from './releaseWorkbench/snapshot';
+import {
+  snapshotRelease,
+  type ReleaseSnapshot
+} from './releaseWorkbench/snapshot';
 
 const buildPlainTags = (
   releaseTags: Array<{ tag: { id: number; name: string; occurrences: number } }>
@@ -12,10 +15,7 @@ const buildPlainTags = (
     .sort((a, b) => a.name.localeCompare(b.name));
 
 const attachTagWithVotes = async (
-  tx: Pick<
-    typeof prisma,
-    'releaseTag' | 'releaseTagVote' | 'releaseHistory'
-  >,
+  tx: Pick<typeof prisma, 'releaseTag' | 'releaseTagVote' | 'releaseHistory'>,
   releaseId: number,
   actorId: number,
   tag: { id: number; name: string },

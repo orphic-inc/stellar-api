@@ -1,4 +1,8 @@
-import { Prisma, ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
+import {
+  Prisma,
+  ReleaseHistoryAction,
+  ReleaseTagVoteDirection
+} from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { resolveTagName } from '../tag';
@@ -131,10 +135,14 @@ export const addReleaseWorkbenchTag = async (
     });
     const postAddSnapshot: ReleaseSnapshot = {
       ...snapshotRelease(currentRelease),
-      tagIds: [...currentRelease.releaseTags.map((rt) => rt.tag.id), tag.id].sort(
-        (a, b) => a - b
-      ),
-      tagNames: [...currentRelease.releaseTags.map((rt) => rt.tag.name), tag.name].sort()
+      tagIds: [
+        ...currentRelease.releaseTags.map((rt) => rt.tag.id),
+        tag.id
+      ].sort((a, b) => a - b),
+      tagNames: [
+        ...currentRelease.releaseTags.map((rt) => rt.tag.name),
+        tag.name
+      ].sort()
     };
     await attachTagWithVotes(
       tx,
@@ -314,7 +322,9 @@ export const removeReleaseWorkbenchTag = async (
         action: ReleaseHistoryAction.tag_removed,
         summary: `Tag "${tag?.name ?? `#${input.tagId}`}" removed`,
         changedFields: ['tags'],
-        before: tag ? ({ tagId: input.tagId, name: tag.name } as never) : undefined,
+        before: tag
+          ? ({ tagId: input.tagId, name: tag.name } as never)
+          : undefined,
         snapshot: postRemovalSnapshot as never
       }
     });

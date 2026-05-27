@@ -75,7 +75,9 @@ const getUserRankAccessMock = getUserRankAccess as jest.MockedFunction<
   typeof getUserRankAccess
 >;
 const addContributionToReleaseMock =
-  addContributionToRelease as jest.MockedFunction<typeof addContributionToRelease>;
+  addContributionToRelease as jest.MockedFunction<
+    typeof addContributionToRelease
+  >;
 const getSettingsMock = getSettings as jest.MockedFunction<typeof getSettings>;
 const recomputeVoteAggregateMock =
   recomputeVoteAggregate as jest.MockedFunction<typeof recomputeVoteAggregate>;
@@ -157,7 +159,9 @@ describe('releaseWorkbench session', () => {
         contributions: [{ id: 5, userId: 7 }]
       }) as never
     );
-    prismaMock.releaseVote.findUnique.mockResolvedValue({ positive: true } as never);
+    prismaMock.releaseVote.findUnique.mockResolvedValue({
+      positive: true
+    } as never);
 
     const session = await releaseWorkbench.open({
       actorId: 7,
@@ -214,7 +218,9 @@ describe('releaseWorkbench session', () => {
       .mockResolvedValueOnce({ id: 3 } as never)
       .mockResolvedValueOnce(makeRelease() as never);
     prismaMock.releaseVote.upsert.mockResolvedValue({} as never);
-    prismaMock.releaseVote.findUnique.mockResolvedValue({ positive: true } as never);
+    prismaMock.releaseVote.findUnique.mockResolvedValue({
+      positive: true
+    } as never);
     prismaMock.releaseVoteAggregate.findUnique.mockResolvedValue({
       releaseId: 3,
       ups: 2,
@@ -350,7 +356,9 @@ describe('releaseWorkbench session', () => {
       user: { id: 7, username: 'user' },
       release: { id: 3, title: 'Kind of Blue', communityId: 1, artistId: 5 }
     } as never);
-    prismaMock.release.findUniqueOrThrow.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue(
+      makeRelease() as never
+    );
 
     const session = await releaseWorkbench.open({
       actorId: 7,

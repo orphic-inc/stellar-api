@@ -45,6 +45,8 @@ describe('releaseBrowse', () => {
       })
     );
     expect(result.total).toBe(1);
-    expect(result.data[0].tags).toEqual([{ id: 7, name: 'jazz', occurrences: 9 }]);
+    expect(result.data[0].tags).toEqual([
+      { id: 7, name: 'jazz', occurrences: 9 }
+    ]);
   });
 });

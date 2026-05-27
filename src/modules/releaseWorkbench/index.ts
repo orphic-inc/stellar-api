@@ -1,4 +1,3 @@
-import { AppError } from '../../lib/errors';
 import type {
   ReleaseContributionView,
   ReleaseTagView,
@@ -25,7 +24,9 @@ import { revertReleaseWorkbenchHistory } from './history';
 const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
   getView: () => getReleaseWorkbenchView(ref),
   getHistoryPage: (input) => getReleaseWorkbenchHistoryPage(ref, input),
-  updateMetadata: (input: UpdateReleaseMetadataInput): Promise<ReleaseWorkbenchView> =>
+  updateMetadata: (
+    input: UpdateReleaseMetadataInput
+  ): Promise<ReleaseWorkbenchView> =>
     updateReleaseWorkbenchMetadata(ref, input),
   vote: (input: {
     direction: 'up' | 'down' | 'clear';
