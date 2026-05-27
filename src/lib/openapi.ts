@@ -56,6 +56,7 @@ import {
   createStaffGroupSchema,
   updateStaffGroupSchema
 } from '../schemas/staff';
+import { VALID_PERMISSIONS } from './rankPermissions';
 import { postSchema, postCommentSchema } from '../schemas/post';
 import {
   commentQuerySchema,
@@ -2489,6 +2490,33 @@ const Release = registry.register(
   })
 );
 
+// ─── Permission catalog ───────────────────────────────────────────────────────
+
+const PermissionKey = registry.register(
+  'PermissionKey',
+  z.enum(VALID_PERMISSIONS)
+);
+
+const PermissionEntry = registry.register(
+  'PermissionEntry',
+  z.object({
+    key: PermissionKey,
+    label: z.string(),
+    description: z.string()
+  })
+);
+
+registry.register(
+  'PermissionGroup',
+  z.object({
+    key: z.string(),
+    title: z.string(),
+    permissions: z.array(PermissionEntry)
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const UserRank = registry.register(
   'UserRank',
   z.object({
@@ -2839,6 +2867,34 @@ registry.registerPath({
     200: {
       description: 'User ranks',
       content: { 'application/json': { schema: z.array(UserRank) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/user-ranks/permissions',
+  tags: ['Tools'],
+  responses: {
+    200: {
+      description: 'Permission catalog',
+      content: {
+        'application/json': {
+          schema: z.array(
+            z.object({
+              key: z.string(),
+              title: z.string(),
+              permissions: z.array(
+                z.object({
+                  key: PermissionKey,
+                  label: z.string(),
+                  description: z.string()
+                })
+              )
+            })
+          )
+        }
+      }
     }
   }
 });

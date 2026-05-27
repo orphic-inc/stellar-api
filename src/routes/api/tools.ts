@@ -11,7 +11,10 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
-import { normalizePermissions } from '../../lib/rankPermissions';
+import {
+  normalizePermissions,
+  PERMISSION_GROUPS
+} from '../../lib/rankPermissions';
 import {
   createRankSchema,
   updateRankSchema,
@@ -69,6 +72,15 @@ router.get(
       include: { _count: { select: { users: true, secondaryUsers: true } } }
     });
     res.json(ranks.map(formatRank));
+  })
+);
+
+// GET /api/tools/user-ranks/permissions — permission catalog (static; no DB)
+router.get(
+  '/user-ranks/permissions',
+  ...requirePermission('rank_permissions_manage'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    res.json(PERMISSION_GROUPS);
   })
 );
 
