@@ -104,42 +104,36 @@ router.post(
 
     const settings = await getSettings();
 
-    if (settings.registrationStatus === 'closed') {
-      return res.status(403).json({ msg: 'Registration is currently closed' });
-    }
-
-    if (settings.registrationStatus === 'invite') {
-      if (!inviteKey) {
-        return res
-          .status(403)
-          .json({ msg: 'An invite key is required to register' });
-      }
-      const invite = await prisma.invite.findUnique({ where: { inviteKey } });
-      if (!invite || invite.status !== 'pending') {
-        return res
-          .status(403)
-          .json({ msg: 'Invalid or already-used invite key' });
-      }
-      if (invite.email.toLowerCase() !== email.toLowerCase()) {
-        return res
-          .status(403)
-          .json({ msg: 'Invite key is not valid for this email address' });
-      }
-    }
-
-    const result = await registerUser(username, email, password);
+    const result = await registerUser({
+      username,
+      email,
+      password,
+      registrationMode: settings.registrationStatus,
+      inviteKey
+    });
     if (!result.ok) {
-      if (result.reason === 'bad_password') {
-        return res.status(400).json({ msg: 'Password is not allowed' });
+      switch (result.reason) {
+        case 'registration_closed':
+          return res
+            .status(403)
+            .json({ msg: 'Registration is currently closed' });
+        case 'invite_required':
+          return res
+            .status(403)
+            .json({ msg: 'An invite key is required to register' });
+        case 'invalid_invite':
+          return res
+            .status(403)
+            .json({ msg: 'Invalid or already-used invite key' });
+        case 'invite_email_mismatch':
+          return res
+            .status(403)
+            .json({ msg: 'Invite key is not valid for this email address' });
+        case 'bad_password':
+          return res.status(400).json({ msg: 'Password is not allowed' });
+        default:
+          return res.status(400).json({ msg: 'User already exists' });
       }
-      return res.status(400).json({ msg: 'User already exists' });
-    }
-
-    if (settings.registrationStatus === 'invite' && inviteKey) {
-      await prisma.invite.update({
-        where: { inviteKey },
-        data: { status: 'accepted' }
-      });
     }
 
     const token = await issueToken(result.user.id);

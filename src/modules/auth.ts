@@ -94,18 +94,58 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
 });
 
 type RegisterResult =
-  | { ok: false; reason: 'user_exists' | 'bad_password' }
+  | {
+      ok: false;
+      reason:
+        | 'user_exists'
+        | 'bad_password'
+        | 'registration_closed'
+        | 'invite_required'
+        | 'invalid_invite'
+        | 'invite_email_mismatch';
+    }
   | { ok: true; user: AuthUser };
+
+export type RegisterOptions = {
+  username: string;
+  email: string;
+  password: string;
+  /** Passed from getSettings().registrationStatus — the module does not read settings itself. */
+  registrationMode: 'open' | 'invite' | 'closed';
+  inviteKey?: string;
+};
 
 type LoginResult =
   | { ok: false; reason: 'not_found' | 'disabled' | 'wrong_password' }
   | { ok: true; user: AuthUser };
 
-export const registerUser = async (
-  username: string,
-  email: string,
-  password: string
-): Promise<RegisterResult> => {
+export const registerUser = async ({
+  username,
+  email,
+  password,
+  registrationMode,
+  inviteKey
+}: RegisterOptions): Promise<RegisterResult> => {
+  // 1. Mode gate — no DB required
+  if (registrationMode === 'closed') {
+    return { ok: false, reason: 'registration_closed' };
+  }
+
+  if (registrationMode === 'invite') {
+    if (!inviteKey) return { ok: false, reason: 'invite_required' };
+    // Pre-validate for an early exit before any writes. The actual
+    // consumption (status → accepted) happens inside the user-creation
+    // transaction below, making the two operations atomic.
+    const invite = await prisma.invite.findUnique({ where: { inviteKey } });
+    if (!invite || invite.status !== 'pending') {
+      return { ok: false, reason: 'invalid_invite' };
+    }
+    if (invite.email.toLowerCase() !== email.toLowerCase()) {
+      return { ok: false, reason: 'invite_email_mismatch' };
+    }
+  }
+
+  // 2. Uniqueness / quality checks
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: email.toLowerCase() }, { username }] }
   });
@@ -127,10 +167,12 @@ export const registerUser = async (
   const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
   const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
 
+  // 3. Atomic: create user + consume invite in one transaction so a crash
+  //    between the two can never leave the invite permanently open.
   const user = await prisma.$transaction(async (tx) => {
     const settings = await tx.userSettings.create({ data: {} });
     const profile = await tx.profile.create({ data: {} });
-    return tx.user.create({
+    const newUser = await tx.user.create({
       data: {
         username,
         email: email.toLowerCase(),
@@ -143,6 +185,15 @@ export const registerUser = async (
       },
       select: authUserSelect
     });
+
+    if (registrationMode === 'invite' && inviteKey) {
+      await tx.invite.update({
+        where: { inviteKey },
+        data: { status: 'accepted' }
+      });
+    }
+
+    return newUser;
   });
 
   return { ok: true, user: toAuthUser(user) };
