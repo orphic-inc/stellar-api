@@ -125,7 +125,8 @@ export const createContributionSubmission = async ({
       await tx.releaseTag.createMany({
         data: tagRecords.map((tag) => ({
           releaseId: release.id,
-          tagId: tag.id
+          tagId: tag.id,
+          positiveVotes: 11
         })),
         skipDuplicates: true
       });

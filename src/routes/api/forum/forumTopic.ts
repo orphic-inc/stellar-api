@@ -2,7 +2,12 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
-import { createTopic, updateTopic, deleteTopic } from '../../../modules/forum';
+import {
+  createTopic,
+  updateTopic,
+  deleteTopic,
+  trashTopic
+} from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { isModerator } from '../../../middleware/permissions';
 import {
@@ -190,6 +195,40 @@ router.delete(
 
     await deleteTopic(id, topic.forumId, req.user.id, !isOwner);
     res.status(204).send();
+  })
+);
+
+// POST /api/forums/:forumId/topics/:forumTopicId/trash — moderator only
+router.post(
+  '/:forumTopicId/trash',
+  requireAuth,
+  validateParams(forumTopicParamsSchema),
+  authHandler(async (req, res) => {
+    const { forumId, forumTopicId: id } = parsedParams<{
+      forumId: number;
+      forumTopicId: number;
+    }>(res);
+    const topic = await prisma.forumTopic.findFirst({
+      where: { id, forumId, deletedAt: null }
+    });
+    if (!topic) return res.status(404).json({ msg: 'Topic not found' });
+
+    if (!(await isModerator(req, res))) {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
+
+    const result = await trashTopic(id);
+    if (!result.ok) {
+      if (result.reason === 'not_found') {
+        return res.status(404).json({ msg: 'Topic not found' });
+      }
+      const msg =
+        result.reason === 'no_trash'
+          ? 'No trash board is configured'
+          : 'Topic is already in the trash board';
+      return res.status(400).json({ msg });
+    }
+    res.json(result.topic);
   })
 );
 

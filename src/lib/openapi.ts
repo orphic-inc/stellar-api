@@ -67,6 +67,13 @@ import {
   addBountySchema,
   fillRequestSchema
 } from '../schemas/requests';
+import {
+  searchReleasesQuerySchema,
+  searchArtistsQuerySchema,
+  searchRequestsQuerySchema,
+  searchLogQuerySchema,
+  searchUsersQuerySchema
+} from '../schemas/search';
 
 extendZodWithOpenApi(z);
 
@@ -2010,6 +2017,29 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Topic removed'
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/{forumId}/topics/{topicId}/trash',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ forumId: z.string(), topicId: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Topic moved to the trash board',
+      content: { 'application/json': { schema: ForumTopic } }
+    },
+    403: {
+      description: 'Not authorized',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5723,6 +5753,649 @@ registry.registerPath({
     { name: 'dncId', in: 'path', required: true, schema: { type: 'integer' } }
   ],
   responses: { 204: { description: 'Deleted' } }
+});
+
+// ─── Bookmarks ────────────────────────────────────────────────────────────────
+
+const refIdName = z.object({ id: z.number(), name: z.string() });
+const refIdUsername = z.object({ id: z.number(), username: z.string() });
+const bookmarkToggle = z.object({ bookmarked: z.boolean() });
+
+const artistBookmark = z.object({
+  id: z.number(),
+  userId: z.number(),
+  artistId: z.number(),
+  createdAt: z.string(),
+  artist: refIdName
+});
+const releaseBookmark = z.object({
+  id: z.number(),
+  userId: z.number(),
+  releaseId: z.number(),
+  sort: z.number(),
+  createdAt: z.string(),
+  release: z.object({
+    id: z.number(),
+    communityId: z.number().nullable(),
+    title: z.string(),
+    artist: refIdName
+  })
+});
+const communityBookmark = z.object({
+  id: z.number(),
+  userId: z.number(),
+  communityId: z.number(),
+  sort: z.number(),
+  createdAt: z.string(),
+  community: refIdName
+});
+const requestBookmark = z.object({
+  id: z.number(),
+  userId: z.number(),
+  requestId: z.number(),
+  createdAt: z.string(),
+  request: z.object({ id: z.number(), title: z.string() })
+});
+
+const registerBookmark = (
+  segment: string,
+  paramName: string,
+  item: z.ZodTypeAny
+) => {
+  registry.registerPath({
+    method: 'get',
+    path: `/bookmarks/${segment}`,
+    tags: ['Bookmarks'],
+    security: [{ cookieAuth: [] }],
+    responses: {
+      200: {
+        description: 'Bookmark list',
+        content: { 'application/json': { schema: z.array(item) } }
+      }
+    }
+  });
+  registry.registerPath({
+    method: 'post',
+    path: `/bookmarks/${segment}/{${paramName}}`,
+    tags: ['Bookmarks'],
+    security: [{ cookieAuth: [] }],
+    request: { params: z.object({ [paramName]: z.string() }) },
+    responses: {
+      200: {
+        description: 'Toggled bookmark',
+        content: { 'application/json': { schema: bookmarkToggle } }
+      }
+    }
+  });
+  registry.registerPath({
+    method: 'delete',
+    path: `/bookmarks/${segment}/{${paramName}}`,
+    tags: ['Bookmarks'],
+    security: [{ cookieAuth: [] }],
+    request: { params: z.object({ [paramName]: z.string() }) },
+    responses: { 204: { description: 'Removed' } }
+  });
+};
+
+registerBookmark('artists', 'artistId', artistBookmark);
+registerBookmark('releases', 'releaseId', releaseBookmark);
+registerBookmark('communities', 'communityId', communityBookmark);
+registerBookmark('requests', 'requestId', requestBookmark);
+
+// ─── Random ───────────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'get',
+  path: '/random/release',
+  tags: ['Random'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'A random release',
+      content: {
+        'application/json': {
+          schema: z.object({
+            id: z.number(),
+            communityId: z.number().nullable(),
+            title: z.string(),
+            year: z.number(),
+            artist: refIdName
+          })
+        }
+      }
+    },
+    404: {
+      description: 'No releases found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/random/artist',
+  tags: ['Random'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'A random artist',
+      content: { 'application/json': { schema: refIdName } }
+    },
+    404: {
+      description: 'No artists found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+const releaseSearchItem = z.object({
+  id: z.number(),
+  title: z.string(),
+  year: z.number().nullable(),
+  type: z.string(),
+  releaseType: z.string(),
+  communityId: z.number().nullable(),
+  catalogueNumber: z.string().nullable(),
+  recordLabel: z.string().nullable(),
+  description: z.string(),
+  createdAt: z.string(),
+  artist: z.object({
+    id: z.number(),
+    name: z.string(),
+    vanityHouse: z.boolean()
+  }),
+  tags: z.array(refIdName),
+  _count: z.object({ consumers: z.number(), contributors: z.number() })
+});
+
+const artistSearchItem = z.object({
+  id: z.number(),
+  name: z.string(),
+  vanityHouse: z.boolean(),
+  tags: z.array(z.object({ tag: refIdName })),
+  _count: z.object({ releases: z.number() })
+});
+
+const requestSearchItem = z.object({
+  id: z.number(),
+  title: z.string(),
+  description: z.string(),
+  type: z.string(),
+  year: z.number().nullable(),
+  status: z.string(),
+  voteCount: z.number(),
+  communityId: z.number(),
+  createdAt: z.string(),
+  user: refIdUsername,
+  community: refIdName.optional(),
+  artists: z.array(z.object({ artist: refIdName })),
+  totalBounty: z.string(),
+  _count: z.object({ bounties: z.number() })
+});
+
+const topicSearchItem = z.object({
+  id: z.number(),
+  title: z.string(),
+  createdAt: z.string(),
+  isLocked: z.boolean(),
+  isSticky: z.boolean(),
+  numPosts: z.number(),
+  forumId: z.number(),
+  author: refIdUsername
+});
+
+const postSearchItem = z.object({
+  id: z.number(),
+  body: z.string(),
+  createdAt: z.string(),
+  forumTopicId: z.number(),
+  author: refIdUsername
+});
+
+const userSearchItem = z.object({
+  id: z.number(),
+  username: z.string(),
+  createdAt: z.string(),
+  userRank: z.object({ name: z.string(), color: z.string().nullable() }),
+  email: z.string().optional(),
+  lastLogin: z.string().nullable().optional(),
+  disabled: z.boolean().optional(),
+  ratio: z.number().nullable().optional(),
+  contributed: z.string().optional(),
+  consumed: z.string().optional()
+});
+
+const paged = (item: z.ZodTypeAny) =>
+  z.object({ data: z.array(item), meta: PaginationMeta });
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/releases',
+  tags: ['Search'],
+  security: [{ cookieAuth: [] }],
+  request: { query: searchReleasesQuerySchema },
+  responses: {
+    200: {
+      description: 'Release search results',
+      content: { 'application/json': { schema: paged(releaseSearchItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/artists',
+  tags: ['Search'],
+  security: [{ cookieAuth: [] }],
+  request: { query: searchArtistsQuerySchema },
+  responses: {
+    200: {
+      description: 'Artist search results',
+      content: { 'application/json': { schema: paged(artistSearchItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/requests',
+  tags: ['Search'],
+  security: [{ cookieAuth: [] }],
+  request: { query: searchRequestsQuerySchema },
+  responses: {
+    200: {
+      description: 'Request search results',
+      content: { 'application/json': { schema: paged(requestSearchItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/log',
+  tags: ['Search'],
+  security: [{ cookieAuth: [] }],
+  request: { query: searchLogQuerySchema },
+  responses: {
+    200: {
+      description: 'Forum log search results',
+      content: {
+        'application/json': {
+          schema: z.union([
+            paged(topicSearchItem),
+            paged(postSearchItem),
+            z.object({
+              topics: paged(topicSearchItem),
+              posts: paged(postSearchItem)
+            })
+          ])
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/users',
+  tags: ['Search'],
+  security: [{ cookieAuth: [] }],
+  request: { query: searchUsersQuerySchema },
+  responses: {
+    200: {
+      description: 'User search results',
+      content: { 'application/json': { schema: paged(userSearchItem) } }
+    }
+  }
+});
+
+// ─── Site history ─────────────────────────────────────────────────────────────
+
+const siteHistoryBase = z.object({
+  id: z.number(),
+  authorId: z.number(),
+  title: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+const siteHistoryEntry = siteHistoryBase.extend({ author: refIdUsername });
+const siteHistoryBody = z.object({ title: z.string(), body: z.string() });
+
+registry.registerPath({
+  method: 'get',
+  path: '/site-history',
+  tags: ['Site history'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'Site history entries',
+      content: { 'application/json': { schema: z.array(siteHistoryEntry) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/site-history',
+  tags: ['Site history'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: siteHistoryBody } } }
+  },
+  responses: {
+    201: {
+      description: 'Created entry',
+      content: { 'application/json': { schema: siteHistoryBase } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/site-history/{id}',
+  tags: ['Site history'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: siteHistoryBody } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated entry',
+      content: { 'application/json': { schema: siteHistoryBase } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/site-history/{id}',
+  tags: ['Site history'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Downloads ────────────────────────────────────────────────────────────────
+
+const grantResult = z.object({
+  grantId: z.number(),
+  downloadUrl: z.string(),
+  amountBytes: z.string(),
+  status: z.string(),
+  createdAt: z.string()
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/contributions/{id}/access',
+  tags: ['Downloads'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ idempotencyKey: z.string().optional() })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Download access granted',
+      content: { 'application/json': { schema: grantResult } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/contributions/{id}/access/latest',
+  tags: ['Downloads'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Most recent grant within the idempotency window',
+      content: { 'application/json': { schema: grantResult } }
+    },
+    404: {
+      description: 'No recent grant',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/downloads/{grantId}/reverse',
+  tags: ['Downloads'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ grantId: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ reason: z.string() })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Grant reversed',
+      content: {
+        'application/json': {
+          schema: z.object({ grantId: z.number(), status: z.string() })
+        }
+      }
+    }
+  }
+});
+
+// ─── Donations ────────────────────────────────────────────────────────────────
+
+const donationItem = z.object({
+  id: z.number(),
+  userId: z.number(),
+  amount: z.number(),
+  email: z.string(),
+  donatedAt: z.string(),
+  currency: z.string(),
+  source: z.string(),
+  reason: z.string(),
+  user: refIdUsername
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/donations',
+  tags: ['Donations'],
+  security: [{ cookieAuth: [] }],
+  request: { query: z.object({ userId: z.string().optional() }) },
+  responses: {
+    200: {
+      description: 'Donation log',
+      content: { 'application/json': { schema: paged(donationItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/donations',
+  tags: ['Donations'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            userId: z.number(),
+            amount: z.number(),
+            email: z.string(),
+            donatedAt: z.string(),
+            currency: z.string().optional(),
+            source: z.string().optional(),
+            reason: z.string()
+          })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Donation recorded',
+      content: { 'application/json': { schema: donationItem } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/donations/{id}',
+  tags: ['Donations'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Email blacklist ──────────────────────────────────────────────────────────
+
+const emailBlacklistItem = z.object({
+  id: z.number(),
+  userId: z.number(),
+  email: z.string(),
+  addedAt: z.string(),
+  comment: z.string()
+});
+const emailBlacklistBody = z.object({
+  email: z.string(),
+  comment: z.string()
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/email-blacklist',
+  tags: ['Email blacklist'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'Blacklisted emails',
+      content: { 'application/json': { schema: z.array(emailBlacklistItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/email-blacklist',
+  tags: ['Email blacklist'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: emailBlacklistBody } } }
+  },
+  responses: {
+    201: {
+      description: 'Created entry',
+      content: { 'application/json': { schema: emailBlacklistItem } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/email-blacklist/{id}',
+  tags: ['Email blacklist'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── IP bans ──────────────────────────────────────────────────────────────────
+
+const ipBanItem = z.object({
+  id: z.number(),
+  fromIp: z.string(),
+  toIp: z.string()
+});
+const ipBanBody = z.object({
+  fromIp: z.string(),
+  toIp: z.string().optional()
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/ip-bans',
+  tags: ['IP bans'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'IP bans',
+      content: { 'application/json': { schema: z.array(ipBanItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/ip-bans',
+  tags: ['IP bans'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: ipBanBody } } }
+  },
+  responses: {
+    201: {
+      description: 'Created ban',
+      content: { 'application/json': { schema: ipBanItem } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/ip-bans/{id}',
+  tags: ['IP bans'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Deleted' },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 // ─── Document builder ─────────────────────────────────────────────────────────

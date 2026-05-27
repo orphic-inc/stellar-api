@@ -303,7 +303,7 @@ model UserSettings {
   externalStylesheet   String?
   styledTooltips       Boolean            @default(true)
   paranoia             Int                @default(0)
-  notificationMethod   NotificationMethod @default(Popup)
+  notificationMethod   NotificationMethod @default(Traditional)
   showEmail            Boolean            @default(false)
   showLastSeen         Boolean            @default(false)
   showContributedStats Boolean            @default(true)

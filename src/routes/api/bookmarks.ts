@@ -82,6 +82,7 @@ router.get(
         release: {
           select: {
             id: true,
+            communityId: true,
             title: true,
             artist: { select: { id: true, name: true } }
           }
