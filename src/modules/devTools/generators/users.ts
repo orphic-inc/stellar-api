@@ -29,7 +29,7 @@ import {
   makeAdminComment,
   makeWarnReason
 } from '../contentFactory';
-import { trackCreate, trackManyCreated, appendWarning } from '../tracking';
+import { trackCreate, appendWarning } from '../tracking';
 
 // User archetype distribution
 const ARCHETYPES = [

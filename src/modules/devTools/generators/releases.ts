@@ -42,7 +42,7 @@ import {
   makeTagSet as makeArtistTagSet,
   makeBBCodeForumPost
 } from '../contentFactory';
-import { trackCreate, trackManyCreated } from '../tracking';
+import { trackCreate } from '../tracking';
 
 const RELEASE_CATEGORIES: ReleaseCategory[] = [
   'Album',
@@ -119,7 +119,6 @@ export async function generateReleases(
 
   const createdArtistIds: number[] = [];
   const createdReleaseIds: number[] = [];
-  const createdTagIds: number[] = [];
 
   // Track tags we create in isolated mode so cleanup can delete them
   const seedTagIds: number[] = [];

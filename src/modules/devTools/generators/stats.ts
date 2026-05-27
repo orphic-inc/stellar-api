@@ -15,7 +15,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { RunContext } from '../types';
-import { pick, randInt, randBool, SeedContext } from '../seedRandom';
+import { randInt, randBool, SeedContext } from '../seedRandom';
 import { trackCreate, trackManyCreated } from '../tracking';
 
 function daysBackDate(days: number): Date {

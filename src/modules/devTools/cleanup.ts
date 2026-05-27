@@ -19,7 +19,7 @@ type DeleteResult = { count: number };
  * Safely attempt a prisma deleteMany and return the count.
  * Swallows errors so one failure doesn't stop the rest of cleanup.
  */
-async function safeDeleteMany<T>(
+async function safeDeleteMany(
   fn: () => Promise<DeleteResult>,
   label: string,
   failedItems: CleanupResult['failedItems']
@@ -150,11 +150,16 @@ export async function cleanupRun(
     'ArtistSubscription',
     failedItems
   );
-  // ForumLastReadTopic
+  // ForumLastReadTopic — by generated user OR by generated topic (integrated mode)
   deletedCounts['ForumLastReadTopic'] = await safeDeleteMany(
     () =>
       prisma.forumLastReadTopic.deleteMany({
-        where: { userId: { in: getIds('User') } }
+        where: {
+          OR: [
+            { userId: { in: getIds('User') } },
+            { forumTopicId: { in: getIds('ForumTopic') } }
+          ]
+        }
       }),
     'ForumLastReadTopic',
     failedItems

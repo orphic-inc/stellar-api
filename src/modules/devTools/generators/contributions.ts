@@ -87,8 +87,6 @@ export async function generateContributions(
   const users = ctx.generatedUserIds;
   const createdContributionIds: number[] = [];
 
-  let contribIndex = 0;
-
   for (const releaseId of ctx.generatedReleaseIds) {
     // ~10% of releases have 0 contributions (edge case)
     if (config.includeEdgeCases && randBool(0.1, rng)) {
@@ -98,7 +96,6 @@ export async function generateContributions(
     const contributionCount = randBool(0.7, rng) ? 1 : randInt(2, 3, rng);
 
     for (let c = 0; c < contributionCount; c++) {
-      contribIndex++;
       const contributorUserId = pick(users, rng);
       const createdAt = daysAgo(0, 2 * 365, rng);
 

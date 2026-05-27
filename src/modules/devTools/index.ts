@@ -49,7 +49,6 @@ import {
   RunContext,
   makeRunContext,
   PRESET_COUNTS,
-  PRESET_KEYS,
   SECTION_KEYS,
   SectionKey,
   PresetKey
@@ -68,6 +67,7 @@ import { generateReports } from './generators/reports';
 import { generateStaffInbox } from './generators/staffInbox';
 import { generateStats } from './generators/stats';
 import { generateMisc } from './generators/misc';
+import { generateForum } from './generators/forum';
 
 // ─── Config Resolution ────────────────────────────────────────────────────────
 
@@ -262,14 +262,7 @@ export async function runGeneration(
 
     // 12. Forum (integrated mode only)
     if (sections.has('forum')) {
-      if (config.mode === 'isolated') {
-        ctx.warnings.push(
-          'Forum generator requires integrated mode — skipped in isolated mode'
-        );
-      } else {
-        // Phase B: import and call generateForum(prisma, ctx)
-        ctx.warnings.push('Forum generator: Phase B — not yet implemented');
-      }
+      await generateForum(prisma, ctx);
     }
 
     // Reconcile denormalized fields
