@@ -10,6 +10,7 @@
 
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import { runGeneration, resolveConfig } from '../modules/devTools/index';
+import type { SectionKey } from '../modules/devTools/types';
 import { cleanupRun } from '../modules/devTools/cleanup';
 
 // Minimal isolated config — fast, no forum
@@ -26,7 +27,7 @@ const MINIMAL_ISOLATED = {
     'collages',
     'requests',
     'wiki'
-  ] as const,
+  ] as SectionKey[],
   includeEdgeCases: false,
   includeModerationData: false,
   includeStatsData: false,
