@@ -4,7 +4,7 @@
  * Orchestrator: resolves config, creates the DevSeedRun, runs generators
  * in dependency order, reconciles denormalized fields, and validates integrity.
  *
- * Coverage Matrix (Phase A — Isolated mode baseline):
+ * Coverage Matrix (Phase A–C — complete generator set):
  *
  * | Section       | Models                                              | Edge Cases                          |
  * |---------------|-----------------------------------------------------|-------------------------------------|
@@ -32,10 +32,11 @@
  * | stats         | UserStatSnapshot, SiteStatSnapshot, Top10Snapshot,  | sparse activity, trends             |
  * |               | Top10SnapshotEntry                                  |                                     |
  * | donations     | Donation, UserDonorRank                             | expired donor rank                  |
+ * | moderation    | UserModerationNote                                  | multi-note users, staff authors     |
+ * | forum         | ForumTopic, ForumPost, ForumPoll, ForumPollVote,    | integrated mode only; polls,        |
+ * |               | ForumPostEdit, ForumTopicNote, ForumLastReadTopic   | notes, edits, read-position         |
  *
- * Known gaps (Phase B+):
- *   - ForumTopic, ForumPost, ForumPoll, ForumTopicNote (require integrated mode)
- *   - UserModerationNote (moderation sub-feature)
+ * Known gaps (deferred):
  *   - FeaturedAlbum, FeaturedMerch (managed via announcements UI, not auto-seeded)
  *   - DonorReward, DonorForumUsername (donor perks UI, deferred)
  *   - RulesPage (static content, low priority)
@@ -68,6 +69,7 @@ import { generateStaffInbox } from './generators/staffInbox';
 import { generateStats } from './generators/stats';
 import { generateMisc } from './generators/misc';
 import { generateForum } from './generators/forum';
+import { generateModeration } from './generators/moderation';
 
 // ─── Config Resolution ────────────────────────────────────────────────────────
 
@@ -132,6 +134,13 @@ export function estimateCounts(config: ResolvedConfig): Record<string, number> {
   }
   if (sections.has('donations')) {
     estimate['Donation'] = Math.max(1, Math.round(s(counts.users) * 0.1));
+  }
+  if (sections.has('moderation') && config.includeModerationData !== false) {
+    // ~25% of users are flagged; each gets 1–3 notes; ~70% get at least one
+    estimate['UserModerationNote'] = Math.max(
+      1,
+      Math.round(s(counts.users) * 0.25 * 0.7 * 2)
+    );
   }
 
   // Forum section warns if isolated
@@ -263,6 +272,12 @@ export async function runGeneration(
     // 12. Forum (integrated mode only)
     if (sections.has('forum')) {
       await generateForum(prisma, ctx);
+    }
+
+    // 13. Moderation notes (depends on users — generates UserModerationNote rows
+    //     for warned/disabled users; runs after users so flagged IDs are set)
+    if (sections.has('moderation')) {
+      await generateModeration(prisma, ctx);
     }
 
     // Reconcile denormalized fields

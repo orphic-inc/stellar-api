@@ -602,6 +602,14 @@ export async function cleanupRun(
   );
 
   // 17. User moderation
+  deletedCounts['UserModerationNote'] = await safeDeleteMany(
+    () =>
+      prisma.userModerationNote.deleteMany({
+        where: { id: { in: getIds('UserModerationNote') } }
+      }),
+    'UserModerationNote',
+    failedItems
+  );
   deletedCounts['UserWarning'] = await safeDeleteMany(
     () =>
       prisma.userWarning.deleteMany({
