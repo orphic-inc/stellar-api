@@ -37,7 +37,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=communities&pageId=5');
+    await request(app).get('/api/comments?context=communities&pageId=5');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'communities', communityId: 5 });
@@ -47,7 +47,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=artist&pageId=3');
+    await request(app).get('/api/comments?context=artist&pageId=3');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'artist', artistId: 3 });
@@ -57,7 +57,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=collages&pageId=2');
+    await request(app).get('/api/comments?context=collages&pageId=2');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'collages', collageId: 2 });
@@ -67,7 +67,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=contributions&pageId=1');
+    await request(app).get('/api/comments?context=contributions&pageId=1');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({
@@ -80,7 +80,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=requests&pageId=4');
+    await request(app).get('/api/comments?context=requests&pageId=4');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'requests', requestId: 4 });
@@ -90,7 +90,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=release&pageId=7');
+    await request(app).get('/api/comments?context=release&pageId=7');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'release', releaseId: 7 });
@@ -100,7 +100,7 @@ describe('GET /api/comments', () => {
     prismaMock.comment.findMany.mockResolvedValue([]);
     prismaMock.comment.count.mockResolvedValue(0);
 
-    await request(app).get('/api/comments?page=artist');
+    await request(app).get('/api/comments?context=artist');
 
     const call = prismaMock.comment.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({ page: 'artist', deletedAt: null });
@@ -108,7 +108,7 @@ describe('GET /api/comments', () => {
   });
 
   it('returns 400 for an invalid page filter', async () => {
-    const res = await request(app).get('/api/comments?page=bad-page&pageId=1');
+    const res = await request(app).get('/api/comments?context=bad-page&pageId=1');
 
     expect(res.status).toBe(400);
     expect(prismaMock.comment.findMany).not.toHaveBeenCalled();

@@ -14,9 +14,14 @@ import {
   parsedBody,
   validate,
   validateParams,
+  validateQuery,
   parsedParams
 } from '../../../middleware/validate';
-import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../../lib/pagination';
 import {
   artistSchema,
   updateArtistSchema,
@@ -40,13 +45,15 @@ const artistHistoryParamsSchema = z.object({
 const artistRevertParamsSchema = z.object({
   historyId: z.coerce.number().int().positive()
 });
+const artistsQuerySchema = z.object({ ...paginationBase });
 
 // GET /api/artists
 router.get(
   '/',
   requireAuth,
+  validateQuery(artistsQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
         skip: pg.skip,
@@ -64,8 +71,9 @@ router.get(
 router.get(
   '/vanity-house',
   ...requirePermission('admin'),
+  validateQuery(artistsQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
         where: { vanityHouse: true },

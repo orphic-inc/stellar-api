@@ -11,9 +11,14 @@ import {
   parsedBody,
   validate,
   validateParams,
+  validateQuery,
   parsedParams
 } from '../../../middleware/validate';
-import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../../lib/pagination';
 import {
   createContributionSchema,
   type CreateContributionInput
@@ -28,13 +33,15 @@ const contributionIdParamsSchema = z.object({
 const reportSchema = z.object({
   reason: z.string().min(1).max(1000)
 });
+const contributionsQuerySchema = z.object({ ...paginationBase });
 
 // GET /api/contributions
 router.get(
   '/',
   requireAuth,
+  validateQuery(contributionsQuerySchema),
   authHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const where = { userId: req.user.id };
     const [contributions, total] = await Promise.all([
       prisma.contribution.findMany({

@@ -17,7 +17,11 @@ import {
   parsedQuery
 } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import { hasPermission } from '../../lib/rankPermissions';
 import {
   createCollageSchema,
@@ -59,13 +63,16 @@ const collageInclude = {
 // Personal collages: categoryId === 0
 const isPersonal = (categoryId: number) => categoryId === 0;
 
+const deletedCollagesQuerySchema = z.object({ ...paginationBase });
+
 // ─── GET /api/collages/deleted — staff recovery list (before /:id) ───────────
 
 router.get(
   '/deleted',
   ...requirePermission('collages_moderate'),
+  validateQuery(deletedCollagesQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [collages, total] = await Promise.all([
       prisma.collage.findMany({
         where: { isDeleted: true, categoryId: { gt: 0 } },
@@ -92,7 +99,7 @@ router.get(
     const authReq = req as AuthenticatedRequest;
     const { search, categoryId, userId, bookmarked, orderBy, order } =
       parsedQuery<CollageQueryInput>(res);
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
 
     const sortField = orderBy ?? 'createdAt';
     const sortDir = order ?? 'desc';

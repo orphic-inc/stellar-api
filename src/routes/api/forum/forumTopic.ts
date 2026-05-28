@@ -17,6 +17,7 @@ import {
   parsedBody,
   validate,
   validateParams,
+  validateQuery,
   parsedParams
 } from '../../../middleware/validate';
 import { writeLimiter } from '../../../middleware/rateLimiter';
@@ -26,7 +27,11 @@ import {
   type CreateTopicInput,
   type UpdateTopicInput
 } from '../../../schemas/forum';
-import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../../lib/pagination';
 import { sanitizePlain } from '../../../lib/sanitize';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import forumPostRouter from './forumPost';
@@ -42,11 +47,14 @@ const forumTopicParamsSchema = z.object({
 
 router.use('/:forumTopicId/posts', forumPostRouter);
 
+const forumTopicsQuerySchema = z.object({ ...paginationBase });
+
 // GET /api/forums/:forumId/topics
 router.get(
   '/',
   requireAuth,
   validateParams(forumIdParamsSchema),
+  validateQuery(forumTopicsQuerySchema),
   authHandler(async (req, res) => {
     const { forumId } = parsedParams<{ forumId: number }>(res);
 
@@ -61,7 +69,7 @@ router.get(
         .json({ msg: 'Insufficient class to read this forum' });
     }
 
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [topics, total] = await Promise.all([
       prisma.forumTopic.findMany({
         where: { forumId, deletedAt: null },

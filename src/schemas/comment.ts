@@ -1,5 +1,6 @@
 import { CommentPage } from '@prisma/client';
 import { z } from 'zod';
+import { paginationBase } from '../lib/pagination';
 
 const commentPageEnum = z.enum(
   Object.values(CommentPage) as [CommentPage, ...CommentPage[]]
@@ -8,7 +9,8 @@ const commentPageEnum = z.enum(
 const pageIdSchema = z.number().int().positive();
 
 export const commentQuerySchema = z.object({
-  page: commentPageEnum.optional(),
+  ...paginationBase,
+  context: commentPageEnum.optional(),
   pageId: z.coerce.number().int().positive().optional()
 });
 

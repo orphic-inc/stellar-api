@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
-import { paginatedResponse } from '../../lib/pagination';
+import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
   searchReleasesQuerySchema,
   searchArtistsQuerySchema,
@@ -54,10 +54,6 @@ function buildArtistTagWhere(
     : { tags: { some: { tag: { name: { in: names } } } } };
 }
 
-function toPageParams(q: { page: number; limit: number }) {
-  return { page: q.page, limit: q.limit, skip: (q.page - 1) * q.limit };
-}
-
 // ─── GET /api/search/releases ─────────────────────────────────────────────────
 
 const RELEASE_SELECT = {
@@ -82,7 +78,7 @@ router.get(
   validateQuery(searchReleasesQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<SearchReleasesQuery>(res);
-    const pg = toPageParams(q);
+    const pg = parsedPage(res);
 
     const communityIds = q.communityId
       ? Array.isArray(q.communityId)
@@ -206,7 +202,7 @@ router.get(
   validateQuery(searchArtistsQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<SearchArtistsQuery>(res);
-    const pg = toPageParams(q);
+    const pg = parsedPage(res);
 
     const tagPredicate = buildArtistTagWhere(q.tags, q.tagMode);
 
@@ -282,7 +278,7 @@ router.get(
   validateQuery(searchRequestsQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<SearchRequestsQuery>(res);
-    const pg = toPageParams(q);
+    const pg = parsedPage(res);
 
     const where: Record<string, unknown> = { deletedAt: null };
     if (q.q) {
@@ -370,7 +366,7 @@ router.get(
   validateQuery(searchLogQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<SearchLogQuery>(res);
-    const pg = toPageParams(q);
+    const pg = parsedPage(res);
 
     const topicWhere: Record<string, unknown> = { deletedAt: null };
     const postWhere: Record<string, unknown> = { deletedAt: null };
@@ -481,7 +477,7 @@ router.get(
   validateQuery(searchUsersQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<SearchUsersQuery>(res);
-    const pg = toPageParams(q);
+    const pg = parsedPage(res);
     const authedReq = req as AuthenticatedRequest;
 
     const rank = await prisma.userRank.findUnique({

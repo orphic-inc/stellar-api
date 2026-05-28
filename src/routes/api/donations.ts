@@ -12,13 +12,18 @@ import {
   parsedQuery
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 
 const router = express.Router();
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
 
 const donationsQuerySchema = z.object({
+  ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
 
@@ -44,7 +49,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { userId } = parsedQuery<DonationsQuery>(res);
     const where = userId ? { userId } : undefined;
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [rows, total] = await Promise.all([
       prisma.donation.findMany({
         where,

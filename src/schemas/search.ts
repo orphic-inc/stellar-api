@@ -5,6 +5,7 @@ import {
   RequestStatus
 } from '@prisma/client';
 import { z } from 'zod';
+import { paginationBase } from '../lib/pagination';
 
 const releaseTypeEnum = z.enum(
   Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]
@@ -18,11 +19,6 @@ const fileTypeEnum = z.enum(
 const requestStatusEnum = z.enum(
   Object.values(RequestStatus) as [RequestStatus, ...RequestStatus[]]
 );
-
-const paginationBase = {
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(25)
-};
 
 export const searchReleasesQuerySchema = z.object({
   ...paginationBase,

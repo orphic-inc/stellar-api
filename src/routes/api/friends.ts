@@ -4,17 +4,24 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { sanitizePlain } from '../../lib/sanitize';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
 
 const router = express.Router();
+
+const friendsQuerySchema = z.object({ ...paginationBase });
 
 const userIdParams = z.object({
   userId: z.coerce.number().int().positive()
@@ -41,8 +48,9 @@ router.get(
 router.get(
   '/',
   requireAuth,
+  validateQuery(friendsQuerySchema),
   authHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [friends, total] = await Promise.all([
       prisma.friend.findMany({
         where: { userId: req.user.id },
