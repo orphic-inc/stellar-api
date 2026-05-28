@@ -4,13 +4,12 @@ import {
   prismaMock,
   makeUserRank,
   createTopicMock,
-  updateTopicMock,
-  createPostMock,
   updatePostMock,
   deleteTopicMock,
   deletePostMock,
   deleteForumMock,
   createTopicNoteMock,
+  topicSessionMock,
   setCurrentUserRankLevel,
   setCurrentUserPermissions,
   resetApiTestState
@@ -25,10 +24,10 @@ import {
 import {
   createTopic,
   updateTopic,
-  createPost,
   updatePost,
   createTopicNote
 } from './modules/forum';
+import { AppError } from './lib/errors';
 
 beforeEach(() => {
   resetApiTestState();
@@ -62,49 +61,43 @@ describe('API forum flows', () => {
   });
 
   it('updates a forum topic for the owner', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, authorId: 7 })
-    );
-    updateTopicMock.mockResolvedValue({
-      id: 44,
-      title: 'Renamed Topic',
-      isLocked: false,
-      isSticky: false
-    } as Awaited<ReturnType<typeof updateTopic>>);
+    topicSessionMock.updateTopic.mockResolvedValue({
+      ok: true,
+      topic: {
+        id: 44,
+        title: 'Renamed Topic',
+        isLocked: false,
+        isSticky: false
+      } as Awaited<ReturnType<typeof updateTopic>>
+    });
 
     const res = await request(app).put('/api/forums/9/topics/44').send({
       title: 'Renamed Topic'
     });
 
     expect(res.status).toBe(200);
-    expect(updateTopicMock).toHaveBeenCalledWith(44, {
-      title: 'Renamed Topic',
-      isLocked: undefined,
-      isSticky: undefined
-    });
+    expect(topicSessionMock.updateTopic).toHaveBeenCalledWith(
+      44,
+      9,
+      expect.objectContaining({ actorId: 7 }),
+      { title: 'Renamed Topic', isLocked: undefined, isSticky: undefined }
+    );
     expect(res.body.title).toBe('Renamed Topic');
   });
 
   it('creates a forum post when the topic is unlocked and belongs to the forum', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue(
-      makeForum({ id: 9, minClassRead: 0 })
-    );
-    prismaMock.forumTopic.findUnique.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, isLocked: false })
-    );
-    createPostMock.mockResolvedValue({
+    topicSessionMock.replyToTopic.mockResolvedValue({
       id: 21,
       forumTopicId: 44,
       authorId: 7,
       body: 'Reply body'
-    } as Awaited<ReturnType<typeof createPost>>);
+    } as never);
 
     const res = await request(app).post('/api/forums/9/topics/44/posts').send({
       body: 'Reply body'
     });
 
     expect(res.status).toBe(201);
-    expect(createPostMock).toHaveBeenCalledWith(9, 44, 7, 'Reply body');
     expect(res.body.body).toBe('Reply body');
   });
 
@@ -151,9 +144,10 @@ describe('API forum flows', () => {
   });
 
   it('rejects topic deletion for non-owners without moderator permissions', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, authorId: 99 })
-    );
+    topicSessionMock.deleteTopic.mockResolvedValue({
+      ok: false,
+      reason: 'not_authorized'
+    });
 
     const res = await request(app).delete('/api/forums/9/topics/44');
 
@@ -661,9 +655,10 @@ describe('POST /api/forums/:forumId/topics — error paths', () => {
 describe('PUT /api/forums/:forumId/topics/:forumTopicId — 403 path', () => {
   it('returns 403 for non-owner without moderator permission', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
-    prismaMock.forumTopic.findFirst.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, authorId: 99 })
-    );
+    topicSessionMock.updateTopic.mockResolvedValue({
+      ok: false,
+      reason: 'not_authorized'
+    });
 
     const res = await request(app)
       .put('/api/forums/9/topics/44')
@@ -678,15 +673,16 @@ describe('PUT /api/forums/:forumId/topics/:forumTopicId — 403 path', () => {
 
 describe('DELETE /api/forums/:forumId/topics/:forumTopicId — success', () => {
   it('owner can delete their topic', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, authorId: 7 })
-    );
-    deleteTopicMock.mockResolvedValue(undefined as never);
+    topicSessionMock.deleteTopic.mockResolvedValue({ ok: true });
 
     const res = await request(app).delete('/api/forums/9/topics/44');
 
     expect(res.status).toBe(204);
-    expect(deleteTopicMock).toHaveBeenCalledWith(44, 9, 7, false);
+    expect(topicSessionMock.deleteTopic).toHaveBeenCalledWith(
+      44,
+      9,
+      expect.objectContaining({ actorId: 7 })
+    );
   });
 
   it('moderator can delete any topic', async () => {
@@ -696,19 +692,23 @@ describe('DELETE /api/forums/:forumId/topics/:forumTopicId — success', () => {
         boolean
       >
     );
-    prismaMock.forumTopic.findFirst.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 9, authorId: 99 })
-    );
-    deleteTopicMock.mockResolvedValue(undefined as never);
+    topicSessionMock.deleteTopic.mockResolvedValue({ ok: true });
 
     const res = await request(app).delete('/api/forums/9/topics/44');
 
     expect(res.status).toBe(204);
-    expect(deleteTopicMock).toHaveBeenCalledWith(44, 9, 7, true);
+    expect(topicSessionMock.deleteTopic).toHaveBeenCalledWith(
+      44,
+      9,
+      expect.objectContaining({ actorId: 7, canModerateForums: true })
+    );
   });
 
   it('returns 404 when topic does not exist', async () => {
-    prismaMock.forumTopic.findFirst.mockResolvedValue(null);
+    topicSessionMock.deleteTopic.mockResolvedValue({
+      ok: false,
+      reason: 'not_found'
+    });
 
     const res = await request(app).delete('/api/forums/9/topics/99');
 
@@ -885,9 +885,10 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts/:id/edits', () => 
 // ─── POST /api/forums/:forumId/topics/:forumTopicId/posts (error paths) ──────
 
 describe('POST /api/forums/:forumId/topics/:forumTopicId/posts — error paths', () => {
-  it('returns 404 when forum does not exist', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue(null);
-    prismaMock.forumTopic.findUnique.mockResolvedValue(null);
+  it('returns 404 when replyToTopic throws a 404 AppError', async () => {
+    topicSessionMock.replyToTopic.mockRejectedValue(
+      new AppError(404, 'Forum not found')
+    );
 
     const res = await request(app)
       .post('/api/forums/99/topics/44/posts')
@@ -897,29 +898,17 @@ describe('POST /api/forums/:forumId/topics/:forumTopicId/posts — error paths',
     expect(res.body.msg).toBe('Forum not found');
   });
 
-  it('returns 404 when topic does not exist', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
-    prismaMock.forumTopic.findUnique.mockResolvedValue(null);
-
-    const res = await request(app)
-      .post('/api/forums/9/topics/99/posts')
-      .send({ body: 'Reply' });
-
-    expect(res.status).toBe(404);
-    expect(res.body.msg).toBe('Forum topic not found');
-  });
-
-  it('returns 403 when topic belongs to a different forum', async () => {
-    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
-    prismaMock.forumTopic.findUnique.mockResolvedValue(
-      makeForumTopic({ id: 44, forumId: 99 })
+  it('returns 403 when replyToTopic throws a 403 AppError', async () => {
+    topicSessionMock.replyToTopic.mockRejectedValue(
+      new AppError(403, 'Topic is locked')
     );
 
     const res = await request(app)
       .post('/api/forums/9/topics/44/posts')
       .send({ body: 'Reply' });
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe('Topic is locked');
   });
 });
 
@@ -1022,5 +1011,102 @@ describe('DELETE /api/forums/:forumId/topics/:forumTopicId/posts/:id — error p
     const res = await request(app).delete('/api/forums/9/topics/44/posts/21');
 
     expect(res.status).toBe(403);
+  });
+});
+
+// ─── GET /api/forums/:forumId/topics/:forumTopicId/session ────────────────────
+
+describe('GET /api/forums/:forumId/topics/:forumTopicId/session', () => {
+  const sessionPayload = {
+    forum: {
+      id: 9,
+      name: 'Open Forum',
+      forumCategoryId: 1,
+      forumCategory: null
+    },
+    topic: makeForumTopic({ id: 44, title: 'Test Topic' }),
+    posts: { data: [], meta: { total: 0, page: 1, limit: 25, totalPages: 0 } },
+    poll: null,
+    subscription: { isSubscribed: false },
+    affordances: {
+      canReply: true,
+      canModerate: false,
+      canVoteInPoll: false,
+      canSubscribe: true,
+      canCatchUp: true
+    },
+    readState: { lastVisiblePostId: null }
+  };
+
+  it('returns 200 with the session view model', async () => {
+    topicSessionMock.getTopicSession.mockResolvedValue(sessionPayload as never);
+
+    const res = await request(app).get('/api/forums/9/topics/44/session');
+
+    expect(res.status).toBe(200);
+    expect(topicSessionMock.getTopicSession).toHaveBeenCalledWith(
+      9,
+      44,
+      expect.objectContaining({ actorId: 7 }),
+      expect.objectContaining({ page: 1 })
+    );
+    expect(res.body.forum.name).toBe('Open Forum');
+    expect(res.body.topic.title).toBe('Test Topic');
+    expect(res.body.affordances.canReply).toBe(true);
+    expect(res.body.subscription.isSubscribed).toBe(false);
+  });
+
+  it('returns 404 when getTopicSession throws a 404 AppError', async () => {
+    topicSessionMock.getTopicSession.mockRejectedValue(
+      new AppError(404, 'Topic not found')
+    );
+
+    const res = await request(app).get('/api/forums/9/topics/99/session');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Topic not found');
+  });
+
+  it('returns 403 when getTopicSession throws a 403 AppError', async () => {
+    topicSessionMock.getTopicSession.mockRejectedValue(
+      new AppError(403, 'Insufficient class to read this forum')
+    );
+
+    const res = await request(app).get('/api/forums/9/topics/44/session');
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe('Insufficient class to read this forum');
+  });
+
+  it('passes page parameter to getTopicSession', async () => {
+    topicSessionMock.getTopicSession.mockResolvedValue(sessionPayload as never);
+
+    await request(app).get('/api/forums/9/topics/44/session?page=3');
+
+    expect(topicSessionMock.getTopicSession).toHaveBeenCalledWith(
+      9,
+      44,
+      expect.any(Object),
+      expect.objectContaining({ page: 3 })
+    );
+  });
+
+  it('derives canModerateForums from the moderator permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank({ forums_moderate: true }).permissions as Record<
+        string,
+        boolean
+      >
+    );
+    topicSessionMock.getTopicSession.mockResolvedValue(sessionPayload as never);
+
+    await request(app).get('/api/forums/9/topics/44/session');
+
+    expect(topicSessionMock.getTopicSession).toHaveBeenCalledWith(
+      9,
+      44,
+      expect.objectContaining({ canModerateForums: true }),
+      expect.any(Object)
+    );
   });
 });

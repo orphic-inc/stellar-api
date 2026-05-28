@@ -1,13 +1,14 @@
 import express from 'express';
 import { z } from 'zod';
-import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import {
-  createTopic,
+  getTopicSession,
   updateTopic,
   deleteTopic,
-  trashTopic
-} from '../../../modules/forum';
+  trashTopic,
+  type TopicSessionActor
+} from '../../../modules/topicSession';
+import { createTopic } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import {
   loadPermissions,
@@ -32,6 +33,7 @@ import {
   paginatedResponse,
   paginationBase
 } from '../../../lib/pagination';
+import { prisma } from '../../../lib/prisma';
 import { sanitizePlain } from '../../../lib/sanitize';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import forumPostRouter from './forumPost';
@@ -49,7 +51,25 @@ router.use('/:forumTopicId/posts', forumPostRouter);
 
 const forumTopicsQuerySchema = z.object({ ...paginationBase });
 
-// GET /api/forums/:forumId/topics
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Derives a narrow actor from the authenticated request. */
+const buildActor = async (
+  req: Parameters<Parameters<typeof authHandler>[0]>[0],
+  res: Parameters<Parameters<typeof authHandler>[0]>[1],
+  _canMod?: boolean
+): Promise<TopicSessionActor> => ({
+  actorId: req.user.id,
+  userRankLevel: req.user.userRankLevel,
+  permittedForumIds: req.user.permittedForumIds,
+  canModerateForums: hasPermission(
+    await loadPermissions(req, res),
+    'forums_moderate'
+  )
+});
+
+// ─── GET /api/forums/:forumId/topics ─────────────────────────────────────────
+
 router.get(
   '/',
   requireAuth,
@@ -89,7 +109,30 @@ router.get(
   })
 );
 
-// GET /api/forums/:forumId/topics/:forumTopicId
+// ─── GET /api/forums/:forumId/topics/:forumTopicId/session ───────────────────
+// Registered before /:forumTopicId so the static "/session" segment takes
+// priority over the parameterized single-topic route.
+
+router.get(
+  '/:forumTopicId/session',
+  requireAuth,
+  validateParams(forumTopicParamsSchema),
+  validateQuery(forumTopicsQuerySchema),
+  authHandler(async (req, res) => {
+    const { forumId, forumTopicId: topicId } = parsedParams<{
+      forumId: number;
+      forumTopicId: number;
+    }>(res);
+    const pg = parsedPage(res);
+    const actor = await buildActor(req, res);
+
+    const session = await getTopicSession(forumId, topicId, actor, pg);
+    res.json(session);
+  })
+);
+
+// ─── GET /api/forums/:forumId/topics/:forumTopicId ───────────────────────────
+
 router.get(
   '/:forumTopicId',
   requireAuth,
@@ -125,7 +168,8 @@ router.get(
   })
 );
 
-// POST /api/forums/:forumId/topics
+// ─── POST /api/forums/:forumId/topics ────────────────────────────────────────
+
 router.post(
   '/',
   requireAuth,
@@ -157,7 +201,8 @@ router.post(
   })
 );
 
-// PUT /api/forums/:forumId/topics/:forumTopicId — author or moderator
+// ─── PUT /api/forums/:forumId/topics/:forumTopicId ───────────────────────────
+
 router.put(
   '/:forumTopicId',
   requireAuth,
@@ -168,26 +213,25 @@ router.put(
       forumId: number;
       forumTopicId: number;
     }>(res);
-    const topic = await prisma.forumTopic.findFirst({
-      where: { id, forumId, deletedAt: null }
-    });
-    if (!topic) return res.status(404).json({ msg: 'Topic not found' });
+    const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
+    const actor = await buildActor(req, res);
 
-    const isOwner = topic.authorId === req.user.id;
-    if (
-      !isOwner &&
-      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
-    ) {
+    const result = await updateTopic(id, forumId, actor, {
+      title,
+      isLocked,
+      isSticky
+    });
+    if (!result.ok) {
+      if (result.reason === 'not_found')
+        return res.status(404).json({ msg: 'Topic not found' });
       return res.status(403).json({ msg: 'Not authorized' });
     }
-
-    const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
-    const updated = await updateTopic(id, { title, isLocked, isSticky });
-    res.json(updated);
+    res.json(result.topic);
   })
 );
 
-// DELETE /api/forums/:forumId/topics/:forumTopicId — author or moderator
+// ─── DELETE /api/forums/:forumId/topics/:forumTopicId ────────────────────────
+
 router.delete(
   '/:forumTopicId',
   requireAuth,
@@ -197,25 +241,20 @@ router.delete(
       forumId: number;
       forumTopicId: number;
     }>(res);
-    const topic = await prisma.forumTopic.findFirst({
-      where: { id, forumId, deletedAt: null }
-    });
-    if (!topic) return res.status(404).json({ msg: 'Topic not found' });
+    const actor = await buildActor(req, res);
 
-    const isOwner = topic.authorId === req.user.id;
-    if (
-      !isOwner &&
-      !hasPermission(await loadPermissions(req, res), 'forums_moderate')
-    ) {
+    const result = await deleteTopic(id, forumId, actor);
+    if (!result.ok) {
+      if (result.reason === 'not_found')
+        return res.status(404).json({ msg: 'Topic not found' });
       return res.status(403).json({ msg: 'Not authorized' });
     }
-
-    await deleteTopic(id, topic.forumId, req.user.id, !isOwner);
     res.status(204).send();
   })
 );
 
-// POST /api/forums/:forumId/topics/:forumTopicId/trash — moderator only
+// ─── POST /api/forums/:forumId/topics/:forumTopicId/trash ────────────────────
+
 router.post(
   '/:forumTopicId/trash',
   requireAuth,
@@ -225,20 +264,14 @@ router.post(
       forumId: number;
       forumTopicId: number;
     }>(res);
-    const topic = await prisma.forumTopic.findFirst({
-      where: { id, forumId, deletedAt: null }
-    });
-    if (!topic) return res.status(404).json({ msg: 'Topic not found' });
+    const actor = await buildActor(req, res);
 
-    if (!hasPermission(await loadPermissions(req, res), 'forums_moderate')) {
-      return res.status(403).json({ msg: 'Not authorized' });
-    }
-
-    const result = await trashTopic(id);
+    const result = await trashTopic(id, forumId, actor);
     if (!result.ok) {
-      if (result.reason === 'not_found') {
+      if (result.reason === 'not_authorized')
+        return res.status(403).json({ msg: 'Not authorized' });
+      if (result.reason === 'not_found')
         return res.status(404).json({ msg: 'Topic not found' });
-      }
       const msg =
         result.reason === 'no_trash'
           ? 'No trash board is configured'

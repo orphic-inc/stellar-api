@@ -2,7 +2,11 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
-import { createPost, updatePost, deletePost } from '../../../modules/forum';
+import { updatePost, deletePost } from '../../../modules/forum';
+import {
+  replyToTopic,
+  type TopicSessionActor
+} from '../../../modules/topicSession';
 import { requireAuth } from '../../../middleware/auth';
 import {
   loadPermissions,
@@ -228,16 +232,17 @@ router.post(
     }>(res);
     const { body } = parsedBody<CreatePostInput>(res);
 
-    const [forum, topic] = await Promise.all([
-      prisma.forum.findUnique({ where: { id: forumId } }),
-      prisma.forumTopic.findUnique({ where: { id: forumTopicId } })
-    ]);
-    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!topic || topic.forumId !== forumId)
-      return res.status(404).json({ msg: 'Forum topic not found' });
-    if (topic.isLocked) return res.status(403).json({ msg: 'Topic is locked' });
+    const actor: TopicSessionActor = {
+      actorId: req.user.id,
+      userRankLevel: req.user.userRankLevel,
+      permittedForumIds: req.user.permittedForumIds,
+      canModerateForums: hasPermission(
+        await loadPermissions(req, res),
+        'forums_moderate'
+      )
+    };
 
-    const post = await createPost(forumId, forumTopicId, req.user.id, body);
+    const post = await replyToTopic(forumId, forumTopicId, actor, body);
     res.status(201).json(post);
   })
 );

@@ -1,7 +1,14 @@
 import express from 'express';
 import { authHandler } from '../../../modules/asyncHandler';
-import { castVote } from '../../../modules/forum';
+import {
+  voteTopicPoll,
+  type TopicSessionActor
+} from '../../../modules/topicSession';
 import { requireAuth } from '../../../middleware/auth';
+import {
+  loadPermissions,
+  hasPermission
+} from '../../../middleware/permissions';
 import { validate, parsedBody } from '../../../middleware/validate';
 import { pollVoteSchema, type PollVoteInput } from '../../../schemas/poll';
 
@@ -14,7 +21,16 @@ router.post(
   validate(pollVoteSchema),
   authHandler(async (req, res) => {
     const { forumPollId, vote } = parsedBody<PollVoteInput>(res);
-    const result = await castVote(forumPollId, req.user, vote);
+    const actor: TopicSessionActor = {
+      actorId: req.user.id,
+      userRankLevel: req.user.userRankLevel,
+      permittedForumIds: req.user.permittedForumIds,
+      canModerateForums: hasPermission(
+        await loadPermissions(req, res),
+        'forums_moderate'
+      )
+    };
+    const result = await voteTopicPoll(forumPollId, actor, vote);
     if (!result.ok) {
       if (result.reason === 'not_found')
         return res.status(404).json({ msg: 'Poll not found' });

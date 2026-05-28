@@ -76,6 +76,7 @@ jest.mock('../modules/forum', () => ({
   createTopic: jest.fn(),
   updateTopic: jest.fn(),
   deleteTopic: jest.fn(),
+  trashTopic: jest.fn(),
   createPost: jest.fn(),
   updatePost: jest.fn(),
   deletePost: jest.fn(),
@@ -84,6 +85,16 @@ jest.mock('../modules/forum', () => ({
   closePoll: jest.fn(),
   castVote: jest.fn(),
   createTopicNote: jest.fn()
+}));
+
+jest.mock('../modules/topicSession', () => ({
+  getTopicSession: jest.fn(),
+  updateTopic: jest.fn(),
+  deleteTopic: jest.fn(),
+  trashTopic: jest.fn(),
+  replyToTopic: jest.fn(),
+  voteTopicPoll: jest.fn(),
+  markTopicRead: jest.fn()
 }));
 
 jest.mock('../modules/pm', () => ({
@@ -263,8 +274,10 @@ import {
   createTopicNote,
   createPoll,
   closePoll,
-  castVote
+  castVote,
+  trashTopic
 } from '../modules/forum';
+import * as topicSessionModule from '../modules/topicSession';
 import {
   grantDownloadAccess,
   reverseDownloadAccess
@@ -362,6 +375,12 @@ export const createPollMock = createPoll as jest.MockedFunction<
 >;
 export const closePollMock = closePoll as jest.MockedFunction<typeof closePoll>;
 export const castVoteMock = castVote as jest.MockedFunction<typeof castVote>;
+export const trashTopicMock = trashTopic as jest.MockedFunction<
+  typeof trashTopic
+>;
+export const topicSessionMock = topicSessionModule as jest.Mocked<
+  typeof topicSessionModule
+>;
 export const grantDownloadAccessMock =
   grantDownloadAccess as jest.MockedFunction<typeof grantDownloadAccess>;
 export const reverseDownloadAccessMock =

@@ -7,7 +7,7 @@ import {
   setCurrentUserPermissions,
   createPollMock,
   closePollMock,
-  castVoteMock
+  topicSessionMock
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
@@ -442,7 +442,7 @@ describe('PUT /api/forums/polls/:id/close', () => {
 
 describe('POST /api/forums/poll-votes', () => {
   it('casts a vote and returns it', async () => {
-    castVoteMock.mockResolvedValue({
+    topicSessionMock.voteTopicPoll.mockResolvedValue({
       ok: true,
       vote: { forumPollId: 5, userId: 7, vote: 1 }
     } as never);
@@ -456,7 +456,10 @@ describe('POST /api/forums/poll-votes', () => {
   });
 
   it('returns 404 when the poll is not found', async () => {
-    castVoteMock.mockResolvedValue({ ok: false, reason: 'not_found' } as never);
+    topicSessionMock.voteTopicPoll.mockResolvedValue({
+      ok: false,
+      reason: 'not_found'
+    } as never);
 
     const res = await request(app)
       .post('/api/forums/poll-votes')
@@ -466,7 +469,7 @@ describe('POST /api/forums/poll-votes', () => {
   });
 
   it('returns 403 when class is insufficient', async () => {
-    castVoteMock.mockResolvedValue({
+    topicSessionMock.voteTopicPoll.mockResolvedValue({
       ok: false,
       reason: 'insufficient_class'
     } as never);
@@ -480,7 +483,10 @@ describe('POST /api/forums/poll-votes', () => {
   });
 
   it('returns 403 when the poll is closed', async () => {
-    castVoteMock.mockResolvedValue({ ok: false, reason: 'closed' } as never);
+    topicSessionMock.voteTopicPoll.mockResolvedValue({
+      ok: false,
+      reason: 'closed'
+    } as never);
 
     const res = await request(app)
       .post('/api/forums/poll-votes')
@@ -491,7 +497,7 @@ describe('POST /api/forums/poll-votes', () => {
   });
 
   it('returns 400 for any other failure reason', async () => {
-    castVoteMock.mockResolvedValue({
+    topicSessionMock.voteTopicPoll.mockResolvedValue({
       ok: false,
       reason: 'already_voted'
     } as never);

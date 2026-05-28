@@ -1774,6 +1774,38 @@ const PaginatedForumTopics = registry.register(
   })
 );
 
+const ForumTopicSessionAffordances = z.object({
+  canReply: z.boolean(),
+  canModerate: z.boolean(),
+  canVoteInPoll: z.boolean(),
+  canSubscribe: z.boolean(),
+  canCatchUp: z.boolean()
+});
+
+const ForumTopicSession = registry.register(
+  'ForumTopicSession',
+  z.object({
+    forum: z.object({
+      id: z.number(),
+      name: z.string(),
+      forumCategoryId: z.number(),
+      forumCategory: z
+        .object({ id: z.number(), name: z.string() })
+        .nullable()
+        .optional()
+    }),
+    topic: ForumTopic,
+    posts: z.object({
+      data: z.array(ForumPost),
+      meta: PaginationMeta
+    }),
+    poll: ForumPoll.nullable().optional(),
+    subscription: z.object({ isSubscribed: z.boolean() }),
+    affordances: ForumTopicSessionAffordances,
+    readState: z.object({ lastVisiblePostId: z.number().nullable() })
+  })
+);
+
 registry.registerPath({
   method: 'get',
   path: '/forums/categories',
@@ -1939,6 +1971,31 @@ registry.registerPath({
     200: {
       description: 'Paginated topics',
       content: { 'application/json': { schema: PaginatedForumTopics } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/{forumId}/topics/{topicId}/session',
+  tags: ['Forums'],
+  request: {
+    params: z.object({ forumId: z.string(), topicId: z.string() }),
+    query: z.object({ page: z.string().optional() })
+  },
+  responses: {
+    200: {
+      description:
+        'Topic session view model (forum + topic + posts + poll + subscription + affordances)',
+      content: { 'application/json': { schema: ForumTopicSession } }
+    },
+    403: {
+      description: 'Insufficient class',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Forum or topic not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
