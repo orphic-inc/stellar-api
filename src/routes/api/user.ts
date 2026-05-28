@@ -39,7 +39,11 @@ import {
   type GrantDonorInput
 } from '../../schemas/user';
 import { audit } from '../../lib/audit';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import { sendRecoveryEmail } from '../../lib/mailer';
 import { email as emailConfig } from '../../modules/config';
 import {
@@ -67,13 +71,21 @@ const warningParamsSchema = z.object({
 const reqIdParamsSchema = z.object({
   reqId: z.coerce.number().int().positive()
 });
-const recoveryStatusSchema = z
-  .enum(['pending', 'used', 'expired'])
-  .default('pending');
 const warningsQuerySchema = z.object({
+  ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
 type WarningsQuery = z.infer<typeof warningsQuerySchema>;
+
+const recoveryRequestsQuerySchema = z.object({
+  ...paginationBase,
+  status: z.enum(['pending', 'used', 'expired']).optional().default('pending')
+});
+type RecoveryRequestsQuery = z.infer<typeof recoveryRequestsQuerySchema>;
+
+const inviteTreeQuerySchema = z.object({ ...paginationBase });
+const ratioWatchQuerySchema = z.object({ ...paginationBase });
+const registrationLogQuerySchema = z.object({ ...paginationBase });
 
 // ─── Donor ranks (static paths — must come before /:id) ──────────────────────
 
@@ -232,10 +244,10 @@ router.put(
 router.get(
   '/recovery-requests',
   ...requirePermission('recovery_manage'),
+  validateQuery(recoveryRequestsQuerySchema),
   authHandler(async (req, res) => {
-    const rawStatus = req.query.status as string | undefined;
-    const statusResult = recoveryStatusSchema.safeParse(rawStatus ?? 'pending');
-    const status = statusResult.success ? statusResult.data : 'pending';
+    const { status } = parsedQuery<RecoveryRequestsQuery>(res);
+    const pg = parsedPage(res);
 
     const now = new Date();
     const where =
@@ -244,8 +256,6 @@ router.get(
         : status === 'used'
         ? { usedAt: { not: null } }
         : { usedAt: null, expiresAt: { lte: now } };
-
-    const pg = parsePage(req);
     const [records, total] = await Promise.all([
       prisma.accountRecovery.findMany({
         where,
@@ -303,6 +313,7 @@ router.delete(
 // ─── Login Watch / Invite Pool / Invite Tree / Ratio Watch (static — before /:id) ───
 
 const sessionsQuerySchema = z.object({
+  ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
 type SessionsQuery = z.infer<typeof sessionsQuerySchema>;
@@ -313,7 +324,7 @@ router.get(
   ...requirePermission('login_watch_view'),
   validateQuery(sessionsQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const { userId } = parsedQuery<SessionsQuery>(res);
     const where = userId ? { userId } : {};
     const [sessions, total] = await Promise.all([
@@ -331,6 +342,7 @@ router.get(
 );
 
 const invitesQuerySchema = z.object({
+  ...paginationBase,
   status: z.string().optional()
 });
 type InvitesQuery = z.infer<typeof invitesQuerySchema>;
@@ -341,7 +353,7 @@ router.get(
   ...requirePermission('invites_manage'),
   validateQuery(invitesQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const { status } = parsedQuery<InvitesQuery>(res);
     const where = status ? { status: status as never } : {};
     const [invites, total] = await Promise.all([
@@ -363,8 +375,9 @@ router.get(
 router.get(
   '/invite-tree',
   ...requirePermission('invites_manage'),
+  validateQuery(inviteTreeQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [trees, total] = await Promise.all([
       prisma.inviteTree.findMany({
         include: { user: { select: { id: true, username: true } } },
@@ -396,8 +409,9 @@ router.get(
 router.get(
   '/ratio-watch',
   ...requirePermission('ratio_policy_manage'),
+  validateQuery(ratioWatchQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const where = {
       status: {
         in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.LEECH_DISABLED]
@@ -423,7 +437,7 @@ router.get(
   ...requirePermission('admin'),
   validateQuery(warningsQuerySchema),
   authHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const { userId } = parsedQuery<WarningsQuery>(res);
     const where = userId ? { userId } : {};
     const [warnings, total] = await Promise.all([
@@ -478,8 +492,9 @@ router.get(
 router.get(
   '/registration-log',
   ...requirePermission('registration_log_view'),
+  validateQuery(registrationLogQuerySchema),
   authHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         orderBy: { dateRegistered: 'desc' },

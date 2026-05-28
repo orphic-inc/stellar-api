@@ -12,6 +12,7 @@ import {
   parsedBody,
   validate,
   validateParams,
+  validateQuery,
   parsedParams
 } from '../../../middleware/validate';
 import {
@@ -20,7 +21,11 @@ import {
   type CreateCommunityInput,
   type UpdateCommunityInput
 } from '../../../schemas/community';
-import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../../lib/pagination';
 import releaseRouter from './release';
 
 const router = express.Router();
@@ -36,6 +41,8 @@ const addMemberSchema = z.object({
 });
 
 router.use('/:communityId/releases', releaseRouter);
+
+const communitiesQuerySchema = z.object({ ...paginationBase });
 
 export async function isCommunityMember(
   communityId: number,
@@ -56,8 +63,9 @@ export async function isCommunityMember(
 router.get(
   '/',
   requireAuth,
+  validateQuery(communitiesQuerySchema),
   authHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const userId = req.user.id;
     const memberFilter = {
       OR: [

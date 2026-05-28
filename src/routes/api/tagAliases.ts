@@ -6,10 +6,15 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import {
   createTagAliasSchema,
   updateTagAliasSchema,
@@ -20,13 +25,15 @@ import { AppError } from '../../lib/errors';
 
 const router = express.Router();
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const tagAliasesQuerySchema = z.object({ ...paginationBase });
 
 // GET /api/tag-aliases
 router.get(
   '/',
   ...requirePermission('tags_manage'),
+  validateQuery(tagAliasesQuerySchema),
   asyncHandler(async (req, res) => {
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const [aliases, total] = await Promise.all([
       prisma.tagAlias.findMany({
         include: {

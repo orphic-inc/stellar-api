@@ -19,7 +19,7 @@ import {
   parsedQuery
 } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
-import { parsePage, paginatedResponse } from '../../lib/pagination';
+import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
   commentQuerySchema,
   createCommentSchema,
@@ -40,20 +40,19 @@ router.get(
   '/',
   validateQuery(commentQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, pageId } = parsedQuery<CommentQueryInput>(res);
+    const { context, pageId } = parsedQuery<CommentQueryInput>(res);
+    const pg = parsedPage(res);
     const where: Record<string, unknown> = {};
-    if (page) where.page = page as CommentPage;
-    if (page && pageId) {
-      if (page === CommentPage.communities) where.communityId = pageId;
-      else if (page === CommentPage.artist) where.artistId = pageId;
-      else if (page === CommentPage.collages) where.collageId = pageId;
-      else if (page === CommentPage.contributions)
+    if (context) where.page = context as CommentPage;
+    if (context && pageId) {
+      if (context === CommentPage.communities) where.communityId = pageId;
+      else if (context === CommentPage.artist) where.artistId = pageId;
+      else if (context === CommentPage.collages) where.collageId = pageId;
+      else if (context === CommentPage.contributions)
         where.contributionId = pageId;
-      else if (page === CommentPage.requests) where.requestId = pageId;
-      else if (page === CommentPage.release) where.releaseId = pageId;
+      else if (context === CommentPage.requests) where.requestId = pageId;
+      else if (context === CommentPage.release) where.releaseId = pageId;
     }
-
-    const pg = parsePage(req);
     const [comments, total] = await Promise.all([
       prisma.comment.findMany({
         where: { ...where, deletedAt: null },

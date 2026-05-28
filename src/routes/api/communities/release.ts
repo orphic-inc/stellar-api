@@ -6,6 +6,7 @@ import { requirePermission } from '../../../middleware/permissions';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedParams,
   parsedBody
 } from '../../../middleware/validate';
@@ -26,7 +27,11 @@ import {
   type AddContributionToReleaseInput
 } from '../../../schemas/contribution';
 import { resolveTagName } from '../../../modules/tag';
-import { parsePage, paginatedResponse } from '../../../lib/pagination';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../../lib/pagination';
 import { releaseWorkbench } from '../../../modules/releaseWorkbench';
 import type { ReleaseWorkbenchView } from '../../../modules/releaseWorkbench/types';
 import {
@@ -39,6 +44,8 @@ const router = express.Router({ mergeParams: true });
 const communityIdParamsSchema = z.object({
   communityId: z.coerce.number().int().positive()
 });
+const releasesQuerySchema = z.object({ ...paginationBase });
+const releaseHistoryQuerySchema = z.object({ ...paginationBase });
 const releaseParamsSchema = z.object({
   communityId: z.coerce.number().int().positive(),
   releaseId: z.coerce.number().int().positive()
@@ -59,9 +66,10 @@ router.get(
   '/',
   requireAuth,
   validateParams(communityIdParamsSchema),
+  validateQuery(releasesQuerySchema),
   authHandler(async (req, res) => {
     const { communityId } = parsedParams<{ communityId: number }>(res);
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const result = await listCommunityReleases({
       actorId: req.user.id,
       communityId,
@@ -77,12 +85,13 @@ router.get(
   '/:releaseId/history',
   requireAuth,
   validateParams(releaseParamsSchema),
+  validateQuery(releaseHistoryQuerySchema),
   authHandler(async (req, res) => {
     const { communityId, releaseId } = parsedParams<{
       communityId: number;
       releaseId: number;
     }>(res);
-    const pg = parsePage(req);
+    const pg = parsedPage(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationBase } from '../lib/pagination';
 
 export const createCollageSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters').max(100),
@@ -21,8 +22,7 @@ export const updateCollageSchema = z.object({
 });
 
 export const collageQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional(),
+  ...paginationBase,
   search: z.string().max(200).optional(),
   categoryId: z.coerce.number().int().min(0).max(6).optional(),
   userId: z.coerce.number().int().positive().optional(),

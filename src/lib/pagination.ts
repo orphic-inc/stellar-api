@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { z } from 'zod';
+import type { Response } from 'express';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -9,13 +10,29 @@ export interface PageParams {
   skip: number;
 }
 
-export const parsePage = (req: Request): PageParams => {
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, parseInt(req.query.limit as string) || DEFAULT_PAGE_SIZE)
-  );
-  return { page, limit, skip: (page - 1) * limit };
+/**
+ * Spread into any Zod query schema to add validated, bounded page/limit fields.
+ * Use with validateQuery() then read back with parsedPage(res).
+ */
+export const paginationBase = {
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE)
+};
+
+/**
+ * Derive PageParams from a query already validated by validateQuery().
+ * The calling route MUST have run validateQuery() with a schema that
+ * spreads paginationBase before calling this.
+ */
+export const parsedPage = (res: Response): PageParams => {
+  const q = res.locals.parsedQuery as { page: number; limit: number };
+  return { page: q.page, limit: q.limit, skip: (q.page - 1) * q.limit };
 };
 
 export const paginatedResponse = (
