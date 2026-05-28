@@ -108,7 +108,9 @@ describe('GET /api/comments', () => {
   });
 
   it('returns 400 for an invalid page filter', async () => {
-    const res = await request(app).get('/api/comments?context=bad-page&pageId=1');
+    const res = await request(app).get(
+      '/api/comments?context=bad-page&pageId=1'
+    );
 
     expect(res.status).toBe(400);
     expect(prismaMock.comment.findMany).not.toHaveBeenCalled();
