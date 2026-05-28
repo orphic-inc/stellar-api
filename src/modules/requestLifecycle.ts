@@ -3,10 +3,22 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { computeRatio } from './ratio';
-import { CreateRequestInput } from '../schemas/requests';
+import { CreateRequestInput, UpdateRequestInput } from '../schemas/requests';
 import { emitNotifications } from '../lib/notifications';
 
 export const MINIMUM_BOUNTY = BigInt(economy.minimumBounty);
+
+// ─── Capability types ─────────────────────────────────────────────────────────
+
+export type RequestActor = {
+  actorId: number;
+  canModerateRequests: boolean;
+};
+
+export type OptionalRequestActor = {
+  actorId?: number;
+  canModerateRequests?: boolean;
+};
 
 // ─── DTO serialization ────────────────────────────────────────────────────────
 
@@ -81,6 +93,151 @@ export function serializeRequest(request: {
       amount: b.amount.toString()
     }))
   };
+}
+
+// ─── getRequestDetail ─────────────────────────────────────────────────────────
+
+export async function getRequestDetail(requestId: number): Promise<
+  SerializedRequest & {
+    voteCount: number;
+    votes: Array<{ userId: number }>;
+  }
+> {
+  const request = await prisma.request.findUnique({
+    where: { id: requestId, deletedAt: null },
+    include: {
+      user: { select: { id: true, username: true } },
+      filler: { select: { id: true, username: true } },
+      community: { select: { id: true, name: true } },
+      artists: { include: { artist: true } },
+      bounties: {
+        include: { user: { select: { id: true, username: true } } }
+      },
+      filledContribution: {
+        include: {
+          release: { select: { id: true, title: true } },
+          user: { select: { id: true, username: true } }
+        }
+      },
+      votes: { select: { userId: true } }
+    }
+  });
+  if (!request) throw new AppError(404, 'Request not found');
+
+  const serialized = serializeRequest(request);
+  return {
+    ...serialized,
+    voteCount: request.voteCount,
+    votes: request.votes
+  };
+}
+
+// ─── getBountyHistory ─────────────────────────────────────────────────────────
+
+export async function getBountyHistory(requestId: number) {
+  const request = await prisma.request.findUnique({
+    where: { id: requestId, deletedAt: null },
+    select: { id: true }
+  });
+  if (!request) throw new AppError(404, 'Request not found');
+
+  const [bounties, actions] = await Promise.all([
+    prisma.requestBounty.findMany({
+      where: { requestId },
+      include: { user: { select: { id: true, username: true } } },
+      orderBy: { createdAt: 'desc' }
+    }),
+    prisma.requestAction.findMany({
+      where: { requestId },
+      orderBy: { createdAt: 'desc' }
+    })
+  ]);
+
+  return { bounties, actions };
+}
+
+// ─── toggleVote ───────────────────────────────────────────────────────────────
+
+export async function toggleVote(
+  requestId: number,
+  userId: number
+): Promise<{ voted: boolean }> {
+  const request = await prisma.request.findUnique({
+    where: { id: requestId, deletedAt: null },
+    select: { id: true }
+  });
+  if (!request) throw new AppError(404, 'Request not found');
+
+  const existing = await prisma.requestVote.findUnique({
+    where: { requestId_userId: { requestId, userId } }
+  });
+
+  if (existing) {
+    await prisma.$transaction([
+      prisma.requestVote.delete({
+        where: { requestId_userId: { requestId, userId } }
+      }),
+      prisma.request.update({
+        where: { id: requestId },
+        data: { voteCount: { decrement: 1 } }
+      })
+    ]);
+    return { voted: false };
+  }
+
+  await prisma.$transaction([
+    prisma.requestVote.create({
+      data: { requestId, userId }
+    }),
+    prisma.request.update({
+      where: { id: requestId },
+      data: { voteCount: { increment: 1 } }
+    })
+  ]);
+  return { voted: true };
+}
+
+// ─── updateRequest ────────────────────────────────────────────────────────────
+
+export async function updateRequest({
+  requestId,
+  actorId,
+  canModerateRequests,
+  input
+}: {
+  requestId: number;
+  actorId: number;
+  canModerateRequests: boolean;
+  input: UpdateRequestInput;
+}): Promise<SerializedRequest> {
+  const existing = await prisma.request.findUnique({
+    where: { id: requestId, deletedAt: null },
+    select: { userId: true, status: true }
+  });
+  if (!existing) throw new AppError(404, 'Request not found');
+  if (existing.status !== 'open')
+    throw new AppError(422, 'Only open requests can be edited');
+
+  if (existing.userId !== actorId && !canModerateRequests)
+    throw new AppError(403, 'Permission denied');
+
+  const updated = await prisma.request.update({
+    where: { id: requestId },
+    data: {
+      ...(input.title !== undefined && { title: input.title }),
+      ...(input.description !== undefined && {
+        description: input.description
+      }),
+      ...(input.type !== undefined && { type: input.type }),
+      ...(input.year !== undefined && { year: input.year }),
+      ...(input.image !== undefined && { image: input.image })
+    },
+    include: {
+      user: { select: { id: true, username: true } },
+      bounties: true
+    }
+  });
+  return serializeRequest(updated);
 }
 
 // ─── createRequest ─────────────────────────────────────────────────────────────
@@ -385,20 +542,34 @@ export async function fillRequest(
 }
 
 // ─── unfillRequest ────────────────────────────────────────────────────────────
-// Staff action. Claws back bounty from the filler and re-opens the request.
+// Now owns authorization: owner, filler, or moderator may unfill.
+// Claws back bounty from the filler and re-opens the request.
 
-export async function unfillRequest(
-  moderatorId: number,
-  requestId: number,
-  reason?: string
-) {
+export async function unfillRequest({
+  requestId,
+  actorId,
+  canModerateRequests,
+  reason
+}: {
+  requestId: number;
+  actorId: number;
+  canModerateRequests: boolean;
+  reason?: string;
+}): Promise<SerializedRequest> {
   return await prisma.$transaction(async (tx) => {
     const request = await tx.request.findUnique({
-      where: { id: requestId, status: 'filled' },
+      where: { id: requestId, deletedAt: null },
       include: { bounties: true }
     });
-    if (!request)
-      throw new AppError(404, 'Request not found or not currently filled');
+    if (!request) throw new AppError(404, 'Request not found');
+    if (request.status !== 'filled')
+      throw new AppError(422, 'Request is not filled');
+
+    const isOwner = request.userId === actorId;
+    const isFiller = request.fillerId === actorId;
+    if (!canModerateRequests && !isOwner && !isFiller)
+      throw new AppError(403, 'Permission denied');
+
     if (!request.fillerId)
       throw new AppError(500, 'Filled request has no fillerId');
 
@@ -432,7 +603,7 @@ export async function unfillRequest(
           reason: 'REQUEST_UNFILL',
           contextId: requestId,
           contextType: 'request',
-          actorUserId: moderatorId
+          actorUserId: actorId
         }
       });
     }
@@ -450,7 +621,7 @@ export async function unfillRequest(
     await tx.requestAction.create({
       data: {
         requestId,
-        actorId: moderatorId,
+        actorId,
         action: 'UNFILL',
         metadata: {
           previousFillerId: request.fillerId,
@@ -468,14 +639,19 @@ export async function unfillRequest(
 }
 
 // ─── deleteRequest ────────────────────────────────────────────────────────────
+// Now owns authorization: owner (open only) or moderator (any status) may delete.
 // Soft-deletes a request. Only refunds bounties when the request is still open
 // (filled requests have already paid out; staff may delete them without refund).
 
-export async function deleteRequest(
-  actorId: number,
-  requestId: number,
-  isStaff: boolean
-) {
+export async function deleteRequest({
+  requestId,
+  actorId,
+  canModerateRequests
+}: {
+  requestId: number;
+  actorId: number;
+  canModerateRequests: boolean;
+}) {
   return await prisma.$transaction(async (tx) => {
     const request = await tx.request.findUnique({
       where: { id: requestId, deletedAt: null },
@@ -483,7 +659,11 @@ export async function deleteRequest(
     });
     if (!request) throw new AppError(404, 'Request not found');
 
-    if (request.status === 'filled' && !isStaff) {
+    const isOwner = request.userId === actorId;
+    if (!isOwner && !canModerateRequests)
+      throw new AppError(403, 'Permission denied');
+
+    if (request.status === 'filled' && !canModerateRequests) {
       throw new AppError(403, 'Only staff can delete a filled request');
     }
 

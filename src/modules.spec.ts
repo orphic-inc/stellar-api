@@ -899,9 +899,9 @@ describe('ratioPolicy.getPolicyState', () => {
 
 // ─── requests module ──────────────────────────────────────────────────────────
 
-import type * as RequestsModule from './modules/requests';
+import type * as RequestsModule from './modules/requestLifecycle';
 const { createRequest, unfillRequest, serializeRequest, listRequests } =
-  jest.requireActual<typeof RequestsModule>('./modules/requests');
+  jest.requireActual<typeof RequestsModule>('./modules/requestLifecycle');
 
 describe('requests.createRequest', () => {
   it('includes artist associations when artists array is provided', async () => {
@@ -960,9 +960,9 @@ describe('requests.unfillRequest', () => {
       bounties: []
     } as never);
 
-    await expect(unfillRequest(7, 1)).rejects.toThrow(
-      'Filled request has no fillerId'
-    );
+    await expect(
+      unfillRequest({ requestId: 1, actorId: 7, canModerateRequests: true })
+    ).rejects.toThrow('Filled request has no fillerId');
   });
 
   it('claws back bounty from filler when bounties exist', async () => {
@@ -991,7 +991,11 @@ describe('requests.unfillRequest', () => {
     prismaMock.request.update.mockResolvedValueOnce({} as never);
     prismaMock.requestAction.create.mockResolvedValueOnce({} as never);
 
-    await unfillRequest(7, 1);
+    await unfillRequest({
+      requestId: 1,
+      actorId: 7,
+      canModerateRequests: true
+    });
 
     expect(prismaMock.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
