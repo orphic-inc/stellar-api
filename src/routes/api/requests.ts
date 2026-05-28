@@ -10,8 +10,7 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import * as requestModule from '../../modules/requests';
-import { prisma } from '../../lib/prisma';
+import * as requestLifecycle from '../../modules/requestLifecycle';
 import { hasPermission } from '../../lib/rankPermissions';
 import {
   createRequestSchema,
@@ -25,7 +24,6 @@ import {
   type UpdateRequestInput
 } from '../../schemas/requests';
 import { AppError } from '../../lib/errors';
-import type { AuthenticatedRequest } from '../../types/auth';
 
 const router = Router();
 
@@ -36,7 +34,7 @@ router.get(
   validateQuery(listRequestsQuerySchema),
   asyncHandler(async (req, res) => {
     const q = parsedQuery<ListRequestsQuery>(res);
-    const result = await requestModule.listRequests({
+    const result = await requestLifecycle.listRequests({
       q: q.q,
       artist: q.artist,
       type: q.type,
@@ -63,7 +61,7 @@ router.post(
     if (!hasPermission(perms, 'requests_create')) {
       throw new AppError(403, 'Permission denied');
     }
-    const request = await requestModule.createRequest(
+    const request = await requestLifecycle.createRequest(
       req.user.id,
       parsedBody(res)
     );
@@ -76,34 +74,10 @@ router.post(
 router.get(
   '/:id',
   validateParams(requestIdParamsSchema),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const request = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      include: {
-        user: { select: { id: true, username: true } },
-        filler: { select: { id: true, username: true } },
-        community: { select: { id: true, name: true } },
-        artists: { include: { artist: true } },
-        bounties: {
-          include: { user: { select: { id: true, username: true } } }
-        },
-        filledContribution: {
-          include: {
-            release: { select: { id: true, title: true } },
-            user: { select: { id: true, username: true } }
-          }
-        },
-        votes: { select: { userId: true } }
-      }
-    });
-    if (!request) throw new AppError(404, 'Request not found');
-    const serialized = requestModule.serializeRequest(request);
-    res.json({
-      ...serialized,
-      voteCount: request.voteCount,
-      votes: request.votes
-    });
+    const result = await requestLifecycle.getRequestDetail(id);
+    res.json(result);
   })
 );
 
@@ -115,40 +89,8 @@ router.post(
   validateParams(requestIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-
-    const request = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      select: { id: true }
-    });
-    if (!request) throw new AppError(404, 'Request not found');
-
-    const existing = await prisma.requestVote.findUnique({
-      where: { requestId_userId: { requestId: id, userId: req.user.id } }
-    });
-
-    if (existing) {
-      await prisma.$transaction([
-        prisma.requestVote.delete({
-          where: { requestId_userId: { requestId: id, userId: req.user.id } }
-        }),
-        prisma.request.update({
-          where: { id },
-          data: { voteCount: { decrement: 1 } }
-        })
-      ]);
-      return res.json({ voted: false });
-    }
-
-    await prisma.$transaction([
-      prisma.requestVote.create({
-        data: { requestId: id, userId: req.user.id }
-      }),
-      prisma.request.update({
-        where: { id },
-        data: { voteCount: { increment: 1 } }
-      })
-    ]);
-    res.json({ voted: true });
+    const result = await requestLifecycle.toggleVote(id, req.user.id);
+    res.json(result);
   })
 );
 
@@ -160,26 +102,8 @@ router.get(
   validateParams(requestIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-
-    const request = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      select: { id: true }
-    });
-    if (!request) throw new AppError(404, 'Request not found');
-
-    const [bounties, actions] = await Promise.all([
-      prisma.requestBounty.findMany({
-        where: { requestId: id },
-        include: { user: { select: { id: true, username: true } } },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.requestAction.findMany({
-        where: { requestId: id },
-        orderBy: { createdAt: 'desc' }
-      })
-    ]);
-
-    res.json({ bounties, actions });
+    const result = await requestLifecycle.getBountyHistory(id);
+    res.json(result);
   })
 );
 
@@ -193,7 +117,7 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { amount } = parsedBody<{ amount: bigint }>(res);
-    const request = await requestModule.addBounty(req.user.id, id, amount);
+    const request = await requestLifecycle.addBounty(req.user.id, id, amount);
     res.json(request);
   })
 );
@@ -208,7 +132,7 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { contributionId } = parsedBody<{ contributionId: number }>(res);
-    const request = await requestModule.fillRequest(
+    const request = await requestLifecycle.fillRequest(
       req.user.id,
       id,
       contributionId
@@ -224,40 +148,18 @@ router.put(
   requireAuth,
   validateParams(requestIdParamsSchema),
   validate(updateRequestSchema),
-  authHandler(async (req: AuthenticatedRequest, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const input = parsedBody<UpdateRequestInput>(res);
-
-    const existing = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      select: { userId: true, status: true }
-    });
-    if (!existing) throw new AppError(404, 'Request not found');
-    if (existing.status !== 'open')
-      throw new AppError(422, 'Only open requests can be edited');
-
     const perms = await loadPermissions(req, res);
-    const isStaff = hasPermission(perms, 'requests_moderate');
-    if (existing.userId !== req.user.id && !isStaff)
-      throw new AppError(403, 'Permission denied');
-
-    const updated = await prisma.request.update({
-      where: { id },
-      data: {
-        ...(input.title !== undefined && { title: input.title }),
-        ...(input.description !== undefined && {
-          description: input.description
-        }),
-        ...(input.type !== undefined && { type: input.type }),
-        ...(input.year !== undefined && { year: input.year }),
-        ...(input.image !== undefined && { image: input.image })
-      },
-      include: {
-        user: { select: { id: true, username: true } },
-        bounties: true
-      }
+    const canModerateRequests = hasPermission(perms, 'requests_moderate');
+    const updated = await requestLifecycle.updateRequest({
+      requestId: id,
+      actorId: req.user.id,
+      canModerateRequests,
+      input
     });
-    res.json(requestModule.serializeRequest(updated));
+    res.json(updated);
   })
 );
 
@@ -268,27 +170,17 @@ router.post(
   requireAuth,
   validateParams(requestIdParamsSchema),
   validate(unfillRequestSchema),
-  authHandler(async (req: AuthenticatedRequest, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { reason } = parsedBody<{ reason?: string }>(res);
-
-    const existing = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      select: { userId: true, fillerId: true, status: true }
-    });
-    if (!existing) throw new AppError(404, 'Request not found');
-    if (existing.status !== 'filled')
-      throw new AppError(422, 'Request is not filled');
-
     const perms = await loadPermissions(req, res);
-    const isStaff = hasPermission(perms, 'requests_moderate');
-    const isOwner = existing.userId === req.user.id;
-    const isFiller = existing.fillerId === req.user.id;
-
-    if (!isStaff && !isOwner && !isFiller)
-      throw new AppError(403, 'Permission denied');
-
-    const request = await requestModule.unfillRequest(req.user.id, id, reason);
+    const canModerateRequests = hasPermission(perms, 'requests_moderate');
+    const request = await requestLifecycle.unfillRequest({
+      requestId: id,
+      actorId: req.user.id,
+      canModerateRequests,
+      reason
+    });
     res.json(request);
   })
 );
@@ -299,22 +191,15 @@ router.delete(
   '/:id',
   requireAuth,
   validateParams(requestIdParamsSchema),
-  authHandler(async (req: AuthenticatedRequest, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-
-    const existing = await prisma.request.findUnique({
-      where: { id, deletedAt: null },
-      select: { userId: true, status: true }
-    });
-    if (!existing) throw new AppError(404, 'Request not found');
-
     const perms = await loadPermissions(req, res);
-    const isStaff = hasPermission(perms, 'requests_moderate');
-    const isOwner = existing.userId === req.user.id;
-
-    if (!isOwner && !isStaff) throw new AppError(403, 'Permission denied');
-
-    await requestModule.deleteRequest(req.user.id, id, isStaff);
+    const canModerateRequests = hasPermission(perms, 'requests_moderate');
+    await requestLifecycle.deleteRequest({
+      requestId: id,
+      actorId: req.user.id,
+      canModerateRequests
+    });
     res.status(204).end();
   })
 );

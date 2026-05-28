@@ -1,8 +1,8 @@
 /**
- * Service-level unit tests for the requests module.
+ * Service-level unit tests for the requestLifecycle module.
  *
  * Prisma is mocked at the lib/prisma boundary so we can test business logic,
- * error paths, and transaction behavior without a real database.
+ * authorization rules, error paths, and transaction behavior without a real DB.
  */
 
 import { ReleaseType, RequestStatus } from '@prisma/client';
@@ -42,7 +42,24 @@ jest.mock('../lib/prisma', () => ({
     $transaction: mockTransaction,
     request: {
       findMany: jest.fn(),
-      count: jest.fn()
+      count: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn()
+    },
+    requestBounty: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn()
+    },
+    requestAction: {
+      create: jest.fn(),
+      findMany: jest.fn()
+    },
+    requestVote: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn()
     }
   }
 }));
@@ -59,8 +76,12 @@ import {
   deleteRequest,
   listRequests,
   MINIMUM_BOUNTY,
-  serializeRequest
-} from './requests';
+  serializeRequest,
+  getRequestDetail,
+  getBountyHistory,
+  toggleVote,
+  updateRequest
+} from './requestLifecycle';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,6 +108,7 @@ const makeRequest = (overrides = {}) => ({
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
+  voteCount: 0,
   bounties: [
     {
       id: 1,
@@ -111,6 +133,38 @@ beforeEach(() => {
   mockTransaction.mockImplementation(
     (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
   );
+});
+
+// ─── serializeRequest ─────────────────────────────────────────────────────────
+
+describe('serializeRequest', () => {
+  it('sums bounty totals and stringifies individual amounts', () => {
+    const result = serializeRequest({
+      ...makeRequest(),
+      bounties: [
+        {
+          id: 1,
+          requestId: 10,
+          userId: 1,
+          amount: BigInt('104857600'),
+          createdAt: new Date()
+        },
+        {
+          id: 2,
+          requestId: 10,
+          userId: 2,
+          amount: BigInt('52428800'),
+          createdAt: new Date()
+        }
+      ]
+    } as Parameters<typeof serializeRequest>[0]);
+
+    expect(result.totalBounty).toBe('157286400');
+    expect(result.bounties?.map((b) => b.amount)).toEqual([
+      '104857600',
+      '52428800'
+    ]);
+  });
 });
 
 // ─── createRequest ─────────────────────────────────────────────────────────────
@@ -198,38 +252,6 @@ describe('createRequest', () => {
       })
     );
     expect(result.totalBounty).toBe(MINIMUM_BOUNTY.toString());
-  });
-});
-
-// ─── fillRequest ──────────────────────────────────────────────────────────────
-
-describe('serializeRequest', () => {
-  it('sums bounty totals and stringifies individual amounts', () => {
-    const result = serializeRequest({
-      ...makeRequest(),
-      bounties: [
-        {
-          id: 1,
-          requestId: 10,
-          userId: 1,
-          amount: BigInt('104857600'),
-          createdAt: new Date()
-        },
-        {
-          id: 2,
-          requestId: 10,
-          userId: 2,
-          amount: BigInt('52428800'),
-          createdAt: new Date()
-        }
-      ]
-    } as Parameters<typeof serializeRequest>[0]);
-
-    expect(result.totalBounty).toBe('157286400');
-    expect(result.bounties?.map((b) => b.amount)).toEqual([
-      '104857600',
-      '52428800'
-    ]);
   });
 });
 
@@ -344,6 +366,8 @@ describe('addBounty', () => {
   });
 });
 
+// ─── fillRequest ──────────────────────────────────────────────────────────────
+
 describe('fillRequest', () => {
   it('throws 404 when contribution not found', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(null);
@@ -442,8 +466,6 @@ describe('fillRequest', () => {
   });
 
   it('notifies requester and bounty holders, excluding the filler', async () => {
-    // makeRequest(): userId=1, bounties=[{userId:1}]
-    // filler is userId=1 → should be excluded (actor === recipient)
     const requestWithBounties = makeRequest({
       userId: 2, // requester
       bounties: [
@@ -536,16 +558,112 @@ describe('fillRequest', () => {
 // ─── unfillRequest ─────────────────────────────────────────────────────────────
 
 describe('unfillRequest', () => {
-  it('throws 404 if request is not filled', async () => {
+  it('throws 404 if request is not found', async () => {
     mockTx.request.findUnique.mockResolvedValue(null);
-    await expect(unfillRequest(99, 10, 'reason')).rejects.toMatchObject({
-      statusCode: 404
-    });
+    await expect(
+      unfillRequest({
+        requestId: 10,
+        actorId: 99,
+        canModerateRequests: true,
+        reason: 'reason'
+      })
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it('claws back bounty from filler and records audit with moderatorId', async () => {
+  it('throws 422 if request is not filled', async () => {
+    mockTx.request.findUnique.mockResolvedValue(
+      makeRequest({ status: 'open', userId: 99, fillerId: null })
+    );
+    await expect(
+      unfillRequest({ requestId: 10, actorId: 99, canModerateRequests: true })
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it('throws 403 when caller is not owner, filler, or moderator', async () => {
+    mockTx.request.findUnique.mockResolvedValue(
+      makeRequest({ status: 'filled', userId: 88, fillerId: 77 })
+    );
+    await expect(
+      unfillRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('allows the request owner to unfill', async () => {
     const filledReq = makeRequest({
       status: 'filled',
+      userId: 1,
+      fillerId: 77
+    });
+    const openReq = { ...filledReq, status: 'open', fillerId: null };
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(filledReq)
+      .mockResolvedValueOnce(openReq);
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      contributed: BigInt('209715200')
+    });
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.request.update.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await expect(
+      unfillRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).resolves.toBeDefined();
+  });
+
+  it('allows the filler to unfill their own fill', async () => {
+    const filledReq = makeRequest({
+      status: 'filled',
+      userId: 88,
+      fillerId: 1
+    });
+    const openReq = { ...filledReq, status: 'open', fillerId: null };
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(filledReq)
+      .mockResolvedValueOnce(openReq);
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      contributed: BigInt('209715200')
+    });
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.request.update.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await expect(
+      unfillRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).resolves.toBeDefined();
+  });
+
+  it('allows a moderator to unfill any filled request', async () => {
+    const filledReq = makeRequest({
+      status: 'filled',
+      userId: 88,
+      fillerId: 77
+    });
+    const openReq = { ...filledReq, status: 'open', fillerId: null };
+    mockTx.request.findUnique
+      .mockResolvedValueOnce(filledReq)
+      .mockResolvedValueOnce(openReq);
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      consumed: BigInt(0),
+      contributed: BigInt('209715200')
+    });
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.request.update.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await expect(
+      unfillRequest({ requestId: 10, actorId: 99, canModerateRequests: true })
+    ).resolves.toBeDefined();
+  });
+
+  it('claws back bounty from filler and records audit with actorId', async () => {
+    const filledReq = makeRequest({
+      status: 'filled',
+      userId: 88,
       fillerId: 7,
       bounties: [
         {
@@ -558,8 +676,8 @@ describe('unfillRequest', () => {
       ]
     });
     mockTx.request.findUnique
-      .mockResolvedValueOnce(filledReq) // initial fetch
-      .mockResolvedValueOnce({ ...filledReq, status: 'open', fillerId: null }); // final fetch
+      .mockResolvedValueOnce(filledReq)
+      .mockResolvedValueOnce({ ...filledReq, status: 'open', fillerId: null });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
       contributed: BigInt('209715200')
@@ -569,7 +687,12 @@ describe('unfillRequest', () => {
     mockTx.request.update.mockResolvedValue(undefined);
     mockTx.requestAction.create.mockResolvedValue(undefined);
 
-    await unfillRequest(99, 10, 'Incorrect fill');
+    await unfillRequest({
+      requestId: 10,
+      actorId: 99,
+      canModerateRequests: true,
+      reason: 'Incorrect fill'
+    });
 
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -605,18 +728,47 @@ describe('unfillRequest', () => {
 describe('deleteRequest', () => {
   it('throws 404 when request not found', async () => {
     mockTx.request.findUnique.mockResolvedValue(null);
-    await expect(deleteRequest(1, 10, false)).rejects.toMatchObject({
-      statusCode: 404
-    });
+    await expect(
+      deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it('throws 403 when non-staff tries to delete a filled request', async () => {
+  it('throws 403 when non-owner non-moderator tries to delete', async () => {
+    mockTx.request.findUnique.mockResolvedValue(makeRequest({ userId: 99 }));
+    await expect(
+      deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('throws 403 when owner tries to delete a filled request without moderation', async () => {
     mockTx.request.findUnique.mockResolvedValue(
-      makeRequest({ status: 'filled' })
+      makeRequest({ userId: 1, status: 'filled' })
     );
-    await expect(deleteRequest(1, 10, false)).rejects.toMatchObject({
-      statusCode: 403
+    await expect(
+      deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('allows moderator to delete a filled request without refunding', async () => {
+    mockTx.request.findUnique.mockResolvedValue(
+      makeRequest({ userId: 99, status: 'filled', bounties: [] })
+    );
+    mockTx.request.update.mockResolvedValue(undefined);
+    mockTx.requestAction.create.mockResolvedValue(undefined);
+
+    await deleteRequest({
+      requestId: 10,
+      actorId: 1,
+      canModerateRequests: true
     });
+
+    expect(mockTx.user.update).not.toHaveBeenCalled();
+    expect(mockTx.economyTransaction.create).not.toHaveBeenCalled();
+    expect(mockTx.requestAction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'DELETE' })
+      })
+    );
   });
 
   it('refunds all bounties when deleting an open request', async () => {
@@ -639,7 +791,11 @@ describe('deleteRequest', () => {
     mockTx.request.update.mockResolvedValue(undefined);
     mockTx.requestAction.create.mockResolvedValue(undefined);
 
-    await deleteRequest(1, 10, false);
+    await deleteRequest({
+      requestId: 10,
+      actorId: 1,
+      canModerateRequests: false
+    });
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
     expect(mockTx.user.update).toHaveBeenNthCalledWith(
@@ -672,20 +828,266 @@ describe('deleteRequest', () => {
     ).toBe(true);
   });
 
-  it('does not refund bounties when staff deletes a filled request', async () => {
+  it('does not refund bounties when moderator deletes a filled request', async () => {
     mockTx.request.findUnique.mockResolvedValue(
-      makeRequest({ status: 'filled' })
+      makeRequest({ status: 'filled', bounties: [] })
     );
     mockTx.request.update.mockResolvedValue(undefined);
     mockTx.requestAction.create.mockResolvedValue(undefined);
 
-    await deleteRequest(99, 10, true); // isStaff = true
+    await deleteRequest({
+      requestId: 10,
+      actorId: 99,
+      canModerateRequests: true
+    });
 
     expect(mockTx.user.update).not.toHaveBeenCalled();
     expect(mockTx.economyTransaction.create).not.toHaveBeenCalled();
     expect(mockTx.requestAction.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ action: 'DELETE' })
+      })
+    );
+  });
+});
+
+// ─── getRequestDetail ─────────────────────────────────────────────────────────
+
+describe('getRequestDetail', () => {
+  it('throws 404 when request is not found', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(getRequestDetail(999)).rejects.toMatchObject({
+      statusCode: 404
+    });
+  });
+
+  it('returns serialized request with voteCount and votes', async () => {
+    const { prisma } = await import('../lib/prisma');
+    const rawRequest = {
+      ...makeRequest({
+        bounties: [
+          {
+            id: 1,
+            requestId: 10,
+            userId: 1,
+            amount: BigInt('104857600'),
+            createdAt: new Date(),
+            user: { id: 1, username: 'testuser' }
+          }
+        ]
+      }),
+      user: { id: 1, username: 'testuser' },
+      filler: null,
+      community: { id: 1, name: 'Jazz' },
+      artists: [],
+      filledContribution: null,
+      votes: [{ userId: 1 }],
+      voteCount: 1
+    };
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(rawRequest);
+
+    const result = await getRequestDetail(10);
+
+    expect(result.totalBounty).toBe('104857600');
+    expect(result.voteCount).toBe(1);
+    expect(result.votes).toEqual([{ userId: 1 }]);
+  });
+});
+
+// ─── getBountyHistory ─────────────────────────────────────────────────────────
+
+describe('getBountyHistory', () => {
+  it('throws 404 when request is not found', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(getBountyHistory(999)).rejects.toMatchObject({
+      statusCode: 404
+    });
+  });
+
+  it('returns bounties and actions for the request', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.requestBounty.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        id: 1,
+        requestId: 10,
+        userId: 1,
+        amount: BigInt('104857600'),
+        createdAt: new Date(),
+        user: { id: 1, username: 'testuser' }
+      }
+    ]);
+    (prisma.requestAction.findMany as jest.Mock).mockResolvedValueOnce([]);
+
+    const result = await getBountyHistory(10);
+
+    expect(result.bounties).toHaveLength(1);
+    expect(result.actions).toHaveLength(0);
+  });
+});
+
+// ─── toggleVote ───────────────────────────────────────────────────────────────
+
+describe('toggleVote', () => {
+  it('throws 404 when request is not found', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(toggleVote(999, 1)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('adds a vote and returns { voted: true } when no existing vote', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.requestVote.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.requestVote.create as jest.Mock).mockReturnValue({} as never);
+    (prisma.request.update as jest.Mock).mockReturnValue({} as never);
+    mockTransaction.mockResolvedValueOnce([{}, {}]);
+
+    const result = await toggleVote(10, 1);
+
+    expect(result).toEqual({ voted: true });
+  });
+
+  it('removes a vote and returns { voted: false } when vote exists', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.requestVote.findUnique as jest.Mock).mockResolvedValueOnce({
+      requestId: 10,
+      userId: 1
+    });
+    (prisma.requestVote.delete as jest.Mock).mockReturnValue({} as never);
+    (prisma.request.update as jest.Mock).mockReturnValue({} as never);
+    mockTransaction.mockResolvedValueOnce([{}, {}]);
+
+    const result = await toggleVote(10, 1);
+
+    expect(result).toEqual({ voted: false });
+  });
+});
+
+// ─── updateRequest ────────────────────────────────────────────────────────────
+
+describe('updateRequest', () => {
+  it('throws 404 when request is not found', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(
+      updateRequest({
+        requestId: 10,
+        actorId: 1,
+        canModerateRequests: false,
+        input: { image: undefined }
+      })
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('throws 422 when request is not open', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+      userId: 1,
+      status: 'filled'
+    });
+
+    await expect(
+      updateRequest({
+        requestId: 10,
+        actorId: 1,
+        canModerateRequests: false,
+        input: { image: undefined }
+      })
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it('throws 403 when non-owner non-moderator edits', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+      userId: 99,
+      status: 'open'
+    });
+
+    await expect(
+      updateRequest({
+        requestId: 10,
+        actorId: 1,
+        canModerateRequests: false,
+        input: { image: undefined }
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('allows owner to update an open request', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+      userId: 1,
+      status: 'open'
+    });
+    (prisma.request.update as jest.Mock).mockResolvedValueOnce({
+      ...makeRequest({ title: 'Updated', userId: 1 }),
+      bounties: [],
+      user: { id: 1, username: 'testuser' }
+    });
+
+    const result = await updateRequest({
+      requestId: 10,
+      actorId: 1,
+      canModerateRequests: false,
+      input: { title: 'Updated', image: undefined }
+    });
+
+    expect(result.title).toBe('Updated');
+  });
+
+  it('allows moderator to update any open request', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+      userId: 99,
+      status: 'open'
+    });
+    (prisma.request.update as jest.Mock).mockResolvedValueOnce({
+      ...makeRequest({ title: 'Mod Edit', userId: 99 }),
+      bounties: [],
+      user: { id: 99, username: 'other' }
+    });
+
+    const result = await updateRequest({
+      requestId: 10,
+      actorId: 1,
+      canModerateRequests: true,
+      input: { title: 'Mod Edit', image: undefined }
+    });
+
+    expect(result.title).toBe('Mod Edit');
+  });
+
+  it('shapes update data correctly, excluding undefined fields', async () => {
+    const { prisma } = await import('../lib/prisma');
+    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+      userId: 1,
+      status: 'open'
+    });
+    (prisma.request.update as jest.Mock).mockResolvedValueOnce({
+      ...makeRequest({ title: 'New Title', image: null, userId: 1 }),
+      bounties: [],
+      user: { id: 1, username: 'testuser' }
+    });
+
+    await updateRequest({
+      requestId: 10,
+      actorId: 1,
+      canModerateRequests: false,
+      input: { title: 'New Title', image: null as string | null | undefined }
+    });
+
+    expect(prisma.request.update as jest.Mock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 10 },
+        data: { title: 'New Title', image: null }
       })
     );
   });
