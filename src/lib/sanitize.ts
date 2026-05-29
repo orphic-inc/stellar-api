@@ -6,6 +6,7 @@ const HTML_CONFIG = {
     'b',
     'i',
     'u',
+    's',
     'em',
     'strong',
     'a',

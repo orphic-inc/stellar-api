@@ -6,6 +6,7 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
+import { parseBBCode } from '../lib/bbcode';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
@@ -967,7 +968,9 @@ export const updateProfile = async (
             : null
         }),
         ...(data.profileInfo !== undefined && {
-          profileInfo: data.profileInfo ? sanitizeHtml(data.profileInfo) : null
+          profileInfo: data.profileInfo
+            ? sanitizeHtml(parseBBCode(data.profileInfo))
+            : null
         })
       }
     }),

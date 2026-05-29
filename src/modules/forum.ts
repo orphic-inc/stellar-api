@@ -299,11 +299,36 @@ export const trashTopic = async (id: number): Promise<TrashTopicResult> => {
     where: { forumTopicId: id }
   });
 
+  const sourceForum = await prisma.forum.findUnique({
+    where: { id: topic.forumId },
+    select: { lastTopicId: true }
+  });
+
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.forum.update({
-      where: { id: topic.forumId },
-      data: { numTopics: { decrement: 1 }, numPosts: { decrement: postCount } }
-    });
+    // If this topic was the forum's latest, find the next most recent one
+    if (sourceForum?.lastTopicId === id) {
+      const nextTopic = await tx.forumTopic.findFirst({
+        where: { forumId: topic.forumId, id: { not: id } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true }
+      });
+      await tx.forum.update({
+        where: { id: topic.forumId },
+        data: {
+          numTopics: { decrement: 1 },
+          numPosts: { decrement: postCount },
+          lastTopicId: nextTopic?.id ?? null
+        }
+      });
+    } else {
+      await tx.forum.update({
+        where: { id: topic.forumId },
+        data: {
+          numTopics: { decrement: 1 },
+          numPosts: { decrement: postCount }
+        }
+      });
+    }
     await tx.forum.update({
       where: { id: trash.id },
       data: { numTopics: { increment: 1 }, numPosts: { increment: postCount } }
