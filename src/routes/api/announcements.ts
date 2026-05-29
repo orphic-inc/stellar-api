@@ -88,13 +88,14 @@ router.post(
   ...requirePermission('news_manage'),
   validate(featuredAlbumSchema),
   asyncHandler(async (_req: Request, res: Response) => {
-    const { groupId, threadId, title, started, ended } =
+    const { groupId, threadId, title, image, started, ended } =
       parsedBody<FeaturedAlbumInput>(res);
     const album = await prisma.featuredAlbum.create({
       data: {
         groupId,
         threadId,
         title,
+        image: image ?? '',
         started: new Date(started),
         ended: new Date(ended)
       }

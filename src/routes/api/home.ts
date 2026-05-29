@@ -52,7 +52,10 @@ router.get(
                   started: featuredAlbum.started,
                   ended: featuredAlbum.ended,
                   threadId: featuredAlbum.threadId,
-                  release
+                  release: {
+                    ...release,
+                    image: featuredAlbum.image || release.image
+                  }
                 }
               : null
           )

@@ -1395,6 +1395,7 @@ model FeaturedAlbum {
   groupId  Int
   threadId Int
   title    String   @default("")
+  image    String   @default("")
   started  DateTime
   ended    DateTime
 
