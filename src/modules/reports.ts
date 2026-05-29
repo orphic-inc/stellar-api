@@ -159,6 +159,66 @@ async function resolveSourceUrls(
         }
         break;
       }
+      case 'Artist': {
+        for (const { reportId, targetId } of entries) {
+          urlMap.set(reportId, `/private/artists/${targetId}`);
+        }
+        break;
+      }
+      case 'Comment': {
+        const comments = await prisma.comment.findMany({
+          where: { id: { in: targetIds } },
+          select: {
+            id: true,
+            page: true,
+            artistId: true,
+            releaseId: true,
+            release: { select: { communityId: true } },
+            collageId: true,
+            requestId: true,
+            communityId: true,
+            contributionId: true,
+            contribution: {
+              select: {
+                releaseId: true,
+                release: { select: { communityId: true } }
+              }
+            }
+          }
+        });
+        const byId = new Map(comments.map((c) => [c.id, c]));
+        for (const { reportId, targetId } of entries) {
+          const c = byId.get(targetId);
+          if (!c) {
+            urlMap.set(reportId, null);
+            break;
+          }
+          let url: string | null = null;
+          if (c.page === 'artist' && c.artistId) {
+            url = `/private/artists/${c.artistId}`;
+          } else if (
+            c.page === 'release' &&
+            c.releaseId &&
+            c.release?.communityId
+          ) {
+            url = `/private/communities/${c.release.communityId}/releases/${c.releaseId}`;
+          } else if (c.page === 'collages' && c.collageId) {
+            url = `/private/collages/${c.collageId}`;
+          } else if (c.page === 'requests' && c.requestId) {
+            url = `/private/requests/${c.requestId}`;
+          } else if (
+            c.page === 'contributions' &&
+            c.contributionId &&
+            c.contribution?.release?.communityId
+          ) {
+            url = `/private/communities/${c.contribution.release.communityId}/releases/${c.contribution.releaseId}`;
+          } else if (c.page === 'communities' && c.communityId) {
+            url = `/private/communities/${c.communityId}`;
+          }
+          urlMap.set(reportId, url);
+        }
+        break;
+      }
       default: {
         for (const { reportId } of entries) {
           urlMap.set(reportId, null);
