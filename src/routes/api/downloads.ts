@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
+import { downloadLimiter } from '../../middleware/rateLimiter';
 import {
   validate,
   validateParams,
@@ -29,6 +30,7 @@ const router = Router();
 // POST /api/contributions/:id/access — grant download access and return URL
 router.post(
   '/contributions/:id/access',
+  downloadLimiter,
   requireAuth,
   validateParams(contributionAccessParamsSchema),
   validate(grantAccessSchema),

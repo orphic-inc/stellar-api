@@ -9,6 +9,7 @@ import cors from 'cors';
 import { getLogger } from './modules/logging';
 import { http } from './modules/config';
 import { isInstalled } from './modules/installState';
+import { writeLimiter } from './middleware/rateLimiter';
 import { startLinkHealthJob } from './modules/linkHealthJob';
 import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
@@ -82,6 +83,13 @@ export const createApp = () => {
       installed: false,
       msg: 'Application not installed. Please complete setup at /install.'
     });
+  });
+
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      return writeLimiter(req, res, next);
+    }
+    next();
   });
 
   app.use('/api/tools', toolsRouter);

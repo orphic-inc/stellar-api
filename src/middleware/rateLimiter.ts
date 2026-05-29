@@ -26,3 +26,9 @@ export const writeLimiter = createLimiter(
   30,
   'Too many requests, please slow down'
 );
+
+export const downloadLimiter = createLimiter(
+  60 * 1000,
+  10,
+  'Too many download requests, please slow down'
+);
