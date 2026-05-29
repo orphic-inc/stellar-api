@@ -418,7 +418,8 @@ export const setCurrentPermittedForumIds = (forumIds: number[]): void => {
 };
 
 export const resetApiTestState = (): void => {
-  jest.resetAllMocks();
+  // jest.config.cjs resetMocks: true already resets mocks before each test;
+  // a second jest.resetAllMocks() here caused ordering races in the full suite.
   mockedIsInstalled.mockResolvedValue(true);
   currentUserRankLevel = 1000;
   hasExplicitCurrentUserPermissions = false;

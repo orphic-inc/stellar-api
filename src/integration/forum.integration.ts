@@ -4,7 +4,7 @@ import { createTopic, createPost, deletePost } from '../modules/forum';
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
-}, 15000);
+});
 
 afterAll(async () => {
   await testPrisma.$disconnect();

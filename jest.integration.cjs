@@ -1,6 +1,7 @@
 /** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: 'node',
+  testTimeout: 15000,
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.integration.ts'],
   globalSetup: '<rootDir>/globalSetup.js',

@@ -17,6 +17,7 @@ import {
   pick,
   randInt,
   randBool,
+  randDate,
   weightedPick,
   daysAgo,
   SeedContext
@@ -109,10 +110,17 @@ export async function generateUsers(
 
     // Date registered: spread over last 3 years
     const dateRegistered = daysAgo(0, 3 * 365, rng);
+    // lastLogin must be >= dateRegistered; active users bias toward last 30 days
+    const activeWindowStart = new Date(
+      Math.max(
+        dateRegistered.getTime(),
+        now.getTime() - 30 * 24 * 60 * 60 * 1000
+      )
+    );
     const lastLogin =
       archetype === 'problem' && randBool(0.4, rng)
-        ? daysAgo(180, 730, rng) // inactive user — old last login
-        : daysAgo(0, 30, rng);
+        ? randDate(dateRegistered, now, rng)
+        : randDate(activeWindowStart, now, rng);
 
     // Assign rank
     let userRankId: number;
