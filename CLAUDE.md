@@ -23,13 +23,15 @@ npm run db:studio        # prisma studio
 
 ## Commit workflow
 
-1. `npx tsc --noEmit` — must be clean
-2. `npm run format` — formats all of src/ including openapi.ts and spec files
-3. `npm run lint` — verify no new ESLint errors in changed files
-4. `npm run test --no-coverage` — must pass
+Run every step before committing. All must pass clean on new/changed files.
+
+1. `npm run format` — format **all** of `src/` (not just changed files — confirms nothing else drifted)
+2. `npm run lint` — must be clean on new/changed files; pre-existing errors in untouched files are acceptable
+3. `npx tsc --noEmit` — must be clean
+4. `npm run test --no-coverage` — full suite must pass
 5. Commit with descriptive message following existing log style
 
-> Note: `npm run lint` has pre-existing errors in unchanged files; only new/changed files must be clean.
+> Order matters: format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
 
 ## Environment
 
