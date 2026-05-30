@@ -9,6 +9,8 @@
  *   Edge cases: empty collage, near-max collage, locked collage
  */
 
+import { randomBytes } from 'crypto';
+
 import { PrismaClient } from '@prisma/client';
 import { RunContext } from '../types';
 import {
@@ -45,9 +47,8 @@ export async function generateCollages(
 
   const createdCollageIds: number[] = [];
 
-  // Per-run index offset so collage names don't collide across runs with the same seed
-  const runOffset =
-    parseInt(runId.replace(/[^0-9a-f]/gi, '').slice(0, 5), 16) % 50_000;
+  // Random 32-bit offset keeps collage names unique across runs with the same seed.
+  const runOffset = randomBytes(4).readUInt32BE(0);
 
   for (let i = 0; i < targetCount; i++) {
     const ownerId = pick(users, rng);
