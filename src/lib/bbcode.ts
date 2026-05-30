@@ -54,10 +54,12 @@ export function parseBBCode(raw: string): string {
       /^https?:\/\//i.test(url) ||
       url.startsWith('/') ||
       url.startsWith('mailto:');
-    // Normalize HTML-encoded quotes to percent-encoding to prevent attribute breakout
+    // Percent-encode quotes (both literal and HTML-entity forms) to prevent attribute breakout
     const safe = (isAllowed ? url : '#')
       .replace(/&quot;/g, '%22')
-      .replace(/&#39;/g, '%27');
+      .replace(/&#39;/g, '%27')
+      .replace(/"/g, '%22')
+      .replace(/'/g, '%27');
     return `<a href="${safe}" rel="noopener noreferrer" target="_blank">${text}</a>`;
   });
   s = s.replace(
