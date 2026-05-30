@@ -264,3 +264,17 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 | `InviteTree`, `PmDraft`, `GroupLog` | Planned — misc features |
 | `ApiApplication`, `ApiUser` | Deferred indefinitely |
 | `TopTenLeaderboard` | Superseded by `Top10Snapshot` / `top10.ts` route |
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues at `orphic-inc/stellar-api`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
