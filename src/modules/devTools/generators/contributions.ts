@@ -147,7 +147,7 @@ export async function generateContributions(
           ),
           downloadUrl: makeSeedDownloadUrl(releaseId, c),
           sizeInBytes,
-          approvedAccountingBytes: 0n,
+          approvedAccountingBytes: BigInt(sizeInBytes),
           linkStatus: 'UNKNOWN' as LinkHealthStatus,
           type: fileType,
           bitrate,
