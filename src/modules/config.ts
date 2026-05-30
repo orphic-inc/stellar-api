@@ -31,6 +31,10 @@ export const economy = {
   minimumBounty: parseInt(process.env.STELLAR_MINIMUM_BOUNTY || '104857600', 10)
 };
 
+export const sentry = {
+  dsn: process.env.STELLAR_SENTRY_DSN ?? ''
+};
+
 export const email = {
   smtpHost: process.env.STELLAR_SMTP_HOST ?? '',
   smtpPort: parseInt(process.env.STELLAR_SMTP_PORT ?? '587', 10),

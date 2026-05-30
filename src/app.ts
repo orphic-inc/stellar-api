@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -7,7 +8,11 @@ import cors from 'cors';
 };
 
 import { getLogger } from './modules/logging';
-import { http } from './modules/config';
+import { http, sentry } from './modules/config';
+
+if (sentry.dsn) {
+  Sentry.init({ dsn: sentry.dsn });
+}
 import { isInstalled } from './modules/installState';
 import { writeLimiter } from './middleware/rateLimiter';
 import { startLinkHealthJob } from './modules/linkHealthJob';
@@ -139,6 +144,10 @@ export const createApp = () => {
   // Dev tools — only mounted outside production
   if (process.env.NODE_ENV !== 'production') {
     app.use('/api/dev', devToolsRouter);
+  }
+
+  if (sentry.dsn) {
+    Sentry.setupExpressErrorHandler(app);
   }
 
   app.use(
