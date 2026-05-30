@@ -49,16 +49,17 @@ export function parseBBCode(raw: string): string {
     return `<span style="font-size:${pt}pt">${content}</span>`;
   });
 
-  s = s.replace(
-    /\[url=([^\]]+)\](.*?)\[\/url\]/gi,
-    (_, url, text) => {
-      const safe =
-        /^https?:\/\//i.test(url) || url.startsWith('/') || url.startsWith('mailto:')
-          ? url
-          : '#';
-      return `<a href="${safe}" rel="noopener noreferrer" target="_blank">${text}</a>`;
-    }
-  );
+  s = s.replace(/\[url=([^\]]+)\](.*?)\[\/url\]/gi, (_, url, text) => {
+    const isAllowed =
+      /^https?:\/\//i.test(url) ||
+      url.startsWith('/') ||
+      url.startsWith('mailto:');
+    // Normalize HTML-encoded quotes to percent-encoding to prevent attribute breakout
+    const safe = (isAllowed ? url : '#')
+      .replace(/&quot;/g, '%22')
+      .replace(/&#39;/g, '%27');
+    return `<a href="${safe}" rel="noopener noreferrer" target="_blank">${text}</a>`;
+  });
   s = s.replace(
     /\[url](https?:\/\/[^[]+)\[\/url]/gi,
     '<a href="$1" rel="noopener noreferrer" target="_blank">$1</a>'
