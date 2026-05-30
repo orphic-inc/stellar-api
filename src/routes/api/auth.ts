@@ -36,7 +36,10 @@ import {
 } from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
 import { sendRecoveryEmail } from '../../lib/mailer';
+import { getLogger } from '../../modules/logging';
 import { z } from 'zod';
+
+const secLog = getLogger('security');
 
 const router = express.Router();
 
@@ -374,6 +377,12 @@ router.post(
 
     const result = await loginUser(email, password, ip);
     if (!result.ok) {
+      const redacted = email.replace(/^(.{3})(.*)(@.*)$/, '$1***$3');
+      secLog.warn('Failed login attempt', {
+        reason: result.reason,
+        ip,
+        email: redacted
+      });
       if (result.reason === 'disabled')
         return res.status(403).json({ msg: 'Account disabled' });
       return res.status(400).json({ msg: 'Invalid credentials' });

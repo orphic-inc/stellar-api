@@ -8,6 +8,9 @@ import {
   VALID_PERMISSIONS
 } from '../lib/rankPermissions';
 import { getUserRankAccess } from '../lib/userRankAccess';
+import { getLogger } from '../modules/logging';
+
+const secLog = getLogger('security');
 
 export { VALID_PERMISSIONS, hasPermission };
 export type { Permission };
@@ -36,6 +39,12 @@ export const requireAdminOnly = (): RequestHandler[] => [
     try {
       const perms = await loadPermissions(req as AuthenticatedRequest, res);
       if (perms['admin']) return next();
+      secLog.warn('Permission denied', {
+        userId: (req as AuthenticatedRequest).user?.id,
+        required: 'admin',
+        method: req.method,
+        path: req.path
+      });
       res.status(403).json({ msg: 'Permission denied' });
     } catch (err) {
       next(err);
@@ -54,6 +63,12 @@ export const requirePermission = (
       const perms = await loadPermissions(req as AuthenticatedRequest, res);
       const granted = permissions.some((p) => hasPermission(perms, p));
       if (granted) return next();
+      secLog.warn('Permission denied', {
+        userId: (req as AuthenticatedRequest).user?.id,
+        required: permissions,
+        method: req.method,
+        path: req.path
+      });
       res.status(403).json({ msg: 'Permission denied' });
     } catch (err) {
       next(err);

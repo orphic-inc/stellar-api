@@ -1,4 +1,8 @@
+import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import { getLogger } from '../modules/logging';
+
+const secLog = getLogger('security');
 
 const createLimiter = (windowMs: number, max: number, msg: string) =>
   rateLimit({
@@ -6,7 +10,17 @@ const createLimiter = (windowMs: number, max: number, msg: string) =>
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { msg }
+    message: { msg },
+    handler: (req: Request, res: Response, _next: NextFunction, options) => {
+      secLog.warn('Rate limit exceeded', {
+        ip: req.ip,
+        method: req.method,
+        path: req.path,
+        limit: options.max,
+        windowMs: options.windowMs
+      });
+      res.status(options.statusCode).json(options.message);
+    }
   });
 
 export const authLimiter = createLimiter(
