@@ -151,6 +151,7 @@ jest.mock('../modules/config', () => ({
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
   logging: { level: 'error', timestampFormat: undefined },
   economy: { minimumBounty: 104857600 },
+  sentry: { dsn: '' },
   email: {
     smtpHost: '',
     smtpPort: 587,
