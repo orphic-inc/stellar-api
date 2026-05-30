@@ -10,6 +10,8 @@
  *               power users, staff users, long bios, unicode-safe usernames
  */
 
+import { randomBytes } from 'crypto';
+
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { RunContext } from '../types';
@@ -93,11 +95,9 @@ export async function generateUsers(
   const createdUserIds: number[] = [];
   const staffUserIds: number[] = [];
 
-  // Derive a per-run offset (0–49999) from the runId so that usernames are
-  // unique across multiple generation runs with the same seed.
-  // e.g. run A → offset 6731, run B → offset 23104
-  const runOffset =
-    parseInt(runId.replace(/[^0-9a-f]/gi, '').slice(0, 5), 16) % 50_000;
+  // Random 32-bit offset (0–4,294,967,295) keeps usernames unique across runs
+  // even with the same seed and concurrent CI jobs.
+  const runOffset = randomBytes(4).readUInt32BE(0);
 
   for (let i = 0; i < targetCount; i++) {
     const archetype = weightedPick<Archetype>(

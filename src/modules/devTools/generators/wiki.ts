@@ -11,6 +11,8 @@
  *               page with alias, page with high read level
  */
 
+import { randomBytes } from 'crypto';
+
 import { PrismaClient } from '@prisma/client';
 import { RunContext } from '../types';
 import { pick, randInt, randBool, daysAgo, SeedContext } from '../seedRandom';
@@ -39,9 +41,8 @@ export async function generateWiki(
   const createdPageIds: number[] = [];
   const usedSlugs = new Set<string>();
 
-  // Per-run index offset so wiki slugs don't collide across runs with the same seed
-  const runOffset =
-    parseInt(runId.replace(/[^0-9a-f]/gi, '').slice(0, 5), 16) % 50_000;
+  // Random 32-bit offset keeps wiki slugs unique across runs with the same seed.
+  const runOffset = randomBytes(4).readUInt32BE(0);
 
   for (let i = 0; i < targetCount; i++) {
     const title = makeWikiTitle(i + runOffset + 1, rng);
