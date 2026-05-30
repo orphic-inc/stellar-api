@@ -5,16 +5,16 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        branch: [main, staging, develop]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -24,10 +24,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/orphic-inc/stellar-api.git
 
-      - name: Sync ${{ matrix.branch }}
+      - name: Sync main from upstream
         run: |
           git fetch upstream
-          # Reset branch to exactly match upstream — fork-specific changes
-          # belong on feature branches, never on main/staging/develop.
-          git checkout -B ${{ matrix.branch }} upstream/${{ matrix.branch }}
-          git push origin ${{ matrix.branch }} --force
+          git rebase upstream/main
+          git push origin main --force-with-lease
