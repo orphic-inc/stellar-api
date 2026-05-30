@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node';
+import { randomUUID } from 'crypto';
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -9,6 +10,8 @@ import cors from 'cors';
 
 import { getLogger } from './modules/logging';
 import { http, sentry } from './modules/config';
+import { prisma } from './lib/prisma';
+import { asyncHandler } from './modules/asyncHandler';
 
 if (sentry.dsn) {
   Sentry.init({ dsn: sentry.dsn });
@@ -76,7 +79,33 @@ export const createApp = () => {
   app.use(express.urlencoded({ extended: false }));
   app.use(cookieParser());
 
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    res.setHeader('x-request-id', requestId);
+    (req as Request & { requestId: string }).requestId = requestId;
+    const start = Date.now();
+    res.on('finish', () => {
+      log.info('request', {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        ms: Date.now() - start,
+        requestId,
+        userId: req.user?.id
+      });
+    });
+    next();
+  });
+
   app.get('/', (_req: Request, res: Response) => res.send('API Running'));
+
+  app.get(
+    '/health',
+    asyncHandler(async (_req: Request, res: Response) => {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', db: 'ok' });
+    })
+  );
 
   app.use('/api/install', installRouter);
   app.use('/api/docs/json', specRouter);
