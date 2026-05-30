@@ -236,7 +236,7 @@ jest.mock('../lib/sanitize', () => ({
   sanitizePlain: (value: string) => value
 }));
 
-import request from 'supertest';
+import supertest from 'supertest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { type DeepMockProxy } from 'jest-mock-extended';
@@ -298,6 +298,27 @@ import * as staffInboxModule from '../modules/staffInbox';
 import * as staffPmModule from '../modules/staffPm';
 import { makeUserRank } from './factories';
 export { makeUserRank } from './factories';
+
+// Persistent server per test file. Calling `request(app)` (supertest's default)
+// opens a fresh server via app.listen(0) on a new ephemeral port for EVERY
+// request. Under the full suite's high request volume, a just-closed port gets
+// reused by the next request's server while a client socket / TIME_WAIT entry
+// still lingers, so a request occasionally receives a complete-but-unrelated
+// HTTP response (wrong status/body assertions) or partial bytes ("Parse Error:
+// Expected HTTP/"). Binding one persistent server per file and reusing it for
+// every request removes the port churn and the cross-request bleed.
+const sharedServer = app.listen(0);
+// Close idle keep-alive connections within 1 ms so they don't outlive this
+// file's server and collide with the next file's ephemeral port.
+sharedServer.keepAliveTimeout = 1;
+afterAll((done) => {
+  sharedServer.close(() => done());
+});
+
+// Preserve the `request(app)` call signature used throughout the specs while
+// routing every request at the single persistent server.
+const request = (_app?: unknown): ReturnType<typeof supertest> =>
+  supertest(sharedServer);
 
 export { app, request };
 
