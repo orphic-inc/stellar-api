@@ -38,7 +38,7 @@ _Avoid_: live testing database, local test instance
 ## Flagged Ambiguities
 
 * **"Token Location"** was confusingly structured -- resolved: authentication accepts authorization header bearer tokens or implicit secure `cookie-parser` keys.
-* **"Testing Data"** was causing conflicts -- resolved: unit tests utilize mock layers via `jest-mock-extended`, while integration routines strictly target the temporary **Integration Database** configured with sequential execution (`--runInBand`).
+* **"Testing Data"** was causing conflicts -- resolved: unit tests utilize mock layers via `jest-mock-extended`; integration routines strictly target the temporary **Integration Database**. Both suites run with `--runInBand` (sequential), but for different reasons: unit tests for socket reliability, integration tests for DB isolation.
 
 ## Repository Execution Guardrails
 
