@@ -67,6 +67,7 @@ jest.mock('../modules/artist', () => ({
 }));
 
 jest.mock('../modules/user', () => ({
+  ...jest.requireActual('../modules/user'),
   getUserSettings: jest.fn(),
   updateUserSettings: jest.fn(),
   createUser: jest.fn()
