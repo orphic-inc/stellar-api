@@ -5,8 +5,21 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   getUserSettings,
   updateUserSettings,
-  createUser
+  createUser,
+  getSnatchList,
+  getInviteTree,
+  getDuplicateIps,
+  warnUser,
+  deleteWarning,
+  setUserRank,
+  grantDonorStatus,
+  getUserIpHistory,
+  updateStaffBio
 } from '../../modules/user';
+import {
+  generateRecoveryToken,
+  persistRecoveryToken
+} from '../../modules/auth';
 import { requireAuth } from '../../middleware/auth';
 import {
   requirePermission,
@@ -51,7 +64,6 @@ import {
   type StatsPeriodQuery
 } from '../../schemas/statsHistory';
 import { getUserStatHistory } from '../../modules/statsHistory';
-import crypto from 'crypto';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -173,43 +185,7 @@ router.get(
   '/me/snatch-list',
   requireAuth,
   authHandler(async (req, res) => {
-    const grants = await prisma.downloadAccessGrant.findMany({
-      where: { consumerId: req.user.id, status: 'COMPLETED' },
-      include: {
-        contribution: {
-          include: {
-            release: {
-              select: {
-                id: true,
-                title: true,
-                communityId: true,
-                artist: { select: { name: true } }
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    const seen = new Set<number>();
-    const items = [];
-    for (const g of grants) {
-      const rel = g.contribution.release;
-      if (!seen.has(rel.id)) {
-        seen.add(rel.id);
-        items.push({
-          id: g.id,
-          release: {
-            id: rel.id,
-            title: rel.title,
-            communityId: rel.communityId
-          },
-          artist: rel.artist ?? null,
-          downloadedAt: g.createdAt
-        });
-      }
-      if (items.length >= 100) break;
-    }
+    const items = await getSnatchList(req.user.id);
     res.json(items);
   })
 );
@@ -378,29 +354,7 @@ router.get(
   validateQuery(inviteTreeQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsedPage(res);
-    const [trees, total] = await Promise.all([
-      prisma.inviteTree.findMany({
-        include: { user: { select: { id: true, username: true } } },
-        orderBy: [
-          { treeId: 'asc' },
-          { treeLevel: 'asc' },
-          { treePosition: 'asc' }
-        ],
-        skip: pg.skip,
-        take: pg.limit
-      }),
-      prisma.inviteTree.count()
-    ]);
-    const inviterIds = [...new Set(trees.map((t) => t.inviterId))];
-    const inviters = await prisma.user.findMany({
-      where: { id: { in: inviterIds } },
-      select: { id: true, username: true }
-    });
-    const inviterMap = new Map(inviters.map((u) => [u.id, u]));
-    const rows = trees.map((t) => ({
-      ...t,
-      inviter: inviterMap.get(t.inviterId) ?? null
-    }));
+    const { rows, total } = await getInviteTree(pg);
     paginatedResponse(res, rows, total, pg);
   })
 );
@@ -462,28 +416,7 @@ router.get(
   '/duplicate-ips',
   ...requirePermission('duplicate_ips_view'),
   authHandler(async (_req, res) => {
-    const dupes = await prisma.user.groupBy({
-      by: ['lastIp'],
-      where: { lastIp: { not: null } },
-      _count: { lastIp: true },
-      having: { lastIp: { _count: { gt: 1 } } },
-      orderBy: { _count: { lastIp: 'desc' } }
-    });
-    const result = await Promise.all(
-      dupes.map(async (d) => {
-        const users = await prisma.user.findMany({
-          where: { lastIp: d.lastIp! },
-          select: {
-            id: true,
-            username: true,
-            dateRegistered: true,
-            disabled: true,
-            lastLogin: true
-          }
-        });
-        return { ip: d.lastIp!, count: d._count.lastIp, users };
-      })
-    );
+    const result = await getDuplicateIps();
     res.json(result);
   })
 );
@@ -617,28 +550,13 @@ router.put(
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
-    if (isSelf && !isAdmin) {
-      const ownRank = await prisma.userRank.findUnique({
-        where: { id: req.user.userRankId },
-        select: { displayStaff: true }
-      });
-      if (!ownRank?.displayStaff) {
-        return res.status(403).json({ msg: 'Permission denied' });
-      }
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true }
-    });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    // Normalize empty string to null
-    const normalized = staffBio?.trim() || null;
-    await prisma.user.update({ where: { id }, data: { staffBio: normalized } });
-    await audit(prisma, req.user.id, 'user.staffBio_updated', 'User', id, {
-      staffBio: normalized
-    });
+    await updateStaffBio(
+      id,
+      staffBio,
+      req.user.id,
+      req.user.userRankId,
+      isAdmin
+    );
     res.json({ msg: 'Staff bio updated' });
   })
 );
@@ -658,7 +576,7 @@ router.post(
     if (!user || user.disabled)
       return res.status(404).json({ msg: 'User not found' });
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = generateRecoveryToken();
     const resetUrl = `${emailConfig.siteUrl}/recovery?token=${token}`;
 
     // Send email first — only touch DB if delivery succeeds
@@ -667,18 +585,7 @@ router.post(
       return res.status(502).json({ msg: 'Email delivery is not configured' });
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    await prisma.$transaction([
-      prisma.accountRecovery.updateMany({
-        where: { userId: id, usedAt: null, expiresAt: { gt: now } },
-        data: { expiresAt: now }
-      }),
-      prisma.accountRecovery.create({
-        data: { userId: id, token, expiresAt }
-      })
-    ]);
-
+    await persistRecoveryToken(id, token);
     await audit(prisma, req.user.id, 'recovery.admin_triggered', 'User', id);
     res.json({ msg: 'Recovery email sent' });
   })
@@ -709,29 +616,7 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { reason, expiresAt } = parsedBody<WarnUserInput>(res);
-
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    const [warning] = await prisma.$transaction([
-      prisma.userWarning.create({
-        data: {
-          userId: id,
-          warnedById: req.user.id,
-          reason,
-          ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {})
-        }
-      }),
-      prisma.user.update({
-        where: { id },
-        data: {
-          warnedTimes: { increment: 1 },
-          warned: new Date()
-        }
-      })
-    ]);
-
-    await audit(prisma, req.user.id, 'user.warned', 'User', id, { reason });
+    const warning = await warnUser(id, req.user.id, reason, expiresAt);
     res.status(201).json({ warning });
   })
 );
@@ -743,17 +628,7 @@ router.delete(
   validateParams(warningParamsSchema),
   authHandler(async (_req, res) => {
     const { id, warnId } = parsedParams<{ id: number; warnId: number }>(res);
-    const warning = await prisma.userWarning.findUnique({
-      where: { id: warnId }
-    });
-    if (!warning || warning.userId !== id) {
-      return res.status(404).json({ msg: 'Warning not found' });
-    }
-    await prisma.userWarning.delete({ where: { id: warnId } });
-    const remaining = await prisma.userWarning.count({ where: { userId: id } });
-    if (remaining === 0) {
-      await prisma.user.update({ where: { id }, data: { warned: null } });
-    }
+    await deleteWarning(id, warnId);
     res.status(204).send();
   })
 );
@@ -874,57 +749,7 @@ router.put(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { userRankId, secondaryRankIds } = parsedBody<SetRankInput>(res);
-
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    const uniqueSecondaryRankIds = [...new Set(secondaryRankIds)];
-    const ranks = await prisma.userRank.findMany({
-      where: { id: { in: [userRankId, ...uniqueSecondaryRankIds] } },
-      select: { id: true, secondary: true }
-    });
-    const rankMap = new Map(ranks.map((rank) => [rank.id, rank]));
-    const primaryRank = rankMap.get(userRankId);
-    if (!primaryRank) return res.status(404).json({ msg: 'Rank not found' });
-    if (primaryRank.secondary) {
-      return res
-        .status(422)
-        .json({ msg: 'Primary rank cannot be a secondary class' });
-    }
-    for (const secondaryRankId of uniqueSecondaryRankIds) {
-      const secondaryRank = rankMap.get(secondaryRankId);
-      if (!secondaryRank) {
-        return res.status(404).json({ msg: 'Secondary rank not found' });
-      }
-      if (!secondaryRank.secondary) {
-        return res.status(422).json({
-          msg: 'Only secondary-class ranks can be assigned as secondary classes'
-        });
-      }
-    }
-
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id },
-        data: { userRankId }
-      }),
-      prisma.userSecondaryRank.deleteMany({ where: { userId: id } }),
-      ...(uniqueSecondaryRankIds.length > 0
-        ? [
-            prisma.userSecondaryRank.createMany({
-              data: uniqueSecondaryRankIds.map((secondaryRankId) => ({
-                userId: id,
-                userRankId: secondaryRankId,
-                assignedById: req.user.id
-              }))
-            })
-          ]
-        : [])
-    ]);
-    await audit(prisma, req.user.id, 'user.rank_changed', 'User', id, {
-      userRankId,
-      secondaryRankIds: uniqueSecondaryRankIds
-    });
+    await setUserRank(id, userRankId, secondaryRankIds, req.user.id);
     res.json({ msg: 'Rank updated' });
   })
 );
@@ -938,43 +763,7 @@ router.post(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { donorRankId, expiresAt } = parsedBody<GrantDonorInput>(res);
-
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    const donorRank = await prisma.donorRank.findUnique({
-      where: { id: donorRankId }
-    });
-    if (!donorRank)
-      return res.status(404).json({ msg: 'Donor rank not found' });
-
-    // Explicit expiresAt wins; fall back to the rank's expiresAfterDays if set
-    const computedExpiresAt = expiresAt
-      ? new Date(expiresAt)
-      : donorRank.expiresAfterDays != null
-      ? new Date(Date.now() + donorRank.expiresAfterDays * 86_400_000)
-      : null;
-
-    await prisma.$transaction([
-      prisma.userDonorRank.upsert({
-        where: { userId: id },
-        create: {
-          userId: id,
-          donorRankId,
-          grantedById: req.user.id,
-          ...(computedExpiresAt ? { expiresAt: computedExpiresAt } : {})
-        },
-        update: {
-          donorRankId,
-          grantedAt: new Date(),
-          grantedById: req.user.id,
-          expiresAt: computedExpiresAt
-        }
-      }),
-      prisma.user.update({ where: { id }, data: { isDonor: true } })
-    ]);
-
-    await audit(prisma, req.user.id, 'user.donor_granted', 'User', id);
+    await grantDonorStatus(id, donorRankId, expiresAt ?? null, req.user.id);
     res.status(201).json({ msg: 'Donor status granted' });
   })
 );
@@ -1004,33 +793,8 @@ router.get(
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const sessions = await prisma.userSession.findMany({
-      where: { userId: id },
-      select: {
-        id: true,
-        ipAddress: true,
-        userAgent: true,
-        createdAt: true,
-        lastActiveAt: true,
-        revokedAt: true
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50
-    });
-    const history = new Map<string, string>();
-    for (const session of sessions) {
-      if (!session.ipAddress) continue;
-      const seenAt = (session.lastActiveAt ?? session.createdAt).toISOString();
-      if (!history.has(session.ipAddress)) {
-        history.set(session.ipAddress, seenAt);
-      }
-    }
-    res.json(
-      Array.from(history.entries()).map(([ip, seenAt]) => ({
-        ip,
-        seenAt
-      }))
-    );
+    const history = await getUserIpHistory(id);
+    res.json(history);
   })
 );
 
@@ -1065,43 +829,7 @@ router.get(
   validateParams(userIdParamsSchema),
   authHandler(async (_req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const grants = await prisma.downloadAccessGrant.findMany({
-      where: { consumerId: id, status: 'COMPLETED' },
-      include: {
-        contribution: {
-          include: {
-            release: {
-              select: {
-                id: true,
-                title: true,
-                communityId: true,
-                artist: { select: { name: true } }
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    const seen = new Set<number>();
-    const items = [];
-    for (const g of grants) {
-      const rel = g.contribution.release;
-      if (!seen.has(rel.id)) {
-        seen.add(rel.id);
-        items.push({
-          id: g.id,
-          release: {
-            id: rel.id,
-            title: rel.title,
-            communityId: rel.communityId
-          },
-          artist: rel.artist ?? null,
-          downloadedAt: g.createdAt
-        });
-      }
-      if (items.length >= 100) break;
-    }
+    const items = await getSnatchList(id);
     res.json(items);
   })
 );

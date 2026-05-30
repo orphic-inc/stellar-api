@@ -1,7 +1,5 @@
-import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { auth as authConfig, email as emailConfig } from '../../modules/config';
@@ -31,8 +29,12 @@ import {
   authUserSelect,
   registerUser,
   loginUser,
-  isPasswordBanned,
-  toAuthUser
+  toAuthUser,
+  changePassword,
+  changeEmail,
+  generateRecoveryToken,
+  persistRecoveryToken,
+  resetPasswordWithToken
 } from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
 import { sendRecoveryEmail } from '../../lib/mailer';
@@ -167,33 +169,7 @@ router.post(
   authHandler(async (req, res) => {
     const { currentPassword, newPassword } =
       parsedBody<ChangePasswordInput>(res);
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, password: true }
-    });
-    if (!user) return res.status(401).json({ msg: 'Unauthorized' });
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch)
-      return res.status(400).json({ msg: 'Current password is incorrect' });
-
-    if (await isPasswordBanned(newPassword)) {
-      return res.status(400).json({ msg: 'Password is not allowed' });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: req.user.id },
-        data: { password: hashed }
-      }),
-      prisma.userSession.updateMany({
-        where: { userId: req.user.id, revokedAt: null },
-        data: { revokedAt: new Date() }
-      })
-    ]);
-
+    await changePassword(req.user.id, currentPassword, newPassword);
     res.status(204).send();
   })
 );
@@ -205,43 +181,13 @@ router.put(
   validate(changeEmailSchema),
   authHandler(async (req, res) => {
     const { newEmail, password } = parsedBody<ChangeEmailInput>(res);
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, email: true, password: true }
-    });
-    if (!user) return res.status(401).json({ msg: 'Unauthorized' });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: 'Password is incorrect' });
-
-    const taken = await prisma.user.findUnique({
-      where: { email: newEmail.toLowerCase() }
-    });
-    if (taken) return res.status(400).json({ msg: 'Email already in use' });
-
     const ip =
       (req.headers['x-forwarded-for'] as string | undefined)
         ?.split(',')[0]
         ?.trim() ??
       req.ip ??
       '';
-
-    await prisma.$transaction([
-      prisma.userEmailHistory.create({
-        data: {
-          userId: req.user.id,
-          oldEmail: user.email,
-          newEmail: newEmail.toLowerCase(),
-          ipAddress: ip
-        }
-      }),
-      prisma.user.update({
-        where: { id: req.user.id },
-        data: { email: newEmail.toLowerCase() }
-      })
-    ]);
-
+    await changeEmail(req.user.id, newEmail, password, ip);
     res.json({ msg: 'Email updated' });
   })
 );
@@ -261,25 +207,12 @@ router.post(
     });
 
     if (user) {
-      const token = crypto.randomBytes(32).toString('hex');
+      const token = generateRecoveryToken();
       const resetUrl = `${emailConfig.siteUrl}/recovery?token=${token}`;
-
       // Only write to DB if email delivery succeeds — avoids dead rows when SMTP is off
       const sent = await sendRecoveryEmail(user.email, resetUrl);
       if (sent) {
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-
-        // Enforce single-active-token: expire any pending tokens before creating a new one
-        await prisma.$transaction([
-          prisma.accountRecovery.updateMany({
-            where: { userId: user.id, usedAt: null, expiresAt: { gt: now } },
-            data: { expiresAt: now }
-          }),
-          prisma.accountRecovery.create({
-            data: { userId: user.id, token, expiresAt }
-          })
-        ]);
+        await persistRecoveryToken(user.id, token);
       }
     }
 
@@ -294,34 +227,7 @@ router.post(
   validate(recoveryResetSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { token, newPassword } = parsedBody<RecoveryResetInput>(res);
-
-    const recovery = await prisma.accountRecovery.findFirst({
-      where: { token, usedAt: null, expiresAt: { gt: new Date() } }
-    });
-    if (!recovery) {
-      return res.status(400).json({ msg: 'Invalid or expired recovery token' });
-    }
-
-    if (await isPasswordBanned(newPassword)) {
-      return res.status(400).json({ msg: 'Password is not allowed' });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: recovery.userId },
-        data: { password: hashed }
-      }),
-      prisma.accountRecovery.update({
-        where: { id: recovery.id },
-        data: { usedAt: new Date() }
-      }),
-      prisma.userSession.updateMany({
-        where: { userId: recovery.userId, revokedAt: null },
-        data: { revokedAt: new Date() }
-      })
-    ]);
-
+    await resetPasswordWithToken(token, newPassword);
     res.json({ msg: 'Password reset successfully' });
   })
 );
