@@ -10,6 +10,11 @@ if (!testUrl) {
 
 process.env.STELLAR_PSQL_URI = testUrl;
 
+// Suppress background jobs (link health, stats, donor expiry) in integration
+// tests — they would start timers that outlive the test suite and cause Jest
+// to warn about open handles.
+process.env.DISABLE_BACKGROUND_JOBS = '1';
+
 // The lib/prisma singleton is cached on globalThis. Clearing it here forces a
 // fresh PrismaClient (pointing at the test DB) when modules load below.
 (globalThis as { prisma?: unknown }).prisma = undefined;
