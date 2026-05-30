@@ -18,6 +18,13 @@ if (!g.__httpSocketPatchApplied) {
     if (!serverSockets.has(this)) {
       const sockets = new Set<net.Socket>();
       serverSockets.set(this, sockets);
+      // Disable keep-alive so sockets close immediately after each response.
+      // Without this, the OS can serve stale keep-alive bytes to the next
+      // test's HTTP parser even after socket destruction.
+      if ('keepAliveTimeout' in this) {
+        (this as { keepAliveTimeout: number }).keepAliveTimeout = 0;
+        (this as { headersTimeout: number }).headersTimeout = 0;
+      }
       // Bump max listeners so our extra listener doesn't trigger the warning
       this.setMaxListeners(this.getMaxListeners() + 1);
       this.on('connection', (socket: net.Socket) => {
