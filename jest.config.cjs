@@ -5,7 +5,6 @@ module.exports = {
   testMatch: ['**/*.spec.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
   resetMocks: true,
-  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
   transform: {
     '^.+\\.ts$': [
       'ts-jest',
