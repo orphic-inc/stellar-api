@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import gravatar from 'gravatar';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
@@ -166,7 +165,6 @@ export const registerUser = async ({
       'Server misconfigured: default rank missing. Run setup.'
     );
 
-  const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
   const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
 
   // 3. Atomic: create user + consume invite in one transaction so a crash
@@ -182,7 +180,8 @@ export const registerUser = async ({
         username,
         email: email.toLowerCase(),
         password: hashedPassword,
-        avatar,
+        // avatar left null — UI falls back to the bundled default avatar.
+        // Gravatar was removed to avoid leaking email hashes (private site).
         userRankId: defaultRank.id,
         userSettingsId: settings.id,
         profileId: profile.id,
