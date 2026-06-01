@@ -31,7 +31,7 @@ function mockSysopTransaction() {
       id: 1,
       username: 'sysop',
       email: 'sysop@example.com',
-      avatar: 'https://gravatar.test/avatar.png',
+      avatar: null,
       isArtist: false,
       isDonor: false,
       canDownload: true,
