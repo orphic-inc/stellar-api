@@ -6,7 +6,7 @@ export const profileUpdateSchema = z.object({
   profileTitle: z.string().max(128).optional(),
   profileInfo: z.string().max(10000).optional(),
   siteAppearance: z.string().optional(),
-  externalStylesheet: z.string().optional(),
+  externalStylesheet: z.string().url().optional().or(z.literal('')),
   styledTooltips: z.boolean().optional(),
   paranoia: z.coerce.number().int().min(0).max(3).optional(),
   notificationMethod: z
