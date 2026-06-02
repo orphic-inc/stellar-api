@@ -212,10 +212,6 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn()
 }));
 
-jest.mock('gravatar', () => ({
-  url: jest.fn().mockReturnValue('https://gravatar.test/avatar.png')
-}));
-
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn(
     (
@@ -288,7 +284,6 @@ import { fileReport } from '../modules/reports';
 import { recordContributionReport } from '../modules/linkHealth';
 import * as donorModule from '../modules/donor';
 
-const gravatar = jest.requireMock('gravatar') as { url: jest.Mock };
 const sanitize = jest.requireMock('../lib/sanitize') as {
   sanitizeHtml: ((value: string) => string) | jest.Mock;
   sanitizePlain: ((value: string) => string) | jest.Mock;
@@ -453,9 +448,6 @@ export const resetApiTestState = (): void => {
   // Restore implementations cleared by resetMocks: true
   (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt');
   (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-  (gravatar.url as jest.Mock).mockReturnValue(
-    'https://gravatar.test/avatar.png'
-  );
   if ('mockImplementation' in sanitize.sanitizeHtml) {
     sanitize.sanitizeHtml.mockImplementation((value: string) => value);
   } else {

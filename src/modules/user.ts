@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { AppError } from '../lib/errors';
+import { getDefaultStylesheetName } from './stylesheet';
 
 export type SnatchItem = {
   id: number;
@@ -114,7 +115,10 @@ export const createUser = async (
   );
 
   const user = await prisma.$transaction(async (tx) => {
-    const settings = await tx.userSettings.create({ data: {} });
+    const defaultTheme = await getDefaultStylesheetName(tx);
+    const settings = await tx.userSettings.create({
+      data: { siteAppearance: defaultTheme }
+    });
     const profile = await tx.profile.create({ data: {} });
     return tx.user.create({
       data: {

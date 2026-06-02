@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import gravatar from 'gravatar';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
@@ -17,6 +16,7 @@ import { getSettings } from '../../modules/settings';
 import { seedRanks, seedForums } from '../../modules/bootstrap';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
+import { getDefaultStylesheetName } from '../../modules/stylesheet';
 
 const TOKEN_TTL_SECONDS = 3600;
 const STARTUP_BUFFER = 5_368_709_120n; // 5 GiB — matches self-registration buffer
@@ -180,21 +180,23 @@ router.post(
         'SysOp rank missing after bootstrap — run db:seed'
       );
 
-    const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
     const hashedPassword = await bcrypt.hash(
       password,
       await bcrypt.genSalt(10)
     );
 
     const rawUser = await prisma.$transaction(async (tx) => {
-      const settings = await tx.userSettings.create({ data: {} });
+      const defaultTheme = await getDefaultStylesheetName(tx);
+      const settings = await tx.userSettings.create({
+        data: { siteAppearance: defaultTheme }
+      });
       const profile = await tx.profile.create({ data: {} });
       return tx.user.create({
         data: {
           username,
           email: email.toLowerCase(),
           password: hashedPassword,
-          avatar,
+          // avatar left null — UI falls back to the bundled default avatar.
           userRankId: sysopRank.id,
           userSettingsId: settings.id,
           profileId: profile.id,

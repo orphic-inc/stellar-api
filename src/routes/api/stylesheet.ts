@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import { requireStrictAdmin } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -11,13 +11,32 @@ import {
 } from '../../middleware/validate';
 import {
   stylesheetSchema,
-  type StylesheetInput
+  stylesheetUpdateSchema,
+  type StylesheetInput,
+  type StylesheetUpdateInput
 } from '../../schemas/stylesheet';
+import {
+  createStylesheet,
+  updateStylesheet,
+  deleteStylesheet,
+  getStylesheetStats
+} from '../../modules/stylesheet';
+import { prisma } from '../../lib/prisma';
 
 const router = express.Router();
 const stylesheetIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+
+// GET /api/stylesheet/admin/stats — must be before /:id
+router.get(
+  '/admin/stats',
+  ...requireStrictAdmin(),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const stats = await getStylesheetStats();
+    res.json(stats);
+  })
+);
 
 // GET /api/stylesheet
 router.get(
@@ -25,7 +44,7 @@ router.get(
   requireAuth,
   asyncHandler(async (_req: Request, res: Response) => {
     const stylesheets = await prisma.stylesheet.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'asc' }
     });
     res.json(stylesheets);
   })
@@ -48,27 +67,42 @@ router.get(
 // POST /api/stylesheet
 router.post(
   '/',
-  requireAuth,
+  ...requireStrictAdmin(),
   validate(stylesheetSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, cssUrl } = parsedBody<StylesheetInput>(res);
-    const stylesheet = await prisma.stylesheet.create({
-      data: { name, cssUrl }
+    const data = parsedBody<StylesheetInput>(res);
+    const stylesheet = await createStylesheet({
+      name: data.name,
+      description: data.description ?? '',
+      cssUrl: data.cssUrl,
+      isDefault: data.isDefault ?? false
     });
     res.status(201).json(stylesheet);
+  })
+);
+
+// PUT /api/stylesheet/:id
+router.put(
+  '/:id',
+  ...requireStrictAdmin(),
+  validateParams(stylesheetIdParamsSchema),
+  validate(stylesheetUpdateSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const data = parsedBody<StylesheetUpdateInput>(res);
+    const stylesheet = await updateStylesheet(id, data);
+    res.json(stylesheet);
   })
 );
 
 // DELETE /api/stylesheet/:id
 router.delete(
   '/:id',
-  requireAuth,
+  ...requireStrictAdmin(),
   validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const existing = await prisma.stylesheet.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ msg: 'Stylesheet not found' });
-    await prisma.stylesheet.delete({ where: { id } });
+    await deleteStylesheet(id);
     res.status(204).send();
   })
 );

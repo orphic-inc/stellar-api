@@ -204,7 +204,7 @@ router.get(
 
 // ─── GET /api/wiki/:id/revisions ──────────────────────────────────────────────
 // Requires canEdit (not just canRead) — revision history can expose restricted
-// prior content. Matches Gazelle's revisions.php access control.
+// prior content — only users who can edit can access revision history.
 router.get(
   '/:id/revisions',
   requireAuth,

@@ -34,6 +34,10 @@ import {
 } from '../contentFactory';
 import { trackCreate, appendWarning } from '../tracking';
 
+// Seed-generated users get a visually distinct avatar so they stand out in
+// the UI from real accounts. Served by stellar-ui from src/static.
+const SEEDED_AVATAR = '/static/common/avatars/seeded.jpg';
+
 // User archetype distribution
 const ARCHETYPES = [
   'regular', // 60%
@@ -205,6 +209,7 @@ export async function generateUsers(
         username,
         email,
         password: passwordHash,
+        avatar: SEEDED_AVATAR,
         userRankId,
         userSettingsId: settings.id,
         profileId: profile.id,

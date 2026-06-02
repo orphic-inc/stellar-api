@@ -8,6 +8,13 @@ All notable changes to stellar-api are documented here.
 
 - Stub tracking issues filed for friends (#60), invite tree (#61), and donations (#62)
 
+### Changed
+- Remove Gravatar dependency — registration and install no longer compute a Gravatar URL from the user's email (which leaked an email hash to a third party; unacceptable for a private site). New users register with a null avatar; the UI falls back to a bundled default.
+- devTools seeded users now get a visually distinct avatar (`/static/common/avatars/seeded.jpg`) so generated accounts stand out from real ones in the UI.
+
+### Migration
+- `prisma/scripts/backfill-remove-gravatar-avatars.ts` — one-off backfill nulling existing stored Gravatar avatar URLs. Run manually: `npx ts-node prisma/scripts/backfill-remove-gravatar-avatars.ts`
+
 ---
 
 ## [0.5.3] — 2026-06-01

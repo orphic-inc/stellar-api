@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import gravatar from 'gravatar';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { computeRatio } from './ratio';
 import { computeUserRankAccess } from '../lib/userRankAccess';
+import { getDefaultStylesheetName } from './stylesheet';
 
 export const isPasswordBanned = async (password: string): Promise<boolean> => {
   const found = await prisma.badPassword.findFirst({ where: { password } });
@@ -165,20 +165,23 @@ export const registerUser = async ({
       'Server misconfigured: default rank missing. Run setup.'
     );
 
-  const avatar = gravatar.url(email, { s: '200', r: 'pg', d: 'mm' });
   const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
 
   // 3. Atomic: create user + consume invite in one transaction so a crash
   //    between the two can never leave the invite permanently open.
   const user = await prisma.$transaction(async (tx) => {
-    const settings = await tx.userSettings.create({ data: {} });
+    const defaultTheme = await getDefaultStylesheetName(tx);
+    const settings = await tx.userSettings.create({
+      data: { siteAppearance: defaultTheme }
+    });
     const profile = await tx.profile.create({ data: {} });
     const newUser = await tx.user.create({
       data: {
         username,
         email: email.toLowerCase(),
         password: hashedPassword,
-        avatar,
+        // avatar left null — UI falls back to the bundled default avatar.
+        // Gravatar was removed to avoid leaking email hashes (private site).
         userRankId: defaultRank.id,
         userSettingsId: settings.id,
         profileId: profile.id,
