@@ -35,8 +35,9 @@ import {
 import { trackCreate, appendWarning } from '../tracking';
 
 // Seed-generated users get a visually distinct avatar so they stand out in
-// the UI from real accounts. Served by stellar-ui from src/static.
-const SEEDED_AVATAR = '/static/common/avatars/seeded.jpg';
+// the UI from real accounts. This is a sentinel, not a URL — stellar-ui's
+// avatarSrc() maps it to a bundled avatar asset (keep the value in sync).
+const SEEDED_AVATAR = 'seeded';
 
 // User archetype distribution
 const ARCHETYPES = [
