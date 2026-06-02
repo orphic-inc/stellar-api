@@ -13,7 +13,7 @@ All notable changes to stellar-api are documented here.
 - devTools seeded users now get a visually distinct avatar (`/static/common/avatars/seeded.jpg`) so generated accounts stand out from real ones in the UI.
 
 ### Migration
-- `prisma/scripts/backfill-remove-gravatar-avatars.sql` — one-off backfill nulling existing stored Gravatar avatar URLs. Run manually: `psql "$STELLAR_PSQL_URI" -f prisma/scripts/backfill-remove-gravatar-avatars.sql`
+- `prisma/scripts/backfill-remove-gravatar-avatars.ts` — one-off backfill nulling existing stored Gravatar avatar URLs. Run manually: `npx ts-node prisma/scripts/backfill-remove-gravatar-avatars.ts`
 
 ---
 

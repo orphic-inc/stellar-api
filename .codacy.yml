@@ -1,7 +1,4 @@
 exclude_paths:
-  # PostgreSQL .sql files — Codacy's SQL analyzer applies T-SQL (SQL Server)
-  # rules (SET ANSI_NULLS, schema-qualified names) that don't apply to Postgres.
   - "prisma/migrations/**/*.sql"
-  - "prisma/scripts/**/*.sql"
   - "openapi.json"
   - "dist/**"
