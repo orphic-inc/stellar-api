@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Greetings and salutations! This in-progress document contains guidance for developing and maintaining Stellar.
+Salutations! This in-progress document contains guidance for developing and maintaining Stellar.
 
 ## Connecting to the Database
 
