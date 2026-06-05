@@ -2722,6 +2722,7 @@ const CommunityHealthPulse = z
     unknown: z.number(),
     total: z.number(),
     checked: z.number(),
+    coverage: z.number().nullable(),
     pulse: z.number().nullable(),
     status: z.enum(['Healthy', 'Ailing', 'Critical', 'Unknown'])
   })

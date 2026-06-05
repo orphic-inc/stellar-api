@@ -9,9 +9,12 @@ const STALE_AFTER_DAYS = 7;
 // Auto-WARN a contribution when this many distinct users have reported it
 const REPORT_WARN_THRESHOLD = 3;
 
-// Community pulse bands — the share of *checked* links that PASS. Retune here.
+// Community pulse bands — the share of *definitively probed* links that PASS.
 const PULSE_HEALTHY = 0.9;
 const PULSE_AILING = 0.6;
+// Below this share of links definitively probed, the pulse isn't trustworthy
+// enough to band — report Unknown rather than a confident Healthy/Critical.
+const PULSE_MIN_COVERAGE = 0.5;
 
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
@@ -108,9 +111,14 @@ export interface CommunityHealthPulse {
   unknown: number;
   /** All contributions in the community. */
   total: number;
-  /** Contributions whose link has actually been probed (PASS + WARN + FAIL). */
+  /**
+   * Definitively probed links (PASS + FAIL). WARN is transient/uncertain and
+   * UNKNOWN is unprobed — both are indeterminate and excluded from the pulse.
+   */
   checked: number;
-  /** Share of checked links that PASS, 0–1. `null` when nothing is checked yet. */
+  /** Share of all links that are definitively probed, 0–1. `null` when empty. */
+  coverage: number | null;
+  /** Share of probed links that PASS, 0–1. `null` when none are probed yet. */
   pulse: number | null;
   status: CommunityPulseStatus;
 }
@@ -148,11 +156,16 @@ export const getCommunityHealthPulse = async (
     }
   }
 
-  const checked = counts.pass + counts.warn + counts.fail;
-  const total = checked + counts.unknown;
+  // Only PASS/FAIL are definitive; WARN (transient) and UNKNOWN (unprobed) are
+  // indeterminate and excluded from the pulse.
+  const checked = counts.pass + counts.fail;
+  const total = checked + counts.warn + counts.unknown;
+  const coverage = total === 0 ? null : checked / total;
   const pulse = checked === 0 ? null : counts.pass / checked;
+  // Don't claim a confident band until enough links are actually probed —
+  // otherwise one PASS among thousands of UNKNOWN would read "Healthy".
   const status: CommunityPulseStatus =
-    pulse === null
+    pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
       ? 'Unknown'
       : pulse >= PULSE_HEALTHY
         ? 'Healthy'
@@ -160,5 +173,5 @@ export const getCommunityHealthPulse = async (
           ? 'Ailing'
           : 'Critical';
 
-  return { ...counts, total, checked, pulse, status };
+  return { ...counts, total, checked, coverage, pulse, status };
 };

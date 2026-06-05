@@ -8,10 +8,14 @@ those up to the community level.
 
 We aggregate **on read** rather than storing a score. `getCommunityHealthPulse`
 (`src/modules/linkHealth.ts`) groups a community's contributions by `linkStatus`
-(via `release.communityId`) and returns a pulse = `pass / checked`, where
-`checked = pass + warn + fail` (UNKNOWN is excluded — not yet probed). The ratio
-is banded `Healthy ≥ 0.90`, `Ailing ≥ 0.60`, `Critical` otherwise, `Unknown`
-when nothing is checked. It is served at `GET /api/communities/:id/health`.
+(via `release.communityId`). Only `PASS` and `FAIL` are definitive (`checked`);
+`WARN` (transient 5xx / report-flagged) and `UNKNOWN` (unprobed) are
+indeterminate and excluded — so a transient-only community reads `Unknown`, not
+`Critical`. The pulse = `pass / checked`, banded `Healthy ≥ 0.90`,
+`Ailing ≥ 0.60`, `Critical` otherwise. It withholds a confident band and reports
+`Unknown` until coverage (`checked / total`) clears a floor (`0.5`), so one
+probed link among thousands of unprobed ones doesn't read `Healthy`. Served at
+`GET /api/communities/:id/health`.
 
 No schema change and no stored state: the pulse is cheap to compute and always
 reflects current link reality, so there is nothing to invalidate. The existing
