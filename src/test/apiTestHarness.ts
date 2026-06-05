@@ -39,7 +39,8 @@ jest.mock('../modules/reports', () => ({
 
 jest.mock('../modules/linkHealth', () => ({
   recordContributionReport: jest.fn(),
-  recheckStaleLinks: jest.fn()
+  recheckStaleLinks: jest.fn(),
+  getCommunityHealthPulse: jest.fn()
 }));
 
 jest.mock('../modules/linkHealthJob', () => ({
@@ -281,7 +282,10 @@ import {
   reverseDownloadAccess
 } from '../modules/downloads';
 import { fileReport } from '../modules/reports';
-import { recordContributionReport } from '../modules/linkHealth';
+import {
+  recordContributionReport,
+  getCommunityHealthPulse
+} from '../modules/linkHealth';
 import * as donorModule from '../modules/donor';
 
 const sanitize = jest.requireMock('../lib/sanitize') as {
@@ -409,6 +413,10 @@ export const fileReportMock = fileReport as jest.MockedFunction<
 export const recordContributionReportMock =
   recordContributionReport as jest.MockedFunction<
     typeof recordContributionReport
+  >;
+export const getCommunityHealthPulseMock =
+  getCommunityHealthPulse as jest.MockedFunction<
+    typeof getCommunityHealthPulse
   >;
 export const pmMock = pmModule as jest.Mocked<typeof pmModule>;
 export const staffInboxMock = staffInboxModule as jest.Mocked<

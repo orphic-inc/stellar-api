@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { getCommunityHealthPulse } from '../../../modules/linkHealth';
 import { requireAuth } from '../../../middleware/auth';
 import {
   requirePermission,
@@ -118,6 +119,27 @@ router.get(
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
     res.json(community);
+  })
+);
+
+// GET /api/communities/:id/health — the community's link-health pulse
+router.get(
+  '/:id/health',
+  requireAuth,
+  validateParams(communityIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const community = await prisma.community.findUnique({
+      where: { id },
+      select: { registrationStatus: true }
+    });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (
+      !(await isCommunityMember(id, req.user.id, community.registrationStatus))
+    ) {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
+    res.json(await getCommunityHealthPulse(id));
   })
 );
 

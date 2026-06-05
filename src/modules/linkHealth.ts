@@ -9,6 +9,10 @@ const STALE_AFTER_DAYS = 7;
 // Auto-WARN a contribution when this many distinct users have reported it
 const REPORT_WARN_THRESHOLD = 3;
 
+// Community pulse bands — the share of *checked* links that PASS. Retune here.
+const PULSE_HEALTHY = 0.9;
+const PULSE_AILING = 0.6;
+
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -93,4 +97,68 @@ export const recordContributionReport = async (
       log.warn('Post-report link recheck failed', { contributionId, err })
     );
   }
+};
+
+export type CommunityPulseStatus = 'Healthy' | 'Ailing' | 'Critical' | 'Unknown';
+
+export interface CommunityHealthPulse {
+  pass: number;
+  warn: number;
+  fail: number;
+  unknown: number;
+  /** All contributions in the community. */
+  total: number;
+  /** Contributions whose link has actually been probed (PASS + WARN + FAIL). */
+  checked: number;
+  /** Share of checked links that PASS, 0–1. `null` when nothing is checked yet. */
+  pulse: number | null;
+  status: CommunityPulseStatus;
+}
+
+/**
+ * The community's link-health "pulse": roll every contribution's linkStatus up
+ * into a single heartbeat. A living community keeps its links alive; the pulse
+ * weakens as they rot. Computed on read — no stored state.
+ */
+export const getCommunityHealthPulse = async (
+  communityId: number
+): Promise<CommunityHealthPulse> => {
+  const grouped = await prisma.contribution.groupBy({
+    by: ['linkStatus'],
+    where: { release: { communityId } },
+    _count: { _all: true }
+  });
+
+  const counts = { pass: 0, warn: 0, fail: 0, unknown: 0 };
+  for (const row of grouped) {
+    const n = row._count._all;
+    switch (row.linkStatus) {
+      case LinkHealthStatus.PASS:
+        counts.pass += n;
+        break;
+      case LinkHealthStatus.WARN:
+        counts.warn += n;
+        break;
+      case LinkHealthStatus.FAIL:
+        counts.fail += n;
+        break;
+      default:
+        counts.unknown += n; // UNKNOWN — not yet probed
+        break;
+    }
+  }
+
+  const checked = counts.pass + counts.warn + counts.fail;
+  const total = checked + counts.unknown;
+  const pulse = checked === 0 ? null : counts.pass / checked;
+  const status: CommunityPulseStatus =
+    pulse === null
+      ? 'Unknown'
+      : pulse >= PULSE_HEALTHY
+        ? 'Healthy'
+        : pulse >= PULSE_AILING
+          ? 'Ailing'
+          : 'Critical';
+
+  return { ...counts, total, checked, pulse, status };
 };

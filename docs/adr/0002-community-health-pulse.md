@@ -1,14 +1,22 @@
-# Community-health pulse → CommunityScore
+# Compute community health as a read-time link pulse; defer persistence and scoring
 
-**Status: Proposed — future direction.** Serves [PRD-01 Community-Score / CRS](../prd/01-Community-Score.md); tracked by [#75](https://github.com/orphic-inc/stellar-api/issues/75).
+`01-Community-Score.md` favours communities that stay "active, healthy, and
+self-sustaining." LinkHealth already gives that health a per-contribution
+signal: submitting through the contribution form sets `Contribution.linkStatus`
+(`UNKNOWN | PASS | WARN | FAIL`), and a job re-checks stale links. Nothing rolled
+those up to the community level.
 
-Stellar computes a community-health signal on read (`getCommunityHealthPulse`). The decision recorded here is how that pulse becomes a durable input to the CommunityReputationScore (CRS).
+We aggregate **on read** rather than storing a score. `getCommunityHealthPulse`
+(`src/modules/linkHealth.ts`) groups a community's contributions by `linkStatus`
+(via `release.communityId`) and returns a pulse = `pass / checked`, where
+`checked = pass + warn + fail` (UNKNOWN is excluded — not yet probed). The ratio
+is banded `Healthy ≥ 0.90`, `Ailing ≥ 0.60`, `Critical` otherwise, `Unknown`
+when nothing is checked. It is served at `GET /api/communities/:id/health`.
 
-Decision to record (not yet finalized):
-
-- **Persistence:** snapshot the pulse over time (mirror `statsHistory`) for trend analysis vs. recompute-on-read only.
-- **Folding into CRS:** how the pulse feeds the `CommunityScore` dimension of `CommunityReputationScore`, and ultimately a `CommunityValueIndex`.
-
-This is the ADR the stylesheet-scoring work ([PRD-03](../prd/03-stylesheet-themes-and-scoring.md)) and other CRS dimensions reference for "computed-on-read vs. event-logged" accrual.
-
-_Fill in the chosen approach and consequences once decided._
+No schema change and no stored state: the pulse is cheap to compute and always
+reflects current link reality, so there is nothing to invalidate. The existing
+`Release → Contribution` shape feeds it as-is, so this does not wait on the Music
+model remodel (#72–#74). Persisting/snapshotting the pulse and folding it into
+the PRD's `CommunityScore` is deliberately deferred (#75), as is weighting it by
+upload quality — a lossless/logged/cued release should count for more than a
+transcode (#76).
