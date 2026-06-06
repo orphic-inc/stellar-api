@@ -49,9 +49,7 @@ export const updateReleaseWorkbenchMetadata = async (
           description: input.description
         }),
         ...(input.image !== undefined && { image: input.image }),
-        ...(input.year !== undefined && { year: input.year }),
-        ...(input.isEdition !== undefined && { isEdition: input.isEdition }),
-        ...(input.edition !== undefined && { edition: input.edition as never })
+        ...(input.year !== undefined && { year: input.year })
       }
     });
 

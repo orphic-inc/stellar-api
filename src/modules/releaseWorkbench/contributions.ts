@@ -67,8 +67,12 @@ export const attachReleaseWorkbenchContribution = async (
   }
 
   await prisma.$transaction(async (tx) => {
+    const credits = await tx.releaseArtist.findMany({
+      where: { releaseId: contribution.release.id },
+      select: { artistId: true }
+    });
     const subs = await tx.artistSubscription.findMany({
-      where: { artistId: contribution.release.artistId },
+      where: { artistId: { in: credits.map((credit) => credit.artistId) } },
       select: { userId: true }
     });
     if (subs.length > 0) {

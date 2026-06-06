@@ -1,6 +1,8 @@
 import {
+  Bitrate,
   FileType,
   ReleaseCategory,
+  ReleaseMedia,
   ReleaseType,
   RequestStatus
 } from '@prisma/client';
@@ -9,6 +11,10 @@ import { paginationBase } from '../lib/pagination';
 
 const releaseTypeEnum = z.enum(
   Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]
+);
+const bitrateEnum = z.enum(Object.values(Bitrate) as [Bitrate, ...Bitrate[]]);
+const mediaEnum = z.enum(
+  Object.values(ReleaseMedia) as [ReleaseMedia, ...ReleaseMedia[]]
 );
 const releaseCategoryEnum = z.enum(
   Object.values(ReleaseCategory) as [ReleaseCategory, ...ReleaseCategory[]]
@@ -48,8 +54,8 @@ export const searchReleasesQuerySchema = z.object({
   releaseType: releaseCategoryEnum.optional(),
   // Advanced — contribution-level (rip specifics)
   format: fileTypeEnum.optional(),
-  bitrate: z.string().max(50).optional(),
-  media: z.string().max(50).optional(),
+  bitrate: bitrateEnum.optional(),
+  media: mediaEnum.optional(),
   hasLog: z.coerce.boolean().optional(),
   hasCue: z.coerce.boolean().optional(),
   isScene: z.coerce.boolean().optional(),

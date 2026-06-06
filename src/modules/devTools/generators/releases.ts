@@ -18,8 +18,9 @@
 
 import {
   PrismaClient,
-  Prisma,
+  ArtistRole,
   ReleaseCategory,
+  ReleaseMedia,
   ReleaseType,
   ReleaseTagVoteDirection
 } from '@prisma/client';
@@ -68,6 +69,19 @@ const RELEASE_TYPES: ReleaseType[] = [
   'Audiobooks',
   'Comedy',
   'Comics'
+];
+
+const RELEASE_MEDIA: ReleaseMedia[] = [
+  'CD',
+  'WEB',
+  'Vinyl',
+  'SACD',
+  'DVD',
+  'Cassette',
+  'BluRay',
+  'DAT',
+  'Soundboard',
+  'Other'
 ];
 
 function pickCategory(rng: SeedContext): ReleaseCategory {
@@ -222,32 +236,53 @@ export async function generateReleases(
 
       const release = await prisma.release.create({
         data: {
-          artistId: artist.id,
           title: title.substring(0, 100),
           description: makeReleaseDescription(rng).substring(0, 1000),
           communityId,
           type: releaseType,
           releaseType: releaseCategory,
           year,
-          isEdition: hasEdition,
-          ...(hasEdition
-            ? {
-                edition: {
-                  title: pick(
-                    ['Deluxe', 'Remastered', 'Anniversary', 'Limited'],
-                    rng
-                  ),
-                  year: year + randInt(0, 30, rng)
-                } as Prisma.InputJsonValue
-              }
-            : {}),
-          catalogueNumber: randBool(0.7, rng) ? makeCatalogueNumber(rng) : null,
-          recordLabel: randBool(0.7, rng) ? makeRecordLabel(rng) : null,
+          credits: { create: { artistId: artist.id, role: ArtistRole.Main } },
           createdAt,
           updatedAt: createdAt
         }
       });
       createdReleaseIds.push(release.id);
+
+      // Default (unknown) edition every release has, plus an optional named
+      // edition. Label/catalogue/media are edition-scoped now.
+      await prisma.edition.create({
+        data: {
+          releaseId: release.id,
+          year,
+          media: pick(RELEASE_MEDIA, rng),
+          catalogueNumber: randBool(0.7, rng) ? makeCatalogueNumber(rng) : null,
+          recordLabel: randBool(0.7, rng) ? makeRecordLabel(rng) : null,
+          isUnknownEdition: true,
+          createdAt,
+          updatedAt: createdAt
+        }
+      });
+      if (hasEdition) {
+        await prisma.edition.create({
+          data: {
+            releaseId: release.id,
+            title: pick(
+              ['Deluxe', 'Remastered', 'Anniversary', 'Limited'],
+              rng
+            ),
+            year: year + randInt(0, 30, rng),
+            media: pick(RELEASE_MEDIA, rng),
+            catalogueNumber: randBool(0.7, rng)
+              ? makeCatalogueNumber(rng)
+              : null,
+            recordLabel: randBool(0.7, rng) ? makeRecordLabel(rng) : null,
+            isRemaster: true,
+            createdAt,
+            updatedAt: createdAt
+          }
+        });
+      }
       await trackCreate(
         prisma as Parameters<typeof trackCreate>[0],
         runId,

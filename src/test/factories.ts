@@ -3,7 +3,8 @@ import {
   ReleaseCategory,
   CommentPage,
   RequestStatus,
-  SubscriptionPage
+  SubscriptionPage,
+  ArtistRole
 } from '@prisma/client';
 import type {
   Prisma,
@@ -343,7 +344,12 @@ export type CollageDetail = Prisma.CollageGetPayload<{
             image: true;
             year: true;
             releaseType: true;
-            artist: { select: { id: true; name: true } };
+            credits: {
+              select: {
+                role: true;
+                artist: { select: { id: true; name: true } };
+              };
+            };
           };
         };
         user: { select: { id: true; username: true } };
@@ -389,7 +395,9 @@ export type CollageEntryDetail = Prisma.CollageEntryGetPayload<{
         image: true;
         year: true;
         releaseType: true;
-        artist: { select: { id: true; name: true } };
+        credits: {
+          select: { role: true; artist: { select: { id: true; name: true } } };
+        };
       };
     };
     user: { select: { id: true; username: true } };
@@ -407,7 +415,9 @@ export function makeCollageEntryDetail(
       image: null,
       year: 1959,
       releaseType: ReleaseCategory.Album,
-      artist: { id: 5, name: 'Miles Davis' }
+      credits: [
+        { role: ArtistRole.Main, artist: { id: 5, name: 'Miles Davis' } }
+      ]
     },
     user: { id: TEST_USER_ID, username: 'testuser' },
     ...overrides
@@ -447,7 +457,6 @@ export function makeBookmarkCollage(
 export function makeRelease(overrides: Partial<Release> = {}): Release {
   return {
     id: 42,
-    artistId: 5,
     title: 'Kind of Blue',
     image: null,
     description: '',
@@ -455,10 +464,6 @@ export function makeRelease(overrides: Partial<Release> = {}): Release {
     type: ReleaseType.Music,
     releaseType: ReleaseCategory.Album,
     year: 1959,
-    isEdition: false,
-    edition: null,
-    catalogueNumber: null,
-    recordLabel: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides

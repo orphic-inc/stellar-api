@@ -5,6 +5,10 @@ import { asyncHandler } from '../../modules/asyncHandler';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
 import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
+  releaseCreditsSelect,
+  withPrimaryArtist
+} from '../../modules/releaseCredits';
+import {
   searchReleasesQuerySchema,
   searchArtistsQuerySchema,
   searchRequestsQuerySchema,
@@ -63,11 +67,9 @@ const RELEASE_SELECT = {
   type: true,
   releaseType: true,
   communityId: true,
-  catalogueNumber: true,
-  recordLabel: true,
   description: true,
   createdAt: true,
-  artist: { select: { id: true, name: true, vanityHouse: true } },
+  credits: releaseCreditsSelect,
   releaseTags: { select: { tag: { select: { id: true, name: true } } } },
   _count: { select: { consumers: true, contributors: true } }
 } as const;
@@ -88,15 +90,34 @@ router.get(
 
     const tagPredicate = buildTagWhere(q.tags, q.tagMode);
 
+    // Contribution-level filters (per-rip specifics). bitrate is a typed enum
+    // now, so match exactly rather than substring.
     const contributionFilter: Record<string, unknown> = {};
     if (q.format) contributionFilter.type = q.format;
-    if (q.bitrate)
-      contributionFilter.bitrate = { contains: q.bitrate, mode: 'insensitive' };
-    if (q.media)
-      contributionFilter.media = { contains: q.media, mode: 'insensitive' };
+    if (q.bitrate) contributionFilter.bitrate = q.bitrate;
     if (q.hasLog !== undefined) contributionFilter.hasLog = q.hasLog;
     if (q.hasCue !== undefined) contributionFilter.hasCue = q.hasCue;
     if (q.isScene !== undefined) contributionFilter.isScene = q.isScene;
+
+    // Edition-level filters — label, catalogue and media are edition-scoped now.
+    const editionFilter: Record<string, unknown> = {};
+    if (q.recordLabel)
+      editionFilter.recordLabel = {
+        contains: q.recordLabel,
+        mode: 'insensitive'
+      };
+    if (q.catalogueNumber)
+      editionFilter.catalogueNumber = {
+        contains: q.catalogueNumber,
+        mode: 'insensitive'
+      };
+    if (q.media) editionFilter.media = q.media;
+
+    // Artist-credit filters (name + vanityHouse) traverse the credits relation.
+    const artistFilter: Record<string, unknown> = {};
+    if (q.artist)
+      artistFilter.name = { contains: q.artist, mode: 'insensitive' };
+    if (q.vanityHouse !== undefined) artistFilter.vanityHouse = q.vanityHouse;
 
     const where: Record<string, unknown> = {};
 
@@ -104,19 +125,14 @@ router.get(
       where.OR = [
         { title: { contains: q.q, mode: 'insensitive' } },
         { description: { contains: q.q, mode: 'insensitive' } },
-        { artist: { name: { contains: q.q, mode: 'insensitive' } } }
+        {
+          credits: {
+            some: { artist: { name: { contains: q.q, mode: 'insensitive' } } }
+          }
+        }
       ];
     }
     if (q.title) where.title = { contains: q.title, mode: 'insensitive' };
-    if (q.artist)
-      where.artist = { name: { contains: q.artist, mode: 'insensitive' } };
-    if (q.recordLabel)
-      where.recordLabel = { contains: q.recordLabel, mode: 'insensitive' };
-    if (q.catalogueNumber)
-      where.catalogueNumber = {
-        contains: q.catalogueNumber,
-        mode: 'insensitive'
-      };
     if (q.description)
       where.description = { contains: q.description, mode: 'insensitive' };
     if (q.type) where.type = q.type;
@@ -125,11 +141,12 @@ router.get(
       where.year = { gte: q.year, ...(q.yearTo ? { lte: q.yearTo } : {}) };
     if (q.yearTo && !q.year) where.year = { lte: q.yearTo };
     if (communityIds) where.communityId = { in: communityIds };
-    if (q.vanityHouse !== undefined)
-      where.artist = {
-        ...((where.artist as object) ?? {}),
-        vanityHouse: q.vanityHouse
-      };
+    if (Object.keys(artistFilter).length) {
+      where.credits = { some: { artist: artistFilter } };
+    }
+    if (Object.keys(editionFilter).length) {
+      where.editions = { some: editionFilter };
+    }
     if (Object.keys(contributionFilter).length) {
       where.contributions = { some: contributionFilter };
     }
@@ -148,7 +165,7 @@ router.get(
       return paginatedResponse(
         res,
         data.map((release) => ({
-          ...release,
+          ...withPrimaryArtist(release),
           tags: release.releaseTags.map((entry) => entry.tag)
         })),
         count,
@@ -177,7 +194,7 @@ router.get(
     paginatedResponse(
       res,
       data.map((release) => ({
-        ...release,
+        ...withPrimaryArtist(release),
         tags: release.releaseTags.map((entry) => entry.tag)
       })),
       total,
@@ -193,7 +210,7 @@ const ARTIST_SELECT = {
   name: true,
   vanityHouse: true,
   tags: { select: { tag: { select: { id: true, name: true } } } },
-  _count: { select: { releases: true } }
+  _count: { select: { credits: true } }
 } as const;
 
 router.get(

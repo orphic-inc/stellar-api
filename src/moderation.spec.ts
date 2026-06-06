@@ -554,7 +554,7 @@ describe('GET /api/users/me/snatch-list', () => {
             id: 42,
             title: 'Kind of Blue',
             communityId: 3,
-            artist: { name: 'Miles Davis' }
+            credits: [{ role: 'Main', artist: { name: 'Miles Davis' } }]
           }
         }
       } as never
@@ -580,7 +580,7 @@ describe('GET /api/users/me/snatch-list', () => {
           id: 42,
           title: 'Kind of Blue',
           communityId: null,
-          artist: { name: 'Miles Davis' }
+          credits: [{ role: 'Main', artist: { name: 'Miles Davis' } }]
         }
       }
     };
@@ -607,7 +607,7 @@ describe('GET /api/users/me/snatch-list', () => {
             id: 43,
             title: 'VA Compilation',
             communityId: null,
-            artist: null
+            credits: []
           }
         }
       } as never
@@ -977,7 +977,7 @@ describe('GET /api/users/:id/snatch-list', () => {
             id: 55,
             title: 'Dark Side',
             communityId: 2,
-            artist: { name: 'Pink Floyd' }
+            credits: [{ role: 'Main', artist: { name: 'Pink Floyd' } }]
           }
         }
       }
@@ -1010,7 +1010,7 @@ describe('GET /api/users/:id/snatch-list', () => {
             id: 56,
             title: 'Various Artists',
             communityId: 2,
-            artist: null
+            credits: []
           }
         }
       }

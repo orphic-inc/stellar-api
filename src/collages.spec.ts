@@ -598,7 +598,7 @@ describe('POST /api/collages/:id/entries', () => {
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
     );
-    prismaMock.$transaction.mockResolvedValue([makeCollageEntryDetail(), {}]);
+    prismaMock.collageEntry.create.mockResolvedValue(makeCollageEntryDetail());
 
     const res = await request(app)
       .post('/api/collages/1/entries')
@@ -920,7 +920,12 @@ describe('collages Prisma contract', () => {
                 select: expect.objectContaining({
                   id: true,
                   title: true,
-                  artist: { select: { id: true, name: true } }
+                  credits: {
+                    select: {
+                      role: true,
+                      artist: { select: { id: true, name: true } }
+                    }
+                  }
                 })
               }),
               user: { select: { id: true, username: true } }

@@ -4,6 +4,10 @@ import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validateParams, parsedParams } from '../../middleware/validate';
+import {
+  releaseCreditsSelect,
+  withPrimaryArtist
+} from '../../modules/releaseCredits';
 
 const router = express.Router();
 
@@ -84,13 +88,18 @@ router.get(
             id: true,
             communityId: true,
             title: true,
-            artist: { select: { id: true, name: true } }
+            credits: releaseCreditsSelect
           }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(bookmarks);
+    res.json(
+      bookmarks.map((bookmark) => ({
+        ...bookmark,
+        release: withPrimaryArtist(bookmark.release)
+      }))
+    );
   })
 );
 

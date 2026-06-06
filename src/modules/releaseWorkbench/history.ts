@@ -54,9 +54,7 @@ export const revertReleaseWorkbenchHistory = async (
         title: restoreState.title,
         description: restoreState.description,
         image: restoreState.image,
-        year: restoreState.year,
-        isEdition: restoreState.isEdition,
-        edition: (restoreState.edition ?? undefined) as never
+        year: restoreState.year
       }
     });
 

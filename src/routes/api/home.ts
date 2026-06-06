@@ -2,6 +2,10 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
+import {
+  releaseCreditsSelect,
+  withPrimaryArtist
+} from '../../modules/releaseCredits';
 
 const router = express.Router();
 
@@ -18,7 +22,7 @@ router.get(
         orderBy: { started: 'desc' }
       }),
       prisma.release.findFirst({
-        where: { artist: { vanityHouse: true } },
+        where: { credits: { some: { artist: { vanityHouse: true } } } },
         orderBy: { updatedAt: 'desc' },
         select: {
           id: true,
@@ -26,7 +30,7 @@ router.get(
           year: true,
           image: true,
           communityId: true,
-          artist: { select: { id: true, name: true } }
+          credits: releaseCreditsSelect
         }
       })
     ]);
@@ -41,7 +45,7 @@ router.get(
               year: true,
               image: true,
               communityId: true,
-              artist: { select: { id: true, name: true } }
+              credits: releaseCreditsSelect
             }
           })
           .then((release) =>
@@ -52,10 +56,10 @@ router.get(
                   started: featuredAlbum.started,
                   ended: featuredAlbum.ended,
                   threadId: featuredAlbum.threadId,
-                  release: {
+                  release: withPrimaryArtist({
                     ...release,
                     image: featuredAlbum.image || release.image
-                  }
+                  })
                 }
               : null
           )
@@ -64,6 +68,8 @@ router.get(
     res.json({
       albumOfTheMonth,
       vanityHouse: vanityHouseRelease
+        ? withPrimaryArtist(vanityHouseRelease)
+        : null
     });
   })
 );

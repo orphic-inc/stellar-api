@@ -67,7 +67,7 @@ describe('releaseLifecycle', () => {
       actorId: 7,
       communityId: 1,
       data: {
-        artistId: 2,
+        credits: [{ artistId: 2, role: 'Main' as never }],
         title: 'Kind of Blue',
         description: 'Classic',
         type: 'Music' as never,
@@ -80,9 +80,10 @@ describe('releaseLifecycle', () => {
     expect(release.id).toBe(3);
     expect(prismaMock.release.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        artistId: 2,
         communityId: 1,
-        image: null
+        image: null,
+        credits: { create: [{ artistId: 2, role: 'Main' }] },
+        editions: { create: { year: 1959, isUnknownEdition: true } }
       })
     });
     expect(prismaMock.releaseHistory.create).toHaveBeenCalledWith({

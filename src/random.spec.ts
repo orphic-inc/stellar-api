@@ -17,7 +17,7 @@ describe('GET /api/random/release', () => {
       communityId: 1,
       title: 'Kind of Blue',
       year: 1959,
-      artist: { id: 7, name: 'Miles Davis' }
+      credits: [{ role: 'Main', artist: { id: 7, name: 'Miles Davis' } }]
     } as never);
 
     const res = await request(app).get('/api/random/release');

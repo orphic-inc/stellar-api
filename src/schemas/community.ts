@@ -1,10 +1,15 @@
 import { z } from 'zod';
 import {
+  ArtistRole,
   CommunityType,
   RegistrationStatus,
   ReleaseType,
   ReleaseCategory
 } from '@prisma/client';
+
+const artistRoleEnum = z.enum(
+  Object.values(ArtistRole) as [ArtistRole, ...ArtistRole[]]
+);
 
 const communityTypeEnum = z.enum(
   Object.values(CommunityType) as [CommunityType, ...CommunityType[]]
@@ -54,16 +59,21 @@ export const updateCommunitySchema = z.object({
 });
 
 export const createGroupSchema = z.object({
-  artistId: z.number().int().positive('artistId is required'),
+  credits: z
+    .array(
+      z.object({
+        artistId: z.number().int().positive(),
+        role: artistRoleEnum.optional()
+      })
+    )
+    .min(1, 'At least one artist credit is required'),
   title: z.string().min(1, 'Title is required').max(256),
   description: z.string().min(1, 'Description is required'),
   type: releaseTypeEnum,
   releaseType: releaseCategoryEnum,
   year: z.number().int().min(1900).max(2100),
   image: z.string().url().optional(),
-  tagIds: z.array(z.number().int().positive()).optional(),
-  isEdition: z.boolean().optional(),
-  edition: z.record(z.string(), z.unknown()).optional()
+  tagIds: z.array(z.number().int().positive()).optional()
 });
 
 export const updateGroupSchema = z.object({
@@ -71,8 +81,6 @@ export const updateGroupSchema = z.object({
   description: z.string().min(1).optional(),
   image: z.string().url().optional(),
   year: z.number().int().min(1900).max(2100).optional(),
-  isEdition: z.boolean().optional(),
-  edition: z.record(z.string(), z.unknown()).optional(),
   tagIds: z.array(z.number().int().positive()).optional(),
   editSummary: z.string().trim().max(255).optional()
 });

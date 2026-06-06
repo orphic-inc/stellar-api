@@ -707,7 +707,6 @@ model Artist {
   concerts       Concert[]
   similarTo      SimilarArtist[]      @relation("ArtistSimilar")
   similarFrom    SimilarArtist[]      @relation("SimilarArtistRef")
-  releases       Release[]
   collaborations Contribution[]       @relation("ContributionCollaborators")
   bookmarks      BookmarkArtist[]
   comments       Comment[]
@@ -886,8 +885,6 @@ model Contributor {
 
 model Release {
   id              Int                   @id @default(autoincrement())
-  artistId        Int
-  artist          Artist                @relation(fields: [artistId], references: [id])
   title           String                @db.VarChar(100)
   image           String?
   description     String                @db.VarChar(1000)
@@ -899,10 +896,6 @@ model Release {
   type            ReleaseType
   releaseType     ReleaseCategory
   year            Int
-  isEdition       Boolean               @default(false)
-  edition         Json?
-  catalogueNumber String?
-  recordLabel     String?
   bookmarks       BookmarkRelease[]
   comments        Comment[]
   collageEntries  CollageEntry[]
@@ -916,7 +909,6 @@ model Release {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
-  @@index([artistId])
   @@index([communityId])
   @@index([year])
   @@index([createdAt])
@@ -941,8 +933,6 @@ model Contribution {
   linkStatus              LinkHealthStatus      @default(UNKNOWN)
   linkCheckedAt           DateTime?
   type                    FileType
-  bitrate                 String?
-  media                   String?
   hasLog                  Boolean               @default(false)
   hasCue                  Boolean               @default(false)
   isScene                 Boolean               @default(false)
@@ -952,9 +942,9 @@ model Contribution {
   fills                   RequestFill[]
   downloadAccessGrants    DownloadAccessGrant[]
   reports                 ContributionReport[]
-  editionId               Int?
-  edition                 Edition?              @relation(fields: [editionId], references: [id])
-  bitrateValue            Bitrate?
+  editionId               Int
+  edition                 Edition               @relation(fields: [editionId], references: [id])
+  bitrate                 Bitrate?
 
   @@index([userId])
   @@index([releaseId])

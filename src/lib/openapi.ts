@@ -2542,8 +2542,6 @@ const ReleaseSnapshot = registry.register(
     description: z.string(),
     image: z.string().nullable(),
     year: z.number(),
-    isEdition: z.boolean(),
-    edition: z.unknown().nullable(),
     tagIds: z.array(z.number()),
     tagNames: z.array(z.string())
   })
@@ -2581,10 +2579,8 @@ const Release = registry.register(
     releaseType: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
-    isEdition: z.boolean().optional(),
-    edition: z.unknown().nullable().optional(),
     createdAt: z.string().optional(),
-    artist: ReleaseArtist.optional(),
+    artist: ReleaseArtist.nullable().optional(),
     tags: z.array(ReleaseTag).optional(),
     releaseTags: z.array(ReleaseTagEnriched).optional(),
     myVote: z.enum(['up', 'down']).nullable().optional(),
@@ -6064,15 +6060,14 @@ const releaseSearchItem = z.object({
   type: z.string(),
   releaseType: z.string(),
   communityId: z.number().nullable(),
-  catalogueNumber: z.string().nullable(),
-  recordLabel: z.string().nullable(),
   description: z.string(),
   createdAt: z.string(),
-  artist: z.object({
-    id: z.number(),
-    name: z.string(),
-    vanityHouse: z.boolean()
-  }),
+  artist: z
+    .object({
+      id: z.number(),
+      name: z.string()
+    })
+    .nullable(),
   tags: z.array(refIdName),
   _count: z.object({ consumers: z.number(), contributors: z.number() })
 });

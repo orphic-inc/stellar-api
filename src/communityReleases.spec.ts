@@ -18,16 +18,13 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
 const makeRelease = (overrides: Record<string, unknown> = {}) => ({
   id: 3,
   communityId: 1,
-  artistId: 2,
   title: 'Kind of Blue',
   description: 'Classic',
   type: 'Music',
   releaseType: 'Album',
   year: 1959,
   image: null,
-  isEdition: false,
-  edition: null,
-  artist: { id: 2, name: 'Miles Davis' },
+  credits: [{ role: 'Main', artist: { id: 2, name: 'Miles Davis' } }],
   tags: [{ id: 7, name: 'jazz', occurrences: 9 }],
   releaseTags: [
     {
@@ -168,14 +165,16 @@ describe('GET /api/communities/:communityId/releases/:releaseId', () => {
 
 describe('POST /api/communities/:communityId/releases', () => {
   it('requires communities_manage permission', async () => {
-    const res = await request(app).post('/api/communities/1/releases').send({
-      artistId: 2,
-      title: 'Kind of Blue',
-      description: 'Classic',
-      type: 'Music',
-      releaseType: 'Album',
-      year: 1959
-    });
+    const res = await request(app)
+      .post('/api/communities/1/releases')
+      .send({
+        credits: [{ artistId: 2 }],
+        title: 'Kind of Blue',
+        description: 'Classic',
+        type: 'Music',
+        releaseType: 'Album',
+        year: 1959
+      });
 
     expect(res.status).toBe(403);
   });
@@ -186,14 +185,16 @@ describe('POST /api/communities/:communityId/releases', () => {
     );
     prismaMock.community.findUnique.mockResolvedValue(null);
 
-    const res = await request(app).post('/api/communities/1/releases').send({
-      artistId: 2,
-      title: 'Kind of Blue',
-      description: 'Classic',
-      type: 'Music',
-      releaseType: 'Album',
-      year: 1959
-    });
+    const res = await request(app)
+      .post('/api/communities/1/releases')
+      .send({
+        credits: [{ artistId: 2 }],
+        title: 'Kind of Blue',
+        description: 'Classic',
+        type: 'Music',
+        releaseType: 'Album',
+        year: 1959
+      });
 
     expect(res.status).toBe(404);
   });
@@ -219,7 +220,7 @@ describe('POST /api/communities/:communityId/releases', () => {
     const res = await request(app)
       .post('/api/communities/1/releases')
       .send({
-        artistId: 2,
+        credits: [{ artistId: 2 }],
         title: 'Kind of Blue',
         description: 'Classic',
         type: 'Music',
@@ -231,9 +232,10 @@ describe('POST /api/communities/:communityId/releases', () => {
     expect(res.status).toBe(201);
     expect(prismaMock.release.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        artistId: 2,
         communityId: 1,
-        image: null
+        image: null,
+        credits: { create: [{ artistId: 2, role: 'Main' }] },
+        editions: { create: { year: 1959, isUnknownEdition: true } }
       })
     });
     expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
@@ -475,6 +477,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       type: FileType.flac,
       release: { id: 3, title: 'Kind of Blue', communityId: 1, artistId: 5 }
     } as never);
+    prismaMock.releaseArtist.findMany.mockResolvedValue([
+      { artistId: 5 }
+    ] as never);
     prismaMock.artistSubscription.findMany.mockResolvedValue([
       { userId: 99 }
     ] as never);
@@ -488,7 +493,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
 
     expect(res.status).toBe(201);
     expect(prismaMock.artistSubscription.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { artistId: 5 } })
+      expect.objectContaining({ where: { artistId: { in: [5] } } })
     );
     expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
       expect.objectContaining({

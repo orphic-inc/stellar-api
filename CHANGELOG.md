@@ -9,6 +9,8 @@ All notable changes to stellar-api are documented here.
 - Stub tracking issues filed for friends (#60), invite tree (#61), and donations (#62)
 
 ### Changed
+- Music model: releases now credit artists through a role-typed `ReleaseArtist` join (multi-artist) instead of a single artist reference. Edition metadata — record label, catalogue number, media, and edition flag — moved to a dedicated `Edition` tier, and contribution `bitrate`/`media` became typed enums. List, detail, and search responses keep a stable `artist` field derived from the primary (Main) credit via a shared `releaseCredits` helper.
+- `/api/search/releases`: artist and vanity-house filters now traverse the credits relation; record label, catalogue number, and media filters traverse the edition relation; `bitrate`/`media` query params are validated as enums (exact match).
 - Remove Gravatar dependency — registration and install no longer compute a Gravatar URL from the user's email (which leaked an email hash to a third party; unacceptable for a private site). New users register with a null avatar; the UI falls back to a bundled default.
 - devTools seeded users now get a visually distinct avatar (`/static/common/avatars/seeded.jpg`) so generated accounts stand out from real ones in the UI.
 

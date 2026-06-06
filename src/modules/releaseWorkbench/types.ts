@@ -35,7 +35,7 @@ export type ReleaseContributionView = {
   createdAt: Date;
   updatedAt: Date;
   user: { id: number; username: string } | null;
-  release: { id: number; title: string; communityId: number; artistId: number };
+  release: { id: number; title: string; communityId: number | null };
   collaborators: Array<{ id: number; name: string }>;
 };
 
@@ -54,7 +54,9 @@ export type ReleaseHistoryPage = {
 export type ReleaseWorkbenchView = {
   release: Prisma.ReleaseGetPayload<{
     include: {
-      artist: true;
+      credits: {
+        select: { role: true; artist: { select: { id: true; name: true } } };
+      };
       voteAggregate: true;
       contributions: {
         select: {
@@ -94,8 +96,6 @@ export type UpdateReleaseMetadataInput = {
   description?: string;
   image?: string;
   year?: number;
-  isEdition?: boolean;
-  edition?: Record<string, unknown>;
   editSummary?: string;
 };
 

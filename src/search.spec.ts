@@ -65,25 +65,18 @@ describe('GET /api/search/releases', () => {
     );
   });
 
-  it('filters by bitrate and media in contribution predicate', async () => {
+  it('filters by bitrate (contribution) and media (edition) predicates', async () => {
     prismaMock.release.findMany.mockResolvedValue([]);
     prismaMock.release.count.mockResolvedValue(0);
-    await request(app).get('/api/search/releases?bitrate=320&media=CD');
-    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          contributions: {
-            some: expect.objectContaining({
-              bitrate: { contains: '320', mode: 'insensitive' },
-              media: { contains: 'CD', mode: 'insensitive' }
-            })
-          }
-        })
-      })
-    );
+    await request(app).get('/api/search/releases?bitrate=Kbps320&media=CD');
+    const call = prismaMock.release.findMany.mock.calls[0][0];
+    expect(call?.where).toMatchObject({
+      contributions: { some: { bitrate: 'Kbps320' } },
+      editions: { some: { media: 'CD' } }
+    });
   });
 
-  it('filters by artist, recordLabel, catalogueNumber, and description fields', async () => {
+  it('filters by artist credit, edition label/catalogue, and description fields', async () => {
     prismaMock.release.findMany.mockResolvedValue([]);
     prismaMock.release.count.mockResolvedValue(0);
     await request(app).get(
@@ -91,9 +84,15 @@ describe('GET /api/search/releases', () => {
     );
     const call = prismaMock.release.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({
-      artist: { name: { contains: 'miles', mode: 'insensitive' } },
-      recordLabel: { contains: 'columbia', mode: 'insensitive' },
-      catalogueNumber: { contains: 'CS8163', mode: 'insensitive' },
+      credits: {
+        some: { artist: { name: { contains: 'miles', mode: 'insensitive' } } }
+      },
+      editions: {
+        some: {
+          recordLabel: { contains: 'columbia', mode: 'insensitive' },
+          catalogueNumber: { contains: 'CS8163', mode: 'insensitive' }
+        }
+      },
       description: { contains: 'modal', mode: 'insensitive' }
     });
   });
@@ -122,7 +121,7 @@ describe('GET /api/search/releases', () => {
         where: expect.objectContaining({
           year: { gte: 1990, lte: 1995 },
           communityId: { in: [1, 2] },
-          artist: expect.objectContaining({ vanityHouse: true })
+          credits: { some: { artist: { vanityHouse: true } } }
         })
       })
     );
