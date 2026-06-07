@@ -37,14 +37,14 @@ describe('scoreStylesheetSelection', () => {
     expect(a.author).toEqual({ userId: 42, delta: SITE_BASE * 3 });
   });
 
-  it('credits the site x5 for a self-set external stylesheet (no author entity)', () => {
+  it('rewards the user but credits no site/author for an authorless external (prune/community handled elsewhere)', () => {
     const a = scoreStylesheetSelection({
       userId: 1,
       origin: { kind: 'external' }
     });
-    expect(a.user).toBeCloseTo(0.3, 10); // USER_BASE x3
-    expect(a.site).toBeCloseTo(SITE_BASE * 5, 10); // FLAG: external x5 -> site (no author)
-    expect(a.author).toBeNull();
+    expect(a.user).toBeCloseTo(0.3, 10); // USER_BASE x3 — customization still counts
+    expect(a.site).toBe(0); // unowned external earns the site nothing
+    expect(a.author).toBeNull(); // prune/investigate (or Community) at the permission layer
   });
 
   it('pays the author the x5 bonus when another user adopts their stylesheet', () => {

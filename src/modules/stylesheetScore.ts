@@ -56,9 +56,13 @@ export const scoreStylesheetSelection = (
       };
 
     case 'external':
-      // Self-set external URL has no author entity to credit, so the x5 accrues
-      // to the site. (FLAG: PRD-03 — could credit no one instead.)
-      return { user: USER_BASE * 3, site: SITE_BASE * 5, author: null };
+      // Authorless external stylesheet: the user's customization still earns the
+      // engagement reward, but NOTHING accrues to the site. An unowned external
+      // .css/.scss is a prune/investigate candidate — or, if other users share it,
+      // a hidden Community stylesheet — resolved at the permission / link-health
+      // layer, not credited here. An external that resolves to an author is scored
+      // as `author` instead.
+      return { user: USER_BASE * 3, site: 0, author: null };
 
     case 'author': {
       const isSelf = origin.authorId === userId;
