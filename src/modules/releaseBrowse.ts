@@ -1,5 +1,6 @@
 import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { sizeBytesToNumber } from '../lib/serialize';
 import { AppError } from '../lib/errors';
 import { isCommunityMember } from '../routes/api/communities/communities';
 
@@ -65,6 +66,10 @@ export const listCommunityReleases = async (input: {
   return {
     data: releases.map((release) => ({
       ...release,
+      contributions: release.contributions.map((c) => ({
+        ...c,
+        sizeInBytes: sizeBytesToNumber(c.sizeInBytes)
+      })),
       tags: buildPlainTags(release.releaseTags)
     })),
     total

@@ -1,5 +1,6 @@
 import { FileType, Prisma, ReleaseCategory, ReleaseType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
 import { checkContributionLink } from './linkHealth';
 import { resolveTagNames } from './tag';
@@ -182,7 +183,10 @@ export const createContributionSubmission = async ({
     })
   );
 
-  return contribution;
+  return {
+    ...contribution,
+    sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
+  };
 };
 
 export const addContributionToRelease = async ({
@@ -257,6 +261,9 @@ export const addContributionToRelease = async ({
           err
         })
       );
-      return contribution;
+      return {
+        ...contribution,
+        sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
+      };
     });
 };
