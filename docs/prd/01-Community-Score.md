@@ -4,9 +4,18 @@ Version 0.0.1 → 0.0.4
 
 Related Issues
 
-* #60 Friends
-* #61 InviteTree
-* #62 Donations
+- #60 Friends
+- #61 InviteTree
+- #62 Donations
+
+Related Decisions (ADR)
+
+- [ADR-0001](../adr/0001-granular-permission-checks.md) — granular permission checks (CRS gates on per-permission checks)
+- [ADR-0002](../adr/0002-community-health-pulse.md) — community-health-pulse → CommunityScore dimension (#75)
+
+Related PRDs
+
+- [PRD-03](03-stylesheet-themes-and-scoring.md) — stylesheet scoring is a dimension of this CRS
 
 ⸻
 
@@ -30,18 +39,18 @@ Version 0.0.1 through 0.0.4 establishes foundational social signals that will co
 
 The system introduces:
 
-* Friend relationships
-* Invitation genealogy
-* Donation history
-* Community contribution signals
+- Friend relationships
+- Invitation genealogy
+- Donation history
+- Community contribution signals
 
 These systems will eventually integrate with:
 
-* IRC participation
-* RSS consumption and publishing
-* Community activity
-* Moderation actions
-* Longevity and account history
+- IRC participation
+- RSS consumption and publishing
+- Community activity
+- Moderation actions
+- Longevity and account history
 
 ⸻
 
@@ -51,11 +60,11 @@ Current user statistics provide visibility into account activity, but do not ade
 
 They do not adequately measure:
 
-* Community engagement
-* Trustworthiness
-* Cultural contribution
-* Stewardship
-* Long-term investment
+- Community engagement
+- Trustworthiness
+- Cultural contribution
+- Stewardship
+- Long-term investment
 
 As a result, highly valuable members and minimally engaged members may appear equivalent despite vastly different levels of contribution.
 
@@ -69,21 +78,21 @@ A user’s reputation should reflect their overall contribution to the preservat
 
 The system should reward:
 
-* Longevity
-* Reliability
-* Participation
-* Referrals
-* Communication
-* Community stewardship
-* Financial support
+- Longevity
+- Reliability
+- Participation
+- Referrals
+- Communication
+- Community stewardship
+- Financial support
 
 The system should discourage:
 
-* Disposable accounts
-* Short-term participation
-* Invitation abuse
-* Community extraction without contribution
-* Reputation manipulation
+- Disposable accounts
+- Short-term participation
+- Invitation abuse
+- Community extraction without contribution
+- Reputation manipulation
 
 ⸻
 
@@ -140,10 +149,10 @@ Formula
 Initial implementation:
 
 CommunityReputationScore =
-  FriendsScore +
-  InviteScore +
-  DonationScore +
-  LongevityScore
+FriendsScore +
+InviteScore +
+DonationScore +
+LongevityScore
 
 Future versions may introduce:
 
@@ -169,22 +178,22 @@ Requirements
 
 Users may:
 
-* Send friend requests
-* Accept requests
-* Remove friends
+- Send friend requests
+- Accept requests
+- Remove friends
 
 ⸻
 
 Model
 
 FriendRelationship {
-  requesterId
-  recipientId
-  status:
-    | pending
-    | accepted
-    | rejected
-  createdAt
+requesterId
+recipientId
+status:
+| pending
+| accepted
+| rejected
+createdAt
 }
 
 ⸻
@@ -199,9 +208,9 @@ The system should prioritize relationship quality, account reputation, and netwo
 
 Future versions may consider:
 
-* Friend account age
-* Mutual communities
-* Interaction frequency
+- Friend account age
+- Mutual communities
+- Interaction frequency
 
 ⸻
 
@@ -221,21 +230,21 @@ Requirements
 
 Track:
 
-* Inviter
-* Invitee
-* Tree depth
-* Branch relationships
+- Inviter
+- Invitee
+- Tree depth
+- Branch relationships
 
 ⸻
 
 Model
 
 InviteTree {
-  parentUserId
-  childUserId
-  level
-  branch
-  createdAt
+parentUserId
+childUserId
+level
+branch
+createdAt
 }
 
 ⸻
@@ -246,17 +255,17 @@ Users inherit reputation from successful invitations.
 
 Positive signals:
 
-* Active invitees
-* Long-lived invitees
-* Contributing invitees
-* High reputation invitees
+- Active invitees
+- Long-lived invitees
+- Contributing invitees
+- High reputation invitees
 
 Negative signals:
 
-* Banned invitees
-* Dormant invitees
-* Abandoned accounts
-* Warned invitees
+- Banned invitees
+- Dormant invitees
+- Abandoned accounts
+- Warned invitees
 
 ⸻
 
@@ -273,11 +282,11 @@ Financial support may contribute to reputation, but donations must never outweig
 Model
 
 Donation {
-  userId
-  amount
-  currency
-  campaign
-  createdAt
+userId
+amount
+currency
+campaign
+createdAt
 }
 
 ⸻
@@ -286,10 +295,10 @@ Requirements
 
 Support:
 
-* One-time donations
-* Recurring donations
-* Anonymous donations
-* Campaign attribution
+- One-time donations
+- Recurring donations
+- Anonymous donations
+- Campaign attribution
 
 ⸻
 
@@ -300,8 +309,8 @@ Donation value should not dominate reputation.
 Instead:
 
 DonationScore =
-  supportConsistency +
-  supportLongevity
+supportConsistency +
+supportLongevity
 
 The goal is recognition, not pay-to-win.
 
@@ -333,17 +342,17 @@ Planned for v0.1.x
 
 Measures:
 
-* Presence
-* Conversation participation
-* Community engagement
-* Event coordination
+- Presence
+- Conversation participation
+- Community engagement
+- Event coordination
 
 Potential weighting:
 
 IRCScore =
-  activity *
-  consistency *
-  channelQuality
+activity _
+consistency _
+channelQuality
 
 ⸻
 
@@ -351,16 +360,16 @@ RSS / Feed Activity
 
 Measures:
 
-* Feed publishing
-* Feed subscriptions
-* Announcement participation
+- Feed publishing
+- Feed subscriptions
+- Announcement participation
 
-Potential weighting: 
+Potential weighting:
 
 FeedScore =
-  publications +
-  subscriptions +
-  engagement
+publications +
+subscriptions +
+engagement
 
 ⸻
 
@@ -370,10 +379,10 @@ Measures:
 
 Recent participation should generally carry greater weight than historical participation, while still recognizing long-term contribution and account longevity.
 
-* Comments
-* Contributions
-* Group creation
-* Community moderation
+- Comments
+- Contributions
+- Group creation
+- Community moderation
 
 ⸻
 
@@ -382,11 +391,12 @@ Community Value Index
 Long-term objective:
 
 CommunityValueIndex =
-  RatioScore
-+ CommunityReputationScore
-+ CommunityParticipationScore
-+ IRCScore
-+ FeedScore
+RatioScore
+
+- CommunityReputationScore
+- CommunityParticipationScore
+- IRCScore
+- FeedScore
 
 This score represents the overall value a member contributes to Stellar.
 
@@ -394,17 +404,17 @@ CommunityReputationScore is intended to measure contribution, reliability, and c
 
 In Scope
 
-* Friend relationships
-* InviteTree implementation
-* Donation tracking
-* CommunityReputationScore foundation
-* Profile statistics integration
+- Friend relationships
+- InviteTree implementation
+- Donation tracking
+- CommunityReputationScore foundation
+- Profile statistics integration
 
 Out of Scope
 
-* IRC scoring
-* RSS scoring
-* Community participation scoring
-* Moderation scoring
-* Automated weighting algorithms
-* CommunityValueIndex calculation
+- IRC scoring
+- RSS scoring
+- Community participation scoring
+- Moderation scoring
+- Automated weighting algorithms
+- CommunityValueIndex calculation
