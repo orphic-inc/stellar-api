@@ -1,5 +1,6 @@
 import { FileType, ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { sizeBytesToNumber } from '../../lib/serialize';
 import { AppError } from '../../lib/errors';
 import { emitNotifications } from '../../lib/notifications';
 import { addContributionToRelease } from '../contribution';
@@ -94,7 +95,7 @@ export const attachReleaseWorkbenchContribution = async (
         after: {
           contributionId: contribution.id,
           type: contribution.type,
-          sizeInBytes: contribution.sizeInBytes ?? null,
+          sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes),
           contributor: contribution.user?.username ?? null
         } as never,
         snapshot: snapshotRelease(releaseWithTags) as never

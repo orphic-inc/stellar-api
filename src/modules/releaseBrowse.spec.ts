@@ -25,7 +25,18 @@ describe('releaseBrowse', () => {
       {
         id: 3,
         title: 'Kind of Blue',
-        releaseTags: [{ tag: { id: 7, name: 'jazz', occurrences: 9 } }]
+        releaseTags: [{ tag: { id: 7, name: 'jazz', occurrences: 9 } }],
+        contributions: [
+          {
+            id: 1,
+            type: 'flac',
+            // BIGINT from the DB — must be returned to clients as a number
+            sizeInBytes: 5_000_000_000n,
+            linkStatus: 'UNKNOWN',
+            user: { id: 7, username: 'miles' },
+            _count: { consumers: 0 }
+          }
+        ]
       }
     ] as never);
     prismaMock.release.count.mockResolvedValue(1);
@@ -48,5 +59,7 @@ describe('releaseBrowse', () => {
     expect(result.data[0].tags).toEqual([
       { id: 7, name: 'jazz', occurrences: 9 }
     ]);
+    // sizeInBytes is exposed as a JS number, not a bigint/string
+    expect(result.data[0].contributions[0].sizeInBytes).toBe(5_000_000_000);
   });
 });

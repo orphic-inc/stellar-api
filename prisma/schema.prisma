@@ -933,7 +933,7 @@ model Contribution {
   collaborators            Artist[]      @relation("ContributionCollaborators")
   comments                 Comment[]
   downloadUrl              String
-  sizeInBytes              Int?
+  sizeInBytes              BigInt?
   approvedAccountingBytes  BigInt?
   linkStatus               LinkHealthStatus @default(UNKNOWN)
   linkCheckedAt            DateTime?

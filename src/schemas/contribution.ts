@@ -15,7 +15,12 @@ export const createContributionSchema = z.object({
   year: z.number().int().min(1900).max(2100),
   fileType: fileTypeEnum,
   downloadUrl: z.string().url('A valid download URL is required'),
-  sizeInBytes: z.number().int().positive().optional(),
+  sizeInBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(Number.MAX_SAFE_INTEGER)
+    .optional(),
   tags: z
     .string()
     .optional()
@@ -62,7 +67,12 @@ export type CreateContributionInput = z.infer<typeof createContributionSchema>;
 export const addContributionToReleaseSchema = z.object({
   fileType: fileTypeEnum,
   downloadUrl: z.string().url('A valid download URL is required'),
-  sizeInBytes: z.number().int().positive().optional(),
+  sizeInBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(Number.MAX_SAFE_INTEGER)
+    .optional(),
   releaseDescription: z
     .string()
     .optional()

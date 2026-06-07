@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
+import { sizeBytesToNumber } from '../../../lib/serialize';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createContributionSubmission } from '../../../modules/contribution';
 import { fileReport } from '../../../modules/reports';
@@ -74,7 +75,15 @@ router.get(
       }),
       prisma.contribution.count({ where })
     ]);
-    paginatedResponse(res, contributions, total, pg);
+    paginatedResponse(
+      res,
+      contributions.map((c) => ({
+        ...c,
+        sizeInBytes: sizeBytesToNumber(c.sizeInBytes)
+      })),
+      total,
+      pg
+    );
   })
 );
 
@@ -117,7 +126,10 @@ router.get(
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Contribution not found' });
-    res.json(contribution);
+    res.json({
+      ...contribution,
+      sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
+    });
   })
 );
 

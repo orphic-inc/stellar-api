@@ -130,11 +130,8 @@ export async function generateContributions(
       const fileType = pick(CONTRIBUTION_FILE_TYPES, rng);
       const bitrate = pick(BITRATES, rng);
       const media = pick(MEDIA, rng);
-      // sizeInBytes is Int? in schema — convert bigint to number (capped at 2 GB)
-      const sizeInBytes = Math.min(
-        Number(makeFileSizeBytes(rng)),
-        2_000_000_000
-      );
+      // sizeInBytes is BIGINT — no need to cap at INT4 / 2 GB anymore.
+      const sizeInBytes = makeFileSizeBytes(rng);
 
       const contribution = await prisma.contribution.create({
         data: {
@@ -147,7 +144,7 @@ export async function generateContributions(
           ),
           downloadUrl: makeSeedDownloadUrl(releaseId, c),
           sizeInBytes,
-          approvedAccountingBytes: BigInt(sizeInBytes),
+          approvedAccountingBytes: sizeInBytes,
           linkStatus: 'UNKNOWN' as LinkHealthStatus,
           type: fileType,
           bitrate,

@@ -108,6 +108,30 @@ describe('createContributionSubmission', () => {
     expect(contributor).not.toBeNull();
   });
 
+  it('stores file sizes larger than INT4 max (>2 GiB) without overflow', async () => {
+    const user = await createUser('big');
+    const community = await createCommunity();
+
+    // 1_040_503_013_376 = 992301 MB * 1048576 — well past INT4 max (2_147_483_647).
+    // Lossless discographies routinely exceed 2 GiB, so sizeInBytes must be 64-bit.
+    const bigSize = 1_040_503_013_376;
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: { ...baseInput(community.id), sizeInBytes: bigSize }
+    });
+
+    expect(result).not.toBeNull();
+    // Contract: sizeInBytes is returned as a JS number (safe < 2^53), not a string.
+    expect(result!.sizeInBytes).toBe(bigSize);
+
+    const persisted = await testPrisma.contribution.findUnique({
+      where: { id: result!.id },
+      select: { sizeInBytes: true }
+    });
+    expect(persisted!.sizeInBytes).toBe(BigInt(bigSize));
+  });
+
   it('reuses an existing artist rather than creating a duplicate', async () => {
     const user = await createUser('b');
     const community = await createCommunity();
