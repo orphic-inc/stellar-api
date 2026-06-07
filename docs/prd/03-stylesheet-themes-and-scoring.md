@@ -36,11 +36,26 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 - **×2** when non-default
 - **×3** when a custom ExternalStylesheet / non-self AuthorStylesheet(Url)
 - **×5** when it's the user's **own** authored stylesheet
-- A user on a modified stylesheet: **+1** CRS → to Site (or admin), and to the **Author** if a custom InjectedStylesheet.
+- A user on a modified stylesheet: a **+1** engagement bonus → to Site (or admin), and to the **Author** if a custom InjectedStylesheet.
 
-**Author** (incentive to design good themes): accrues when others adopt their AuthorStylesheet (exact split TBD with Contests / CommunityStylesheets).
+**Tiering (decided).** The +1 is **both** additive **and** folds into the multipliers as a user **tiers up** — engagement escalates like the [`/verbiagating`](../../../skills) tier ladder: each step of customization/sharing compounds the base rather than paying a flat one-off. The flat multipliers above are **tier 0**; the escalation schedule (the curve as a user climbs tiers) is the **next scoring slice** — curve TBD.
+
+**External disposition (decided, #84).** A `profile.externalStylesheet` that resolves to an author is scored as an **AuthorStylesheet** (credit the author). An **authorless** external `.css/.scss` earns the _user_ the customization reward but **nothing to the site** — it's a **prune/investigate** candidate, or, if multiple users share it, a hidden **Community stylesheet**, both handled at the **permission / link-health layer**, not scored here.
+
+**Author** (incentive to design good themes): accrues when others adopt their AuthorStylesheet (exact split TBD with Contests / CommunityStylesheets). **Self-use is not an adoption** — using your own sheet pays the user reward (×5) only, no author bonus (anti-farm, #84).
 
 **Staff** (context): community staff earn **+50 CRS per week served** (Standards/Communities — cross-ref PRD-01).
+
+## Negative scoring (decided — the model needs downside)
+
+Rewards alone let bad actors coast; CRS must be able to go **down**.
+
+- **Dead externalUrl** — an `externalStylesheet` whose link is dead/unreachable is **suspicious → negative CRS** for the user hosting it (link-health driven). This is the stylesheet sibling of contribution link-health: a dead link isn't neutral, it's a penalty.
+- **Broader negative CRS lives in PRD-01 (lifetime CRS) + the LinkHealth lifecycle**, referenced here so the stylesheet penalty stays consistent with them:
+  - flapping / unresolved-in-72h links → penalty then sweep
+  - **upheld** reports on contributions → penalty (a heavily-reported user is always suspect)
+  - **repeat offenders** → large-scale lifetime CRS penalties (compounding, the downside mirror of tiering)
+- PRD-03 scope: the dead-external penalty (magnitude TBD — flagged). The lifetime/repeat-offender curves belong to PRD-01 / PRD-04 LinkHealth lifecycle.
 
 ## Anti-abuse
 
@@ -70,13 +85,17 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 First testable slices (much of the substrate already exists):
 
-1. **Stylesheet selection → CRS accrual** — pure scoring function over the weights above (unit-testable, no DB): table-driven red-green on each multiplier (default/non-default/external/self/author).
-2. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual.
-3. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
+1. ✅ **Stylesheet selection → CRS accrual** — pure `scoreStylesheetSelection` (no DB), table-driven over each multiplier. **Shipped: [#84](https://github.com/orphic-inc/stellar-api/pull/84)** (tier-0 multipliers; external/self decisions applied).
+2. **Tiering escalation** — the curve that compounds the base multipliers as a user climbs tiers (the `/verbiagating`-style ladder). Next slice; curve TBD.
+3. **Dead-external penalty** — link-health-driven negative CRS for a dead `externalStylesheet`; red-green once the penalty magnitude is set.
+4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual.
+5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions
 
 - AuthorStylesheetUrl storage shape (URL vs stored file) — pending ExternalStylesheet + global-reset findings.
 - Whether stylesheet-score accrual is computed-on-read (mirror the pulse) or event-logged.
-- Per-author adoption cap on top of invite+report, or not.
+- **Tiering curve** + **dead-external penalty magnitude** — values TBD.
 - IRC scoring belongs to PRD-02 — confirm it's not duplicated here.
+
+**Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed (the `/private` invite+report model covers it).
