@@ -23,7 +23,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "ts-node prisma/seed.ts",
     "db:studio": "prisma studio",
-    "prepare": "husky install"
+    "prepare": "husky install || true"
   },
   "lint-staged": {
     "*.ts": [
