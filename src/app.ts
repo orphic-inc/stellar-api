@@ -82,7 +82,7 @@ export const createApp = () => {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     res.setHeader('x-request-id', requestId);
-    (req as Request & { requestId: string }).requestId = requestId;
+    req.requestId = requestId;
     const start = Date.now();
     res.on('finish', () => {
       log.info('request', {
