@@ -57,9 +57,9 @@ Stellar has no peer-to-peer transfers — contributions are hosted links. `downl
 
 ## Red-green descent targets
 
-1. **Relief LinkHealth gate** — filter `eligibleContributionBytes` by `linkStatus ≠ FAIL`; spec that required ratio rises when a covered contribution flips `FAIL`, and that `WARN`/`UNKNOWN` still count. *No schema change.*
-2. **72h WARN→FAIL sweep** — extend `linkHealthJob.ts`; PM contributor + staff report on promotion.
-3. **`RatioScore` dimension** — derive a bounded CRS sub-score from current ratio health (one-way into PRD-01's registry).
+1. ✅ **Relief LinkHealth gate** — `eligibleContributionBytes` filtered by `linkStatus ≠ FAIL`; required ratio rises when a covered contribution flips `FAIL`, `WARN`/`UNKNOWN` still count. **Shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96).**
+2. 🟡 **72h WARN→FAIL sweep** — `linkStatusChangedAt` + `sweepStaleWarnLinks` in `linkHealthJob.ts`. **Promotion shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96)**; the contributor-PM + staff-report notification on promotion is still TODO.
+3. ✅ **`RatioScore` dimension** — bounded CRS sub-score from current ratio health, one-way into PRD-01's registry. **Shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96).**
 
 ## Open questions
 

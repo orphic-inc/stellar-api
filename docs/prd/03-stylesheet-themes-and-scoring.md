@@ -95,7 +95,7 @@ First testable slices (much of the substrate already exists):
 1. ✅ **Stylesheet selection → CRS accrual** — pure `scoreStylesheetSelection` (no DB), table-driven over each multiplier. **Shipped: [#84](https://github.com/orphic-inc/stellar-api/pull/84)** (tier-0 multipliers; external/self decisions applied).
 2. **Tiering escalation** — the curve that compounds the base multipliers as a user climbs tiers (the `/verbiagating`-style ladder). Next slice; curve TBD.
 3. **Dead-external penalty** — link-health-driven negative CRS for a dead `externalStylesheet`; red-green once the penalty magnitude is set.
-4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual.
+4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual. **Currently the keystone gap:** `scoreStylesheetSelection` (shipped #84) is wired to *nothing* — no `AuthorStylesheet` model, no adopt event. This slice wires it, and **unblocks** the Friends×Stylesheet controlled vector + the `CRS_*` adoption ledger (PRD-01 / ADR-0007), which have no event to hook onto until adoption exists.
 5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions
