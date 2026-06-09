@@ -152,10 +152,14 @@ export async function generateContributions(
           approvedAccountingBytes: sizeInBytes,
           linkStatus: 'UNKNOWN' as LinkHealthStatus,
           type: fileType,
-          bitrate,
-          hasLog: randBool(0.4, rng),
-          hasCue: randBool(0.3, rng),
-          isScene: randBool(0.15, rng),
+          releaseFile: {
+            create: {
+              bitrate,
+              hasLog: randBool(0.4, rng),
+              hasCue: randBool(0.3, rng),
+              isScene: randBool(0.15, rng)
+            }
+          },
           createdAt,
           updatedAt: createdAt
         }

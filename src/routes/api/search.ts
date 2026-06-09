@@ -90,14 +90,20 @@ router.get(
 
     const tagPredicate = buildTagWhere(q.tags, q.tagMode);
 
-    // Contribution-level filters (per-rip specifics). bitrate is a typed enum
-    // now, so match exactly rather than substring.
+    // Contribution-level filters. `type` (file format) stays on the
+    // Contribution spine; the music-rip specifics (bitrate, log/cue/scene) are
+    // edition-agnostic per-file metadata living on the ReleaseFile satellite,
+    // so they nest under `releaseFile`. bitrate is a typed enum now, so match
+    // exactly rather than substring.
     const contributionFilter: Record<string, unknown> = {};
     if (q.format) contributionFilter.type = q.format;
-    if (q.bitrate) contributionFilter.bitrate = q.bitrate;
-    if (q.hasLog !== undefined) contributionFilter.hasLog = q.hasLog;
-    if (q.hasCue !== undefined) contributionFilter.hasCue = q.hasCue;
-    if (q.isScene !== undefined) contributionFilter.isScene = q.isScene;
+    const releaseFileFilter: Record<string, unknown> = {};
+    if (q.bitrate) releaseFileFilter.bitrate = q.bitrate;
+    if (q.hasLog !== undefined) releaseFileFilter.hasLog = q.hasLog;
+    if (q.hasCue !== undefined) releaseFileFilter.hasCue = q.hasCue;
+    if (q.isScene !== undefined) releaseFileFilter.isScene = q.isScene;
+    if (Object.keys(releaseFileFilter).length)
+      contributionFilter.releaseFile = releaseFileFilter;
 
     // Edition-level filters — label, catalogue and media are edition-scoped now.
     const editionFilter: Record<string, unknown> = {};

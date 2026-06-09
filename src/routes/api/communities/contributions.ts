@@ -61,10 +61,14 @@ router.get(
           linkStatus: true,
           linkCheckedAt: true,
           type: true,
-          bitrate: true,
-          hasLog: true,
-          hasCue: true,
-          isScene: true,
+          releaseFile: {
+            select: {
+              bitrate: true,
+              hasLog: true,
+              hasCue: true,
+              isScene: true
+            }
+          },
           createdAt: true,
           updatedAt: true,
           user: { select: { id: true, username: true } },
@@ -106,10 +110,9 @@ router.get(
         linkStatus: true,
         linkCheckedAt: true,
         type: true,
-        bitrate: true,
-        hasLog: true,
-        hasCue: true,
-        isScene: true,
+        releaseFile: {
+          select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
+        },
         createdAt: true,
         updatedAt: true,
         user: { select: { id: true, username: true } },

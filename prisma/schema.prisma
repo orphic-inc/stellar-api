@@ -934,9 +934,6 @@ model Contribution {
   linkCheckedAt           DateTime?
   linkStatusChangedAt     DateTime?
   type                    FileType
-  hasLog                  Boolean               @default(false)
-  hasCue                  Boolean               @default(false)
-  isScene                 Boolean               @default(false)
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
   Request                 Request[]
@@ -945,13 +942,30 @@ model Contribution {
   reports                 ContributionReport[]
   editionId               Int
   edition                 Edition               @relation(fields: [editionId], references: [id])
-  bitrate                 Bitrate?
+  releaseFile             ReleaseFile?
 
   @@index([userId])
   @@index([releaseId])
   @@index([contributorId])
   @@index([editionId])
   @@map("contributions")
+}
+
+// Music-file metadata for a Contribution. One row per music Contribution
+// (1:1). Holds the per-file rip fingerprint — bitrate + log/cue/scene — that
+// is specific to the Release/music Contribution type and must not sit on the
+// generic Contribution spine. Other Contribution types (Film, eLearning,
+// ApiPlugin) attach their own analogous metadata model. See PRD-04.
+model ReleaseFile {
+  id             Int          @id @default(autoincrement())
+  contributionId Int          @unique
+  contribution   Contribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  bitrate        Bitrate?
+  hasLog         Boolean      @default(false)
+  hasCue         Boolean      @default(false)
+  isScene        Boolean      @default(false)
+
+  @@map("release_files")
 }
 
 // Credits an artist on a release with a role (Main, Guest, …). Replaces the
