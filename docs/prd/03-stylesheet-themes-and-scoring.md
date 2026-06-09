@@ -46,6 +46,13 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 **Staff** (context): community staff earn **+50 CRS per week served** (Standards/Communities — cross-ref PRD-01).
 
+**Friends × Stylesheet — controlled vector (decided).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — *separate from and additive to* the stylesheet-dimension weights above:
+
+- **Adopter: +0.2** (rewards active, organic curation — the adopter earns slightly more than the author, to favour participation).
+- **Author: +0.1** (recognition that someone vouched for your sheet).
+- **Bounded ("controlled"):** counted **once per distinct (adopter, author) pair**, with a per-user cap on total Friends-dimension score this vector can contribute — so ring/sock-puppet mass-adoption flattens out. Plain friending remains the stronger, separate signal; adoption is the weak-tie nudge.
+- Fires on **any** adoption (friend or not). The dedup + cap are durable via the CRS event ledger ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)).
+
 ## Negative scoring (decided — the model needs downside)
 
 Rewards alone let bad actors coast; CRS must be able to go **down**.
@@ -94,8 +101,7 @@ First testable slices (much of the substrate already exists):
 ## Open questions
 
 - AuthorStylesheetUrl storage shape (URL vs stored file) — pending ExternalStylesheet + global-reset findings.
-- Whether stylesheet-score accrual is computed-on-read (mirror the pulse) or event-logged.
 - **Tiering curve** + **dead-external penalty magnitude** — values TBD.
 - IRC scoring belongs to PRD-02 — confirm it's not duplicated here.
 
-**Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed (the `/private` invite+report model covers it).
+**Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed for the stylesheet-dimension author bonus (the `/private` invite+report model covers it) · **accrual model = computed-on-read, with adoption events logged to a `CRS_*` ledger** ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1, once-per-pair + per-user cap).

@@ -11,4 +11,4 @@ Decision to record (not yet finalized):
 
 This is the ADR the stylesheet-scoring work ([PRD-03](../prd/03-stylesheet-themes-and-scoring.md)) and other CRS dimensions reference for "computed-on-read vs. event-logged" accrual.
 
-_Fill in the chosen approach and consequences once decided._
+**Resolved by [ADR-0007 — CRS computation: read-time value + event accrual ledger](0007-crs-read-time-and-event-ledger.md):** the score is computed-on-read; only events that current state cannot reconstruct are append-only logged (a `CRS_*` reason on `EconomyTransaction`); time-series snapshots (the pulse-over-time trend this ADR anticipated) are a deferred additive layer mirroring `statsHistory`, never the source of truth. The pulse stays computed-on-read and folds into the `CommunityScore` dimension under that model.
