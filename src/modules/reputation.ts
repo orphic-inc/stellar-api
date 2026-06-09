@@ -16,12 +16,17 @@
  * Weight/cap constants are tier-0 — tune alongside the PRD.
  */
 import { prisma } from '../lib/prisma';
+import { computeRatio } from './ratio';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
 export interface DimensionInput {
   userId: number;
   createdAt: Date;
+  /** Current ratio (contributed/consumed). Defaults to the break-even 1.0. */
+  ratio?: number;
+  /** Lifetime contributed bytes — gates RatioScore so a fresh default account earns nothing. */
+  contributed?: bigint;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -69,9 +74,30 @@ const longevityScorer: DimensionScorer = {
   }
 };
 
-// Registry — add a dimension here (Friends, Invite, Donation, RatioScore, …)
-// and the aggregator picks it up unchanged.
-const REGISTRY: DimensionScorer[] = [longevityScorer];
+// ─── RatioScore ───────────────────────────────────────────────────────────
+// Reputation reflection of the Ratio mechanism, strictly one-way: CRS reads
+// ratio, ratio never reads CRS (ADR-0006 / PRD-06). Rewards a net-contributor
+// ratio with diminishing returns — but only once the user has demonstrated
+// contribution (contributed > 0), so a fresh account at the default 1.0 ratio
+// earns nothing. Non-negative: ratio enforcement (WATCH/LEECH_DISABLED) is the
+// Ratio mechanism's job, not a CRS penalty.
+const RATIO_CAP = 8;
+const RATIO_TAU = 1.5; // ratio 1.5 → ~63% of cap, 3.0 → ~86%
+const RATIO_WEIGHT = 1.0;
+
+const ratioScorer: DimensionScorer = {
+  name: 'ratio',
+  weight: RATIO_WEIGHT,
+  cap: RATIO_CAP,
+  compute: ({ ratio = 1, contributed = 0n }) => {
+    if (contributed <= 0n) return 0;
+    return RATIO_CAP * (1 - Math.exp(-Math.max(0, ratio) / RATIO_TAU));
+  }
+};
+
+// Registry — add a dimension here (Friends, Invite, Donation, …) and the
+// aggregator picks it up unchanged.
+const REGISTRY: DimensionScorer[] = [longevityScorer, ratioScorer];
 
 /** Pure aggregator: sum each capped dimension's weighted subScore. */
 export const computeCrs = (input: DimensionInput): CrsResult => {
@@ -87,8 +113,13 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 export const getReputation = async (userId: number): Promise<CrsResult> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { createdAt: true }
+    select: { createdAt: true, contributed: true, consumed: true }
   });
   if (!user) return { score: 0, dimensions: [] };
-  return computeCrs({ userId, createdAt: user.createdAt });
+  return computeCrs({
+    userId,
+    createdAt: user.createdAt,
+    ratio: computeRatio(user.contributed, user.consumed),
+    contributed: user.contributed
+  });
 };

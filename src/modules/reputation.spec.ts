@@ -79,16 +79,78 @@ describe('computeCrs — Longevity dimension', () => {
   });
 });
 
+// ─── computeCrs / Ratio dimension ─────────────────────────────────────────────
+
+describe('computeCrs — Ratio dimension', () => {
+  const ratioOf = (input: Parameters<typeof computeCrs>[0]) =>
+    computeCrs(input).dimensions.find((d) => d.name === 'ratio')!.subScore;
+
+  it('earns nothing without demonstrated contribution (fresh default account)', () => {
+    // default ratio 1.0, contributed 0 → no ratio reputation
+    expect(ratioOf({ userId: 1, createdAt: NOW, now: NOW })).toBe(0);
+    expect(
+      ratioOf({
+        userId: 1,
+        createdAt: NOW,
+        now: NOW,
+        ratio: 1,
+        contributed: 0n
+      })
+    ).toBe(0);
+  });
+
+  it('rewards a net contributor, diminishing returns toward the cap', () => {
+    const contributed = 1n;
+    const low = ratioOf({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ratio: 1,
+      contributed
+    });
+    const high = ratioOf({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ratio: 4,
+      contributed
+    });
+    expect(high).toBeGreaterThan(low);
+    expect(high).toBeLessThanOrEqual(8); // cap
+  });
+
+  it('is bounded even for an enormous ratio', () => {
+    const sub = ratioOf({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ratio: 1000,
+      contributed: 1n
+    });
+    expect(sub).toBeLessThanOrEqual(8);
+    expect(sub).toBeGreaterThan(7.9);
+  });
+});
+
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('computes CRS from the user createdAt', async () => {
-    mockPrismaUser.findUnique.mockResolvedValue({ createdAt: yearsAgo(6) });
+  it('computes CRS from the user createdAt + ratio', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: yearsAgo(6),
+      contributed: 30n * 1024n ** 3n,
+      consumed: 10n * 1024n ** 3n // ratio 3.0
+    });
     const result = await getReputation(1);
     expect(result.score).toBeGreaterThan(0);
-    expect(result.dimensions.map((d) => d.name)).toContain('longevity');
+    expect(result.dimensions.map((d) => d.name)).toEqual(
+      expect.arrayContaining(['longevity', 'ratio'])
+    );
+    expect(
+      result.dimensions.find((d) => d.name === 'ratio')!.subScore
+    ).toBeGreaterThan(0);
   });
 
   it('returns an empty score for an unknown user', async () => {
