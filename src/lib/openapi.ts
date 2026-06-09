@@ -2505,6 +2505,8 @@ const Contribution = registry.register(
     type: z.string(),
     downloadUrl: z.string(),
     sizeInBytes: z.number().nullable().optional(),
+    linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']),
+    linkCheckedAt: z.string().nullable().optional(),
     collaborators: z.array(
       z.object({
         id: z.number(),
@@ -2704,6 +2706,41 @@ registry.registerPath({
     200: {
       description: 'Community',
       content: { 'application/json': { schema: Community } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+const CommunityHealthPulse = z
+  .object({
+    pass: z.number(),
+    warn: z.number(),
+    fail: z.number(),
+    unknown: z.number(),
+    total: z.number(),
+    checked: z.number(),
+    coverage: z.number().nullable(),
+    pulse: z.number().nullable(),
+    status: z.enum(['Healthy', 'Ailing', 'Critical', 'Unknown'])
+  })
+  .openapi('CommunityHealthPulse');
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{id}/health',
+  tags: ['Communities'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Community link-health pulse',
+      content: { 'application/json': { schema: CommunityHealthPulse } }
+    },
+    403: {
+      description: 'Not a member of this community',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',

@@ -11,6 +11,13 @@ const REPORT_WARN_THRESHOLD = 3;
 // A contribution stuck at WARN this long is promoted to FAIL (ADR-0006)
 const WARN_SWEEP_AFTER_MS = 72 * 60 * 60 * 1000;
 
+// Community pulse bands — the share of *definitively probed* links that PASS.
+const PULSE_HEALTHY = 0.9;
+const PULSE_AILING = 0.6;
+// Below this share of links definitively probed, the pulse isn't trustworthy
+// enough to band — report Unknown rather than a confident Healthy/Critical.
+const PULSE_MIN_COVERAGE = 0.5;
+
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -136,4 +143,82 @@ export const recordContributionReport = async (
       );
     }
   }
+};
+
+export type CommunityPulseStatus =
+  | 'Healthy'
+  | 'Ailing'
+  | 'Critical'
+  | 'Unknown';
+
+export interface CommunityHealthPulse {
+  pass: number;
+  warn: number;
+  fail: number;
+  unknown: number;
+  /** All contributions in the community. */
+  total: number;
+  /**
+   * Definitively probed links (PASS + FAIL). WARN is transient/uncertain and
+   * UNKNOWN is unprobed — both are indeterminate and excluded from the pulse.
+   */
+  checked: number;
+  /** Share of all links that are definitively probed, 0–1. `null` when empty. */
+  coverage: number | null;
+  /** Share of probed links that PASS, 0–1. `null` when none are probed yet. */
+  pulse: number | null;
+  status: CommunityPulseStatus;
+}
+
+/**
+ * The community's link-health "pulse": roll every contribution's linkStatus up
+ * into a single heartbeat. A living community keeps its links alive; the pulse
+ * weakens as they rot. Computed on read — no stored state.
+ */
+export const getCommunityHealthPulse = async (
+  communityId: number
+): Promise<CommunityHealthPulse> => {
+  const grouped = await prisma.contribution.groupBy({
+    by: ['linkStatus'],
+    where: { release: { communityId } },
+    _count: { _all: true }
+  });
+
+  const counts = { pass: 0, warn: 0, fail: 0, unknown: 0 };
+  for (const row of grouped) {
+    const n = row._count._all;
+    switch (row.linkStatus) {
+      case LinkHealthStatus.PASS:
+        counts.pass += n;
+        break;
+      case LinkHealthStatus.WARN:
+        counts.warn += n;
+        break;
+      case LinkHealthStatus.FAIL:
+        counts.fail += n;
+        break;
+      default:
+        counts.unknown += n; // UNKNOWN — not yet probed
+        break;
+    }
+  }
+
+  // Only PASS/FAIL are definitive; WARN (transient) and UNKNOWN (unprobed) are
+  // indeterminate and excluded from the pulse.
+  const checked = counts.pass + counts.fail;
+  const total = checked + counts.warn + counts.unknown;
+  const coverage = total === 0 ? null : checked / total;
+  const pulse = checked === 0 ? null : counts.pass / checked;
+  // Don't claim a confident band until enough links are actually probed —
+  // otherwise one PASS among thousands of UNKNOWN would read "Healthy".
+  const status: CommunityPulseStatus =
+    pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
+      ? 'Unknown'
+      : pulse >= PULSE_HEALTHY
+      ? 'Healthy'
+      : pulse >= PULSE_AILING
+      ? 'Ailing'
+      : 'Critical';
+
+  return { ...counts, total, checked, coverage, pulse, status };
 };

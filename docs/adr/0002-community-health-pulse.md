@@ -1,14 +1,28 @@
-# Community-health pulse → CommunityScore
+# Compute community health as a read-time link pulse; defer persistence and scoring
 
-**Status: Proposed — future direction.** Serves [PRD-01 Community-Score / CRS](../prd/01-Community-Score.md); tracked by [#75](https://github.com/orphic-inc/stellar-api/issues/75).
+`01-Community-Score.md` favours communities that stay "active, healthy, and
+self-sustaining." LinkHealth already gives that health a per-contribution
+signal: submitting through the contribution form sets `Contribution.linkStatus`
+(`UNKNOWN | PASS | WARN | FAIL`), and a job re-checks stale links. Nothing rolled
+those up to the community level.
 
-Stellar computes a community-health signal on read (`getCommunityHealthPulse`). The decision recorded here is how that pulse becomes a durable input to the CommunityReputationScore (CRS).
+We aggregate **on read** rather than storing a score. `getCommunityHealthPulse`
+(`src/modules/linkHealth.ts`) groups a community's contributions by `linkStatus`
+(via `release.communityId`). Only `PASS` and `FAIL` are definitive (`checked`);
+`WARN` (transient 5xx / report-flagged) and `UNKNOWN` (unprobed) are
+indeterminate and excluded — so a transient-only community reads `Unknown`, not
+`Critical`. The pulse = `pass / checked`, banded `Healthy ≥ 0.90`,
+`Ailing ≥ 0.60`, `Critical` otherwise. It withholds a confident band and reports
+`Unknown` until coverage (`checked / total`) clears a floor (`0.5`), so one
+probed link among thousands of unprobed ones doesn't read `Healthy`. Served at
+`GET /api/communities/:id/health`.
 
-Decision to record (not yet finalized):
+No schema change and no stored state: the pulse is cheap to compute and always
+reflects current link reality, so there is nothing to invalidate. The existing
+`Release → Contribution` shape feeds it as-is, so this does not wait on the Music
+model remodel (#72–#74). Persisting/snapshotting the pulse and folding it into
+the PRD's `CommunityScore` is deliberately deferred (#75), as is weighting it by
+upload quality — a lossless/logged/cued release should count for more than a
+transcode (#76).
 
-- **Persistence:** snapshot the pulse over time (mirror `statsHistory`) for trend analysis vs. recompute-on-read only.
-- **Folding into CRS:** how the pulse feeds the `CommunityScore` dimension of `CommunityReputationScore`, and ultimately a `CommunityValueIndex`.
-
-This is the ADR the stylesheet-scoring work ([PRD-03](../prd/03-stylesheet-themes-and-scoring.md)) and other CRS dimensions reference for "computed-on-read vs. event-logged" accrual.
-
-**Resolved by [ADR-0007 — CRS computation: read-time value + event accrual ledger](0007-crs-read-time-and-event-ledger.md):** the score is computed-on-read; only events that current state cannot reconstruct are append-only logged (a `CRS_*` reason on `EconomyTransaction`); time-series snapshots (the pulse-over-time trend this ADR anticipated) are a deferred additive layer mirroring `statsHistory`, never the source of truth. The pulse stays computed-on-read and folds into the `CommunityScore` dimension under that model.
+**Resolved by [ADR-0007 — CRS computation: read-time value + event accrual ledger](0007-crs-read-time-and-event-ledger.md):** the computed-on-read-vs-event-logged question this ADR left open is settled — the CRS value is computed-on-read; only events current state cannot reconstruct are append-only logged (a `CRS_*` reason on `EconomyTransaction`); time-series snapshots (the pulse-over-time trend, #75 / #94) are a deferred additive layer mirroring `statsHistory`, never the source of truth.
