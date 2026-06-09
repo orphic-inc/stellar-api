@@ -937,6 +937,7 @@ model Contribution {
   approvedAccountingBytes  BigInt?
   linkStatus               LinkHealthStatus @default(UNKNOWN)
   linkCheckedAt            DateTime?
+  linkStatusChangedAt      DateTime?
   type                     FileType
   bitrate                  String?
   media                    String?

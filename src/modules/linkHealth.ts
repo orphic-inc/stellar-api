@@ -8,6 +8,8 @@ const TIMEOUT_MS = 10_000;
 const STALE_AFTER_DAYS = 7;
 // Auto-WARN a contribution when this many distinct users have reported it
 const REPORT_WARN_THRESHOLD = 3;
+// A contribution stuck at WARN this long is promoted to FAIL (ADR-0006)
+const WARN_SWEEP_AFTER_MS = 72 * 60 * 60 * 1000;
 
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
@@ -35,16 +37,42 @@ export const checkContributionLink = async (
 ): Promise<void> => {
   const contribution = await prisma.contribution.findUnique({
     where: { id: contributionId },
-    select: { downloadUrl: true }
+    select: { downloadUrl: true, linkStatus: true, linkStatusChangedAt: true }
   });
   if (!contribution) return;
 
   const status = await checkUrl(contribution.downloadUrl);
+  const now = new Date();
+  // Stamp the transition time when the status actually changes — or when it's
+  // never been stamped (backfill) — so the WARN sweep has a clock to read.
+  const stampChange =
+    status !== contribution.linkStatus ||
+    contribution.linkStatusChangedAt === null;
   await prisma.contribution.update({
     where: { id: contributionId },
-    data: { linkStatus: status, linkCheckedAt: new Date() }
+    data: {
+      linkStatus: status,
+      linkCheckedAt: now,
+      ...(stampChange ? { linkStatusChangedAt: now } : {})
+    }
   });
   log.info('Link checked', { contributionId, status });
+};
+
+// Promote contributions stuck at WARN past the sweep window to FAIL. Suspicion
+// alone never revokes ratio relief; only a confirmed-or-persistent FAIL does
+// (ADR-0006). This closes the "returns 200 but the file is gone" hole.
+export const sweepStaleWarnLinks = async (): Promise<void> => {
+  const cutoff = new Date(Date.now() - WARN_SWEEP_AFTER_MS);
+  const now = new Date();
+  const { count } = await prisma.contribution.updateMany({
+    where: {
+      linkStatus: LinkHealthStatus.WARN,
+      linkStatusChangedAt: { lt: cutoff }
+    },
+    data: { linkStatus: LinkHealthStatus.FAIL, linkStatusChangedAt: now }
+  });
+  if (count > 0) log.info('Swept stale WARN links to FAIL', { count });
 };
 
 export const recheckStaleLinks = async (): Promise<void> => {
@@ -80,17 +108,32 @@ export const recordContributionReport = async (
     distinct: ['reporterId']
   });
   if (distinctReporters.length >= REPORT_WARN_THRESHOLD) {
-    await prisma.contribution.update({
+    const current = await prisma.contribution.findUnique({
       where: { id: contributionId },
-      data: { linkStatus: LinkHealthStatus.WARN }
+      select: { linkStatus: true }
     });
-    log.info('Contribution auto-warned by reports', {
-      contributionId,
-      distinctReporters: distinctReporters.length
-    });
-    // Kick off a recheck so status can be corrected if the link is actually fine
-    checkContributionLink(contributionId).catch((err) =>
-      log.warn('Post-report link recheck failed', { contributionId, err })
-    );
+    // Only warn from a healthy/unknown state: don't reset the sweep clock on
+    // an already-WARN link, and don't downgrade a confirmed FAIL back to WARN.
+    if (
+      current &&
+      current.linkStatus !== LinkHealthStatus.WARN &&
+      current.linkStatus !== LinkHealthStatus.FAIL
+    ) {
+      await prisma.contribution.update({
+        where: { id: contributionId },
+        data: {
+          linkStatus: LinkHealthStatus.WARN,
+          linkStatusChangedAt: new Date()
+        }
+      });
+      log.info('Contribution auto-warned by reports', {
+        contributionId,
+        distinctReporters: distinctReporters.length
+      });
+      // Kick off a recheck so status can be corrected if the link is actually fine
+      checkContributionLink(contributionId).catch((err) =>
+        log.warn('Post-report link recheck failed', { contributionId, err })
+      );
+    }
   }
 };
