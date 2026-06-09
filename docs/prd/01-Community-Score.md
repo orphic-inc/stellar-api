@@ -187,6 +187,16 @@ Ratio (the contributed/consumed download gate, PRD-06) and CRS are layered stric
 - A derived RatioScore flows one-way into this CRS (and the eventual CommunityValueIndex) as one bounded dimension among many.
 - CRS never gates downloads. It is a status/trust signal, not an enforcement lever.
 
+Implementation status (PR #96)
+
+The registry + aggregator (computed-on-read) ship with three bounded dimensions:
+
+- ✅ LongevityScore — account age, diminishing returns, cap 10.
+- ✅ RatioScore — current ratio health, one-way, cap 8; gated on contributed > 0.
+- ✅ FriendsScore — friend count, deliberately low cap 4 (count can't dominate).
+- ⏳ InviteScore, DonationScore — next dimensions (#61, #62).
+- Surfaced at GET /api/profile/me/reputation (score + per-dimension breakdown).
+
 ⸻
 
 Friends System
