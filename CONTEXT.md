@@ -31,11 +31,36 @@ _Avoid_: active passport, logged-in session, user record
 The isolated, transactional test database targeting custom parameters from `.env.test` executed via `npm run test:integration` inside `jest`.
 _Avoid_: live testing database, local test instance
 
+**Effective Availability**:
+A contribution is effectively available — the local analog of a seeded release — while its current `linkStatus` is not `FAIL`. Effective availability, not a one-time approval, is what earns ongoing ratio relief.
+_Avoid_: link uptime, seeding status, alive link
+
+**Eligible Contribution Bytes**:
+The staff-approved, 72h-matured contribution bytes that are also effectively available, summed per user to form the **coverage** term that lowers their required ratio. Revocable: bytes leave the pool when a contribution goes `FAIL`.
+_Avoid_: contribution credit, ratio bonus, approved bytes
+
+**Ratio Mechanism**:
+The standalone `contributed`/`consumed` download gate (required-ratio brackets + the `OK/WATCH/LEECH_DISABLED` policy). Distinct from **RatioScore**. The Ratio Mechanism never reads CRS.
+_Avoid_: ratio score, ratio policy (when meaning the whole gate)
+
+**RatioScore**:
+A bounded CRS **Dimension Scorer** derived one-way from a user's current ratio health. An input to reputation, never an enforcement lever.
+_Avoid_: ratio, required ratio
+
+**Dimension Scorer**:
+A bounded, pure function `compute(user) → subScore` contributing one capped term to the Community Reputation Score. Self-registers into the CRS registry.
+_Avoid_: metric, plugin, scorer module
+
+**Controlled Vector**:
+A bounded cross-dimension CRS edge — one signal nudging another dimension — capped and deduplicated to resist farming (e.g. stylesheet adoption feeding the Friends dimension).
+_Avoid_: cross-score, bonus link, coupling
+
 ## Relationships
 
 - A **Contract Schema** directly structures incoming inputs and dictates the programmatic generation of the schema served by `swagger-ui-express`.
 - An **Identity State** acts as an authorized gateway, validating if a request can access or mutate a specific database record via the **Data Client**.
 - **Sanitized Values** must be extracted at the Controller layer using **Contract Schemas** before execution by domain services.
+- The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 
 ## Flagged Ambiguities
 

@@ -12,10 +12,13 @@ Related Decisions (ADR)
 
 - [ADR-0001](../adr/0001-granular-permission-checks.md) — granular permission checks (CRS gates on per-permission checks)
 - [ADR-0002](../adr/0002-community-health-pulse.md) — community-health-pulse → CommunityScore dimension (#75)
+- [ADR-0006](../adr/0006-linkhealth-gated-ratio-relief.md) — LinkHealth-gated ratio relief (RatioScore substrate)
+- [ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md) — CRS computed-on-read + event accrual ledger
 
 Related PRDs
 
 - [PRD-03](03-stylesheet-themes-and-scoring.md) — stylesheet scoring is a dimension of this CRS
+- [PRD-06](06-ratio.md) — the Ratio mechanism; a derived `RatioScore` feeds this CRS (one-way)
 
 ⸻
 
@@ -161,6 +164,28 @@ FeedScore
 CommunityScore
 ModerationScore
 ContributionScore
+
+⸻
+
+Architecture (decided)
+
+CRS is a registry of bounded, pure dimension-scorers — not a hardcoded sum.
+
+- Each dimension is a pure function compute(user) → subScore, mirroring the shipped stylesheetScore.ts. No DB inside the scorer.
+- Each dimension is bounded — diminishing returns and/or a hard cap — so no single axis can dominate. This enforces the PRD's guardrails structurally rather than by good intentions: "Friend count alone should not determine score" and "Donation value should not dominate" become caps, not hopes.
+- CRS = Σ (weight_i × subScore_i), with explicit, hand-pinned weight and cap constants (no automated weighting algorithm yet — that stays out of scope). Recent participation may be weighted over historical, while still recognising longevity.
+- Dimensions self-register. New dimensions (RatioScore, stylesheet, LinkHealthBonusPoints, IRC, Feed) slot in by adding a registry entry — never by editing the aggregator.
+- v0.0.x dimension set: Friends, Invite, Donation, Longevity.
+
+Computation: the CRS value is always computed on read (no stored, stale score column). Only events that current state cannot reconstruct — e.g. the Friends×Stylesheet adoption edges and their once-per-pair dedup — are append-only logged to a CRS_* reason on the existing EconomyTransaction ledger. Time-series snapshots (trends) are a deferred additive layer. See ADR-0007.
+
+Ratio independence (decided)
+
+Ratio (the contributed/consumed download gate, PRD-06) and CRS are layered strictly one-way:
+
+- Ratio is a standalone enforcement mechanism. It never reads CRS — reputation, friends, or donations cannot lower a user's required ratio. The gate stays uncorruptible.
+- A derived RatioScore flows one-way into this CRS (and the eventual CommunityValueIndex) as one bounded dimension among many.
+- CRS never gates downloads. It is a status/trust signal, not an enforcement lever.
 
 ⸻
 
