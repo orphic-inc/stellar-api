@@ -1,3 +1,4 @@
+import { LinkHealthStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 const GiB = BigInt(1024 ** 3);
@@ -63,12 +64,17 @@ export const getEligibleContributionBytes = async (
   userId: number
 ): Promise<bigint> => {
   const cutoff = new Date(Date.now() - ELIGIBILITY_WINDOW_MS);
-  // Only count contributions that staff have explicitly approved (approvedAccountingBytes set)
+  // Count a contribution toward coverage only if staff approved it
+  // (approvedAccountingBytes set) AND its link is not confirmed dead. A live
+  // link is the seeding analog — relief tracks ongoing availability, so a
+  // FAIL contribution drops out of the pool (ADR-0006). WARN/UNKNOWN still
+  // count: suspicion alone never revokes; only a confirmed FAIL does.
   const contributions = await prisma.contribution.findMany({
     where: {
       userId,
       createdAt: { lt: cutoff },
-      approvedAccountingBytes: { not: null }
+      approvedAccountingBytes: { not: null },
+      linkStatus: { not: LinkHealthStatus.FAIL }
     },
     select: { approvedAccountingBytes: true }
   });

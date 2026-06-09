@@ -129,6 +129,32 @@ describe('getEligibleContributionBytes', () => {
     const result = await getEligibleContributionBytes(1);
     expect(result).toBe(0n);
   });
+
+  it('excludes FAIL-status contributions from the relief pool (ADR-0006)', async () => {
+    // The LinkHealth gate is enforced in the query: a confirmed-dead link
+    // (FAIL) must not count toward coverage. WARN/UNKNOWN are NOT excluded —
+    // suspicion alone never revokes relief.
+    mockPrismaContribution.findMany.mockResolvedValue([]);
+    await getEligibleContributionBytes(1);
+    expect(mockPrismaContribution.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approvedAccountingBytes: { not: null },
+          linkStatus: { not: 'FAIL' }
+        })
+      })
+    );
+  });
+
+  it('relief is revocable: losing a contribution to FAIL raises required ratio', () => {
+    // 15 GiB consumed (10–20 GiB bracket: max 0.20). With 7.5 GiB eligible,
+    // coverage 0.5 → required 0.10. If that contribution flips FAIL it leaves
+    // the pool (eligible → 0), coverage 0 → required rises to the 0.20 ceiling.
+    const consumed = 15n * GiB;
+    const withHealthyLink = BigInt(Math.round(7.5 * 1024 ** 3));
+    expect(computeRequiredRatio(consumed, withHealthyLink)).toBeCloseTo(0.1);
+    expect(computeRequiredRatio(consumed, 0n)).toBeCloseTo(0.2);
+  });
 });
 
 // ─── getRatioStats ────────────────────────────────────────────────────────────
