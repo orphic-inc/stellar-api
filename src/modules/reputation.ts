@@ -27,6 +27,8 @@ export interface DimensionInput {
   ratio?: number;
   /** Lifetime contributed bytes — gates RatioScore so a fresh default account earns nothing. */
   contributed?: bigint;
+  /** Number of friend relationships. Defaults to 0. */
+  friendCount?: number;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -95,9 +97,33 @@ const ratioScorer: DimensionScorer = {
   }
 };
 
-// Registry — add a dimension here (Friends, Invite, Donation, …) and the
-// aggregator picks it up unchanged.
-const REGISTRY: DimensionScorer[] = [longevityScorer, ratioScorer];
+// ─── FriendsScore ─────────────────────────────────────────────────────────
+// A lightweight trust signal (PRD-01 "Relationships Matter"). The PRD is
+// explicit that "friend count alone should not determine score", so this is
+// deliberately the weakest dimension: a LOW cap and heavy diminishing returns,
+// so even a huge friend list can't dominate longevity/ratio — and ring-farming
+// (the model is a directed add, no reciprocity yet, #60) hits the cap fast.
+// Quality-weighting (mutuality, friend account age, network diversity) is
+// future work per the PRD.
+const FRIENDS_CAP = 4;
+const FRIENDS_TAU = 5; // 5 friends → ~63% of cap; diminishing hard after
+const FRIENDS_WEIGHT = 1.0;
+
+const friendsScorer: DimensionScorer = {
+  name: 'friends',
+  weight: FRIENDS_WEIGHT,
+  cap: FRIENDS_CAP,
+  compute: ({ friendCount = 0 }) =>
+    FRIENDS_CAP * (1 - Math.exp(-Math.max(0, friendCount) / FRIENDS_TAU))
+};
+
+// Registry — add a dimension here (Invite, Donation, …) and the aggregator
+// picks it up unchanged.
+const REGISTRY: DimensionScorer[] = [
+  longevityScorer,
+  ratioScorer,
+  friendsScorer
+];
 
 /** Pure aggregator: sum each capped dimension's weighted subScore. */
 export const computeCrs = (input: DimensionInput): CrsResult => {
@@ -111,15 +137,19 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
 export const getReputation = async (userId: number): Promise<CrsResult> => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { createdAt: true, contributed: true, consumed: true }
-  });
+  const [user, friendCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true, contributed: true, consumed: true }
+    }),
+    prisma.friend.count({ where: { userId } })
+  ]);
   if (!user) return { score: 0, dimensions: [] };
   return computeCrs({
     userId,
     createdAt: user.createdAt,
     ratio: computeRatio(user.contributed, user.consumed),
-    contributed: user.contributed
+    contributed: user.contributed,
+    friendCount
   });
 };

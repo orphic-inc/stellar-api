@@ -4,9 +4,10 @@
  */
 
 const mockPrismaUser = { findUnique: jest.fn() };
+const mockPrismaFriend = { count: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
-  prisma: { user: mockPrismaUser }
+  prisma: { user: mockPrismaUser, friend: mockPrismaFriend }
 }));
 
 import { computeCrs, getReputation } from './reputation';
@@ -132,17 +133,47 @@ describe('computeCrs — Ratio dimension', () => {
   });
 });
 
+// ─── computeCrs / Friends dimension ───────────────────────────────────────────
+
+describe('computeCrs — Friends dimension', () => {
+  const friendsOf = (friendCount: number) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      friendCount
+    }).dimensions.find((d) => d.name === 'friends')!.subScore;
+
+  it('zero friends → zero', () => {
+    expect(friendsOf(0)).toBe(0);
+  });
+
+  it('more friends help, with diminishing returns', () => {
+    expect(friendsOf(5)).toBeGreaterThan(friendsOf(2));
+    expect(friendsOf(20) - friendsOf(15)).toBeLessThan(
+      friendsOf(5) - friendsOf(0)
+    );
+  });
+
+  it('count cannot dominate: even thousands of friends stay under the low cap', () => {
+    // FRIENDS_CAP = 4, far below longevity (10) / ratio (8) — count alone can't win
+    expect(friendsOf(10_000)).toBeLessThanOrEqual(4);
+    expect(friendsOf(10_000)).toBeGreaterThan(3.9);
+  });
+});
+
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('computes CRS from the user createdAt + ratio', async () => {
+  it('computes CRS from the user createdAt + ratio + friends', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
       createdAt: yearsAgo(6),
       contributed: 30n * 1024n ** 3n,
       consumed: 10n * 1024n ** 3n // ratio 3.0
     });
+    mockPrismaFriend.count.mockResolvedValue(5);
     const result = await getReputation(1);
     expect(result.score).toBeGreaterThan(0);
     expect(result.dimensions.map((d) => d.name)).toEqual(
@@ -151,10 +182,14 @@ describe('getReputation', () => {
     expect(
       result.dimensions.find((d) => d.name === 'ratio')!.subScore
     ).toBeGreaterThan(0);
+    expect(
+      result.dimensions.find((d) => d.name === 'friends')!.subScore
+    ).toBeGreaterThan(0);
   });
 
   it('returns an empty score for an unknown user', async () => {
     mockPrismaUser.findUnique.mockResolvedValue(null);
+    mockPrismaFriend.count.mockResolvedValue(0);
     const result = await getReputation(999);
     expect(result).toEqual({ score: 0, dimensions: [] });
   });
