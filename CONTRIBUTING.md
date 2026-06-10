@@ -30,6 +30,28 @@ git remote add upstream git@github.com:orphic-inc/stellar-api.git   # or: git wi
 
 **Dependency bumps** are isolated (own branch/PR), pinned, ADR'd, and atomic with the regen/migration they force — never entangled with feature work (ADR-0009).
 
+## Local pre-commit gate
+
+Each repo runs a **husky** pre-commit hook that invokes **lint-staged** over your staged files, so formatting/lint never lands in a commit:
+
+- staged `*.ts`/`*.tsx` → `eslint --fix` then `prettier --write`
+- staged `*.{json,md,scss,css}` → `prettier --write` (ui also runs `stylelint` on `*.scss`)
+
+The hook installs automatically — `npm install` runs the `prepare` script (`husky install || true`; the `|| true` keeps dependency-free production/Docker builds from failing). Nothing to wire up by hand.
+
+> **One config, no shadow.** lint-staged config lives **only** in `package.json`. Do not add a `.lintstagedrc` — lint-staged prefers the rc file and silently ignores the `package.json` block, which disables the real rules.
+
+lint-staged is the fast staged-file pass, not the full check. **Before pushing**, run the complete gate (it must be clean on new/changed files):
+
+```bash
+npm run format   # prettier --write (whole tree — confirms nothing else drifted)
+npm run lint     # eslint, clean on changed files
+npx tsc --noEmit # type-check
+npm run test     # full suite
+```
+
+Order matters: format before lint (Prettier violations surface as ESLint errors), lint before type-check.
+
 ## Code Standards
 
 ### Error Handling
