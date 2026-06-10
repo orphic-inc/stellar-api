@@ -39,6 +39,7 @@ const prismaMock = {
   },
   tagAlias: { findUnique: jest.fn() },
   artistSubscription: { findMany: jest.fn() },
+  releaseArtist: { findMany: jest.fn() },
   notification: { createMany: jest.fn() },
   siteSettings: { upsert: jest.fn() },
   $transaction: jest.fn()
@@ -124,6 +125,7 @@ describe('releaseWorkbench session', () => {
     });
     prismaMock.tagAlias.findUnique.mockResolvedValue(null as never);
     prismaMock.artistSubscription.findMany.mockResolvedValue([] as never);
+    prismaMock.releaseArtist.findMany.mockResolvedValue([] as never);
     getUserRankAccessMock.mockResolvedValue({
       userRankId: 1,
       effectiveLevel: 1000,

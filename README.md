@@ -4,7 +4,33 @@
 
 This is the Node.js API backend for **Stellar**, a modern, next-generation community content tracker and forum software.
 
+Stellar is an invite-only (`/private/`) platform built around **Communities** with granular permissions, member contributions, and a **Community Reputation Score (CRS)** that rewards long-term, healthy participation.
+
+## What's here
+
+- **Communities, membership & staff** — invite tree, roles, granular per-permission checks ([ADR-0001](docs/adr/0001-granular-permission-checks.md)).
+- **Contributions & releases** — track releases, ratio accounting (contributed/consumed), download cost ledger.
+- **Community Reputation Score (CRS)** — composite reputation across social, contribution, donation, and longevity signals ([PRD-01](docs/prd/01-Community-Score.md)); fed by a community-health pulse ([ADR-0002](docs/adr/0002-community-health-pulse.md)).
+- **Stylesheets & theming** — built-in + user-authored themes with adoption scoring ([PRD-03](docs/prd/03-stylesheet-themes-and-scoring.md), [ADR-0003](docs/adr/0003-stylesheet-injection-isolation.md)).
+- **Link health** — periodic checks on contribution links, flapping detection, staff escalation, stale-link sweep.
+
+## Documentation
+
+The README is the lamp-post; specs and decisions live in [`docs/`](docs/):
+
+| Doc                                                                                          | Covers                                       |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [PRD-01 — Community-Score / CRS](docs/prd/01-Community-Score.md)                             | reputation model, dimensions, roadmap        |
+| [PRD-03 — Stylesheet themes & scoring](docs/prd/03-stylesheet-themes-and-scoring.md)         | themes, author stylesheets, CRS weights      |
+| [ADR-0001 — Granular permission checks](docs/adr/0001-granular-permission-checks.md)         | why no role convenience functions            |
+| [ADR-0002 — Community-health pulse → CRS](docs/adr/0002-community-health-pulse.md)           | pulse persistence + CRS folding _(proposed)_ |
+| [ADR-0003 — Stylesheet injection isolation](docs/adr/0003-stylesheet-injection-isolation.md) | user-CSS sandbox/reset _(proposed)_          |
+| [`docs/agents/`](docs/agents/) · [CONTEXT.md](CONTEXT.md) · [AGENTS.md](AGENTS.md)           | domain language, agent/dev guides            |
+
+> PRD numbering: **PRD-01** Community-Score · **PRD-02** Donations/IRC/Announce · **PRD-03** Stylesheets · **PRD-04** Contribution/Release/Music.
+
 ## Tech Stack
+
 - **Runtime**: Node.js (LTS)
 - **Framework**: Express.js
 - **Database**: PostgreSQL with Prisma ORM
@@ -20,10 +46,12 @@ See the [stellar-compose](https://github.com/orphic-inc/stellar-compose) reposit
 If you prefer to run the API directly on your local machine for development:
 
 ### 1. Prerequisites
+
 - Node.js (LTS version)
 - A running PostgreSQL instance
 
 ### 2. Installation
+
 ```bash
 git clone https://github.com/orphic-inc/stellar-api.git
 cd stellar-api
@@ -31,25 +59,30 @@ npm install
 ```
 
 ### 3. Environment Variables
+
 Copy `.env.example` to `.env` (or create one) and configure the following variables:
 
 | Variable                   | Description                                    | Default                 |
-|----------------------------|------------------------------------------------|-------------------------|
+| -------------------------- | ---------------------------------------------- | ----------------------- |
 | `DATABASE_URL`             | Prisma connection string to your Postgres DB   | `postgresql://...`      |
-| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs (must be securely set) | *undefined*             |
+| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs (must be securely set) | _undefined_             |
 | `STELLAR_LOG_LEVEL`        | Winston log level (e.g., debug, info, error)   | `info`                  |
 | `STELLAR_HTTP_PORT`        | API listening port                             | `8080`                  |
 | `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)       | `http://localhost:3000` |
 
 ### 4. Database Setup
+
 Before running the app, ensure your database schema is initialized and the Prisma Client is generated:
+
 ```bash
 npx prisma migrate dev
 npx prisma generate
 ```
 
 ### 5. Running the API
+
 Start the server in development mode (with hot-reloading):
+
 ```bash
 npm run dev
 ```
@@ -58,19 +91,23 @@ npm run dev
 
 Stellar relies on an OpenAPI specification to maintain type-safety between the API and the UI.
 When you make changes to Zod schemas or API routes, you must export the new OpenAPI spec:
+
 ```bash
 npm run openapi:export
 ```
+
 This generates an `openapi.json` file in the project root. The `stellar-ui` repository will read this file to generate its frontend TypeScript types.
 
 ## Testing
 
 Run the test suite:
+
 ```bash
 npm run test
 ```
 
 Run integration tests (requires a `stellar_test` database and `.env.test` file):
+
 ```bash
 npm run test:integration
 ```

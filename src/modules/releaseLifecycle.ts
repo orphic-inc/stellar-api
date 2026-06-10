@@ -1,4 +1,8 @@
-import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
+import {
+  ArtistRole,
+  ReleaseHistoryAction,
+  ReleaseTagVoteDirection
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import type { CreateGroupInput } from '../schemas/community';
@@ -67,23 +71,20 @@ export const createCommunityRelease = async (input: {
   }
 
   const {
-    artistId,
+    credits,
     title,
     description,
     type,
     releaseType,
     year,
     image,
-    tagIds,
-    isEdition,
-    edition
+    tagIds
   } = input.data;
   const uniqueTagIds = tagIds ? [...new Set(tagIds)] : [];
 
   return prisma.$transaction(async (tx) => {
     const created = await tx.release.create({
       data: {
-        artistId,
         communityId: input.communityId,
         title,
         description,
@@ -91,8 +92,15 @@ export const createCommunityRelease = async (input: {
         releaseType,
         year,
         image: image ?? null,
-        isEdition: isEdition ?? false,
-        edition: (edition ?? undefined) as never
+        credits: {
+          create: credits.map((credit) => ({
+            artistId: credit.artistId,
+            role: credit.role ?? ArtistRole.Main
+          }))
+        },
+        editions: {
+          create: { year, isUnknownEdition: true }
+        }
       }
     });
 
@@ -112,7 +120,12 @@ export const createCommunityRelease = async (input: {
 
     const release = await tx.release.findUniqueOrThrow({
       where: { id: created.id },
-      include: { artist: true, releaseTags: { include: { tag: true } } }
+      include: {
+        credits: {
+          select: { role: true, artist: { select: { id: true, name: true } } }
+        },
+        releaseTags: { include: { tag: true } }
+      }
     });
     const createdSnapshot = snapshotRelease(release);
     await tx.releaseHistory.create({

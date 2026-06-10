@@ -16,6 +16,10 @@ import {
   parsedParams,
   parsedQuery
 } from '../../middleware/validate';
+import {
+  releaseCreditsSelect,
+  withPrimaryArtist
+} from '../../modules/releaseCredits';
 import { sanitizeHtml } from '../../lib/sanitize';
 import {
   parsedPage,
@@ -156,7 +160,7 @@ router.get(
                 year: true,
                 communityId: true,
                 releaseType: true,
-                artist: { select: { id: true, name: true } }
+                credits: releaseCreditsSelect
               }
             },
             user: { select: { id: true, username: true } }
@@ -203,6 +207,10 @@ router.get(
 
     res.json({
       ...collage,
+      entries: collage.entries.map((entry) => ({
+        ...entry,
+        release: withPrimaryArtist(entry.release)
+      })),
       isSubscribed: !!subscription,
       isBookmarked: !!bookmark
     });
@@ -521,7 +529,7 @@ router.post(
               image: true,
               year: true,
               releaseType: true,
-              artist: { select: { id: true, name: true } }
+              credits: releaseCreditsSelect
             }
           },
           user: { select: { id: true, username: true } }
@@ -547,7 +555,10 @@ router.post(
       return created;
     });
 
-    res.status(201).json(entry);
+    res.status(201).json({
+      ...entry,
+      release: withPrimaryArtist(entry.release)
+    });
   })
 );
 

@@ -55,6 +55,8 @@ jobs:
         run: npm run lint
       - name: Type check
         run: npx tsc --noEmit
+      - name: Type check (test files)
+        run: npm run typecheck:test
       - name: Unit tests
         run: npm test
       - name: OpenAPI freshness

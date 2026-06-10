@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { AppError } from '../lib/errors';
 import { getDefaultStylesheetName } from './stylesheet';
+import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 
 export type SnatchItem = {
   id: number;
@@ -156,7 +157,7 @@ export const getSnatchList = async (
               id: true,
               title: true,
               communityId: true,
-              artist: { select: { name: true } }
+              credits: releaseCreditsSelect
             }
           }
         }
@@ -174,7 +175,7 @@ export const getSnatchList = async (
       items.push({
         id: g.id,
         release: { id: rel.id, title: rel.title, communityId: rel.communityId },
-        artist: rel.artist ?? null,
+        artist: primaryArtist(rel.credits),
         downloadedAt: g.createdAt
       });
     }

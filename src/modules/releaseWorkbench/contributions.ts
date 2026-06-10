@@ -1,5 +1,6 @@
 import { FileType, ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { sizeBytesToNumber } from '../../lib/serialize';
 import { AppError } from '../../lib/errors';
 import { emitNotifications } from '../../lib/notifications';
 import { addContributionToRelease } from '../contribution';
@@ -67,8 +68,12 @@ export const attachReleaseWorkbenchContribution = async (
   }
 
   await prisma.$transaction(async (tx) => {
+    const credits = await tx.releaseArtist.findMany({
+      where: { releaseId: contribution.release.id },
+      select: { artistId: true }
+    });
     const subs = await tx.artistSubscription.findMany({
-      where: { artistId: contribution.release.artistId },
+      where: { artistId: { in: credits.map((credit) => credit.artistId) } },
       select: { userId: true }
     });
     if (subs.length > 0) {
@@ -94,7 +99,7 @@ export const attachReleaseWorkbenchContribution = async (
         after: {
           contributionId: contribution.id,
           type: contribution.type,
-          sizeInBytes: contribution.sizeInBytes ?? null,
+          sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes),
           contributor: contribution.user?.username ?? null
         } as never,
         snapshot: snapshotRelease(releaseWithTags) as never

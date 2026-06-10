@@ -25,8 +25,8 @@ const makeArtist = (overrides = {}) => ({
   aliases: [],
   tags: [],
   similarTo: [],
-  releases: [],
-  _count: { releases: 3 },
+  credits: [],
+  _count: { credits: 3 },
   ...overrides
 });
 

@@ -1,6 +1,7 @@
 import { CommunityType, RegistrationStatus } from '@prisma/client';
 import {
   app,
+  getCommunityHealthPulseMock,
   makeUserRank,
   prismaMock,
   request,
@@ -114,6 +115,54 @@ describe('GET /api/communities/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Jazz');
+  });
+});
+
+describe('GET /api/communities/:id/health', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/health');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns the link-health pulse for a member', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    getCommunityHealthPulseMock.mockResolvedValue({
+      pass: 6,
+      warn: 2,
+      fail: 2,
+      unknown: 0,
+      total: 10,
+      checked: 8,
+      coverage: 0.8,
+      pulse: 0.75,
+      status: 'Ailing'
+    });
+
+    const res = await request(app).get('/api/communities/1/health');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      pulse: 0.75,
+      status: 'Ailing',
+      checked: 8
+    });
+    expect(getCommunityHealthPulseMock).toHaveBeenCalledWith(1);
+  });
+
+  it('returns 403 when the user is not a member of a restricted community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
+    );
+    prismaMock.consumer.findFirst.mockResolvedValue(null);
+    prismaMock.contributor.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/health');
+
+    expect(res.status).toBe(403);
+    expect(getCommunityHealthPulseMock).not.toHaveBeenCalled();
   });
 });
 

@@ -193,7 +193,7 @@ router.put(
       communityId: number;
       releaseId: number;
     }>(res);
-    const { title, description, image, year, isEdition, edition, editSummary } =
+    const { title, description, image, year, editSummary } =
       parsedBody<UpdateGroupInput>(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
@@ -206,8 +206,6 @@ router.put(
       description,
       image,
       year,
-      isEdition,
-      edition,
       editSummary
     });
     res.json(serializeReleaseWorkbenchView(view));

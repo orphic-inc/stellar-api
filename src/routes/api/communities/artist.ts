@@ -58,7 +58,7 @@ router.get(
       prisma.artist.findMany({
         skip: pg.skip,
         take: pg.limit,
-        include: { _count: { select: { releases: true } } },
+        include: { _count: { select: { credits: true } } },
         orderBy: { name: 'asc' }
       }),
       prisma.artist.count()
@@ -79,7 +79,7 @@ router.get(
         where: { vanityHouse: true },
         skip: pg.skip,
         take: pg.limit,
-        include: { _count: { select: { releases: true } } },
+        include: { _count: { select: { credits: true } } },
         orderBy: { name: 'asc' }
       }),
       prisma.artist.count({ where: { vanityHouse: true } })
@@ -105,7 +105,7 @@ router.put(
     const updated = await prisma.artist.update({
       where: { id },
       data: { vanityHouse: parsed.data.vanityHouse },
-      include: { _count: { select: { releases: true } } }
+      include: { _count: { select: { credits: true } } }
     });
     res.json(updated);
   })
@@ -293,10 +293,19 @@ router.get(
           similarTo: {
             include: { similarArtist: { select: { id: true, name: true } } }
           },
-          releases: {
-            where: { communityId: { in: accessibleCommunityIds } },
-            include: { community: { select: { id: true, name: true } } },
-            orderBy: [{ year: 'desc' }, { title: 'asc' }]
+          credits: {
+            where: {
+              release: { communityId: { in: accessibleCommunityIds } }
+            },
+            include: {
+              release: {
+                include: { community: { select: { id: true, name: true } } }
+              }
+            },
+            orderBy: [
+              { release: { year: 'desc' } },
+              { release: { title: 'asc' } }
+            ]
           }
         }
       }),
@@ -305,7 +314,15 @@ router.get(
       })
     ]);
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
-    res.json({ ...artist, isSubscribed: subscription !== null });
+    const { credits, ...artistRest } = artist;
+    res.json({
+      ...artistRest,
+      releases: credits.map((credit) => ({
+        ...credit.release,
+        role: credit.role
+      })),
+      isSubscribed: subscription !== null
+    });
   })
 );
 

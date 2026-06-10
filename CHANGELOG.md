@@ -6,26 +6,64 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
-- Stub tracking issues filed for friends (#60), invite tree (#61), and donations (#62)
+---
+
+## [0.5.4] — 2026-06-10
+
+### Added
+
+- **Community Reputation Score (CRS)** — a reputation registry with Longevity, Ratio (one-way ratio → reputation), and Friends (bounded trust signal) dimensions, exposed via `GET /me/reputation` [PRD-01].
+- **Community link-health pulse** — a coverage-gated health endpoint that treats WARN as indeterminate [ADR-0002].
+- **Stylesheet management** — admin routes, stats, and `isDefault` enforcement; pure stylesheet-selection CRS scoring [PRD-03]; bundled themes (Layer Cake, Proton, Postmod).
+- **Edition tier + multi-artist credits** for the music model (see Changed) [#72].
+- Decision records: ADRs 0002–0009 and PRDs 01/03/04/05/06; `AGENTS.md`; expanded `CONTEXT.md` / `README.md` covering CRS, ratio, the music model, stylesheets, governance, and fork workflow.
 
 ### Changed
+
+- **Music model**: releases now credit artists through a role-typed `ReleaseArtist` join (multi-artist) instead of a single artist reference. Edition metadata — record label, catalogue number, media, and edition flag — moved to a dedicated `Edition` tier, and contribution `bitrate`/`media` became typed enums. List, detail, and search responses keep a stable `artist` field derived from the primary (Main) credit via a shared `releaseCredits` helper [#72, #98].
+- `/api/search/releases`: artist and vanity-house filters now traverse the credits relation; record label, catalogue number, and media filters traverse the edition relation; `bitrate`/`media` query params are validated as enums (exact match).
+- **Ratio**: eligible-contribution relief is now gated on link health, with a 72h WARN→FAIL sweep and `linkStatusChangedAt` tracking [ADR-0006].
 - Remove Gravatar dependency — registration and install no longer compute a Gravatar URL from the user's email (which leaked an email hash to a third party; unacceptable for a private site). New users register with a null avatar; the UI falls back to a bundled default.
-- devTools seeded users now get a visually distinct avatar (`/static/common/avatars/seeded.jpg`) so generated accounts stand out from real ones in the UI.
+- devTools seeded users store a null avatar and fall back to the shared default in the UI, like real null-avatar accounts. (Reverts an earlier `'seeded'` sentinel / hardcoded `seeded.jpg` path that rendered broken — no UI mapper existed and no such asset is served.)
+- Bumped Prisma 5.3.1 → 6.19.3 and pinned the Docker base image.
+
+### Fixed
+
+- Contributions: store `sizeInBytes` as `BIGINT` to stop INT4 overflow.
+- Integration suite: repaired four consumers stranded by the music remodel — collages/downloads release credits, the downloads edition FK, vanityHouse `_count`, and the devTools cleanup sweep (`ReleaseArtist`/`Edition`).
+- `requestId` typed via the Express request augmentation [#78].
+
+### Security
+
+- Restored `externalStylesheet` URL validation on the profile-update schema — it accepted an arbitrary string while the user endpoint required a URL, an input-validation regression on a shared UI injection point.
+
+### Internal
+
+- CI now type-checks test files (`tsconfig.test.json`); `*.integration.ts` / `*.spec.ts` type errors previously surfaced only at runtime. Added staging/develop branch CI support.
 
 ### Migration
-- `prisma/scripts/backfill-remove-gravatar-avatars.ts` — one-off backfill nulling existing stored Gravatar avatar URLs. Run manually: `npx ts-node prisma/scripts/backfill-remove-gravatar-avatars.ts`
+
+- `prisma/scripts/backfill-remove-gravatar-avatars.ts` — one-off backfill nulling existing stored Gravatar avatar URLs. Run manually: `npx ts-node prisma/scripts/backfill-remove-gravatar-avatars.ts`.
+- Music-model expand→contract migrations — **DESTRUCTIVE** on a populated database (requires #73/#74 backfill first); safe as-is on fresh / CI databases.
+
+### Stub tracking
+
+- Issues filed for friends (#60), invite tree (#61), and donations (#62).
 
 ---
 
 ## [0.5.3] — 2026-06-01
 
 ### Added
+
 - CI: staging and develop branch workflows
 
 ### Changed
+
 - `collages.ts`: inline permission checks at all call sites, removing `isStaffOrModerator` named role helper (ADR-0001 compliance) — eliminates double DB lookup on GET `/:id`
 
 ### Fixed
+
 - devTools generators: expanded offset space to eliminate cross-run unique constraint collisions on seeded usernames
 
 ---
@@ -33,6 +71,7 @@ All notable changes to stellar-api are documented here.
 ## [0.5.2] — 2026-05-30
 
 ### Added
+
 - Sentry error reporting integration
 - Structured security event logging (failed logins, 403s, 429s)
 - Health check endpoint with graceful shutdown and request logging
@@ -41,12 +80,14 @@ All notable changes to stellar-api are documented here.
 - CI checks: lint, format, OpenAPI freshness
 
 ### Changed
+
 - Business logic extracted from user and auth route handlers into domain modules
 - Seed generator byte accounting fixed; devTools generator offset space expanded
 - Rate limiting expanded to all write endpoints and download grants
 - Integration test coverage: contributions, downloads, PM, permission loading
 
 ### Fixed
+
 - Forum trash handling, BBCode Prettier conflicts, integration timeouts
 - Report source URLs for Artist and Comment target types
 - Sentry type lint error
@@ -57,6 +98,7 @@ All notable changes to stellar-api are documented here.
 ## [0.5.1] — 2026-05-28
 
 ### Changed
+
 - Release backend refactored into workbench modules
 - Forum topic model deepened: `topicSession` module and session endpoint
 - Request lifecycle deepened: detail, vote, history, and auth moved into module
@@ -65,10 +107,12 @@ All notable changes to stellar-api are documented here.
 - `isModerator` replaced with granular permission checks at all call sites (ADR-0001)
 
 ### Added
+
 - `GET /tools/user-ranks/permissions` endpoint; static `permissionCatalog` duplicate removed
 - Missing OpenAPI specs; forum topic trash endpoint
 
 ### Fixed
+
 - Integration test calls to `registerUser` after options-object refactor
 - Release workbench lint issues
 - DownloadAccessGrant FK fields and cleanup ordering
@@ -78,11 +122,13 @@ All notable changes to stellar-api are documented here.
 ## [0.5.0] — 2026-05-19
 
 ### Added
+
 - Comprehensive unit test coverage across all API routes and modules
 - Permissions middleware spec; comment schema cross-page validation tests
 - Coverage for: auth, PM, forum, top10, communities, reports, requests, collages, wiki, search, downloads, notifications, bookmarks, posts, profile, announcements, settings, tools, subscriptions, stats, home, stylesheet, random, user, artist, DNU, poll
 
 ### Fixed
+
 - Comment targets for contributions and requests
 - Reports module mock completeness
 - Test suite Prettier formatting
@@ -92,6 +138,7 @@ All notable changes to stellar-api are documented here.
 ## [0.4.99] — 2026-05-27 _(alias: v0.4.9)_
 
 ### Added
+
 - Staff toolbox: generate test data API (Phases A–C) — user, community, release, forum, wiki, moderation generators seeded from real music library data and publicly available packaging data rates
 
 ---
@@ -99,10 +146,12 @@ All notable changes to stellar-api are documented here.
 ## [0.4.9] — 2026-05-17
 
 ### Added
+
 - Top 10 leaderboards with TTL caching and snapshot persistence
 - Release voting and tag management
 
 ### Changed
+
 - `upload`/`download` renamed to `contribute`/`consume` throughout (domain language alignment)
 - Staff PMs bifurcated from user private conversations into dedicated staff inbox
 
@@ -111,6 +160,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.9] — 2026-05-17
 
 ### Added
+
 - **Economy**: download grants, ratio calculation, ratio watch state machine, link health checks and approval workflow, requests/bounty system
 - **Communities**: download URLs, domain gate via SiteSettings, per-community `allowDuplicateFormats`
 - **Collages**: full CRUD with personal collage limits per user rank
@@ -127,6 +177,7 @@ All notable changes to stellar-api are documented here.
 - Dev QoL: lint-staged, seed script, Dockerfile improvements
 
 ### Fixed
+
 - Boolean query-param parsing in report and ticket queues
 - Five UX bugs in ticket workflow
 - Install flow: survive DB resets; launch checklist handling
@@ -137,6 +188,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.4] — 2026-04-24 _(Phase 4)_
 
 ### Fixed
+
 - `parsedParams` ESLint import conflict reverted and reworked
 - DOMPurify mock converted to TypeScript
 - Integration script and Codacy parsing errors
@@ -146,6 +198,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.3] — 2026-04-23 _(Phase 3)_
 
 ### Added
+
 - DB-backed integration test harness
 - Codacy artifact exclusions
 
@@ -154,6 +207,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.2] — 2026-04-23 _(Phase 2)_
 
 ### Changed
+
 - Business logic extracted from route files into service modules (auth, stats, comment, artist)
 - `AuthenticatedRequest` introduced; `req.user!` assertions eliminated
 - Error envelope fully standardized: `{ msg }` replaces legacy `{ errors: [] }` shape
@@ -162,6 +216,7 @@ All notable changes to stellar-api are documented here.
 - Forum logic fully extracted to modules; OpenAPI schema gaps filled
 
 ### Fixed
+
 - `Post.comments` and `ForumPost.edits` normalized from JSON to relational tables
 - 30-day audit fixes: batch collaborator upsert, `express-validator` removed
 
@@ -170,6 +225,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.1] — 2026-04-23 _(Phase 1)_ _(alias: v0.4.1)_
 
 ### Changed
+
 - Full audit remediation: C1–C7, H1–H6, M1–M7, L1–L4
 - Routes reorganized from `sections/` into domain-based directory structure
 - `install.ts` schemas split into domain schema files
@@ -187,6 +243,7 @@ All notable changes to stellar-api are documented here.
 ## [0.3.0] — 2026-04-23
 
 ### Added
+
 - Jest API contract coverage (domain-split)
 - Workflow actions pinned; CI test setup hardened
 
@@ -195,6 +252,7 @@ All notable changes to stellar-api are documented here.
 ## [0.2.5] — 2026-04-23
 
 ### Added
+
 - `validateParams` and `validateQuery` helpers — reusable param/query validation
 - Param validation rolled out: forum topics, forum posts, communities routes
 - Homepage featured content and hardened poll reads
@@ -202,6 +260,7 @@ All notable changes to stellar-api are documented here.
 - Artist, forum, stats, announcements, notifications OpenAPI expansion
 
 ### Fixed
+
 - Forum auth guards and install OpenAPI sync
 
 ---
@@ -209,6 +268,7 @@ All notable changes to stellar-api are documented here.
 ## [0.2.0] — 2026-04-23
 
 ### Added
+
 - Prisma-backed installation flow and API routes
 - `GET /api/stats` endpoint
 - Audit hardening: core infra, permissions, auth, Zod validation, rate limiting
@@ -219,12 +279,14 @@ All notable changes to stellar-api are documented here.
 - Artist DELETE and full announcements CRUD
 
 ### Changed
+
 - Routes reorganized into domain-based directories
 - Schemas split by domain
 - Error envelope standardized (P5/P6)
 - `express-validator` replaced with Zod
 
 ### Fixed
+
 - Poll field sanitization; 201 status codes corrected
 - Codacy ESLint warnings resolved
 
@@ -235,6 +297,7 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 ## [0.1.0] — 2026-04-22
 
 ### Added
+
 - Full Prisma schema with stub models: User, Community, Artist, Release, Tag, enums
 - Relational fields: consumer/contributor/invite stubs
 - User route scaffolding and Prisma connection
@@ -243,6 +306,7 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 - Web server and Dockerfile
 
 ### Changed
+
 - Converted codebase to TypeScript
 - Environment variable names unified across UI and API
 - Config keys and logging type errors resolved
@@ -252,11 +316,13 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 ## [0.0.1] — 2024-02-14
 
 ### Added
+
 - Initial import: project scaffolding, config, formatting baseline
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/orphic-inc/stellar-api/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/orphic-inc/stellar-api/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/orphic-inc/stellar-api/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/orphic-inc/stellar-api/compare/v0.5.0...v0.5.1

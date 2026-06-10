@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler } from '../../modules/asyncHandler';
+import {
+  releaseCreditsSelect,
+  withPrimaryArtist
+} from '../../modules/releaseCredits';
 
 const router = Router();
 
@@ -20,10 +24,10 @@ router.get(
         communityId: true,
         title: true,
         year: true,
-        artist: { select: { id: true, name: true } }
+        credits: releaseCreditsSelect
       }
     });
-    res.json(release);
+    res.json(release ? withPrimaryArtist(release) : null);
   })
 );
 

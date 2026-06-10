@@ -8,6 +8,15 @@ const TIMEOUT_MS = 10_000;
 const STALE_AFTER_DAYS = 7;
 // Auto-WARN a contribution when this many distinct users have reported it
 const REPORT_WARN_THRESHOLD = 3;
+// A contribution stuck at WARN this long is promoted to FAIL (ADR-0006)
+const WARN_SWEEP_AFTER_MS = 72 * 60 * 60 * 1000;
+
+// Community pulse bands — the share of *definitively probed* links that PASS.
+const PULSE_HEALTHY = 0.9;
+const PULSE_AILING = 0.6;
+// Below this share of links definitively probed, the pulse isn't trustworthy
+// enough to band — report Unknown rather than a confident Healthy/Critical.
+const PULSE_MIN_COVERAGE = 0.5;
 
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
@@ -35,16 +44,42 @@ export const checkContributionLink = async (
 ): Promise<void> => {
   const contribution = await prisma.contribution.findUnique({
     where: { id: contributionId },
-    select: { downloadUrl: true }
+    select: { downloadUrl: true, linkStatus: true, linkStatusChangedAt: true }
   });
   if (!contribution) return;
 
   const status = await checkUrl(contribution.downloadUrl);
+  const now = new Date();
+  // Stamp the transition time when the status actually changes — or when it's
+  // never been stamped (backfill) — so the WARN sweep has a clock to read.
+  const stampChange =
+    status !== contribution.linkStatus ||
+    contribution.linkStatusChangedAt === null;
   await prisma.contribution.update({
     where: { id: contributionId },
-    data: { linkStatus: status, linkCheckedAt: new Date() }
+    data: {
+      linkStatus: status,
+      linkCheckedAt: now,
+      ...(stampChange ? { linkStatusChangedAt: now } : {})
+    }
   });
   log.info('Link checked', { contributionId, status });
+};
+
+// Promote contributions stuck at WARN past the sweep window to FAIL. Suspicion
+// alone never revokes ratio relief; only a confirmed-or-persistent FAIL does
+// (ADR-0006). This closes the "returns 200 but the file is gone" hole.
+export const sweepStaleWarnLinks = async (): Promise<void> => {
+  const cutoff = new Date(Date.now() - WARN_SWEEP_AFTER_MS);
+  const now = new Date();
+  const { count } = await prisma.contribution.updateMany({
+    where: {
+      linkStatus: LinkHealthStatus.WARN,
+      linkStatusChangedAt: { lt: cutoff }
+    },
+    data: { linkStatus: LinkHealthStatus.FAIL, linkStatusChangedAt: now }
+  });
+  if (count > 0) log.info('Swept stale WARN links to FAIL', { count });
 };
 
 export const recheckStaleLinks = async (): Promise<void> => {
@@ -80,17 +115,110 @@ export const recordContributionReport = async (
     distinct: ['reporterId']
   });
   if (distinctReporters.length >= REPORT_WARN_THRESHOLD) {
-    await prisma.contribution.update({
+    const current = await prisma.contribution.findUnique({
       where: { id: contributionId },
-      data: { linkStatus: LinkHealthStatus.WARN }
+      select: { linkStatus: true }
     });
-    log.info('Contribution auto-warned by reports', {
-      contributionId,
-      distinctReporters: distinctReporters.length
-    });
-    // Kick off a recheck so status can be corrected if the link is actually fine
-    checkContributionLink(contributionId).catch((err) =>
-      log.warn('Post-report link recheck failed', { contributionId, err })
-    );
+    // Only warn from a healthy/unknown state: don't reset the sweep clock on
+    // an already-WARN link, and don't downgrade a confirmed FAIL back to WARN.
+    if (
+      current &&
+      current.linkStatus !== LinkHealthStatus.WARN &&
+      current.linkStatus !== LinkHealthStatus.FAIL
+    ) {
+      await prisma.contribution.update({
+        where: { id: contributionId },
+        data: {
+          linkStatus: LinkHealthStatus.WARN,
+          linkStatusChangedAt: new Date()
+        }
+      });
+      log.info('Contribution auto-warned by reports', {
+        contributionId,
+        distinctReporters: distinctReporters.length
+      });
+      // Kick off a recheck so status can be corrected if the link is actually fine
+      checkContributionLink(contributionId).catch((err) =>
+        log.warn('Post-report link recheck failed', { contributionId, err })
+      );
+    }
   }
+};
+
+export type CommunityPulseStatus =
+  | 'Healthy'
+  | 'Ailing'
+  | 'Critical'
+  | 'Unknown';
+
+export interface CommunityHealthPulse {
+  pass: number;
+  warn: number;
+  fail: number;
+  unknown: number;
+  /** All contributions in the community. */
+  total: number;
+  /**
+   * Definitively probed links (PASS + FAIL). WARN is transient/uncertain and
+   * UNKNOWN is unprobed — both are indeterminate and excluded from the pulse.
+   */
+  checked: number;
+  /** Share of all links that are definitively probed, 0–1. `null` when empty. */
+  coverage: number | null;
+  /** Share of probed links that PASS, 0–1. `null` when none are probed yet. */
+  pulse: number | null;
+  status: CommunityPulseStatus;
+}
+
+/**
+ * The community's link-health "pulse": roll every contribution's linkStatus up
+ * into a single heartbeat. A living community keeps its links alive; the pulse
+ * weakens as they rot. Computed on read — no stored state.
+ */
+export const getCommunityHealthPulse = async (
+  communityId: number
+): Promise<CommunityHealthPulse> => {
+  const grouped = await prisma.contribution.groupBy({
+    by: ['linkStatus'],
+    where: { release: { communityId } },
+    _count: { _all: true }
+  });
+
+  const counts = { pass: 0, warn: 0, fail: 0, unknown: 0 };
+  for (const row of grouped) {
+    const n = row._count._all;
+    switch (row.linkStatus) {
+      case LinkHealthStatus.PASS:
+        counts.pass += n;
+        break;
+      case LinkHealthStatus.WARN:
+        counts.warn += n;
+        break;
+      case LinkHealthStatus.FAIL:
+        counts.fail += n;
+        break;
+      default:
+        counts.unknown += n; // UNKNOWN — not yet probed
+        break;
+    }
+  }
+
+  // Only PASS/FAIL are definitive; WARN (transient) and UNKNOWN (unprobed) are
+  // indeterminate and excluded from the pulse.
+  const checked = counts.pass + counts.fail;
+  const total = checked + counts.warn + counts.unknown;
+  const coverage = total === 0 ? null : checked / total;
+  const pulse = checked === 0 ? null : counts.pass / checked;
+  // Don't claim a confident band until enough links are actually probed —
+  // otherwise one PASS among thousands of UNKNOWN would read "Healthy".
+  const status: CommunityPulseStatus =
+    pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
+      ? 'Unknown'
+      : pulse >= PULSE_HEALTHY
+      ? 'Healthy'
+      : pulse >= PULSE_AILING
+      ? 'Ailing'
+      : 'Critical';
+
+  return { ...counts, total, checked, coverage, pulse, status };
 };

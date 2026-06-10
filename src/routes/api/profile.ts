@@ -8,6 +8,7 @@ import {
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
+import { getReputation } from '../../modules/reputation';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../lib/audit';
@@ -81,6 +82,15 @@ router.get(
       getPolicyState(req.user.id)
     ]);
     res.json({ ...stats, policy });
+  })
+);
+
+// GET /api/profile/me/reputation — Community Reputation Score (PRD-01), computed on read
+router.get(
+  '/me/reputation',
+  requireAuth,
+  authHandler(async (req, res) => {
+    res.json(await getReputation(req.user.id));
   })
 );
 

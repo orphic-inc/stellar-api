@@ -87,7 +87,9 @@ export const getReleaseWorkbenchView = async (
     prisma.release.findFirst({
       where: { id: ref.releaseId, communityId: ref.communityId },
       include: {
-        artist: true,
+        credits: {
+          select: { role: true, artist: { select: { id: true, name: true } } }
+        },
         releaseTags: {
           include: {
             tag: { select: { id: true, name: true, occurrences: true } },

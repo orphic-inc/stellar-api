@@ -5,6 +5,7 @@ import type {
   StaffInboxStatus
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { parseBBCode } from '../lib/bbcode';
 import { sendInviteEmail } from '../lib/mailer';
@@ -351,7 +352,7 @@ const getRecentContributions = async (
           title: true,
           communityId: true,
           image: true,
-          artist: { select: { id: true, name: true } }
+          credits: releaseCreditsSelect
         }
       }
     }
@@ -365,7 +366,7 @@ const getRecentContributions = async (
       title: row.release.title,
       communityId: row.release.communityId,
       image: row.release.image,
-      artist: row.release.artist
+      artist: primaryArtist(row.release.credits)
     }
   }));
 };
@@ -382,7 +383,7 @@ const getRecentSnatches = async (userId: number): Promise<RecentSnatch[]> => {
               id: true,
               title: true,
               communityId: true,
-              artist: { select: { name: true } }
+              credits: releaseCreditsSelect
             }
           }
         }
@@ -406,7 +407,7 @@ const getRecentSnatches = async (userId: number): Promise<RecentSnatch[]> => {
         title: release.title,
         communityId: release.communityId
       },
-      artist: release.artist ?? null
+      artist: primaryArtist(release.credits)
     });
     if (items.length >= 5) break;
   }
