@@ -68,6 +68,12 @@ const baseInput = (communityId: number): CreateContributionInput => ({
   description: undefined,
   bitrate: undefined,
   media: undefined,
+  releaseCategory: undefined,
+  recordLabel: undefined,
+  catalogueNumber: undefined,
+  editionTitle: undefined,
+  editionYear: undefined,
+  isRemaster: false,
   hasLog: false,
   hasCue: false,
   isScene: false,
@@ -175,6 +181,108 @@ describe('createContributionSubmission', () => {
     const jazz = await testPrisma.tag.findUnique({ where: { name: 'jazz' } });
     expect(jazz).not.toBeNull();
     expect(jazz!.occurrences).toBeGreaterThanOrEqual(1);
+  });
+
+  it('sets the release category from input rather than defaulting to Album', async () => {
+    const user = await createUser('cat');
+    const community = await createCommunity();
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: { ...baseInput(community.id), releaseCategory: 'EP' }
+    });
+
+    const release = await testPrisma.release.findUnique({
+      where: { id: result!.releaseId }
+    });
+    expect(release!.releaseType).toBe('EP');
+  });
+
+  it('defaults the release category to Album for Music when omitted', async () => {
+    const user = await createUser('catdef');
+    const community = await createCommunity();
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: baseInput(community.id)
+    });
+
+    const release = await testPrisma.release.findUnique({
+      where: { id: result!.releaseId }
+    });
+    expect(release!.releaseType).toBe('Album');
+  });
+
+  it('persists edition metadata and marks the edition as known', async () => {
+    const user = await createUser('ed');
+    const community = await createCommunity();
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: {
+        ...baseInput(community.id),
+        recordLabel: 'Blue Note',
+        catalogueNumber: 'BN-1577',
+        editionTitle: '24-bit Remaster',
+        editionYear: 2015,
+        isRemaster: true
+      }
+    });
+
+    const edition = await testPrisma.edition.findFirst({
+      where: { releaseId: result!.releaseId }
+    });
+    expect(edition!.recordLabel).toBe('Blue Note');
+    expect(edition!.catalogueNumber).toBe('BN-1577');
+    expect(edition!.title).toBe('24-bit Remaster');
+    expect(edition!.year).toBe(2015);
+    expect(edition!.isRemaster).toBe(true);
+    expect(edition!.isUnknownEdition).toBe(false);
+  });
+
+  it('leaves the edition unknown when no edition metadata is supplied', async () => {
+    const user = await createUser('edu');
+    const community = await createCommunity();
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: baseInput(community.id)
+    });
+
+    const edition = await testPrisma.edition.findFirst({
+      where: { releaseId: result!.releaseId }
+    });
+    expect(edition!.isUnknownEdition).toBe(true);
+    expect(edition!.recordLabel).toBeNull();
+  });
+
+  it('creates one credit per collaborator with its mapped role', async () => {
+    const user = await createUser('roles');
+    const community = await createCommunity();
+
+    const result = await createContributionSubmission({
+      userId: user.id,
+      input: {
+        ...baseInput(community.id),
+        collaborators: [
+          { artist: 'Lead Singer', importance: 'Main artist' },
+          { artist: 'Featured Guest', importance: 'Guest artist' },
+          { artist: 'The Remixer', importance: 'Remixer' }
+        ]
+      }
+    });
+
+    const credits = await testPrisma.releaseArtist.findMany({
+      where: { releaseId: result!.releaseId },
+      include: { artist: true }
+    });
+    expect(credits).toHaveLength(3);
+    const roleByName = Object.fromEntries(
+      credits.map((c) => [c.artist.name, c.role])
+    );
+    expect(roleByName['Lead Singer']).toBe('Main');
+    expect(roleByName['Featured Guest']).toBe('Guest');
+    expect(roleByName['The Remixer']).toBe('Remixer');
   });
 });
 

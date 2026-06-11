@@ -26,6 +26,29 @@ const normalizeTags = (tags?: string): string[] => [
   )
 ];
 
+// UI role labels ("Main artist", "Remixer", legacy "main") → ArtistRole. Kept
+// tolerant of casing and a trailing "artist"/"artists"; anything unrecognised
+// (including the non-music "Creator"/"Contributor"/"Editor" labels) falls back
+// to Main so a credit is always created.
+const ROLE_BY_LABEL: Record<string, ArtistRole> = {
+  main: ArtistRole.Main,
+  guest: ArtistRole.Guest,
+  composer: ArtistRole.Composer,
+  conductor: ArtistRole.Conductor,
+  dj: ArtistRole.DJ,
+  remixer: ArtistRole.Remixer,
+  producer: ArtistRole.Producer,
+  arranger: ArtistRole.Arranger
+};
+
+const roleFromImportance = (importance: string): ArtistRole => {
+  const normalized = importance
+    .trim()
+    .toLowerCase()
+    .replace(/\s*artists?$/, '');
+  return ROLE_BY_LABEL[normalized] ?? ArtistRole.Main;
+};
+
 export const createContributionSubmission = async ({
   userId,
   input
@@ -47,6 +70,12 @@ export const createContributionSubmission = async ({
     releaseDescription,
     bitrate,
     media,
+    releaseCategory,
+    recordLabel,
+    catalogueNumber,
+    editionTitle,
+    editionYear,
+    isRemaster,
     hasLog,
     hasCue,
     isScene,
@@ -94,7 +123,20 @@ export const createContributionSubmission = async ({
     const collaboratorRecords = collaborators.map(
       (c) => artistMap.get(c.artist)!
     );
-    const primaryArtist = collaboratorRecords[0];
+
+    // One ReleaseArtist credit per collaborator with its mapped role, deduped
+    // on artist+role to respect the ReleaseArtist @@unique([releaseId, artistId,
+    // role]) constraint when the same artist is listed twice in one role.
+    const seenCredits = new Set<string>();
+    const creditData = collaborators.flatMap((c) => {
+      const artist = artistMap.get(c.artist)!;
+      const role = roleFromImportance(c.importance);
+      const key = `${artist.id}:${role}`;
+      if (seenCredits.has(key)) return [];
+      seenCredits.add(key);
+      return [{ artistId: artist.id, role }];
+    });
+
     const tagRecords =
       canonicalTags.length > 0
         ? await Promise.all(
@@ -115,24 +157,34 @@ export const createContributionSubmission = async ({
         year,
         type,
         releaseType:
-          type === ReleaseType.Music
+          releaseCategory ??
+          (type === ReleaseType.Music
             ? ReleaseCategory.Album
-            : ReleaseCategory.Unknown,
+            : ReleaseCategory.Unknown),
         image: image ?? null,
         description: description ?? releaseDescription ?? title,
         contributors: { connect: { id: contributor.id } },
-        credits: {
-          create: { artistId: primaryArtist.id, role: ArtistRole.Main }
-        }
+        credits: { create: creditData }
       }
     });
 
+    const hasEditionMeta = Boolean(
+      recordLabel ||
+        catalogueNumber ||
+        editionTitle ||
+        editionYear ||
+        isRemaster
+    );
     const edition = await tx.edition.create({
       data: {
         releaseId: release.id,
-        year,
+        title: editionTitle ?? null,
+        year: editionYear ?? year,
+        recordLabel: recordLabel ?? null,
+        catalogueNumber: catalogueNumber ?? null,
         media: media ?? null,
-        isUnknownEdition: true
+        isRemaster: isRemaster ?? false,
+        isUnknownEdition: !hasEditionMeta
       }
     });
 
