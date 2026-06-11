@@ -4,7 +4,7 @@ Welcome! We appreciate your interest in contributing to Stellar API. To keep the
 
 ## Workflow (fork model)
 
-Stellar is three repos developed together — `stellar-api`, `stellar-ui`, `stellar-compose` — using a **fork model**. See [ADR-0009](docs/adr/0009-fork-workflow-and-dependency-discipline.md) for the why.
+Stellar is three repos developed together — `stellar-api`, `stellar-ui`, `stellar-compose` — using a **fork model** with a single `main` trunk. See [ADR-0009](docs/adr/0009-fork-workflow-and-dependency-discipline.md) (fork remotes + dependency discipline) and [ADR-0010](docs/adr/0010-trunk-based-single-branch-workflow.md) (trunk-based workflow) for the why.
 
 **Remotes:** `origin` = your fork (`<you>/stellar-*`), `upstream` = `orphic-inc/stellar-*` (canonical). Never push to `upstream`; PRs go fork → upstream.
 
@@ -18,15 +18,15 @@ git remote add upstream git@github.com:orphic-inc/stellar-api.git   # or: git wi
 
 **Aliases** (install via the `~/.config/git/stellar-aliases.gitconfig` include):
 
-| alias                | does                                                                  |
-| -------------------- | --------------------------------------------------------------------- |
-| `git sync`           | fetch upstream, ff `develop` to `upstream/develop`, push to your fork |
-| `git feature <name>` | `sync` then branch off a fresh `develop`                              |
-| `git publish`        | push the current branch to your fork                                  |
-| `git opr`            | open a PR from the current branch into `upstream/develop`             |
-| `git remotes`        | show which remote is fork vs upstream                                 |
+| alias                | does                                                            |
+| -------------------- | --------------------------------------------------------------- |
+| `git sync`           | fetch upstream, ff `main` to `upstream/main`, push to your fork |
+| `git feature <name>` | `sync` then branch off a fresh `main`                           |
+| `git publish`        | push the current branch to your fork                            |
+| `git opr`            | open a PR from the current branch into `upstream/main`          |
+| `git remotes`        | show which remote is fork vs upstream                           |
 
-**Branches:** `develop` = integration (PR target) · `staging` = pre-prod · `main` = released. Promotion flows **up**; `main` never runs ahead of `develop`. Linear history on `develop` — **cut feature branches from `develop`, not `main`.**
+**Branches:** `main` is the only long-lived branch and the sole PR target — there is no `develop` or `staging`. **Cut feature branches from `main`** on your fork and PR into `upstream/main`; linear history (rebase-merge). `release/*` branches may live on `upstream` when a release needs coordination — the one sanctioned exception. See [ADR-0010](docs/adr/0010-trunk-based-single-branch-workflow.md).
 
 **Dependency bumps** are isolated (own branch/PR), pinned, ADR'd, and atomic with the regen/migration they force — never entangled with feature work (ADR-0009).
 
