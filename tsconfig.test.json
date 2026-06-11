@@ -1,0 +1,18 @@
+{
+  // Type-checks the whole tree INCLUDING test files. The base tsconfig excludes
+  // *.spec.ts / *.integration.ts / src/test, so `tsc --noEmit` never catches
+  // type errors in tests — they only surface at ts-jest runtime. CI runs this
+  // (`npm run typecheck:test`) so test-only type breakage fails fast.
+  //
+  // module/moduleResolution are overridden to match how ts-jest executes the
+  // tests (commonjs/node), not the NodeNext build config — otherwise extension-
+  // less imports in tests trip TS2835 false positives.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist"]
+}

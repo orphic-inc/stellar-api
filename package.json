@@ -1,7 +1,7 @@
 {
   "name": "@stellar/api",
   "private": true,
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Stellar API",
   "author": "ayan4m1 <andrew@bulletlogic.com>, Kyle O'Brien <obrienk@webbhost.net>",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --esm",
     "watch": "tsc -w",
     "lint": "eslint src --ext .ts",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "format": "prettier --write src",
     "test": "jest --forceExit",
     "test:watch": "jest --watch --forceExit",
