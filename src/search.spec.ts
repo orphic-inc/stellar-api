@@ -71,7 +71,7 @@ describe('GET /api/search/releases', () => {
     await request(app).get('/api/search/releases?bitrate=Kbps320&media=CD');
     const call = prismaMock.release.findMany.mock.calls[0][0];
     expect(call?.where).toMatchObject({
-      contributions: { some: { bitrate: 'Kbps320' } },
+      contributions: { some: { releaseFile: { bitrate: 'Kbps320' } } },
       editions: { some: { media: 'CD' } }
     });
   });
@@ -104,7 +104,7 @@ describe('GET /api/search/releases', () => {
     expect(prismaMock.release.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          contributions: { some: { hasLog: true } }
+          contributions: { some: { releaseFile: { hasLog: true } } }
         })
       })
     );
@@ -182,8 +182,10 @@ describe('GET /api/search/releases', () => {
           contributions: {
             some: expect.objectContaining({
               type: 'flac',
-              hasCue: true,
-              isScene: true
+              releaseFile: expect.objectContaining({
+                hasCue: true,
+                isScene: true
+              })
             })
           }
         })

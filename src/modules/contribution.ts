@@ -209,10 +209,14 @@ export const createContributionSubmission = async ({
         type: fileType as FileType,
         downloadUrl,
         sizeInBytes: sizeInBytes ?? null,
-        bitrate: bitrate ?? null,
-        hasLog: hasLog ?? false,
-        hasCue: hasCue ?? false,
-        isScene: isScene ?? false,
+        releaseFile: {
+          create: {
+            bitrate: bitrate ?? null,
+            hasLog: hasLog ?? false,
+            hasCue: hasCue ?? false,
+            isScene: isScene ?? false
+          }
+        },
         collaborators: {
           connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
         }
@@ -228,10 +232,9 @@ export const createContributionSubmission = async ({
         linkStatus: true,
         linkCheckedAt: true,
         type: true,
-        bitrate: true,
-        hasLog: true,
-        hasCue: true,
-        isScene: true,
+        releaseFile: {
+          select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
+        },
         createdAt: true,
         updatedAt: true,
         user: { select: { id: true, username: true } },
@@ -306,10 +309,14 @@ export const addContributionToRelease = async ({
           downloadUrl: input.downloadUrl,
           sizeInBytes: input.sizeInBytes ?? null,
           releaseDescription: input.releaseDescription,
-          bitrate: input.bitrate ?? null,
-          hasLog: input.hasLog ?? false,
-          hasCue: input.hasCue ?? false,
-          isScene: input.isScene ?? false
+          releaseFile: {
+            create: {
+              bitrate: input.bitrate ?? null,
+              hasLog: input.hasLog ?? false,
+              hasCue: input.hasCue ?? false,
+              isScene: input.isScene ?? false
+            }
+          }
         },
         select: {
           id: true,
@@ -322,10 +329,14 @@ export const addContributionToRelease = async ({
           linkStatus: true,
           linkCheckedAt: true,
           type: true,
-          bitrate: true,
-          hasLog: true,
-          hasCue: true,
-          isScene: true,
+          releaseFile: {
+            select: {
+              bitrate: true,
+              hasLog: true,
+              hasCue: true,
+              isScene: true
+            }
+          },
           createdAt: true,
           updatedAt: true,
           user: { select: { id: true, username: true } },
