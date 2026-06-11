@@ -426,6 +426,33 @@ export async function cleanupRun(
     failedItems
   );
 
+  // 8b. ReleaseArtist credits + Editions (music remodel #72).
+  //     Both have non-cascading FKs to Release; ReleaseArtist also references
+  //     Artist; Edition is referenced by Contribution (deleted in step 7).
+  //     Delete by relation (not tracked IDs) so credits/editions are caught
+  //     even if the generator never tracked them individually.
+  deletedCounts['ReleaseArtist'] = await safeDeleteMany(
+    () =>
+      prisma.releaseArtist.deleteMany({
+        where: {
+          OR: [
+            { releaseId: { in: getIds('Release') } },
+            { artistId: { in: getIds('Artist') } }
+          ]
+        }
+      }),
+    'ReleaseArtist',
+    failedItems
+  );
+  deletedCounts['Edition'] = await safeDeleteMany(
+    () =>
+      prisma.edition.deleteMany({
+        where: { releaseId: { in: getIds('Release') } }
+      }),
+    'Edition',
+    failedItems
+  );
+
   // 9. Releases
   deletedCounts['Release'] = await safeDeleteMany(
     () =>
