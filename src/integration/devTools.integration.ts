@@ -118,6 +118,29 @@ describe('runGeneration — minimal isolated', () => {
     expect(communityRecords).toBe(result.summary['Community']);
   }, 120_000);
 
+  it('stamps generated users with the seeded-avatar sentinel the UI maps', async () => {
+    const result = await runGeneration(MINIMAL_ISOLATED, actorId);
+
+    const records = await testPrisma.devSeedRecord.findMany({
+      where: { runId: result.runId, entityType: 'User' },
+      select: { pk: true }
+    });
+    // pk is JSON: { id: <number> } for User records.
+    const ids = records.map((r) => (r.pk as { id: number }).id);
+    const users = await testPrisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { avatar: true }
+    });
+
+    // Contract: generated users carry the 'seeded' sentinel so stellar-ui's
+    // avatarSrc() maps them to the distinct seeded.png (not the shared default).
+    // Must stay in sync with SEEDED_AVATAR_SENTINEL in stellar-ui
+    // src/utils/avatar.ts. (Regression: the generator briefly stored null,
+    // making seeded users indistinguishable from real null-avatar accounts.)
+    expect(users.length).toBeGreaterThan(0);
+    for (const u of users) expect(u.avatar).toBe('seeded');
+  }, 120_000);
+
   it('dry run returns estimates without writing any rows', async () => {
     const result = await runGeneration(
       { ...MINIMAL_ISOLATED, dryRun: true },

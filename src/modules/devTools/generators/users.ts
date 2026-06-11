@@ -34,12 +34,13 @@ import {
 } from '../contentFactory';
 import { trackCreate, appendWarning } from '../tracking';
 
-// Seed users store no avatar and fall back to the shared default in the UI,
-// exactly like real null-avatar accounts. (The previous `'seeded'` sentinel
-// rendered as a broken <img src="seeded"> — no UI mapper existed — and the
-// hardcoded `/static/.../seeded.jpg` path 404s where no such asset is served.
-// A distinct seeded avatar needs a real asset placed alongside default.png.)
-const SEEDED_AVATAR: string | null = null;
+// Seed users carry the 'seeded' sentinel so generated test accounts are
+// visually obvious. stellar-ui's avatarSrc() (src/utils/avatar.ts,
+// SEEDED_AVATAR_SENTINEL) maps it to the distinct bundled seeded.png. This
+// briefly stored null — back when no UI mapper/asset existed and the sentinel
+// rendered as a broken <img src="seeded"> — but #59/#68 landed the mapper +
+// seeded.png, so the value is restored. Keep it in sync with the UI sentinel.
+const SEEDED_AVATAR: string | null = 'seeded';
 
 // User archetype distribution
 const ARCHETYPES = [
