@@ -9,6 +9,11 @@ All notable changes to stellar-api are documented here.
 ### Added
 
 - **Contribution submission parity** — `POST /contributions` now accepts the full legacy upload-form metadata: release category (Album/Single/EP/…), record label, catalogue number, and edition info (title/year/remaster), persisting them to the `Release`/`Edition` tier. Each collaborator is credited as a role-typed `ReleaseArtist` (Main/Guest/Remixer/…, mapped case-insensitively) instead of only the first artist as Main [#72].
+- `GET /health` now reports the running API `version`, sourced from the manifest via `lib/version.ts`.
+
+### Fixed
+
+- OpenAPI `info.version` is now derived from the manifest (`lib/version.ts`) instead of a hardcoded `0.1.0` — the Swagger doc was advertising a version three minor releases stale.
 
 ---
 
