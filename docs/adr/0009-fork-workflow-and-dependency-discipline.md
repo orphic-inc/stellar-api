@@ -1,6 +1,6 @@
 # Fork-model multi-repo workflow + dependency-bump discipline
 
-**Status: Accepted.**
+**Status: Accepted — branch model superseded by [ADR-0010](0010-trunk-based-single-branch-workflow.md) (2026-06-11).** The fork-remote model and dependency-bump discipline below remain in force; the `develop`/`staging`/`main` promotion model (the "Branches — `develop` is the integration trunk" section) is retired in favour of a single `main` trunk.
 
 Stellar is three repos developed in lockstep — `stellar-api`, `stellar-ui`, `stellar-compose`. Two recurring failure modes motivated pinning the workflow: (1) **remote/clone ambiguity** — parallel clone-sets where `origin` meant the fork in one and the org in another, so `origin/develop` was ambiguous; and (2) a **dependency bump that "transcended the whole tree"** (the prisma6/openssl3 upgrade entangled schema regen, the Docker base image, and migrations with unrelated feature work).
 
