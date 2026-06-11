@@ -11,6 +11,7 @@ import cors from 'cors';
 import { getLogger } from './modules/logging';
 import { http, sentry } from './modules/config';
 import { prisma } from './lib/prisma';
+import { appVersion } from './lib/version';
 import { asyncHandler } from './modules/asyncHandler';
 
 if (sentry.dsn) {
@@ -103,7 +104,7 @@ export const createApp = () => {
     '/health',
     asyncHandler(async (_req: Request, res: Response) => {
       await prisma.$queryRaw`SELECT 1`;
-      res.json({ status: 'ok', db: 'ok' });
+      res.json({ status: 'ok', db: 'ok', version: appVersion });
     })
   );
 

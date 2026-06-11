@@ -4,6 +4,7 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { appVersion } from './version';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -6605,7 +6606,7 @@ export function buildOpenApiDocument() {
     openapi: '3.0.0',
     info: {
       title: 'Stellar API',
-      version: '0.1.0',
+      version: appVersion,
       description:
         'REST API for the Stellar community tracker. All routes under `/api/*`. ' +
         'Authentication uses JWT cookies (`token` cookie set on login).'
