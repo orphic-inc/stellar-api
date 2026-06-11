@@ -58,13 +58,16 @@ const createContribution = async (userId: number, sizeBytes = 1_000_000) => {
   });
   const release = await testPrisma.release.create({
     data: {
-      artistId: artist.id,
       title: `DL-Release-${Date.now()}`,
       description: 'desc',
       type: ReleaseType.Music,
       releaseType: 'Album',
-      year: 2020
+      year: 2020,
+      credits: { create: { artistId: artist.id } }
     }
+  });
+  const edition = await testPrisma.edition.create({
+    data: { releaseId: release.id }
   });
   const contributor = await testPrisma.contributor.upsert({
     where: { userId },
@@ -76,6 +79,7 @@ const createContribution = async (userId: number, sizeBytes = 1_000_000) => {
       userId,
       releaseId: release.id,
       contributorId: contributor.id,
+      editionId: edition.id,
       type: FileType.flac,
       downloadUrl: 'https://example.com/file.torrent',
       sizeInBytes: sizeBytes,

@@ -30,12 +30,12 @@ const createUser = async (tag: string) => {
 const createRelease = async (artistId: number) =>
   testPrisma.release.create({
     data: {
-      artistId,
       title: `Release-${Date.now()}-${Math.random()}`,
       description: 'desc',
       type: ReleaseType.Music,
       releaseType: ReleaseCategory.Album,
-      year: 2020
+      year: 2020,
+      credits: { create: { artistId } }
     }
   });
 

@@ -39,6 +39,14 @@ _Avoid_: link uptime, seeding status, alive link
 The staff-approved, 72h-matured contribution bytes that are also effectively available, summed per user to form the **coverage** term that lowers their required ratio. Revocable: bytes leave the pool when a contribution goes `FAIL`.
 _Avoid_: contribution credit, ratio bonus, approved bytes
 
+**Contribution Spine**:
+The generic `Contribution` model — the type-agnostic unit of shared content (a Download URL) carried across every CommunityType. Holds only fields every Contribution has (ids, `downloadUrl`, `sizeInBytes`, `linkStatus`, the `type` format discriminator, accounting). A Release is the primary Contribution type; Film/eLearning/ApiPlugin follow. Type-specific metadata lives in satellite models, never on the spine (ADR-0008).
+_Avoid_: contribution table, base contribution, release row
+
+**Release File**:
+The per-file rip-metadata satellite (`ReleaseFile`, 1:1 with a music Contribution): `bitrate`, `hasLog`, `hasCue`, `isScene` — the fingerprint the quality grade reads. Per-file, so distinct from the per-pressing `Edition`. The music analog of the satellite each future Contribution type attaches.
+_Avoid_: contribution metadata, file info, rip record
+
 **Ratio Mechanism**:
 The standalone `contributed`/`consumed` download gate (required-ratio brackets + the `OK/WATCH/LEECH_DISABLED` policy). Distinct from **RatioScore**. The Ratio Mechanism never reads CRS.
 _Avoid_: ratio score, ratio policy (when meaning the whole gate)
@@ -61,6 +69,7 @@ _Avoid_: cross-score, bonus link, coupling
 - An **Identity State** acts as an authorized gateway, validating if a request can access or mutate a specific database record via the **Data Client**.
 - **Sanitized Values** must be extracted at the Controller layer using **Contract Schemas** before execution by domain services.
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
+- A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
 
 ## Flagged Ambiguities
 

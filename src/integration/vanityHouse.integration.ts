@@ -49,13 +49,13 @@ describe('vanity house toggle', () => {
     const vh = await testPrisma.artist.findMany({
       where: { vanityHouse: true },
       orderBy: { name: 'asc' },
-      include: { _count: { select: { releases: true } } }
+      include: { _count: { select: { credits: true } } }
     });
 
     const ids = vh.map((a) => a.id);
     expect(ids).toContain(a1.id);
     expect(ids).not.toContain(a2.id);
-    expect(vh[0]._count).toHaveProperty('releases');
+    expect(vh[0]._count).toHaveProperty('credits');
   });
 
   it('throws when updating a non-existent artist', async () => {
