@@ -541,6 +541,7 @@ const PublicProfile = registry.register(
     isDonor: z.boolean(),
     disabled: z.boolean(),
     warned: z.string().nullable(),
+    standing: z.enum(['pristine', 'clean', 'neutral', 'poor', 'hammer']),
     inviteCount: z.number().nullable(),
     staffBio: z.string().nullable(),
     stats: ProfileStats,
