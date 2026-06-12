@@ -69,7 +69,7 @@ GoldenRule (site-wide, 1..7)
 ## Red-green descent targets
 
 1. **Rule model** — a `Rule`/`SubRule` tree with a CRS-weight field + a pure `ruleImpact(...)` function (table-driven, mirroring the PRD-03 stylesheet slice).
-2. **Warning/Ban model** + standing computation (ADR-0004).
+2. ~~**Warning/Ban model** + standing computation (ADR-0004).~~ **Standing computation shipped: [#124](https://github.com/orphic-inc/stellar-api/issues/124).** Pure `computeStanding()` (`src/modules/standing.ts`) rolls active `UserWarning` rows (accrual + expiry) and ban state into the 5-tier `Standing` that `ruleImpact()` (#1) consumes; surfaced on the profile read path (`PublicProfile.standing`). Thresholds are ADR-0004 placeholders (TBD). The fuller Warning/Ban _entity_ model (suspensions, escalation ladder, ban-evasion linkage) remains for ADR-0004 to finalize — this slice computes standing over the existing `UserWarning` + `banDate`.
 3. **Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new.
 
 ## Open questions
