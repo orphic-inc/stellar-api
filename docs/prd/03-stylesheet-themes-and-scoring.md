@@ -46,7 +46,7 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 **Staff** (context): community staff earn **+50 CRS per week served** (Standards/Communities — cross-ref PRD-01).
 
-**Friends × Stylesheet — controlled vector (decided).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — *separate from and additive to* the stylesheet-dimension weights above:
+**Friends × Stylesheet — controlled vector (decided).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — _separate from and additive to_ the stylesheet-dimension weights above:
 
 - **Adopter: +0.2** (rewards active, organic curation — the adopter earns slightly more than the author, to favour participation).
 - **Author: +0.1** (recognition that someone vouched for your sheet).
@@ -74,15 +74,15 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Concept → existing code (the descent map)
 
-| Concept                                             | Lives in                                                                                                                                            |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CRS / CommunityScore                                | [PRD-01](01-Community-Score.md), [#75](https://github.com/orphic-inc/stellar-api/issues/75), `statsHistory.ts`, `getCommunityHealthPulse`           |
-| Stylesheet model + admin                            | `schemas/stylesheet.ts`, `schemas/profile.ts`, [#34](https://github.com/orphic-inc/stellar-api/issues/34) (closed), stellar-ui `StylesheetInjector` |
-| LinkHealth + bonus                                  | `linkHealth.ts`, `linkHealthJob.ts`, branch `feat/community-health-pulse`                                                                           |
-| ContributionScore / quality                         | [#76](https://github.com/orphic-inc/stellar-api/issues/76), branch `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102))                                               |
-| AccountingLedger / ratio                            | `ratio.ts`, `ratioPolicy.ts`, BigInt sizeInBytes ([#81](https://github.com/orphic-inc/stellar-api/pull/81))                                         |
-| Top10 / Wiki / Announce                             | `top10.ts`, wiki workbench, `schemas/announcement.ts`                                                                                               |
-| **AuthorStylesheetUrl, IRC scoring, exact weights** | **net-new** (this PRD)                                                                                                                              |
+| Concept                                             | Lives in                                                                                                                                                          |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CRS / CommunityScore                                | [PRD-01](01-Community-Score.md), [#75](https://github.com/orphic-inc/stellar-api/issues/75), `statsHistory.ts`, `getCommunityHealthPulse`                         |
+| Stylesheet model + admin                            | `schemas/stylesheet.ts`, `schemas/profile.ts`, [#34](https://github.com/orphic-inc/stellar-api/issues/34) (closed), stellar-ui `StylesheetInjector`               |
+| LinkHealth + bonus                                  | `linkHealth.ts`, `linkHealthJob.ts`, branch `feat/community-health-pulse`                                                                                         |
+| ContributionScore / quality                         | [#76](https://github.com/orphic-inc/stellar-api/issues/76), branch `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102)) |
+| AccountingLedger / ratio                            | `ratio.ts`, `ratioPolicy.ts`, BigInt sizeInBytes ([#81](https://github.com/orphic-inc/stellar-api/pull/81))                                                       |
+| Top10 / Wiki / Announce                             | `top10.ts`, wiki workbench, `schemas/announcement.ts`                                                                                                             |
+| **AuthorStylesheetUrl, IRC scoring, exact weights** | **net-new** (this PRD)                                                                                                                                            |
 
 ## Out of scope (other PRDs)
 
@@ -95,7 +95,10 @@ First testable slices (much of the substrate already exists):
 1. ✅ **Stylesheet selection → CRS accrual** — pure `scoreStylesheetSelection` (no DB), table-driven over each multiplier. **Shipped: [#84](https://github.com/orphic-inc/stellar-api/pull/84)** (tier-0 multipliers; external/self decisions applied).
 2. **Tiering escalation** — the curve that compounds the base multipliers as a user climbs tiers (the `/verbiagating`-style ladder). Next slice; curve TBD.
 3. **Dead-external penalty** — link-health-driven negative CRS for a dead `externalStylesheet`; red-green once the penalty magnitude is set.
-4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual. **Currently the keystone gap:** `scoreStylesheetSelection` (shipped #84) is wired to *nothing* — no `AuthorStylesheet` model, no adopt event. This slice wires it, and **unblocks** the Friends×Stylesheet controlled vector + the `CRS_*` adoption ledger (PRD-01 / ADR-0007), which have no event to hook onto until adoption exists.
+4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual. **Currently the keystone gap:** `scoreStylesheetSelection` (shipped #84) is wired to _nothing_ — no `AuthorStylesheet` model, no adopt event. This slice wires it, and **unblocks** the Friends×Stylesheet controlled vector + the `CRS_*` adoption ledger (PRD-01 / ADR-0007), which have no event to hook onto until adoption exists.
+   - **4a. Save** — ~~`AuthorStylesheet` model + `POST`/`GET /stylesheet/author`; create→fetch round-trip; no CRS wiring.~~ **Shipped: [#118](https://github.com/orphic-inc/stellar-api/issues/118) ([PR #127](https://github.com/orphic-inc/stellar-api/pull/127)).** The model `scoreStylesheetSelection` had nothing to hook onto now exists.
+   - **4b. Adopt** — [#119](https://github.com/orphic-inc/stellar-api/issues/119): a user adopts another's AuthorStylesheet (the adoption event). _Blocked on 4a — now unblocked._
+   - **4c. Score-on-adopt** — [#120](https://github.com/orphic-inc/stellar-api/issues/120): wire the adopt event into `scoreStylesheetSelection` → author/site accrual + the Friends×Stylesheet vector. _Blocked on 4b._
 5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions
