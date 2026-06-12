@@ -50,12 +50,12 @@ The Release model must be air-tight **before** the Contribution/Community spine 
 
 1. ~~**Land #85**~~ (done, via #98) + ~~**land the grade**~~ (#102, supersedes #86) — the models, then the grade. The grade reads the `ReleaseFile` satellite.
 2. **Quality grade → CRS weight** — pure scoring function (table-driven, mirroring the PRD-03 stylesheet slice) once the weighting is set.
-3. **`releaseDescription` → structured fields** — migration + stellar-ui form (keep free-text as an optional supplement? — TBD).
+3. ~~**`releaseDescription` → structured fields**~~ — **done**: `POST /contributions` accepts `releaseCategory` → `Release.releaseType`, `recordLabel`/`catalogueNumber`/edition info → `Edition`, and per-artist role credits → `ReleaseArtist`; the accessible stellar-ui contribute form drives them (stellar-api [#113](https://github.com/orphic-inc/stellar-api/pull/113) + stellar-ui [#70](https://github.com/orphic-inc/stellar-ui/pull/70)). `releaseDescription` is **kept as an optional supplement** (resolves the open question below).
 4. ~~**Type the bitrate** (#72)~~ — **done**: `Bitrate` enum on the `ReleaseFile` satellite ([ADR-0008](../adr/0008-contribution-metadata-satellites.md)).
 
 ## Open questions
 
 - Confirm the enum sets: `ReleaseType`, `ReleaseCategory`, `ArtistRole`, edition tiers.
-- Keep `releaseDescription` free-text as a supplement alongside the structured fields, or drop it?
+- ~~Keep `releaseDescription` free-text as a supplement alongside the structured fields, or drop it?~~ **Resolved: kept as an optional supplement** (descent target #3).
 - Quality-grade → CRS magnitude (TBD; PRD-01 / ADR-0002).
 - ~~Does the `releaseDescription`→structured migration warrant its own ADR?~~ — **yes**: [ADR-0008](../adr/0008-contribution-metadata-satellites.md) records the Contribution spine / Edition / per-file-satellite tiering.
