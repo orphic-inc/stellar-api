@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import * as Sentry from '@sentry/node';
 import jwt from 'jsonwebtoken';
 import { auth as authConfig } from '../modules/config';
 import { prisma } from '../lib/prisma';
 import { computeUserRankAccess } from '../lib/userRankAccess';
+import { userContextFromRequest } from '../lib/sentry';
 
 interface JwtPayload {
   user: { id: number; sessionId?: string };
@@ -91,6 +93,8 @@ export const requireAuth = async (
       permittedForumIds: rankAccess.permittedForumIds,
       permissions: rankAccess.permissions as Record<string, boolean>
     };
+    // Attach who-hit-this to the request's Sentry scope for error context.
+    Sentry.setUser(userContextFromRequest(req));
     next();
   } catch {
     res.status(401).json({ msg: 'Token is not valid' });

@@ -12,10 +12,16 @@ import { getLogger } from './modules/logging';
 import { http, sentry } from './modules/config';
 import { prisma } from './lib/prisma';
 import { appVersion } from './lib/version';
+import { sentryBeforeSend } from './lib/sentry';
 import { asyncHandler } from './modules/asyncHandler';
 
 if (sentry.dsn) {
-  Sentry.init({ dsn: sentry.dsn });
+  Sentry.init({
+    dsn: sentry.dsn,
+    release: appVersion,
+    environment: process.env.NODE_ENV ?? 'development',
+    beforeSend: sentryBeforeSend
+  });
 }
 import { isInstalled } from './modules/installState';
 import { writeLimiter } from './middleware/rateLimiter';
