@@ -12,20 +12,27 @@ import {
 import {
   stylesheetSchema,
   stylesheetUpdateSchema,
+  authorStylesheetSchema,
   type StylesheetInput,
-  type StylesheetUpdateInput
+  type StylesheetUpdateInput,
+  type AuthorStylesheetInput
 } from '../../schemas/stylesheet';
 import {
   createStylesheet,
   updateStylesheet,
   deleteStylesheet,
-  getStylesheetStats
+  getStylesheetStats,
+  createAuthorStylesheet,
+  getAuthorStylesheets
 } from '../../modules/stylesheet';
 import { prisma } from '../../lib/prisma';
 
 const router = express.Router();
 const stylesheetIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
+});
+const authorParamsSchema = z.object({
+  authorId: z.coerce.number().int().positive()
 });
 
 // GET /api/stylesheet/admin/stats — must be before /:id
@@ -47,6 +54,36 @@ router.get(
       orderBy: { createdAt: 'asc' }
     });
     res.json(stylesheets);
+  })
+);
+
+// ─── AuthorStylesheet (PRD-03 #4a) — must be before /:id ──────────────────────
+
+// POST /api/stylesheet/author — save the authed user's own named stylesheet
+router.post(
+  '/author',
+  requireAuth,
+  validate(authorStylesheetSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const data = parsedBody<AuthorStylesheetInput>(res);
+    const created = await createAuthorStylesheet(req.user!.id, {
+      name: data.name,
+      description: data.description ?? '',
+      source: data.source
+    });
+    res.status(201).json(created);
+  })
+);
+
+// GET /api/stylesheet/author/:authorId — read an author's saved stylesheets
+router.get(
+  '/author/:authorId',
+  requireAuth,
+  validateParams(authorParamsSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { authorId } = parsedParams<{ authorId: number }>(res);
+    const sheets = await getAuthorStylesheets(authorId);
+    res.json(sheets);
   })
 );
 

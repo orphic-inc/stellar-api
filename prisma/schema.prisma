@@ -436,6 +436,7 @@ model User {
   rulesPagesAuthored       RulesPage[]                      @relation("RulesPageAuthor")
   userStatSnapshots        UserStatSnapshot[]
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
+  authorStylesheets        AuthorStylesheet[]               @relation("AuthorStylesheets")
 
   @@index([userRankId])
   @@map("users")
@@ -519,6 +520,26 @@ model Stylesheet {
   createdAt   DateTime @default(now())
 
   @@map("stylesheets")
+}
+
+/// A user-authored, named stylesheet saved for others to adopt (PRD-03 #4a,
+/// keystone slice — docs/prd/03-stylesheet-themes-and-scoring.md). This is the
+/// model `scoreStylesheetSelection` (shipped #84) had nothing to hook onto.
+/// One author may save several sheets; (authorId, name) is unique. No CRS wiring
+/// yet — the adopt → accrual hook is descent-target #4c (#120).
+model AuthorStylesheet {
+  id          Int      @id @default(autoincrement())
+  authorId    Int
+  author      User     @relation("AuthorStylesheets", fields: [authorId], references: [id], onDelete: Cascade)
+  name        String
+  description String   @default("")
+  source      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([authorId, name])
+  @@index([authorId])
+  @@map("author_stylesheets")
 }
 
 // ─── Forum ────────────────────────────────────────────────────────────────────

@@ -80,3 +80,25 @@ export const deleteStylesheet = async (id: number) => {
     throw new AppError(400, 'Cannot delete the default stylesheet');
   await prisma.stylesheet.delete({ where: { id } });
 };
+
+// ─── AuthorStylesheet (PRD-03 #4a) ────────────────────────────────────────────
+// User-owned, named stylesheets saved for others to adopt. No CRS wiring yet —
+// the adopt → scoreStylesheetSelection accrual hook is descent-target #4c (#120).
+
+export const createAuthorStylesheet = async (
+  authorId: number,
+  data: { name: string; description: string; source: string }
+) => {
+  const existing = await prisma.authorStylesheet.findUnique({
+    where: { authorId_name: { authorId, name: data.name } }
+  });
+  if (existing)
+    throw new AppError(409, 'You already have a stylesheet with that name');
+  return prisma.authorStylesheet.create({ data: { authorId, ...data } });
+};
+
+export const getAuthorStylesheets = async (authorId: number) =>
+  prisma.authorStylesheet.findMany({
+    where: { authorId },
+    orderBy: { createdAt: 'asc' }
+  });

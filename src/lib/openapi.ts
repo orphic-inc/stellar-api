@@ -39,7 +39,8 @@ import {
 } from '../schemas/artist';
 import {
   stylesheetSchema,
-  stylesheetUpdateSchema
+  stylesheetUpdateSchema,
+  authorStylesheetSchema
 } from '../schemas/stylesheet';
 import {
   subscribeSchema,
@@ -1260,6 +1261,19 @@ const StylesheetStat = registry.register(
   })
 );
 
+const AuthorStylesheet = registry.register(
+  'AuthorStylesheet',
+  z.object({
+    id: z.number(),
+    authorId: z.number(),
+    name: z.string(),
+    description: z.string(),
+    source: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
 registry.registerPath({
   method: 'get',
   path: '/announcements',
@@ -1575,6 +1589,46 @@ registry.registerPath({
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/stylesheet/author',
+  tags: ['Stylesheets'],
+  description: "Save the authed user's own named, adoptable stylesheet",
+  request: {
+    body: {
+      content: { 'application/json': { schema: authorStylesheetSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'AuthorStylesheet created',
+      content: { 'application/json': { schema: AuthorStylesheet } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    409: {
+      description: 'Author already has a stylesheet with that name',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/author/{authorId}',
+  tags: ['Stylesheets'],
+  description: "Read an author's saved stylesheets",
+  request: { params: z.object({ authorId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Author stylesheets',
+      content: { 'application/json': { schema: z.array(AuthorStylesheet) } }
     }
   }
 });

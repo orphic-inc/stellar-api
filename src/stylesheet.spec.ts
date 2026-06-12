@@ -338,3 +338,101 @@ describe('DELETE /api/stylesheet/:id', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ─── AuthorStylesheet (PRD-03 #4a) ────────────────────────────────────────────
+
+const makeAuthorStylesheet = (overrides = {}) => ({
+  id: 1,
+  authorId: 7,
+  name: 'my-theme',
+  description: 'A theme I made',
+  source: 'body { background: #111; }',
+  createdAt: new Date('2026-06-12'),
+  updatedAt: new Date('2026-06-12'),
+  ...overrides
+});
+
+describe('POST /api/stylesheet/author', () => {
+  it('saves the authed user’s stylesheet and returns 201', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+    prismaMock.authorStylesheet.create.mockResolvedValue(
+      makeAuthorStylesheet() as never
+    );
+
+    const res = await request(app).post('/api/stylesheet/author').send({
+      name: 'my-theme',
+      description: 'A theme I made',
+      source: 'body { background: #111; }'
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('my-theme');
+    expect(res.body.authorId).toBe(7);
+    expect(prismaMock.authorStylesheet.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          authorId: 7,
+          name: 'my-theme',
+          source: 'body { background: #111; }'
+        })
+      })
+    );
+  });
+
+  it('returns 409 when the author already has a sheet with that name', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue(
+      makeAuthorStylesheet() as never
+    );
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'my-theme', source: 'body {}' });
+
+    expect(res.status).toBe(409);
+    expect(prismaMock.authorStylesheet.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when source is missing', async () => {
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'my-theme' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when name is empty', async () => {
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: '', source: 'body {}' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/stylesheet/author/:authorId', () => {
+  it('reads an author’s saved stylesheets back', async () => {
+    prismaMock.authorStylesheet.findMany.mockResolvedValue([
+      makeAuthorStylesheet(),
+      makeAuthorStylesheet({ id: 2, name: 'second' })
+    ] as never);
+
+    const res = await request(app).get('/api/stylesheet/author/7');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].name).toBe('my-theme');
+    expect(prismaMock.authorStylesheet.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { authorId: 7 } })
+    );
+  });
+
+  it('returns an empty array when the author has none', async () => {
+    prismaMock.authorStylesheet.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/stylesheet/author/99');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+
+  it('returns 400 for a non-numeric authorId', async () => {
+    const res = await request(app).get('/api/stylesheet/author/not-a-number');
+    expect(res.status).toBe(400);
+  });
+});
