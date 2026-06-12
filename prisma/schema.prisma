@@ -2145,6 +2145,52 @@ model RulesPage {
   @@map("rules_pages")
 }
 
+/// The composable, CRS-weighted rule tree (PRD-05 #1 — the governance substrate
+/// in docs/prd/05-rules-and-governance.md). A `Rule` is a node (e.g. one of the 7
+/// GoldenRules); each carries its own compliance/violation CRS micro-impact so
+/// governance is data-driven, not hardcoded. The pure `ruleImpact()` scorer
+/// (src/modules/ruleImpact.ts) reads these weights — no logic lives in the row.
+/// Magnitudes are PRD-05 TBD; the model is the shape, the values are placeholders.
+model Rule {
+  id          Int    @id @default(autoincrement())
+  /// Machine-stable key, e.g. "golden.accounts" — distinct from the display title.
+  code        String @unique @db.VarChar(100)
+  title       String @db.VarChar(200)
+  description String @default("") @db.Text
+  /// CRS reward when the rule is adhered to (>= 0). Magnitude PRD-05 TBD.
+  complianceWeight Float @default(0)
+  /// CRS penalty magnitude when the rule is breached (>= 0; ruleImpact negates it).
+  violationWeight  Float @default(0)
+  sortOrder        Int   @default(0)
+  subRules         SubRule[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("rules")
+}
+
+/// A child node of a `Rule` (PRD-05: "5 rules with 2 SubRules each"). Its weight
+/// composes additively on top of its parent rule's in `ruleImpact()`.
+model SubRule {
+  id          Int    @id @default(autoincrement())
+  ruleId      Int
+  rule        Rule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  /// Stable key, unique within the parent rule (e.g. "no-sharing").
+  code        String @db.VarChar(100)
+  title       String @db.VarChar(200)
+  description String @default("") @db.Text
+  complianceWeight Float @default(0)
+  violationWeight  Float @default(0)
+  sortOrder        Int   @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([ruleId, code])
+  @@index([ruleId])
+  @@map("sub_rules")
+}
+
 // ─── Top 10 ───────────────────────────────────────────────────────────────────
 
 model ReleaseVote {

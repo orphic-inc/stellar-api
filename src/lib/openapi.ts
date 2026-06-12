@@ -5119,6 +5119,56 @@ const RulesPage = registry.register(
   })
 );
 
+// PRD-05 #1 — the composable, CRS-weighted rule tree (Rule + nested SubRule).
+const SubRule = registry.register(
+  'SubRule',
+  z.object({
+    id: z.number(),
+    ruleId: z.number(),
+    code: z.string(),
+    title: z.string(),
+    description: z.string(),
+    complianceWeight: z.number(),
+    violationWeight: z.number(),
+    sortOrder: z.number(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+const Rule = registry.register(
+  'Rule',
+  z.object({
+    id: z.number(),
+    code: z.string(),
+    title: z.string(),
+    description: z.string(),
+    complianceWeight: z.number(),
+    violationWeight: z.number(),
+    sortOrder: z.number(),
+    subRules: z.array(SubRule),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/rules/tree',
+  tags: ['Rules'],
+  description: 'The composable Rule/SubRule tree with CRS weights (PRD-05 #1)',
+  responses: {
+    200: {
+      description: 'Rule tree, each rule with its nested sub-rules',
+      content: {
+        'application/json': {
+          schema: z.object({ rules: z.array(Rule) })
+        }
+      }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/rules',
