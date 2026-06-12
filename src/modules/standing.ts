@@ -32,7 +32,12 @@ export interface StandingInput {
   warnings: WarningRecord[];
   /** True when the user is banned (`User.banDate` is set). */
   banned: boolean;
-  /** ADR-0004 ban-evasion linkage signal — the worst standing (optional). */
+  /**
+   * ADR-0004 ban-evasion linkage signal — the worst standing. NOT yet fed by any
+   * caller: the invite-tree/account linkage that would set it is the unfinished
+   * part of ADR-0004's entity model. Wired here as the seam (and unit-tested) so
+   * the computation is ready; until that model lands it is always undefined.
+   */
   banEvasion?: boolean;
   /** Clock for expiry evaluation — passed in to keep the function pure. */
   now: Date;
