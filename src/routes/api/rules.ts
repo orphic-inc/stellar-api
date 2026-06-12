@@ -57,6 +57,24 @@ router.get(
   })
 );
 
+// GET /tree — the composable Rule/SubRule tree with CRS weights (PRD-05 #1).
+// Static segment — MUST be before /:slug or it'd be read as a rules-page slug.
+// Read-only substrate for ruleImpact(); login-gated only (rules are site-wide
+// and visible to every member).
+router.get(
+  '/tree',
+  requireAuth,
+  authHandler(async (_req, res) => {
+    const rules = await prisma.rule.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      include: {
+        subRules: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }
+      }
+    });
+    res.json({ rules });
+  })
+);
+
 // GET /:slug — single page (static 'manager' would shadow this if registered after; frontend uses 'manager')
 router.get(
   '/:slug',

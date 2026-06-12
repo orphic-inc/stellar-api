@@ -264,3 +264,80 @@ describe('DELETE /api/rules/:id', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ─── Rule/SubRule tree (PRD-05 #1) ────────────────────────────────────────────
+
+const makeRule = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  code: 'golden.accounts',
+  title: 'Accounts',
+  description: 'One account per person per lifetime.',
+  complianceWeight: 1,
+  violationWeight: 5,
+  sortOrder: 0,
+  createdAt: new Date('2026-06-12'),
+  updatedAt: new Date('2026-06-12'),
+  subRules: [],
+  ...overrides
+});
+
+describe('GET /api/rules/tree', () => {
+  it('returns the rule tree with nested sub-rules, ordered', async () => {
+    prismaMock.rule.findMany.mockResolvedValue([
+      makeRule({
+        subRules: [
+          {
+            id: 10,
+            ruleId: 1,
+            code: 'no-sharing',
+            title: 'No sharing',
+            description: '',
+            complianceWeight: 0,
+            violationWeight: 3,
+            sortOrder: 0,
+            createdAt: new Date('2026-06-12'),
+            updatedAt: new Date('2026-06-12')
+          }
+        ]
+      }),
+      makeRule({
+        id: 2,
+        code: 'golden.invites',
+        title: 'Invites',
+        sortOrder: 1
+      })
+    ] as never);
+
+    const res = await request(app).get('/api/rules/tree');
+
+    expect(res.status).toBe(200);
+    expect(res.body.rules).toHaveLength(2);
+    expect(res.body.rules[0].code).toBe('golden.accounts');
+    expect(res.body.rules[0].subRules[0].code).toBe('no-sharing');
+    expect(res.body.rules[0].violationWeight).toBe(5);
+    // tree is read ordered by sortOrder then id, sub-rules nested + ordered
+    expect(prismaMock.rule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        include: {
+          subRules: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }
+        }
+      })
+    );
+  });
+
+  it('returns an empty rules array when no rules are defined', async () => {
+    prismaMock.rule.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/rules/tree');
+    expect(res.status).toBe(200);
+    expect(res.body.rules).toEqual([]);
+  });
+
+  it('is not shadowed by GET /:slug (static segment wins)', async () => {
+    prismaMock.rule.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/rules/tree');
+    // a 200 with { rules } proves /tree resolved here, not the rules-page handler
+    expect(res.body).toHaveProperty('rules');
+    expect(prismaMock.rulesPage.findUnique).not.toHaveBeenCalled();
+  });
+});
