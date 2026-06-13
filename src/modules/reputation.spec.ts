@@ -5,9 +5,14 @@
 
 const mockPrismaUser = { findUnique: jest.fn() };
 const mockPrismaFriend = { count: jest.fn() };
+const mockPrismaIrcActivity = { findMany: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
-  prisma: { user: mockPrismaUser, friend: mockPrismaFriend }
+  prisma: {
+    user: mockPrismaUser,
+    friend: mockPrismaFriend,
+    ircActivity: mockPrismaIrcActivity
+  }
 }));
 
 import { computeCrs, getReputation } from './reputation';
@@ -165,7 +170,10 @@ describe('computeCrs — Friends dimension', () => {
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrismaIrcActivity.findMany.mockResolvedValue([]);
+  });
 
   it('computes CRS from the user createdAt + ratio + friends', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
