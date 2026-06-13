@@ -12,6 +12,9 @@ import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
+import { computeStanding } from './standing';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const log = getLogger('profile');
 
@@ -151,6 +154,8 @@ const PROFILE_BASE_SELECT = {
   isDonor: true,
   disabled: true,
   warned: true,
+  banDate: true,
+  warnings: { select: { expiresAt: true } },
   inviteCount: true,
   staffBio: true,
   contributed: true,
@@ -799,6 +804,17 @@ const buildProfileView = async (
   const donorPresentation = buildDonorPresentation(user);
   const derivedRatio = computeRatio(user.contributed, user.consumed);
 
+  // PRD-05 #2 / ADR-0004 — governance standing rolled from warnings + ban state.
+  const now = new Date();
+  const standing = computeStanding({
+    warnings: user.warnings,
+    banned: user.banDate !== null,
+    now,
+    accountAgeDays: Math.floor(
+      (now.getTime() - user.dateRegistered.getTime()) / DAY_MS
+    )
+  });
+
   return {
     id: user.id,
     username: user.username,
@@ -811,6 +827,7 @@ const buildProfileView = async (
     isDonor: user.isDonor,
     disabled: user.disabled,
     warned: user.warned?.toISOString() ?? null,
+    standing,
     inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
     staffBio: user.staffBio ?? null,
     stats: {
