@@ -20,3 +20,11 @@ export const ircActivitySchema = z.object({
 });
 
 export type IrcActivityInput = z.infer<typeof ircActivitySchema>;
+
+// Delegated SASL validation (ADR-0011): account = userId, password = IRCKey.
+export const saslValidateSchema = z.object({
+  account: z.string().min(1).max(32),
+  password: z.string().min(1).max(64)
+});
+
+export type SaslValidateInput = z.infer<typeof saslValidateSchema>;

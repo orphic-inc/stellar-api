@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from '../../modules/asyncHandler';
-import { requireBotToken } from '../../middleware/botToken';
+import { requireBotToken } from '../../middleware/sharedSecret';
 import { validate, parsedBody } from '../../middleware/validate';
 import { ircActivitySchema, type IrcActivityInput } from '../../schemas/irc';
 import { upsertActivity, toUtcDay } from '../../modules/ircActivity';
