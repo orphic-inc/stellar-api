@@ -1,6 +1,6 @@
 # PRD-02 — IRC & Announce
 
-**Status:** Draft · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
+**Status:** In-repo build shipped ([#143](https://github.com/orphic-inc/stellar-api/pull/143)) — credentials, activity rollup, IRCScore, delegated SASL, and the announce feeds (RSS + JSON) are merged. Outstanding: magnitude pinning ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL) and infra ([#142](https://github.com/orphic-inc/stellar-api/issues/142), stellar-compose). · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
 **Decisions:** [ADR-0011 delegated IRC authentication](../adr/0011-delegated-irc-authentication.md), [ADR-0012 IRC activity rollup substrate](../adr/0012-irc-activity-rollup-substrate.md), [ADR-0007 CRS read-time + ledger](../adr/0007-crs-read-time-and-event-ledger.md), [ADR-0009 dependency/infra discipline](../adr/0009-fork-workflow-and-dependency-discipline.md)
 **Numbering:** PRD-01 Community-Score · **PRD-02 IRC & Announce** · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · PRD-05 Rules & Governance · PRD-06 Ratio
 
@@ -59,12 +59,12 @@ Anti-farming is structural: the per-channel/day cap defeats flooding, `consisten
 
 ## Red-green descent targets
 
-1. **`IRCKey` + `AnnounceKey` on `User`** — unique, generate/rotate endpoints, drop `communityPass`. The documented blocker; everything hangs off it.
-2. **Delegated SASL-validate endpoint** — internal, network-scoped; Ergo's auth callback (ADR-0011).
-3. **Release-Announce Feed** — AnnounceKey-gated feed of new Contributions (IRC announce relay first; **RSS/XML fast-follow** reusing the same substrate).
-4. **`IrcActivity` rollup + bot upsert** — messages-only, `user×channel×day` (ADR-0012).
-5. **`scoreIrcActivity(rows, weights, window)`** — pure, table-driven, unit-tested against fixtures **before** any IRC infra; then register `IRCScore` into the CRS registry.
-6. **The Lounge / bouncer** — web client surface; donor perks defer to the Donations PRD.
+1. ✅ **`IRCKey` + `AnnounceKey` on `User`** — unique, generate/rotate endpoints, drop `communityPass`. The documented blocker; everything hangs off it. *(shipped [#134](https://github.com/orphic-inc/stellar-api/issues/134))*
+2. ✅ **Delegated SASL-validate endpoint** — internal, network-scoped; Ergo's auth callback (ADR-0011). *(shipped [#138](https://github.com/orphic-inc/stellar-api/issues/138))*
+3. ✅ **Release-Announce Feed** — AnnounceKey-gated feed of new Contributions (JSON `?since=` cursor for the relay; RSS/XML fast-follow on the same substrate). Notify-and-link delivery ([#136](https://github.com/orphic-inc/stellar-api/issues/136)). *(shipped [#139](https://github.com/orphic-inc/stellar-api/issues/139) + [#140](https://github.com/orphic-inc/stellar-api/issues/140))*
+4. ✅ **`IrcActivity` rollup + bot upsert** — messages-only, `user×channel×day` (ADR-0012). *(shipped [#135](https://github.com/orphic-inc/stellar-api/issues/135))*
+5. ✅ **`scoreIrcActivity(rows, weights, window)`** — pure, table-driven, unit-tested against fixtures **before** any IRC infra; then register `IRCScore` into the CRS registry. Magnitudes provisional, pinned in [#141](https://github.com/orphic-inc/stellar-api/issues/141) (HITL). *(shipped [#137](https://github.com/orphic-inc/stellar-api/issues/137))*
+6. ⏳ **The Lounge / bouncer** — web client surface; donor perks defer to the Donations PRD. *(infra, [#142](https://github.com/orphic-inc/stellar-api/issues/142))*
 
 ## Open questions
 

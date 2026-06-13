@@ -44,6 +44,8 @@ Copy `.env.default` → `.env`.
 | `STELLAR_HTTP_PORT` | Server port (default 8080) |
 | `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin |
 | `STELLAR_LOG_LEVEL` | Winston log level (default `info`) |
+| `STELLAR_IRC_BOT_TOKEN` | Scoped token the announce bot presents to `/api/irc/*` (PRD-02; fails closed when unset) |
+| `STELLAR_IRC_SASL_SECRET` | Shared secret for Ergo's internal SASL-validate callback `/internal/irc/sasl` (ADR-0011; fails closed when unset) |
 
 ## Architecture
 
@@ -76,15 +78,23 @@ src/
     stats.ts                # Stats query helpers
     top10.ts                # Ranked list logic: binomial scoring, TTL caching, snapshots
     user.ts                 # User query helpers
+    reputation.ts           # CRS dimension registry (longevity/ratio/friends/irc); pure scorers + read-time assembler
+    keys.ts                 # Per-user IRC/Announce key generate/rotate (PRD-02)
+    ircActivity.ts          # IrcActivity rollup upsert — messages-only (ADR-0012)
+    ircScore.ts             # Pure scoreIrcActivity() + provisional magnitudes (the IRCScore dimension)
+    ircAuth.ts              # Delegated SASL validation — validateSasl (ADR-0011)
+    announceFeed.ts         # Release-Announce Feed: AnnounceKey resolve, feed query, RSS render
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user
     permissions.ts          # requirePermission, requireAuth, isModerator
-    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter
+    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter, saslLimiter
+    sharedSecret.ts         # requireBotToken / requireSaslSecret — Bearer shared-secret gate (fails closed)
     validate.ts             # validate(bodySchema), validateParams(paramsSchema)
   lib/
     prisma.ts               # Singleton PrismaClient
     audit.ts                # audit(prisma, actorId, action, targetType, targetId, meta?)
     errors.ts               # AppError class (extends Error with statusCode)
+    secureCompare.ts        # Constant-time string equality (length-tolerant)
     mailer.ts               # SMTP email utility (sendInviteEmail)
     openapi.ts              # Auto-generated OpenAPI type definitions
     pagination.ts           # parsePage(req) → { skip, limit, page }
@@ -137,6 +147,9 @@ src/
     stylesheet.ts           # User stylesheets
     wiki.ts                 # Wiki pages, aliases, revisions
     docs.ts                 # API docs endpoint
+    keys.ts                 # GET / (my keys), POST /:kind (generate), POST /:kind/rotate
+    irc.ts                  # POST /activity — bot-token scoped IrcActivity upsert
+    announce.ts             # GET /feed (JSON), GET /feed.xml (RSS) — AnnounceKey-gated
     communities/
       communities.ts        # Community CRUD
       release.ts            # Release CRUD under /:communityId/releases
@@ -152,6 +165,8 @@ src/
       forumPollVote.ts      # Poll voting
       forumTopicNote.ts     # Moderator notes on topics
       forumLastReadTopic.ts # Read-position tracking
+  routes/internal/          # NOT under /api — network-isolated, never public ingress
+    ircSasl.ts              # POST /sasl — Ergo's delegated SASL-validate callback (ADR-0011)
 ```
 
 ## req.user shape
