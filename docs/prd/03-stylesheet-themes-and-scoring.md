@@ -60,7 +60,7 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 **Staff** (context): community staff earn **+50 CRS per week served** (Standards/Communities — cross-ref PRD-01).
 
-**Friends × Stylesheet — controlled vector (decided).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — *separate from and additive to* the stylesheet-dimension weights above:
+**Friends × Stylesheet — controlled vector (decided; not yet built — [#147](https://github.com/orphic-inc/stellar-api/issues/147)).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — *separate from and additive to* the stylesheet-dimension weights above. The keystone (#120) built the deduped adoption ledger this vector reads from, but wired only the stylesheet dimension; the Friends-dimension accrual is the follow-up:
 
 - **Adopter: +0.2** (rewards active, organic curation — the adopter earns slightly more than the author, to favour participation).
 - **Author: +0.1** (recognition that someone vouched for your sheet).
@@ -126,7 +126,7 @@ First testable slices (much of the substrate already exists):
    - **4b adopt (#119, ✅ shipped):** many-per-author (cardinality fixed here — `@unique authorId` dropped); a viewer adopts a sheet into their **Site Stylesheet** slot (`UserSettings.activeAuthorStylesheetId`) via `POST /api/stylesheet/author-stylesheet/:id/adopt`, idempotent.
    - **4c score (#120, ✅ shipped):** adoption fires `scoreStylesheetSelection`; non-self adoptions write a `CRS_STYLESHEET_ADOPTION` ledger row deduped **once per (adopter, author)** (ADR-0007), and a read-time **stylesheet** CRS dimension counts them → author's global CRS. Self-adoption renders, earns nothing.
 
-   **Deferred** (named, not built): Profile-slot + Community-slot designation · rank-gated stylesheet **count limit** · **byte-identical cross-author dedup** on submit (reject a duplicate sheet under a second author's name; UI offers the existing one — *ADR-when-built*: hard to reverse, needs a content hash + index, "is identical = exact bytes or normalized?" is a real trade-off).
+   **Deferred** (named, not built): Profile-slot + Community-slot designation · rank-gated stylesheet **count limit** + list pagination ([#146](https://github.com/orphic-inc/stellar-api/issues/146)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1 into the Friends dimension — the §"Friends × Stylesheet" decision; the `CRS_STYLESHEET_ADOPTION` ledger built here is its substrate, but the second Friends-dimension accrual is not yet wired — [#147](https://github.com/orphic-inc/stellar-api/issues/147)) · **byte-identical cross-author dedup** on submit (reject a duplicate sheet under a second author's name; UI offers the existing one — *ADR-when-built*: hard to reverse, needs a content hash + index, "is identical = exact bytes or normalized?" is a real trade-off).
 5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions
