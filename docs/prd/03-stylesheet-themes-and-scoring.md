@@ -16,9 +16,23 @@ Stellar is an invite-only `/private/` community site. Users want to theme their 
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Built-in / site stylesheets**            | Seeded themes: `kuro`, `layer-cake`, `postmod`, `proton`, `sublime`. **Sublime = default/base + selectable + contest reference** (net-new authoring; reset target).                  |
 | **ExternalStylesheet**                     | A URL on the user's profile (`profile.externalStylesheet`).                                                                                                                          |
-| **AuthorStylesheet / AuthorStylesheetUrl** | A user-authored `.scss`/`.css` (one per author) saved for others to adopt. **Shape TBD** — depends on ExternalStylesheet + global-reset findings against the current Tailwind theme. |
-| **CommunityStylesheet**                    | Community-scoped theme (TBD — tied to Contests).                                                                                                                                     |
+| **AuthorStylesheet / AuthorStylesheetUrl** | A user-authored `.scss`/`.css` saved for others to adopt. **Many per author** (cardinality decided 2026-06-13; rank-gated *count limit* deferred). The author is a **StylesheetAuthor** — shorthand for any member who has authored one, not a distinct role. |
+| **CommunityStylesheet**                    | Community-scoped theme, set by that Community's Staff; rendered to any viewer on that community's pages. Slot deferred (TBD — tied to Contests / Community Toolbox).                  |
 | **Global SCSS/CSS reset flag**             | Per-injection boundary so a user sheet can't leak into app chrome (see ADR-0003).                                                                                                    |
+
+### Slots & cascade (decided 2026-06-13)
+
+A stylesheet renders by being placed into one of three single-valued **slots**, selected by **page context** — not a single global "active theme":
+
+| Slot                     | Set by                | Rendered when                                            |
+| ------------------------ | --------------------- | ------------------------------------------------------- |
+| **Profile Stylesheet**   | the profile's owner   | any viewer is on *that owner's* profile page            |
+| **Site Stylesheet**      | the viewer            | the viewer is on the general site                       |
+| **Community Stylesheet** | that Community's Staff | any viewer is on *that* community's pages                |
+
+**Precedence is page-context-first:** a Profile or Community page shows its own slot to *every* viewer, regardless of the viewer's Site Stylesheet. On the general site the viewer sees their own Site Stylesheet, falling back to the **Site Theme** (`Sublime`/Default) when they have not adopted one. A member has exactly one stylesheet per slot.
+
+**Only the Site Stylesheet slot scores** (a **Stylesheet Adoption**): the viewer adopting another member's AuthorStylesheet credits the author. Slotting your own sheet as your Profile Stylesheet is not an adoption. Profile-slot and Community-slot designation are **deferred** (named here, not built in #119/#120).
 
 ## Community-Score weights (proposed by PRD owner)
 
@@ -95,7 +109,12 @@ First testable slices (much of the substrate already exists):
 1. ✅ **Stylesheet selection → CRS accrual** — pure `scoreStylesheetSelection` (no DB), table-driven over each multiplier. **Shipped: [#84](https://github.com/orphic-inc/stellar-api/pull/84)** (tier-0 multipliers; external/self decisions applied).
 2. **Tiering escalation** — the curve that compounds the base multipliers as a user climbs tiers (the `/verbiagating`-style ladder). Next slice; curve TBD.
 3. **Dead-external penalty** — link-health-driven negative CRS for a dead `externalStylesheet`; red-green once the penalty magnitude is set.
-4. **AuthorStylesheet save + adopt** — model + endpoint (extends `schemas/stylesheet.ts`); integration test for adopt → author/site accrual. **Currently the keystone gap:** `scoreStylesheetSelection` (shipped #84) is wired to *nothing* — no `AuthorStylesheet` model, no adopt event. This slice wires it, and **unblocks** the Friends×Stylesheet controlled vector + the `CRS_*` adoption ledger (PRD-01 / ADR-0007), which have no event to hook onto until adoption exists.
+4. **AuthorStylesheet save → adopt → score** (the keystone — wires shipped `scoreStylesheetSelection` #84 to a real event). Three slices:
+   - **4a save (#118, ✅ shipped):** `AuthorStylesheet` model + `POST`/`GET /api/stylesheet/author`.
+   - **4b adopt (#119, ✅ shipped):** many-per-author (cardinality fixed here — `@unique authorId` dropped); a viewer adopts a sheet into their **Site Stylesheet** slot (`UserSettings.activeAuthorStylesheetId`) via `POST /api/stylesheet/author-stylesheet/:id/adopt`, idempotent.
+   - **4c score (#120, ✅ shipped):** adoption fires `scoreStylesheetSelection`; non-self adoptions write a `CRS_STYLESHEET_ADOPTION` ledger row deduped **once per (adopter, author)** (ADR-0007), and a read-time **stylesheet** CRS dimension counts them → author's global CRS. Self-adoption renders, earns nothing.
+
+   **Deferred** (named, not built): Profile-slot + Community-slot designation · rank-gated stylesheet **count limit** · **byte-identical cross-author dedup** on submit (reject a duplicate sheet under a second author's name; UI offers the existing one — *ADR-when-built*: hard to reverse, needs a content hash + index, "is identical = exact bytes or normalized?" is a real trade-off).
 5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions
