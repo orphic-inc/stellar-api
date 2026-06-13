@@ -17,6 +17,11 @@
  */
 import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
+import {
+  scoreIrcActivity,
+  IRC_SCORE_CONFIG,
+  type IrcActivityRow
+} from './ircScore';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
@@ -29,6 +34,8 @@ export interface DimensionInput {
   contributed?: bigint;
   /** Number of friend relationships. Defaults to 0. */
   friendCount?: number;
+  /** Trailing-window IRC activity rollup rows (ADR-0012). Defaults to empty. */
+  ircActivity?: IrcActivityRow[];
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -117,12 +124,28 @@ const friendsScorer: DimensionScorer = {
     FRIENDS_CAP * (1 - Math.exp(-Math.max(0, friendCount) / FRIENDS_TAU))
 };
 
+// ─── IRCScore ───────────────────────────────────────────────────────────────
+// Real-time community participation (PRD-02). A bounded scorer over the IRC
+// activity rollup (ADR-0012): messages only — presence/idle never counts. The
+// pure scorer and its anti-farming structure live in `ircScore.ts`; magnitudes
+// are provisional, hand-pinned later (HITL, #141).
+const IRC_WEIGHT = 1.0;
+
+const ircScorer: DimensionScorer = {
+  name: 'irc',
+  weight: IRC_WEIGHT,
+  cap: IRC_SCORE_CONFIG.cap,
+  compute: ({ ircActivity = [], now }) =>
+    scoreIrcActivity(ircActivity, IRC_SCORE_CONFIG, now ?? new Date())
+};
+
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
 // picks it up unchanged.
 const REGISTRY: DimensionScorer[] = [
   longevityScorer,
   ratioScorer,
-  friendsScorer
+  friendsScorer,
+  ircScorer
 ];
 
 /** Pure aggregator: sum each capped dimension's weighted subScore. */
@@ -137,12 +160,19 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
 export const getReputation = async (userId: number): Promise<CrsResult> => {
-  const [user, friendCount] = await Promise.all([
+  const windowStart = new Date(
+    Date.now() - IRC_SCORE_CONFIG.windowDays * 24 * 60 * 60 * 1000
+  );
+  const [user, friendCount, ircActivity] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { createdAt: true, contributed: true, consumed: true }
     }),
-    prisma.friend.count({ where: { userId } })
+    prisma.friend.count({ where: { userId } }),
+    prisma.ircActivity.findMany({
+      where: { userId, day: { gte: windowStart } },
+      select: { channel: true, day: true, msgCount: true }
+    })
   ]);
   if (!user) return { score: 0, dimensions: [] };
   return computeCrs({
@@ -150,6 +180,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     createdAt: user.createdAt,
     ratio: computeRatio(user.contributed, user.consumed),
     contributed: user.contributed,
-    friendCount
+    friendCount,
+    ircActivity
   });
 };
