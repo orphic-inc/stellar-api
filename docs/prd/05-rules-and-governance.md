@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
 **Decisions:** [ADR-0001 granular permissions](../adr/0001-granular-permission-checks.md) (enforcement), [ADR-0002 community-health-pulse](../adr/0002-community-health-pulse.md) (standing trend), [ADR-0004 standing → CRS + warnings/bans](../adr/0004-standing-warnings-bans.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance**
+**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce _(unwritten)_ · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance**
 
 > The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose (that lives in `RulesPage`).
 

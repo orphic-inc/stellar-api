@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Owner:** @obrien-k
 **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md) · **Decisions:** [ADR-0002 community-health-pulse → CRS](../adr/0002-community-health-pulse.md) (accrual model), [ADR-0003 stylesheet injection isolation](../adr/0003-stylesheet-injection-isolation.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
+**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce _(unwritten)_ · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
 
 > Lean PRD. Captures the decided shape + the Community-Score weights, flags TBDs, and maps each concept to existing code so this becomes a red-green descent, not greenfield. Stylesheet scoring is a **dimension of PRD-01's CRS**, not a separate score.
 
