@@ -63,6 +63,26 @@ _Avoid_: metric, plugin, scorer module
 A bounded cross-dimension CRS edge — one signal nudging another dimension — capped and deduplicated to resist farming (e.g. stylesheet adoption feeding the Friends dimension).
 _Avoid_: cross-score, bonus link, coupling
 
+**Release-Announce Feed**:
+The out-of-band stream of new Contributions delivered to a member over RSS/XML and IRC — the firehose of the Contribution Spine as it grows. Authenticated by the **AnnounceKey**, not the **Identity State** (the member is not carrying a session cookie on these channels). Distinct from consuming a release, which stays a session-authed accounted download.
+_Avoid_: rss feed, announce stream, the firehose
+
+**AnnounceKey**:
+A per-user credential authenticating a member's **Release-Announce Feed** (RSS + IRC announce). It gates *receiving* the stream of new Contributions; it never authenticates a download — release consumption remains a session-authed grant through the **Ratio Mechanism**. Rotatable; rotating it invalidates the prior feed URL.
+_Avoid_: passkey, download key, torrent key
+
+**IRCKey**:
+A per-user credential authenticating a member's **identity on the IRC network** (presented as the SASL secret to the IRCd, validated against this API). Paired with the **AnnounceKey** it enables personalized release announcements pushed over IRC; alone it only establishes who a nick is. Distinct from the AnnounceKey — different channel, different rotation/threat model.
+_Avoid_: irc password, chat token, drone key
+
+**IRCScore**:
+A bounded CRS **Dimension Scorer** derived from a member's *message* activity on IRC over a trailing window — message volume weighted by channel and scaled by how many distinct days they were active. Presence/idle never contributes (anti-farming); only messages count. Capped with diminishing returns like every dimension, so IRC cannot dominate reputation.
+_Avoid_: irc activity, chat score, presence score
+
+**IRC Activity Rollup**:
+The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is *irreducible* (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
+_Avoid_: irc log, activity table, message history
+
 ## Relationships
 
 - A **Contract Schema** directly structures incoming inputs and dictates the programmatic generation of the schema served by `swagger-ui-express`.
@@ -70,6 +90,7 @@ _Avoid_: cross-score, bonus link, coupling
 - **Sanitized Values** must be extracted at the Controller layer using **Contract Schemas** before execution by domain services.
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 - A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
+- The **AnnounceKey** authenticates the **Release-Announce Feed** (RSS + IRC) and the **IRCKey** authenticates IRC identity; the two paired enable IRC-delivered release announcements. Neither replaces the **Identity State** on the session-authed download path — they authenticate out-of-band channels only, never a download.
 
 ## Flagged Ambiguities
 
