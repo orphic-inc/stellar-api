@@ -1,7 +1,7 @@
 # PRD-04 — Contribution, Release & Music Model
 
 **Status:** Draft · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce _(unwritten)_ · PRD-03 Stylesheets · **PRD-04 Contribution/Release/Music**
+**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · **PRD-04 Contribution/Release/Music**
 
 > Lean PRD. The structured model has **landed on `main`** (#85 music model + ReleaseArtist/Edition, merged via #98 — `develop` retired in the [ADR-0010](../adr/0010-trunk-based-single-branch-workflow.md) trunk fold), with per-file rip metadata split out to a `ReleaseFile` satellite ([ADR-0008](../adr/0008-contribution-metadata-satellites.md)). The quality grade landed on `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102), supersedes #86). This documents the model + CRS weighting and flags TBDs. Prod is pre-alpha with disposable data, so the model was migrated destructively (no backfill).
 

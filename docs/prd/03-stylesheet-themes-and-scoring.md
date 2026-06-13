@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Owner:** @obrien-k
 **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md) · **Decisions:** [ADR-0002 community-health-pulse → CRS](../adr/0002-community-health-pulse.md) (accrual model), [ADR-0003 stylesheet injection isolation](../adr/0003-stylesheet-injection-isolation.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce _(unwritten)_ · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
+**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
 
 > Lean PRD. Captures the decided shape + the Community-Score weights, flags TBDs, and maps each concept to existing code so this becomes a red-green descent, not greenfield. Stylesheet scoring is a **dimension of PRD-01's CRS**, not a separate score.
 
@@ -70,7 +70,7 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Donor add-ons
 
-**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to PRD-02 Donations / `donor.ts`).
+**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to the Donations PRD / `donor.ts`).
 
 ## Concept → existing code (the descent map)
 
@@ -86,7 +86,7 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Out of scope (other PRDs)
 
-- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02, PRD-04. Referenced here only where they feed stylesheet scoring.
+- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02 (IRC), the Donations PRD, PRD-04. Referenced here only where they feed stylesheet scoring.
 
 ## Red-green descent targets
 

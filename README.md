@@ -27,7 +27,7 @@ The README is the lamp-post; specs and decisions live in [`docs/`](docs/):
 | [ADR-0003 — Stylesheet injection isolation](docs/adr/0003-stylesheet-injection-isolation.md) | user-CSS sandbox/reset _(proposed)_          |
 | [`docs/agents/`](docs/agents/) · [CONTEXT.md](CONTEXT.md) · [AGENTS.md](AGENTS.md)           | domain language, agent/dev guides            |
 
-> PRD numbering: **PRD-01** Community-Score · **PRD-02** Donations/IRC/Announce · **PRD-03** Stylesheets · **PRD-04** Contribution/Release/Music.
+> PRD numbering: **PRD-01** Community-Score · **PRD-02** IRC & Announce · **PRD-03** Stylesheets · **PRD-04** Contribution/Release/Music · **PRD-05** Rules & Governance · **PRD-06** Ratio.
 
 ## Tech Stack
 
