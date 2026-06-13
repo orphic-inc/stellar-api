@@ -5,9 +5,14 @@
 
 const mockPrismaUser = { findUnique: jest.fn() };
 const mockPrismaFriend = { count: jest.fn() };
+const mockPrismaEconomy = { count: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
-  prisma: { user: mockPrismaUser, friend: mockPrismaFriend }
+  prisma: {
+    user: mockPrismaUser,
+    friend: mockPrismaFriend,
+    economyTransaction: mockPrismaEconomy
+  }
 }));
 
 import { computeCrs, getReputation } from './reputation';
@@ -162,10 +167,38 @@ describe('computeCrs — Friends dimension', () => {
   });
 });
 
+// ─── StylesheetScore dimension ────────────────────────────────────────────────
+
+describe('computeCrs — Stylesheet dimension', () => {
+  const styleOf = (stylesheetAdoptions: number): number =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      stylesheetAdoptions
+    }).dimensions.find((d) => d.name === 'stylesheet')!.subScore;
+
+  it('an author with no adoptions scores 0', () => {
+    expect(styleOf(0)).toBeCloseTo(0, 10);
+  });
+
+  it('rises with each distinct adoption', () => {
+    expect(styleOf(3)).toBeGreaterThan(styleOf(1));
+    expect(styleOf(1)).toBeGreaterThan(0);
+  });
+
+  it('is bounded: mass adoption cannot dominate (STYLESHEET_CAP = 6)', () => {
+    expect(styleOf(1000)).toBeLessThanOrEqual(6);
+  });
+});
+
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrismaEconomy.count.mockResolvedValue(0);
+  });
 
   it('computes CRS from the user createdAt + ratio + friends', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
@@ -192,5 +225,26 @@ describe('getReputation', () => {
     mockPrismaFriend.count.mockResolvedValue(0);
     const result = await getReputation(999);
     expect(result).toEqual({ score: 0, dimensions: [] });
+  });
+
+  it('reflects stylesheet adoptions from the CRS_* ledger count', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    mockPrismaEconomy.count.mockResolvedValue(4); // 4 distinct adopters
+
+    const result = await getReputation(1);
+
+    expect(mockPrismaEconomy.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 1, reason: 'CRS_STYLESHEET_ADOPTION' }
+      })
+    );
+    expect(
+      result.dimensions.find((d) => d.name === 'stylesheet')!.subScore
+    ).toBeGreaterThan(0);
   });
 });
