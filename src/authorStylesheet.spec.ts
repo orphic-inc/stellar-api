@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -115,11 +116,10 @@ describe('GET /api/stylesheet/author-stylesheet/:id', () => {
 
 describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
   beforeEach(() => {
-    prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
-      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
-    );
+    // The Site-slot pointer update and the ledger write are no longer wrapped
+    // in one transaction — each runs directly against the client (the partial
+    // unique index, not an app-level findFirst, enforces dedup).
     prismaMock.user.update.mockResolvedValue({} as never);
-    prismaMock.economyTransaction.findFirst.mockResolvedValue(null);
     prismaMock.economyTransaction.create.mockResolvedValue({} as never);
   });
 
@@ -155,13 +155,18 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
     );
   });
 
-  it('is idempotent: re-adopting the same author writes no second ledger row', async () => {
+  it('is idempotent: a duplicate (adopter, author) pair (P2002) is not a second credit', async () => {
     prismaMock.authorStylesheet.findUnique.mockResolvedValue(
       mockSheet as never
     );
-    prismaMock.economyTransaction.findFirst.mockResolvedValue({
-      id: 99
-    } as never);
+    // The partial unique index rejects the second insert; the module swallows
+    // P2002 and reports scored: false rather than double-crediting the author.
+    prismaMock.economyTransaction.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0'
+      })
+    );
 
     const res = await request(app).post(
       '/api/stylesheet/author-stylesheet/1/adopt'
@@ -170,7 +175,6 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
     expect(res.status).toBe(200);
     expect(res.body.scored).toBe(false);
     expect(prismaMock.user.update).toHaveBeenCalled(); // slot still updated
-    expect(prismaMock.economyTransaction.create).not.toHaveBeenCalled();
   });
 
   it('self-adoption renders but credits nothing (anti-farm)', async () => {
@@ -188,7 +192,6 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
     expect(res.body.scored).toBe(false);
     expect(prismaMock.user.update).toHaveBeenCalled(); // own sheet still rendered
     expect(prismaMock.economyTransaction.create).not.toHaveBeenCalled();
-    expect(prismaMock.economyTransaction.findFirst).not.toHaveBeenCalled();
   });
 
   it('404s when adopting a non-existent stylesheet', async () => {

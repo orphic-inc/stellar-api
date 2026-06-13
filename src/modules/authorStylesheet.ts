@@ -12,6 +12,7 @@
  *     once in the `CRS_*` event ledger (ADR-0007); the author's read-time
  *     stylesheet CRS dimension counts those pairs.
  */
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { scoreStylesheetSelection } from './stylesheetScore';
@@ -53,6 +54,13 @@ export interface AdoptionResult {
  * row is written. A cross-user adoption records the (adopter, author) pair once
  * (deduped); re-adopting the same author's sheets never double-credits, which
  * is exactly the once-per-distinct-pair rule the controlled vector needs.
+ *
+ * The Site-slot pointer update and the CRS ledger write are deliberately NOT
+ * in one transaction: changing your theme is the user-facing effect and must
+ * not be rolled back or blocked by a hiccup in the (advisory) author accrual.
+ * The dedup is enforced atomically by a partial unique index on
+ * (userId, actorUserId) WHERE reason = 'CRS_STYLESHEET_ADOPTION', so concurrent
+ * double-adopts insert-and-catch P2002 rather than both crediting the author.
  */
 export const adoptAuthorStylesheet = async (
   adopterId: number,
@@ -63,31 +71,26 @@ export const adoptAuthorStylesheet = async (
   });
   if (!sheet) throw new AppError(404, 'Author stylesheet not found');
 
-  const accrual = scoreStylesheetSelection({
+  // #119 — point the adopter's Site Stylesheet slot at this sheet (idempotent).
+  // Done unconditionally and independently of the ledger write below.
+  await prisma.user.update({
+    where: { id: adopterId },
+    data: { userSettings: { update: { activeAuthorStylesheetId: sheet.id } } }
+  });
+
+  const authorAccrual = scoreStylesheetSelection({
     userId: adopterId,
     origin: { kind: 'author', authorId: sheet.authorId }
-  });
-  const authorAccrual = accrual.author;
+  }).author;
+  // Self-adoption (author: null) renders but earns nothing — no ledger row.
+  if (!authorAccrual) return { authorStylesheet: sheet, scored: false };
 
-  const scored = await prisma.$transaction(async (tx) => {
-    // #119 — point the adopter's Site Stylesheet slot at this sheet (idempotent).
-    await tx.user.update({
-      where: { id: adopterId },
-      data: { userSettings: { update: { activeAuthorStylesheetId: sheet.id } } }
-    });
-
-    // #120 — record the durable adoption event, once per (adopter, author).
-    if (!authorAccrual) return false;
-    const existing = await tx.economyTransaction.findFirst({
-      where: {
-        userId: authorAccrual.userId,
-        actorUserId: adopterId,
-        reason: 'CRS_STYLESHEET_ADOPTION'
-      },
-      select: { id: true }
-    });
-    if (existing) return false;
-    await tx.economyTransaction.create({
+  // #120 — record the durable adoption event, once per (adopter, author).
+  // Insert-and-catch: the partial unique index turns a duplicate (the same
+  // adopter re-adopting this author, or a concurrent double-click) into P2002,
+  // which we treat as "already scored".
+  try {
+    await prisma.economyTransaction.create({
       data: {
         userId: authorAccrual.userId, // CRS recipient = the author
         actorUserId: adopterId, // who adopted
@@ -97,8 +100,14 @@ export const adoptAuthorStylesheet = async (
         contextId: sheet.id
       }
     });
-    return true;
-  });
-
-  return { authorStylesheet: sheet, scored };
+    return { authorStylesheet: sheet, scored: true };
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      return { authorStylesheet: sheet, scored: false };
+    }
+    throw err;
+  }
 };

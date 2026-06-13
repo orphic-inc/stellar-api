@@ -115,6 +115,31 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
     expect(ledger).toBe(1);
   });
 
+  it('concurrent double-adopt credits the author exactly once (F1: partial unique index)', async () => {
+    const author = await createUser();
+    const adopter = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Race',
+      source: 'r {}'
+    });
+
+    // Two simultaneous adopts (a double-click). Without the DB-level partial
+    // unique index both check-then-insert would pass and double-credit; with
+    // it, the loser raises P2002 and is swallowed as scored: false.
+    const [a, b] = await Promise.all([
+      adoptAuthorStylesheet(adopter.id, sheet.id),
+      adoptAuthorStylesheet(adopter.id, sheet.id)
+    ]);
+
+    // Exactly one of the two recorded a credit.
+    expect([a.scored, b.scored].filter(Boolean)).toHaveLength(1);
+
+    const ledger = await testPrisma.economyTransaction.count({
+      where: { reason: 'CRS_STYLESHEET_ADOPTION' }
+    });
+    expect(ledger).toBe(1);
+  });
+
   it('self-adoption renders the sheet but credits nothing (anti-farm)', async () => {
     const author = await createUser();
     const sheet = await createAuthorStylesheet(author.id, {

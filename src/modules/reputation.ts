@@ -153,6 +153,11 @@ const ircScorer: DimensionScorer = {
 // (ADR-0007): nothing stores a denormalized stylesheet score. Anti-farm is the
 // `/private` invite + report model's job (PRD-03), not a bespoke cap — the cap
 // here is the module's standard "no single dimension dominates" guardrail.
+//
+// PROVISIONAL (tier-0): the per-adoption magnitude and cap are interim. The
+// real reward shape is PRD-03 target #2 (BonusPoints tiering, TBD), which will
+// swap these constants without touching the ledger — the ledger row stays a
+// pure (adopter, author) event marker.
 const STYLESHEET_AUTHOR_PER_ADOPTION =
   scoreStylesheetSelection({
     userId: 0,
