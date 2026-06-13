@@ -161,6 +161,7 @@ enum EconomyTransactionReason {
   DOWNLOAD_DEBIT
   DOWNLOAD_CREDIT
   STAFF_REVERSAL
+  CRS_STYLESHEET_ADOPTION
 }
 
 enum DownloadGrantStatus {
@@ -310,7 +311,14 @@ model UserSettings {
   showConsumedStats    Boolean            @default(true)
   showRatioStats       Boolean            @default(true)
   user                 User?
+  // The AuthorStylesheet adopted into this member's Site Stylesheet slot
+  // (PRD-03 #119): what they see on the general site. Null = on the Site Theme
+  // (Sublime/Default). SetNull on delete so a pruned sheet clears its adopters'
+  // pointers rather than orphaning them. Profile/Community slots are deferred.
+  activeAuthorStylesheetId Int?
+  activeAuthorStylesheet   AuthorStylesheet? @relation(fields: [activeAuthorStylesheetId], references: [id])
 
+  @@index([activeAuthorStylesheetId])
   @@map("user_settings")
 }
 
@@ -438,6 +446,7 @@ model User {
   userStatSnapshots        UserStatSnapshot[]
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
   ircActivity              IrcActivity[]
+  authoredStylesheets      AuthorStylesheet[]
 
   @@index([userRankId])
   @@map("users")
@@ -541,6 +550,26 @@ model Stylesheet {
   createdAt   DateTime @default(now())
 
   @@map("stylesheets")
+}
+
+/// A user-authored stylesheet saved for others to adopt (PRD-03, descent
+/// target #4). Many per author (cardinality fixed in #119; the rank-gated count
+/// limit is deferred). The keystone the shipped `scoreStylesheetSelection` (#84)
+/// hooks onto: #118 saves it, #119 adopts it into a viewer's Site Stylesheet
+/// slot, #120 scores the adoption. `adopters` are the UserSettings currently
+/// pointing their Site slot here.
+model AuthorStylesheet {
+  id        Int            @id @default(autoincrement())
+  authorId  Int
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  name      String
+  source    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  adopters  UserSettings[]
+
+  @@index([authorId])
+  @@map("author_stylesheets")
 }
 
 // ─── Forum ────────────────────────────────────────────────────────────────────

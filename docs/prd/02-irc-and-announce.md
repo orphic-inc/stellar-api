@@ -70,6 +70,7 @@ Anti-farming is structural: the per-channel/day cap defeats flooding, `consisten
 
 - Greenfield network, or is there an existing IRC network / nick reservations to migrate?
 - `IRCScore` magnitudes + the channel-weight map — TBD with the other CRS magnitudes (HITL, like #121/#122/#126).
+- **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers *earn capability* — rights to create new official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
 
 ## Resolved decisions
 

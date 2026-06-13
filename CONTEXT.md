@@ -83,6 +83,26 @@ _Avoid_: irc activity, chat score, presence score
 The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is *irreducible* (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
 _Avoid_: irc log, activity table, message history
 
+**CommunityScore**:
+A *deferred* (#75) CRS **Dimension Scorer** that folds a Community's read-time health pulse (`getCommunityHealthPulse`, ADR-0002) into a member's **single, global** Community Reputation Score. It is **not** a separate per-community reputation: a member has one CRS; "their CommunityScore *for* a Community" is that community's health contributing one capped term to it. No parallel per-community score exists.
+_Avoid_: community reputation, per-community CRS, community ranking
+
+**Site Theme**:
+A built-in, admin-managed stylesheet (`Stylesheet` model: `Sublime`/Default + alternatives, referenced by `cssUrl`, one flagged `isDefault`). The base layer of the cascade, applied site-wide until a member or page context selects something else. Authored by staff/SysOps, not members.
+_Avoid_: default css, base skin, system stylesheet
+
+**Authored Stylesheet**:
+A `.scss`/`.css` theme written by a member — the **StylesheetAuthor** (shorthand for any User who has authored one, not a distinct role/entity). Stored as raw `source`; injection isolation is the UI injector's job (ADR-0003), never sanitized server-side. A member may author several. Distinct from a **Site Theme** (built-in) and from the **slots** a stylesheet is placed into.
+_Avoid_: user theme, custom css, skin
+
+**Stylesheet Slot**:
+One of three single-valued placements a stylesheet occupies, chosen by **page context**, not a global toggle: the **Profile Stylesheet** (set by a profile's owner; rendered to any visitor on *that* profile), the **Site Stylesheet** (set by the viewer; rendered on the general site, falling back to the **Site Theme**/Default when unset), and the **Community Stylesheet** (set by a Community's Staff; rendered to anyone on *that* community's pages). Page context wins: a profile or community page shows its own slot to every viewer regardless of the viewer's Site Stylesheet.
+_Avoid_: active stylesheet, theme preference, selected skin
+
+**Stylesheet Adoption**:
+A viewer setting their **Site Stylesheet** slot to another member's **Authored Stylesheet** — the scoring event that credits the author's CRS (stylesheet dimension) and fires the Friends **Controlled Vector**. Deduplicated **once per distinct (adopter, author) pair** in the `CRS_*` event ledger (ADR-0007); self-adoption (using your own sheet) renders but earns the author nothing (anti-farm). Site-wide, so the accrual is a global-CRS event — it carries no `communityId`.
+_Avoid_: applying a theme, selecting a stylesheet, using a skin
+
 ## Relationships
 
 - A **Contract Schema** directly structures incoming inputs and dictates the programmatic generation of the schema served by `swagger-ui-express`.

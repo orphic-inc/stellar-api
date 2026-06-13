@@ -837,7 +837,8 @@ describe('API auth/profile/user flows', () => {
       showLastSeen: false,
       showContributedStats: true,
       showConsumedStats: true,
-      showRatioStats: true
+      showRatioStats: true,
+      activeAuthorStylesheetId: null
     });
 
     const res = await request(app).get('/api/users/settings');
@@ -860,7 +861,8 @@ describe('API auth/profile/user flows', () => {
       showLastSeen: true,
       showContributedStats: false,
       showConsumedStats: false,
-      showRatioStats: false
+      showRatioStats: false,
+      activeAuthorStylesheetId: null
     });
 
     const res = await request(app).put('/api/users/settings').send({

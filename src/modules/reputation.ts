@@ -22,6 +22,7 @@ import {
   IRC_SCORE_CONFIG,
   type IrcActivityRow
 } from './ircScore';
+import { scoreStylesheetSelection } from './stylesheetScore';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
@@ -36,6 +37,9 @@ export interface DimensionInput {
   friendCount?: number;
   /** Trailing-window IRC activity rollup rows (ADR-0012). Defaults to empty. */
   ircActivity?: IrcActivityRow[];
+  /** Distinct (adopter, author) adoptions of this member's stylesheets — the
+   *  durable count from the CRS_* ledger (ADR-0007). Defaults to 0. */
+  stylesheetAdoptions?: number;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -139,13 +143,44 @@ const ircScorer: DimensionScorer = {
     scoreIrcActivity(ircActivity, IRC_SCORE_CONFIG, now ?? new Date())
 };
 
+// ─── StylesheetScore ──────────────────────────────────────────────────────────
+// An author's reward for others adopting their stylesheets (PRD-03). The CRS
+// magnitude is sourced from the shared pure scorer `scoreStylesheetSelection`
+// (the per-adoption author delta of a non-self `author` selection) so the value
+// has a single home; this dimension only multiplies it by the durable count of
+// distinct (adopter, author) adoptions read from the ledger. Computed on read
+// (ADR-0007): nothing stores a denormalized stylesheet score. Anti-farm is the
+// `/private` invite + report model's job (PRD-03), not a bespoke cap — the cap
+// here is the module's standard "no single dimension dominates" guardrail.
+//
+// PROVISIONAL (tier-0): the per-adoption magnitude and cap are interim. The
+// real reward shape is PRD-03 target #2 (BonusPoints tiering, TBD), which will
+// swap these constants without touching the ledger — the ledger row stays a
+// pure (adopter, author) event marker.
+const STYLESHEET_AUTHOR_PER_ADOPTION =
+  scoreStylesheetSelection({
+    userId: 0,
+    origin: { kind: 'author', authorId: 1 }
+  }).author?.delta ?? 0;
+const STYLESHEET_CAP = 6;
+const STYLESHEET_WEIGHT = 1.0;
+
+const stylesheetScorer: DimensionScorer = {
+  name: 'stylesheet',
+  weight: STYLESHEET_WEIGHT,
+  cap: STYLESHEET_CAP,
+  compute: ({ stylesheetAdoptions = 0 }) =>
+    STYLESHEET_AUTHOR_PER_ADOPTION * Math.max(0, stylesheetAdoptions)
+};
+
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
 // picks it up unchanged.
 const REGISTRY: DimensionScorer[] = [
   longevityScorer,
   ratioScorer,
   friendsScorer,
-  ircScorer
+  ircScorer,
+  stylesheetScorer
 ];
 
 /** Pure aggregator: sum each capped dimension's weighted subScore. */
@@ -163,17 +198,24 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
   const windowStart = new Date(
     Date.now() - IRC_SCORE_CONFIG.windowDays * 24 * 60 * 60 * 1000
   );
-  const [user, friendCount, ircActivity] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { createdAt: true, contributed: true, consumed: true }
-    }),
-    prisma.friend.count({ where: { userId } }),
-    prisma.ircActivity.findMany({
-      where: { userId, day: { gte: windowStart } },
-      select: { channel: true, day: true, msgCount: true }
-    })
-  ]);
+  const [user, friendCount, ircActivity, stylesheetAdoptions] =
+    await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { createdAt: true, contributed: true, consumed: true }
+      }),
+      prisma.friend.count({ where: { userId } }),
+      prisma.ircActivity.findMany({
+        where: { userId, day: { gte: windowStart } },
+        select: { channel: true, day: true, msgCount: true }
+      }),
+      // Distinct (adopter, author) pairs where this user is the author — one
+      // ledger row per pair (deduped at write), so a plain count is the distinct
+      // adoption count.
+      prisma.economyTransaction.count({
+        where: { userId, reason: 'CRS_STYLESHEET_ADOPTION' }
+      })
+    ]);
   if (!user) return { score: 0, dimensions: [] };
   return computeCrs({
     userId,
@@ -181,6 +223,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     ratio: computeRatio(user.contributed, user.consumed),
     contributed: user.contributed,
     friendCount,
-    ircActivity
+    ircActivity,
+    stylesheetAdoptions
   });
 };

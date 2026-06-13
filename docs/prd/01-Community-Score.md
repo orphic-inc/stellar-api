@@ -453,3 +453,13 @@ Out of Scope
 - Moderation scoring
 - Automated weighting algorithms
 - CommunityValueIndex calculation
+
+## Future direction — making CRS *bite* (noted 2026-06-13, not scoped)
+
+Today CRS only *accrues* — unlike the **Ratio Mechanism**, which has real teeth (gates downloads, warns, bans), the reputation dimensions (stylesheet, IRC, …) sum into a number with no monitoring, display, or downstream effect yet. Recorded so the gap is explicit, not designed:
+
+- **Positive-reinforcement teeth (privilege-granting).** High reputation should *unlock capability*, not gate downloads (CRS never gates downloads — that stays the Ratio Mechanism's job). E.g. a high **IRCScore** earns rights to create official channels or moderate specific community channels (see PRD-02). This is a distinct lever from ratio enforcement.
+- **Staff Toolbox.** CRS (and its dimensions) surface to staff for monitoring/triage in a **Staff Toolbox** — the display/admin surface for the whole reputation system. Out of purview today.
+- **Community Toolbox.** A forward-looking surface letting **Community Staff** manage their *own* community (a la the Community Do-Not-Contribute list) — where Community-scoped levers (the Community Stylesheet slot, channel moderation grants) would live. Much further down the path.
+
+These are the home for the eventual "what does a score *do*" decisions; capturing them here keeps the dimension work (stylesheet #120, IRC) honest about being substrate, not yet consequence.

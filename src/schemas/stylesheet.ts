@@ -22,3 +22,13 @@ export const stylesheetUpdateSchema = z
 
 export type StylesheetInput = z.infer<typeof stylesheetSchema>;
 export type StylesheetUpdateInput = z.infer<typeof stylesheetUpdateSchema>;
+
+// PRD-03 #118 — a user-authored stylesheet (one per author) saved for others to
+// adopt. `source` is the raw CSS/SCSS; injection isolation is the UI injector's
+// job (ADR-0003), so it is stored verbatim, not sanitized here.
+export const authorStylesheetSchema = z.object({
+  name: z.string().min(1).max(100),
+  source: z.string().min(1).max(100_000)
+});
+
+export type AuthorStylesheetInput = z.infer<typeof authorStylesheetSchema>;
