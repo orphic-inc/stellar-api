@@ -35,15 +35,10 @@ export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };
 
-// IRC integration (PRD-02). Both secrets default to empty and the guarding
-// middleware fails closed when unset — the endpoints are inert until the
-// stellar-compose stack provides them.
-export const irc = {
-  // Scoped token the announce/activity bot presents (Golden Rule 5 —
-  // automation via the API only).
-  botToken: process.env.STELLAR_IRC_BOT_TOKEN ?? '',
-  // Shared secret for Ergo's internal SASL-validate callback (ADR-0011).
-  saslSecret: process.env.STELLAR_IRC_SASL_SECRET ?? ''
+export const korin = {
+  apiUrl: process.env.KORIN_API_URL ?? '',
+  pullKey: process.env.KORIN_PULL_KEY ?? '',
+  pollIntervalMs: parseInt(process.env.KORIN_POLL_INTERVAL_MS ?? '300000', 10) // 5 min
 };
 
 export const email = {

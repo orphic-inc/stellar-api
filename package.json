@@ -23,6 +23,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed-wiki": "ts-node prisma/scripts/seed-wiki-irc-community.ts",
     "db:studio": "prisma studio",
     "prepare": "husky install || true"
   },

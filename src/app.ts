@@ -28,6 +28,7 @@ import { writeLimiter } from './middleware/rateLimiter';
 import { startLinkHealthJob } from './modules/linkHealthJob';
 import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
+import { startIrcJob } from './modules/ircJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -230,6 +231,7 @@ export const createApp = () => {
     startLinkHealthJob();
     startStatsJob();
     startDonorExpiryJob();
+    startIrcJob();
   }
 
   return app;
