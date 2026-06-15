@@ -8,8 +8,8 @@ Node.js / Express / TypeScript REST API with PostgreSQL (Prisma ORM) and JWT coo
 npm run dev              # nodemon + ts-node
 npm run build            # tsc
 npx tsc --noEmit         # type-check only (run before committing)
-npm run format           # prettier --write src — run on ALL changed files before committing
-npm run lint             # eslint src --ext .ts — run before committing; must be clean on new/changed files
+npm run format           # prettier --write src + prisma/**/*.ts — run on ALL changed files before committing
+npm run lint             # eslint src prisma --ext .ts — run before committing; must be clean on new/changed files
 npm run test             # jest --runInBand
 npm run test:watch       # jest --watch
 npm run test:integration # integration tests (requires .env.test)
@@ -25,7 +25,7 @@ npm run db:studio        # prisma studio
 
 Run every step before committing. All must pass clean on new/changed files.
 
-1. `npm run format` — format **all** of `src/` (not just changed files — confirms nothing else drifted)
+1. `npm run format` — format **all** of `src/` and `prisma/**/*.ts` (not just changed files — confirms nothing else drifted)
 2. `npm run lint` — must be clean on new/changed files; pre-existing errors in untouched files are acceptable
 3. `npx tsc --noEmit` — must be clean
 4. `npm run test --no-coverage` — full suite must pass
