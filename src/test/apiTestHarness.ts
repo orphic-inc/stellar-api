@@ -162,7 +162,7 @@ jest.mock('../modules/config', () => ({
     fromAddress: 'noreply@stellar.local',
     siteUrl: 'http://localhost:3000'
   },
-  irc: { botToken: 'test-bot-token', saslSecret: 'test-sasl-secret' }
+  korin: { apiUrl: '', pullKey: '', pollIntervalMs: 300000 }
 }));
 
 let currentUserRankLevel = 1000;

@@ -17,11 +17,7 @@
  */
 import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
-import {
-  scoreIrcActivity,
-  IRC_SCORE_CONFIG,
-  type IrcActivityRow
-} from './ircScore';
+import { getIrcScore } from './irc';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
@@ -34,8 +30,8 @@ export interface DimensionInput {
   contributed?: bigint;
   /** Number of friend relationships. Defaults to 0. */
   friendCount?: number;
-  /** Trailing-window IRC activity rollup rows (ADR-0012). Defaults to empty. */
-  ircActivity?: IrcActivityRow[];
+  /** IRC nick linked to this account — used to look up the cached IRCScore. */
+  ircNick?: string | null;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -124,19 +120,24 @@ const friendsScorer: DimensionScorer = {
     FRIENDS_CAP * (1 - Math.exp(-Math.max(0, friendCount) / FRIENDS_TAU))
 };
 
-// ─── IRCScore ───────────────────────────────────────────────────────────────
-// Real-time community participation (PRD-02). A bounded scorer over the IRC
-// activity rollup (ADR-0012): messages only — presence/idle never counts. The
-// pure scorer and its anti-farming structure live in `ircScore.ts`; magnitudes
-// are provisional, hand-pinned later (HITL, #141).
+// ─── IRCScore ─────────────────────────────────────────────────────────────
+// PRD-01 v0.1.x. Reads the last flush window cached by ircJob.ts from korin.pink.
+// Formula: activity × consistency × channelQuality (see irc.ts for definitions).
+// Returns 0 if the user has no linked nick or no data in the current window —
+// IRC presence is optional; absence is not penalised (ADR-0005).
+const IRC_CAP = 6;
 const IRC_WEIGHT = 1.0;
 
 const ircScorer: DimensionScorer = {
   name: 'irc',
   weight: IRC_WEIGHT,
-  cap: IRC_SCORE_CONFIG.cap,
-  compute: ({ ircActivity = [], now }) =>
-    scoreIrcActivity(ircActivity, IRC_SCORE_CONFIG, now ?? new Date())
+  cap: IRC_CAP,
+  compute: ({ ircNick }) => {
+    if (!ircNick) return 0;
+    const raw = getIrcScore(ircNick);
+    // getIrcScore returns [0,1]; scale up to cap so the dimension fills its range
+    return raw !== null ? raw * IRC_CAP : 0;
+  }
 };
 
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
@@ -160,19 +161,17 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
 export const getReputation = async (userId: number): Promise<CrsResult> => {
-  const windowStart = new Date(
-    Date.now() - IRC_SCORE_CONFIG.windowDays * 24 * 60 * 60 * 1000
-  );
-  const [user, friendCount, ircActivity] = await Promise.all([
+  const [user, friendCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { createdAt: true, contributed: true, consumed: true }
+      select: {
+        createdAt: true,
+        contributed: true,
+        consumed: true,
+        ircNick: true
+      }
     }),
-    prisma.friend.count({ where: { userId } }),
-    prisma.ircActivity.findMany({
-      where: { userId, day: { gte: windowStart } },
-      select: { channel: true, day: true, msgCount: true }
-    })
+    prisma.friend.count({ where: { userId } })
   ]);
   if (!user) return { score: 0, dimensions: [] };
   return computeCrs({
@@ -181,6 +180,6 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     ratio: computeRatio(user.contributed, user.consumed),
     contributed: user.contributed,
     friendCount,
-    ircActivity
+    ircNick: user.ircNick
   });
 };

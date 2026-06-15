@@ -822,6 +822,57 @@ router.get(
   })
 );
 
+// PUT /api/users/:id/irc-nick — link or clear an IRC nick (self or admin)
+const ircNickSchema = z.object({
+  ircNick: z
+    .string()
+    .max(30)
+    .regex(
+      /^[a-zA-Z_\-[\]\\^{}|`][a-zA-Z0-9_\-[\]\\^{}|`]*$/,
+      'Invalid IRC nick'
+    )
+    .nullable()
+});
+
+router.put(
+  '/:id/irc-nick',
+  requireAuth,
+  validateParams(userIdParamsSchema),
+  validate(ircNickSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { ircNick } = parsedBody<{ ircNick: string | null }>(res);
+
+    const perms = await loadPermissions(req, res);
+    const isAdmin = hasPermission(perms, 'admin');
+    const isSelf = req.user.id === id;
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ msg: 'Permission denied' });
+    }
+
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: { ircNick: ircNick ?? null }
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (
+        msg.includes('Unique constraint') ||
+        msg.includes('User_ircNick_key')
+      ) {
+        return res
+          .status(409)
+          .json({ msg: 'IRC nick already claimed by another account' });
+      }
+      throw err;
+    }
+
+    res.json({ msg: ircNick ? 'IRC nick linked' : 'IRC nick cleared' });
+  })
+);
+
 // GET /api/users/:id/snatch-list
 router.get(
   '/:id/snatch-list',

@@ -28,6 +28,7 @@ import { writeLimiter } from './middleware/rateLimiter';
 import { startLinkHealthJob } from './modules/linkHealthJob';
 import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
+import { startIrcJob } from './modules/ircJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -74,10 +75,6 @@ import staffRouter from './routes/api/staff';
 import rulesRouter from './routes/api/rules';
 import friendsRouter from './routes/api/friends';
 import tagAliasesRouter from './routes/api/tagAliases';
-import keysRouter from './routes/api/keys';
-import ircRouter from './routes/api/irc';
-import announceRouter from './routes/api/announce';
-import ircSaslRouter from './routes/internal/ircSasl';
 import devToolsRouter from './routes/api/devTools';
 
 const log = getLogger('app');
@@ -121,11 +118,6 @@ export const createApp = () => {
   app.use('/api/install', installRouter);
   app.use('/api/docs/json', specRouter);
   app.use('/api/docs', uiRouter);
-
-  // INTERNAL — Ergo's delegated SASL-validate callback (ADR-0011). Mounted
-  // OUTSIDE /api on purpose: it inherits none of the public-router middleware
-  // and must be network-isolated (never the public ingress) in stellar-compose.
-  app.use('/internal/irc', ircSaslRouter);
 
   app.use('/api', async (_req: Request, res: Response, next: NextFunction) => {
     if (await isInstalled()) return next();
@@ -185,9 +177,6 @@ export const createApp = () => {
   app.use('/api/rules', rulesRouter);
   app.use('/api/friends', friendsRouter);
   app.use('/api/tag-aliases', tagAliasesRouter);
-  app.use('/api/keys', keysRouter);
-  app.use('/api/irc', ircRouter);
-  app.use('/api/announce', announceRouter);
 
   // Dev tools — only mounted outside production
   if (process.env.NODE_ENV !== 'production') {
@@ -230,6 +219,7 @@ export const createApp = () => {
     startLinkHealthJob();
     startStatsJob();
     startDonorExpiryJob();
+    startIrcJob();
   }
 
   return app;

@@ -37,15 +37,16 @@ Run every step before committing. All must pass clean on new/changed files.
 
 Copy `.env.default` → `.env`.
 
-| Variable | Purpose |
-|---|---|
-| `STELLAR_PSQL_URI` | PostgreSQL connection string |
-| `STELLAR_AUTH_JWT_SECRET` | JWT signing secret |
-| `STELLAR_HTTP_PORT` | Server port (default 8080) |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin |
-| `STELLAR_LOG_LEVEL` | Winston log level (default `info`) |
-| `STELLAR_IRC_BOT_TOKEN` | Scoped token the announce bot presents to `/api/irc/*` (PRD-02; fails closed when unset) |
-| `STELLAR_IRC_SASL_SECRET` | Shared secret for Ergo's internal SASL-validate callback `/internal/irc/sasl` (ADR-0011; fails closed when unset) |
+| Variable                   | Purpose                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| `STELLAR_PSQL_URI`         | PostgreSQL connection string                                                              |
+| `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                        |
+| `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                                |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                       |
+| `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                        |
+| `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)               |
+| `KORIN_PULL_KEY`           | Auth key stellar presents when polling korin.pink (ADR-0013; polling disabled when unset) |
+| `KORIN_POLL_INTERVAL_MS`   | IRC metrics poll interval (default 300000 = 5 min)                                        |
 
 ## Architecture
 
@@ -79,22 +80,17 @@ src/
     top10.ts                # Ranked list logic: binomial scoring, TTL caching, snapshots
     user.ts                 # User query helpers
     reputation.ts           # CRS dimension registry (longevity/ratio/friends/irc); pure scorers + read-time assembler
-    keys.ts                 # Per-user IRC/Announce key generate/rotate (PRD-02)
-    ircActivity.ts          # IrcActivity rollup upsert — messages-only (ADR-0012)
-    ircScore.ts             # Pure scoreIrcActivity() + provisional magnitudes (the IRCScore dimension)
-    ircAuth.ts              # Delegated SASL validation — validateSasl (ADR-0011)
-    announceFeed.ts         # Release-Announce Feed: AnnounceKey resolve, feed query, RSS render
+    irc.ts                  # korin.pink metrics poll client + pure IRCScore scorer (getIrcScore); ADR-0013
+    ircJob.ts               # Background poll job — fetches korin.pink IRC metrics into the in-process cache (ADR-0013)
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user
     permissions.ts          # requirePermission, requireAuth, isModerator
-    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter, saslLimiter
-    sharedSecret.ts         # requireBotToken / requireSaslSecret — Bearer shared-secret gate (fails closed)
+    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter
     validate.ts             # validate(bodySchema), validateParams(paramsSchema)
   lib/
     prisma.ts               # Singleton PrismaClient
     audit.ts                # audit(prisma, actorId, action, targetType, targetId, meta?)
     errors.ts               # AppError class (extends Error with statusCode)
-    secureCompare.ts        # Constant-time string equality (length-tolerant)
     mailer.ts               # SMTP email utility (sendInviteEmail)
     openapi.ts              # Auto-generated OpenAPI type definitions
     pagination.ts           # parsePage(req) → { skip, limit, page }
@@ -147,9 +143,6 @@ src/
     stylesheet.ts           # User stylesheets
     wiki.ts                 # Wiki pages, aliases, revisions
     docs.ts                 # API docs endpoint
-    keys.ts                 # GET / (my keys), POST /:kind (generate), POST /:kind/rotate
-    irc.ts                  # POST /activity — bot-token scoped IrcActivity upsert
-    announce.ts             # GET /feed (JSON), GET /feed.xml (RSS) — AnnounceKey-gated
     communities/
       communities.ts        # Community CRUD
       release.ts            # Release CRUD under /:communityId/releases
@@ -165,8 +158,6 @@ src/
       forumPollVote.ts      # Poll voting
       forumTopicNote.ts     # Moderator notes on topics
       forumLastReadTopic.ts # Read-position tracking
-  routes/internal/          # NOT under /api — network-isolated, never public ingress
-    ircSasl.ts              # POST /sasl — Ergo's delegated SASL-validate callback (ADR-0011)
 ```
 
 ## req.user shape
@@ -178,6 +169,7 @@ req.user = { id: number; userRankId: number; userRankLevel: number }
 ```
 
 `AuthUser` in `types/auth.ts` also carries optional `contributed`/`consumed` as strings (BigInt serialization). `userRankLevel` enables inline forum class checks without extra queries:
+
 ```ts
 if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) { ... }
 ```
@@ -185,10 +177,13 @@ if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) { ... }
 ## Established patterns
 
 ### Business logic in modules
+
 Route handlers delegate to domain modules in `src/modules/`. Modules own DB queries, transactions, and business rules. Routes handle HTTP concerns (auth, validation, response shape).
 
 ### Body validation
+
 Always run `validate(schema)` before the handler. Destructure using the Zod-inferred type:
+
 ```ts
 validate(loginSchema),
 asyncHandler(async (req, res) => {
@@ -196,7 +191,9 @@ asyncHandler(async (req, res) => {
 ```
 
 ### Param validation
+
 Use `validateParams` with `z.coerce` for numeric IDs — never use raw `parseInt` + `isNaN`:
+
 ```ts
 const artistIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
 router.get('/:id', validateParams(artistIdParamsSchema), asyncHandler(async (req, res) => {
@@ -204,9 +201,11 @@ router.get('/:id', validateParams(artistIdParamsSchema), asyncHandler(async (req
 ```
 
 ### Static routes before parameterized
+
 Any static-segment route (`/history/:artistId`, `/settings`) must be registered **before** `/:id` in the same router or Express shadows it.
 
 ### Auth & permissions
+
 ```ts
 requireAuth                                // sets req.user or 401
 ...requirePermission('admin')              // spread — includes requireAuth
@@ -214,27 +213,36 @@ requireAuth                                // sets req.user or 401
 const perms = await loadPermissions(req, res);
 if (!hasPermission(perms, 'forums_moderate')) { ... }
 ```
+
 Do not introduce named role checks (`isModerator`, `isStaffUser`). See `docs/adr/0001-granular-permission-checks.md`.
 
 ### Pagination
+
 ```ts
-const pg = parsePage(req);  // reads ?page=&limit= with sane defaults
-const [rows, total] = await Promise.all([prisma.foo.findMany({ skip: pg.skip, take: pg.limit }), prisma.foo.count()]);
+const pg = parsePage(req); // reads ?page=&limit= with sane defaults
+const [rows, total] = await Promise.all([
+  prisma.foo.findMany({ skip: pg.skip, take: pg.limit }),
+  prisma.foo.count()
+]);
 paginatedResponse(res, rows, total, pg);
 ```
 
 ### Typed errors
+
 Throw `new AppError('message', statusCode)` from modules; the global handler in `app.ts` catches it and sends `{ msg }` with the correct status.
 
 ### Soft delete
+
 Users are never hard-deleted — set `disabled: true`. Filter active users with `where: { disabled: false }`. Forum topics and posts use `deletedAt`.
 
 ### Error responses
+
 - Field-level validation: `{ errors: { field: [msgs] } }` — emitted by `validate.ts`
 - Single-message errors: `{ msg: "..." }` — used everywhere else
 - Never use `{ error: "..." }` (old global handler shape — now standardized)
 
 ### Transactions
+
 Use `prisma.$transaction([...])` (batch) for fire-and-forget operations where partial failure would leave bad state. Use `prisma.$transaction(async tx => ...)` (interactive) when you need the result of one operation to inform the next.
 
 ## Testing
@@ -246,6 +254,7 @@ Use `prisma.$transaction([...])` (batch) for fire-and-forget operations where pa
 ## Audit history
 
 Five rounds of audit remediation have been applied to this codebase. Key items completed:
+
 - Auth shape: `{ user: AuthUser }` wrapper, JWT issued as HttpOnly cookie
 - `req.user` carries `userRankLevel` from DB lookup in auth middleware
 - Forum class enforcement (`minClassRead`, `minClassCreate`, `minClassWrite`)
@@ -263,22 +272,22 @@ Five rounds of audit remediation have been applied to this codebase. Key items c
 
 These Prisma models exist in `schema.prisma` but have no API routes:
 
-| Model | Status |
-|---|---|
-| `CoverArt` | Planned — release art management |
-| `Donation`, `BitcoinDonation`, `DonorReward` | Planned — donor system |
-| `DonorRank`, `UserDonorRank`, `DonorForumUsername` | Planned — donor ranks |
-| `Applicant`, `Thread` | Planned — application/thread system |
-| `Friend` | Planned — social feature |
-| `Concert`, `ContestType` | Planned — events/contests |
-| `MassMessage`, `News`, `Note` | Planned — admin messaging/content |
-| `IpBan`, `EmailBlacklist`, `BadPassword` | Planned — admin moderation tools |
-| `EconomyTransaction`, `CurrencyConversionRate` | Planned — economy system |
-| `FeaturedMerch` | Planned — merch feature |
-| `AccountRecovery`, `UserEmailHistory`, `UserWarning` | Planned — user management |
-| `InviteTree`, `PmDraft`, `GroupLog` | Planned — misc features |
-| `ApiApplication`, `ApiUser` | Deferred indefinitely |
-| `TopTenLeaderboard` | Superseded by `Top10Snapshot` / `top10.ts` route |
+| Model                                                | Status                                           |
+| ---------------------------------------------------- | ------------------------------------------------ |
+| `CoverArt`                                           | Planned — release art management                 |
+| `Donation`, `BitcoinDonation`, `DonorReward`         | Planned — donor system                           |
+| `DonorRank`, `UserDonorRank`, `DonorForumUsername`   | Planned — donor ranks                            |
+| `Applicant`, `Thread`                                | Planned — application/thread system              |
+| `Friend`                                             | Planned — social feature                         |
+| `Concert`, `ContestType`                             | Planned — events/contests                        |
+| `MassMessage`, `News`, `Note`                        | Planned — admin messaging/content                |
+| `IpBan`, `EmailBlacklist`, `BadPassword`             | Planned — admin moderation tools                 |
+| `EconomyTransaction`, `CurrencyConversionRate`       | Planned — economy system                         |
+| `FeaturedMerch`                                      | Planned — merch feature                          |
+| `AccountRecovery`, `UserEmailHistory`, `UserWarning` | Planned — user management                        |
+| `InviteTree`, `PmDraft`, `GroupLog`                  | Planned — misc features                          |
+| `ApiApplication`, `ApiUser`                          | Deferred indefinitely                            |
+| `TopTenLeaderboard`                                  | Superseded by `Top10Snapshot` / `top10.ts` route |
 
 ## Agent skills
 
