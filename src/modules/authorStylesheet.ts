@@ -15,16 +15,26 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { sanitizeStylesheetSource } from '../lib/cssSanitize';
 import { scoreStylesheetSelection } from './stylesheetScore';
 import type { AuthorStylesheetInput } from '../schemas/stylesheet';
 
-/** Create a new AuthorStylesheet for the calling author (many per author). */
+/**
+ * Create a new AuthorStylesheet for the calling author (many per author).
+ *
+ * `source` is sanitized at store-time (ADR-0003): the injected artifact is kept
+ * safe in the database, not just at render. See `lib/cssSanitize.ts`.
+ */
 export const createAuthorStylesheet = (
   authorId: number,
   input: AuthorStylesheetInput
 ) =>
   prisma.authorStylesheet.create({
-    data: { authorId, name: input.name, source: input.source }
+    data: {
+      authorId,
+      name: input.name,
+      source: sanitizeStylesheetSource(input.source)
+    }
   });
 
 /** List an author's stylesheets, oldest first. */
