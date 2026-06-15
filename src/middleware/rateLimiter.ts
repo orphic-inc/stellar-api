@@ -46,11 +46,3 @@ export const downloadLimiter = createLimiter(
   10,
   'Too many download requests, please slow down'
 );
-
-// Ergo's internal SASL-validate callback (ADR-0011). Generous enough not to
-// throttle legitimate login bursts from the IRCd, but still bounded.
-export const saslLimiter = createLimiter(
-  60 * 1000,
-  300,
-  'Too many SASL validation attempts, please slow down'
-);

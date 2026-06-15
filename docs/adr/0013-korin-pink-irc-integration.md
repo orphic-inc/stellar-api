@@ -75,24 +75,29 @@ The reconcile lands as part of the `feat/korin-pink` integration onto `main`. Ne
 - New migration (run via `prisma migrate dev` — interactive TTY required):
 
   ```sql
-  -- ADR-0013: korin.pink external IRC supersedes in-repo build
-  DROP TABLE IF EXISTS "irc_activity";          -- IrcActivity @@map("irc_activity")
-  ALTER TABLE "User" DROP COLUMN IF EXISTS "ircKey";
-  ALTER TABLE "User" DROP COLUMN IF EXISTS "announceKey";
-  ALTER TABLE "User" ADD COLUMN "ircNick" TEXT;
-  CREATE UNIQUE INDEX "User_ircNick_key" ON "User"("ircNick");
+  -- ADR-0013: korin.pink external IRC supersedes the in-repo build.
+  -- Table is mapped to "users"; reverses 20260613000000 + 20260613000001.
+  DROP TABLE "irc_activity";
+  DROP INDEX "users_ircKey_key";
+  DROP INDEX "users_announceKey_key";
+  ALTER TABLE "users" DROP COLUMN "ircKey",
+  DROP COLUMN "announceKey";
+  ALTER TABLE "users" ADD COLUMN "ircNick" TEXT;
+  CREATE UNIQUE INDEX "users_ircNick_key" ON "users"("ircNick");
   ```
+
+  Committed as `prisma/migrations/20260614000000_korin_pink_supersede_irc/`. Run `prisma migrate dev` (interactive TTY) to apply / verify against the schema.
 
 **Code — merge conflicts (6).** Rebasing `feat/korin-pink` onto `main` surfaces exactly six conflicting files. Three are clean side-takes (korin wins); three are genuine hand-merges where a naive side-take loses non-IRC work:
 
-| File | Resolution |
-| --- | --- |
-| `src/modules/config.ts` | Take korin — drop the `irc` `{ botToken, saslSecret }` block, keep `korin` `{ apiUrl, pullKey, pollIntervalMs }`. |
-| `src/modules/reputation.ts` | Take korin (4 hunks) — `ircScorer` reads `getIrcScore(ircNick)` from `irc.ts`, `ircNick` in `DimensionInput`, drop the `prisma.ircActivity` query. Self-consistent: imports `./irc`, defines `IRC_CAP = 6` locally. |
-| `src/modules/reputation.spec.ts` | Take korin — its tests cover the external IRCScore; main's cover the deleted in-repo scorer (~166 lines, effectively two different files). |
-| `prisma/schema.prisma` | **Hand-merge** — main's `User` model (no `communityPass` per #134, no `ircKey`/`announceKey`) **+** korin's `ircNick String? @unique`. korin's branch still carries `communityPass`; a blind take reintroduces it. |
-| `package.json` | **Hand-merge** — main's `version` + `prepare: husky install` **+** korin's `db:seed-wiki` script. |
-| `CHANGELOG.md` | **Hand-merge** — keep main's structure/entries; rewrite korin's `[0.5.61]` entry for the *external* korin.pink (it currently cites the to-be-deleted `irc.ts`/`ircJob.ts` and the old "ADR-0005" → now ADR-0013). |
+| File                             | Resolution                                                                                                                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/modules/config.ts`          | Take korin — drop the `irc` `{ botToken, saslSecret }` block, keep `korin` `{ apiUrl, pullKey, pollIntervalMs }`.                                                                                                   |
+| `src/modules/reputation.ts`      | Take korin (4 hunks) — `ircScorer` reads `getIrcScore(ircNick)` from `irc.ts`, `ircNick` in `DimensionInput`, drop the `prisma.ircActivity` query. Self-consistent: imports `./irc`, defines `IRC_CAP = 6` locally. |
+| `src/modules/reputation.spec.ts` | Take korin — its tests cover the external IRCScore; main's cover the deleted in-repo scorer (~166 lines, effectively two different files).                                                                          |
+| `prisma/schema.prisma`           | **Hand-merge** — main's `User` model (no `communityPass` per #134, no `ircKey`/`announceKey`) **+** korin's `ircNick String? @unique`. korin's branch still carries `communityPass`; a blind take reintroduces it.  |
+| `package.json`                   | **Hand-merge** — main's `version` + `prepare: husky install` **+** korin's `db:seed-wiki` script.                                                                                                                   |
+| `CHANGELOG.md`                   | **Hand-merge** — keep main's structure/entries; rewrite korin's `[0.5.61]` entry for the _external_ korin.pink (it currently cites the to-be-deleted `irc.ts`/`ircJob.ts` and the old "ADR-0005" → now ADR-0013).   |
 
 **Code — in-repo IRC subsystem to delete (#143).** These carry **no conflict markers** — they simply don't exist on korin's side, so the rebase won't flag them. They must be removed by hand and the suite kept green:
 

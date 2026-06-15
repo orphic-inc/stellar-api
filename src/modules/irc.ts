@@ -96,11 +96,9 @@ export const getIrcScore = (nick: string): number | null => {
   const user = payload.users.find((u) => u.nick === nick);
   if (!user) return null;
 
-  const windowDurationSeconds =
-    (user.windowEnd - user.windowStart) / 1000 || 1;
+  const windowDurationSeconds = (user.windowEnd - user.windowStart) / 1000 || 1;
 
-  const activity =
-    Math.log1p(user.messageCount) / Math.log1p(ACTIVITY_REF);
+  const activity = Math.log1p(user.messageCount) / Math.log1p(ACTIVITY_REF);
   const consistency = Math.min(user.presenceSeconds / windowDurationSeconds, 1);
   const channelQuality =
     Math.log1p(user.channelCount) / Math.log1p(CHANNEL_REF);

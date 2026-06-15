@@ -8,13 +8,18 @@ const STARTUP_DELAY_MS = 30_000; // wait 30s after boot before first poll
 
 export const startIrcJob = (): void => {
   if (!korinConfig.apiUrl || !korinConfig.pullKey) {
-    log.warn('KORIN_API_URL or KORIN_PULL_KEY not configured — IRC metrics job disabled');
+    log.warn(
+      'KORIN_API_URL or KORIN_PULL_KEY not configured — IRC metrics job disabled'
+    );
     return;
   }
 
   const outer = setTimeout(() => {
     void pollKorinMetrics();
-    setInterval(() => void pollKorinMetrics(), korinConfig.pollIntervalMs).unref();
+    setInterval(
+      () => void pollKorinMetrics(),
+      korinConfig.pollIntervalMs
+    ).unref();
   }, STARTUP_DELAY_MS);
   outer.unref();
 

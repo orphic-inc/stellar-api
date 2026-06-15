@@ -164,7 +164,12 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
   const [user, friendCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { createdAt: true, contributed: true, consumed: true, ircNick: true }
+      select: {
+        createdAt: true,
+        contributed: true,
+        consumed: true,
+        ircNick: true
+      }
     }),
     prisma.friend.count({ where: { userId } })
   ]);

@@ -827,7 +827,10 @@ const ircNickSchema = z.object({
   ircNick: z
     .string()
     .max(30)
-    .regex(/^[a-zA-Z_\-\[\]\\^{}|`][a-zA-Z0-9_\-\[\]\\^{}|`]*$/, 'Invalid IRC nick')
+    .regex(
+      /^[a-zA-Z_\-[\]\\^{}|`][a-zA-Z0-9_\-[\]\\^{}|`]*$/,
+      'Invalid IRC nick'
+    )
     .nullable()
 });
 
@@ -855,8 +858,13 @@ router.put(
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('Unique constraint') || msg.includes('User_ircNick_key')) {
-        return res.status(409).json({ msg: 'IRC nick already claimed by another account' });
+      if (
+        msg.includes('Unique constraint') ||
+        msg.includes('User_ircNick_key')
+      ) {
+        return res
+          .status(409)
+          .json({ msg: 'IRC nick already claimed by another account' });
       }
       throw err;
     }
