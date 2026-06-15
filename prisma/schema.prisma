@@ -346,9 +346,8 @@ model User {
   warned             DateTime?
   warnedTimes        Int                 @default(0)
   lastIp             String?
-  ircKey             String?             @unique
-  announceKey        String?             @unique
   disablePm          Boolean             @default(false)
+  ircNick            String?             @unique
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -437,31 +436,11 @@ model User {
   rulesPagesAuthored       RulesPage[]                      @relation("RulesPageAuthor")
   userStatSnapshots        UserStatSnapshot[]
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
-  ircActivity              IrcActivity[]
 
   @@index([userRankId])
   @@map("users")
 }
 
-/// IRC activity rollup — the durable substrate for IRCScore (ADR-0012).
-/// One row per member × channel × day of MESSAGE counts, upserted by the IRC
-/// bot. Messages only — presence/idle is never recorded here (most farmable
-/// signal). The CRS assembler reads a trailing 90-day window of these rows into
-/// DimensionInput; there is no stored ircScore column (ADR-0007 rule 1).
-model IrcActivity {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel   String
-  day       DateTime @db.Date
-  msgCount  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, channel, day])
-  @@index([userId, day])
-  @@map("irc_activity")
-}
 
 model UserSecondaryRank {
   userId       Int
