@@ -68,7 +68,7 @@ The out-of-band stream of new Contributions delivered to a member over RSS/XML a
 _Avoid_: rss feed, announce stream, the firehose
 
 **AnnounceKey**:
-A per-user credential authenticating a member's **Release-Announce Feed** (RSS + IRC announce). It gates *receiving* the stream of new Contributions; it never authenticates a download — release consumption remains a session-authed grant through the **Ratio Mechanism**. Rotatable; rotating it invalidates the prior feed URL.
+A per-user credential authenticating a member's **Release-Announce Feed** (RSS + IRC announce). It gates _receiving_ the stream of new Contributions; it never authenticates a download — release consumption remains a session-authed grant through the **Ratio Mechanism**. Rotatable; rotating it invalidates the prior feed URL.
 _Avoid_: passkey, download key, torrent key
 
 **IRCKey**:
@@ -76,12 +76,24 @@ A per-user credential authenticating a member's **identity on the IRC network** 
 _Avoid_: irc password, chat token, drone key
 
 **IRCScore**:
-A bounded CRS **Dimension Scorer** derived from a member's *message* activity on IRC over a trailing window — message volume weighted by channel and scaled by how many distinct days they were active. Presence/idle never contributes (anti-farming); only messages count. Capped with diminishing returns like every dimension, so IRC cannot dominate reputation.
+A bounded CRS **Dimension Scorer** derived from a member's _message_ activity on IRC over a trailing window — message volume weighted by channel and scaled by how many distinct days they were active. Presence/idle never contributes (anti-farming); only messages count. Capped with diminishing returns like every dimension, so IRC cannot dominate reputation.
 _Avoid_: irc activity, chat score, presence score
 
 **IRC Activity Rollup**:
-The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is *irreducible* (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
+The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is _irreducible_ (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
 _Avoid_: irc log, activity table, message history
+
+**Chrome Layer**:
+The high-priority CSS `@layer` / `all: revert` boundary that renders critical app chrome (navigation, staff/admin and moderation controls) so an injected user stylesheet cannot override or hide it. The isolation half of the stylesheet trust boundary; user themes cascade everywhere else, and a store-time sanitizer + inject-time CSP cover the exfiltration half (ADR-0003).
+_Avoid_: sandbox, shadow root, reset wrapper
+
+**Standing**:
+A member's five-rung governance tier — `pristine | clean | neutral | poor | hammer` — computed on read from active **Warnings**, ban state, and account tenure (never a stored column). It _scales_ rule impact on the CRS (pristine amplifies compliance rewards, hammer amplifies violation penalties); it is not a **Dimension Scorer** and never gates access (ADR-0004).
+_Avoid_: reputation tier, warning level, standing score, rank
+
+**Contagion**:
+The invite-tree suspicion that flows from an infected _trunk_ (a banned or ban-evading inviter) down to its _branches_ (the invitees). A **graded**, distance-decaying signal — suspect, not condemned — owned by the InviteTree. Distinct from a member's own **confirmed** ban-evasion, which alone reaches the terminal `hammer` **Standing**.
+_Avoid_: tree poisoning, ban inheritance, guilt by association
 
 ## Relationships
 
@@ -91,6 +103,7 @@ _Avoid_: irc log, activity table, message history
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 - A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
 - The **AnnounceKey** authenticates the **Release-Announce Feed** (RSS + IRC) and the **IRCKey** authenticates IRC identity; the two paired enable IRC-delivered release announcements. Neither replaces the **Identity State** on the session-authed download path — they authenticate out-of-band channels only, never a download.
+- **Standing** is computed on read from **Warnings** / ban state / tenure and _scales_ rule impact on the CRS via `ruleImpact`; it is never a **Dimension Scorer** and never gates access (enforcement stays granular permissions). A member's own **confirmed** ban-evasion feeds the terminal `hammer` rung, whereas invite-tree **Contagion** feeds only a graded suspicion — suspect is not condemned.
 
 ## Flagged Ambiguities
 

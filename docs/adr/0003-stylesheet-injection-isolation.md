@@ -1,12 +1,30 @@
 # Stylesheet injection isolation & sanitization
 
-**Status: Proposed — decision pending.** Records the decision to be made; see [PRD-03](../prd/03-stylesheet-themes-and-scoring.md). (ADR-0002 is reserved for community-health-pulse, [#75](https://github.com/orphic-inc/stellar-api/issues/75).)
+**Status: Accepted.** Records the isolation + sanitization strategy for user-supplied stylesheets; see [PRD-03](../prd/03-stylesheet-themes-and-scoring.md). Resolves decision [#130](https://github.com/orphic-inc/stellar-api/issues/130). (ADR-0002 is reserved for community-health-pulse, [#75](https://github.com/orphic-inc/stellar-api/issues/75).)
 
-User-supplied stylesheets (`profile.externalStylesheet` / AuthorStylesheetUrl) are injected site-wide by the stellar-ui `StylesheetInjector`. This is a trust boundary: an unscoped user stylesheet can break the app chrome or carry an injection/exfiltration vector. The URL is format-validated (`z.string().url()`), but format validation is not safety. Mitigated in part by the `/private/` invite-only model, but the injection mechanics still need a decided isolation strategy.
+## Context
 
-Decision to record here (not yet made):
+User-supplied stylesheets — an inline-stored `AuthorStylesheet.source` (raw CSS) and a `profile.externalStylesheet` URL — are injected site-wide by stellar-ui's `StylesheetInjector`. This is a trust boundary: an unscoped sheet can break or visually hijack app chrome (hide moderation/admin controls, clickjack) or carry an exfiltration vector (`@import`, `url()`, `@font-face` firing requests to arbitrary hosts). The URL is format-validated (`z.string().url()`) and `source` is length-capped (100 KB), but neither is a safety control. The `/private/` invite-only model mitigates but does not eliminate the threat (a compromised or malicious member).
 
-- **Isolation:** how user CSS is scoped so it cannot override app chrome — a global-CSS-reset boundary (e.g. `all: revert` on a container, per MDN) around the injected sheet vs. iframe/shadow-DOM sandbox. This is the "Global SCSS/CSS reset flag" in PRD-03.
-- **Sanitization / fetch policy:** proxy + scan server-side, host allowlist, CSP `style-src`, and handling of `url()` / `@import` inside user CSS.
+The product goal is **site-wide** theming — the theme must cascade into the real DOM — which rules out sandboxing the theme away from the app.
 
-_Fill in the chosen approach and consequences once decided._
+## Decision
+
+A two-arm, defense-in-depth boundary.
+
+### Arm 1 — Isolation: a protected-chrome layer, not a sandbox
+
+User CSS is injected into the real document so theming works, but **critical app chrome** (primary navigation, staff/admin and moderation controls) is rendered inside a high-priority CSS `@layer` and/or an `all: revert` reset container that user sheets cannot override. Themeable regions accept the cascade; chrome is locked. This is the "Global SCSS/CSS reset flag" PRD-03 anticipates. A sandbox (iframe / shadow DOM) is **rejected**: it can only theme content inside the sandbox and cannot theme the app's own chrome, which defeats the feature.
+
+### Arm 2 — Sanitization & fetch: clean at ingestion, constrained at injection
+
+- **Store-time (server, the ingestion path):** `AuthorStylesheet.source` is sanitized **before it is persisted** — `@import` stripped, and `url()` / `@font-face src` constrained to an allowlist or `data:` URIs — so the stored artifact is already safe (fail-closed, matching the API's posture). `source` is treated as **plain CSS**; server-side compilation of untrusted SCSS is out of scope.
+- **Inject-time (UI + headers):** a Content-Security-Policy backstops the injector — `style-src 'unsafe-inline'` for the theme, with `img-src` / `font-src` / `connect-src` locked so any construct the store-time pass misses still cannot exfiltrate.
+- **ExternalStylesheet URL:** the same fetch constraints (host allowlist / CSP) apply; an authorless or dead external URL is a prune/investigate + link-health concern (PRD-03), not a render-time trust grant.
+
+## Consequences
+
+- **#145 changes before merge:** the AuthorStylesheet ingestion path gains a store-time CSS sanitizer; it does **not** merge storing raw `source`.
+- `source` is plain CSS at the boundary; the SCSS-vs-stored-file shape question in PRD-03 narrows to CSS-in, with any authoring-time SCSS compilation happening client-side before submission.
+- The injector spec (PRD-03 descent target #5, stellar-ui) asserts the chrome layer + CSP — the UI half of this boundary.
+- Defense-in-depth: a bypass must defeat the store-time sanitizer, the CSP, and the chrome layer together.
