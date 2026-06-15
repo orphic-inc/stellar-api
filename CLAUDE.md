@@ -37,16 +37,17 @@ Run every step before committing. All must pass clean on new/changed files.
 
 Copy `.env.default` → `.env`.
 
-| Variable                   | Purpose                                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `STELLAR_PSQL_URI`         | PostgreSQL connection string                                                              |
-| `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                        |
-| `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                                |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                       |
-| `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                        |
-| `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)               |
-| `KORIN_PULL_KEY`           | Auth key stellar presents when polling korin.pink (ADR-0013; polling disabled when unset) |
-| `KORIN_POLL_INTERVAL_MS`   | IRC metrics poll interval (default 300000 = 5 min)                                        |
+| Variable                   | Purpose                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `STELLAR_PSQL_URI`         | PostgreSQL connection string                                                             |
+| `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                       |
+| `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                               |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                      |
+| `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                       |
+| `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)              |
+| `KORIN_PULL_KEY`           | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013) |
+| `KORIN_POLL_INTERVAL_MS`   | IRC metrics poll + announce push interval (default 300000 = 5 min)                       |
+| `STELLAR_SERVICE_KEY`      | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed     |
 
 ## Architecture
 
@@ -82,10 +83,13 @@ src/
     reputation.ts           # CRS dimension registry (longevity/ratio/friends/irc); pure scorers + read-time assembler
     irc.ts                  # korin.pink metrics poll client + pure IRCScore scorer (getIrcScore); ADR-0013
     ircJob.ts               # Background poll job — fetches korin.pink IRC metrics into the in-process cache (ADR-0013)
+    announce.ts             # Release-Announce publisher — builds new-contribution RSS, pushes to korin POST /irc/announce (ADR-0013)
+    announceJob.ts          # Background job — cursor over new contributions, pushes each to korin (ADR-0013)
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user
     permissions.ts          # requirePermission, requireAuth, isModerator
     rateLimiter.ts          # authLimiter, writeLimiter, installLimiter
+    serviceAuth.ts          # requireServiceKey — Bearer gate for korin.pink inbound calls (ADR-0013; fails closed)
     validate.ts             # validate(bodySchema), validateParams(paramsSchema)
   lib/
     prisma.ts               # Singleton PrismaClient

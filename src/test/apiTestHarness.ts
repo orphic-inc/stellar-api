@@ -162,7 +162,12 @@ jest.mock('../modules/config', () => ({
     fromAddress: 'noreply@stellar.local',
     siteUrl: 'http://localhost:3000'
   },
-  korin: { apiUrl: '', pullKey: '', pollIntervalMs: 300000 }
+  korin: {
+    apiUrl: '',
+    pullKey: '',
+    pollIntervalMs: 300000,
+    serviceKey: 'test-service-key'
+  }
 }));
 
 let currentUserRankLevel = 1000;

@@ -129,3 +129,32 @@ The reconcile lands as part of the `feat/korin-pink` integration onto `main`. Ne
 - The `TtlCache` is per-process; multi-instance deployments each poll independently (Redis is the upgrade path).
 - The in-repo IRC build (#143) is effectively reverted at the IRC layer. Its commit history stays on `main`; this ADR is the record of why it was superseded rather than extended.
 - korin-pink's flush window (`FLUSH_INTERVAL_MS`, 60s) sets signal granularity; stellar's poll interval (`KORIN_POLL_INTERVAL_MS`, 5min) sets freshness. IRCScore reflects the most recent completed flush window at CRS read time.
+
+---
+
+## Integration contract (v0.1.x — bidirectional, corrected 2026-06-15)
+
+> This section is the **single source of truth** for the stellar-api ↔ korin.pink
+> wire contract. It was added after the first cut left ownership and direction
+> under-specified, producing a circular IRCScore claim and an over-removed
+> Announce path. korin.pink mirrors this in `docs/CLAUDE.md` (§Stellar Integration
+> Contract), `docs/domain.md`, and `docs/CONTEXT.md` (open question #1 → resolved).
+
+**Ownership (no overlap):**
+
+- **korin.pink owns the IRC substrate and raw signals** — Ergo, the irc-bridge, and per-user `{messageCount, presenceSeconds, channelCount, channels, window}`. It does **not** compute IRCScore.
+- **stellar-api owns the IRCScore formula, the nick↔account map, and the release data.** IRCScore is computed read-time from korin's raw signals (`src/modules/irc.ts`); `User.ircNick` is the mapping; contributions are the announce source.
+
+**Flows (direction is fixed):**
+
+| Flow             | Direction                | Endpoint                                       | Auth                                        | Notes                                                                                                                                                                                              |
+| ---------------- | ------------------------ | ---------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IRC metrics      | **stellar pulls korin**  | `GET {KORIN_API_URL}/irc/metrics`              | `x-pull-key: KORIN_PULL_KEY`                | Payload `{users:[{nick,presenceSeconds,messageCount,channelCount,channels,windowStart,windowEnd}],lastFlushAt}`, ms epochs, keyed by **nick**. Cached in-process (TTL 2× interval).                |
+| Release announce | **stellar pushes korin** | `POST {KORIN_API_URL}/irc/announce`            | `x-pull-key: KORIN_PULL_KEY`                | Body `{xmlPayload(RSS), templateType:'minimal', environment:{osc8}}`. One contribution per POST; korin renders the newest artifact to `#announce`. Reverses the superseded AnnounceKey RSS _feed_. |
+| nick → account   | **korin calls stellar**  | `GET /api/users/by-irc-nick/:nick`             | `Authorization: Bearer STELLAR_SERVICE_KEY` | Returns `{id, username, ircNick}`; 404 if unlinked/disabled.                                                                                                                                       |
+| link nick        | **korin calls stellar**  | `PUT /api/users/:id/irc-nick` body `{ircNick}` | Bearer (or session, self/admin)             | Field is `ircNick` (not `nick`); path is `/api`-prefixed.                                                                                                                                          |
+| reputation read  | **korin calls stellar**  | `GET /api/users/:id/reputation`                | `Authorization: Bearer STELLAR_SERVICE_KEY` | CRS by id; self-serve view stays `/api/profile/me/reputation`.                                                                                                                                     |
+
+**Rejected:** korin pushing metrics to a stellar `/reputation/irc-metrics` receiver (the orphaned `lib/stellar.ts` push path). Pull is the one model; the push client is removed from korin.
+
+**Keys (each path fails closed until set):** `KORIN_API_URL`/`KORIN_PULL_KEY` (stellar→korin, both directions of stellar-initiated calls); `STELLAR_SERVICE_KEY` (korin→stellar bearer). korin's env names the same secrets `STELLAR_API_URL` / `STELLAR_PULL_KEY` (== `KORIN_PULL_KEY`) / `STELLAR_API_KEY` (== `STELLAR_SERVICE_KEY`).

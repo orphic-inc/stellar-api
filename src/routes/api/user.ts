@@ -21,6 +21,8 @@ import {
   persistRecoveryToken
 } from '../../modules/auth';
 import { requireAuth } from '../../middleware/auth';
+import { requireServiceKey } from '../../middleware/serviceAuth';
+import { getReputation } from '../../modules/reputation';
 import {
   requirePermission,
   loadPermissions,
@@ -211,6 +213,30 @@ router.put(
     const result = await updateUserSettings(req.user.id, data);
     if (!result) return res.status(404).json({ msg: 'User not found' });
     res.json(result);
+  })
+);
+
+// ─── korin.pink service endpoints (ADR-0013 contract) ───────────────────────
+// Service-key gated (Bearer STELLAR_SERVICE_KEY). Static path → before /:id.
+
+// GET /api/users/by-irc-nick/:nick — resolve an IRC nick to its Stellar account
+const ircNickParamsSchema = z.object({ nick: z.string().min(1).max(30) });
+router.get(
+  '/by-irc-nick/:nick',
+  requireServiceKey,
+  validateParams(ircNickParamsSchema),
+  asyncHandler(async (_req, res) => {
+    const { nick } = parsedParams<{ nick: string }>(res);
+    const user = await prisma.user.findUnique({
+      where: { ircNick: nick },
+      select: { id: true, username: true, ircNick: true, disabled: true }
+    });
+    if (!user || user.disabled) {
+      return res
+        .status(404)
+        .json({ msg: 'No account linked to that IRC nick' });
+    }
+    res.json({ id: user.id, username: user.username, ircNick: user.ircNick });
   })
 );
 
@@ -870,6 +896,18 @@ router.put(
     }
 
     res.json({ msg: ircNick ? 'IRC nick linked' : 'IRC nick cleared' });
+  })
+);
+
+// GET /api/users/:id/reputation — CRS for an account by id (korin service call,
+// ADR-0013). Service-key gated; the self-serve view is /api/profile/me/reputation.
+router.get(
+  '/:id/reputation',
+  requireServiceKey,
+  validateParams(userIdParamsSchema),
+  asyncHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    res.json(await getReputation(id));
   })
 );
 

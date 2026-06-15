@@ -37,8 +37,14 @@ export const sentry = {
 
 export const korin = {
   apiUrl: process.env.KORIN_API_URL ?? '',
+  // Key stellar presents to korin on outbound calls (metrics pull + announce
+  // push), sent as the `x-pull-key` header.
   pullKey: process.env.KORIN_PULL_KEY ?? '',
-  pollIntervalMs: parseInt(process.env.KORIN_POLL_INTERVAL_MS ?? '300000', 10) // 5 min
+  pollIntervalMs: parseInt(process.env.KORIN_POLL_INTERVAL_MS ?? '300000', 10), // 5 min
+  // Bearer key korin presents on its INBOUND service calls to stellar
+  // (by-irc-nick lookup, link-nick, reputation-by-id). Fails closed when unset
+  // — the korin-facing endpoints reject all requests (ADR-0013 contract).
+  serviceKey: process.env.STELLAR_SERVICE_KEY ?? ''
 };
 
 export const email = {
