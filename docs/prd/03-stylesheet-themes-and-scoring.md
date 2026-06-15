@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Owner:** @obrien-k
 **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md) · **Decisions:** [ADR-0002 community-health-pulse → CRS](../adr/0002-community-health-pulse.md) (accrual model), [ADR-0003 stylesheet injection isolation](../adr/0003-stylesheet-injection-isolation.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
+**Numbering:** PRD-01 Community-Score · PRD-02 Donations/IRC/Announce · **PRD-03 Stylesheets** · PRD-04 Contribution/Release/Music
 
 > Lean PRD. Captures the decided shape + the Community-Score weights, flags TBDs, and maps each concept to existing code so this becomes a red-green descent, not greenfield. Stylesheet scoring is a **dimension of PRD-01's CRS**, not a separate score.
 
@@ -53,6 +53,18 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 - **Bounded ("controlled"):** counted **once per distinct (adopter, author) pair**, with a per-user cap on total Friends-dimension score this vector can contribute — so ring/sock-puppet mass-adoption flattens out. Plain friending remains the stronger, separate signal; adoption is the weak-tie nudge.
 - Fires on **any** adoption (friend or not). The dedup + cap are durable via the CRS event ledger ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)).
 
+**IRC Mutual-Mention × Friends — negative controlled vector (decided, v0.2.x).** The vector above rewards the positive path (adopt → trust signal). This arm penalises the **missing** trust edge: two users who consistently mention each other on IRC over a rolling week but have not friended each other. Channel co-presence alone is not sufficient — being in the same room is not interaction. The trigger is **mutual nick-mention frequency over 7 days**.
+
+- **Detection (requires irc-bridge change):** irc-bridge must track per-message nick mentions — when a user's PRIVMSG contains another tracked nick, emit that as a pairwise `{ from, to, mentionCount }` signal in the flush payload alongside per-user metrics. Stellar-api aggregates these into a rolling 7-day window per (userA, userB) pair. The trigger fires when **both directions** exceed a threshold (TBD — e.g., ≥5 mutual mentions each over 7 days). One-sided mention (fan, lurker) does not trigger it.
+- **Base penalty: −0.1** applied once per week to each user's FriendsScore for every unfriended pair that clears the mutual-mention threshold.
+- **Stylesheet mitigator:** if both users share the same stylesheet (same site built-in, or both adopters of the same AuthorStylesheet), penalty is halved to **−0.05**. Aesthetic proximity signals latent trust even without the formal Friend edge — they're not strangers.
+- **Floor:** total negative contribution from this vector is floored at **−2.0** per user. Separate from and does not interact with the positive Friends-dimension cap.
+- **Dedup:** one penalty per (userA, userB) per 7-day rolling window, regardless of mention volume above the threshold.
+- **Resolves on friendship:** once mutually friended, the negative stops accruing and the positive adoption vector becomes available.
+- **Scope:** does not extend to Forums/Comments at v0.2.x. Thread co-authorship is a weaker signal; deferred.
+- **Open: mention threshold** (the ≥5/direction/week figure above is a placeholder — pin before implementation).
+- **Ledger:** same `CRS_*` ledger (ADR-0007). Event = weekly penalty per pair; dedup key = (userA, userB, weekStart ISO date).
+
 ## Negative scoring (decided — the model needs downside)
 
 Rewards alone let bad actors coast; CRS must be able to go **down**.
@@ -70,7 +82,7 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Donor add-ons
 
-**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to the Donations PRD / `donor.ts`).
+**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to PRD-02 Donations / `donor.ts`).
 
 ## Concept → existing code (the descent map)
 
@@ -86,7 +98,7 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Out of scope (other PRDs)
 
-- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02 (IRC), the Donations PRD, PRD-04. Referenced here only where they feed stylesheet scoring.
+- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02, PRD-04. Referenced here only where they feed stylesheet scoring.
 
 ## Red-green descent targets
 
