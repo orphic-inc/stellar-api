@@ -608,6 +608,7 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       disabled: false,
       warned: null,
+      standing: 'clean',
       inviteCount: 0,
       stats: {
         contributed: '0',
@@ -668,6 +669,7 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       disabled: false,
       warned: null,
+      standing: 'clean',
       inviteCount: 1,
       stats: {
         contributed: '100',
@@ -750,6 +752,7 @@ describe('API auth/profile/user flows', () => {
       isDonor: false,
       disabled: false,
       warned: null,
+      standing: 'clean',
       inviteCount: null,
       stats: {
         contributed: null,
