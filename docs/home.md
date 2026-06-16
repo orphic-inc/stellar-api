@@ -2,18 +2,26 @@
 
 ## Documentation Map
 
-| Document | Purpose |
-|----------|---------|
-| AGENTS.md | Repository workflow, architecture, coding patterns |
-| CONTEXT.md | Current project/domain context |
-| docs/adr/ | Architectural decision records |
-| docs/agents/issue-tracker.md | GitHub issue workflow |
-| docs/agents/triage-labels.md | Standard label definitions |
-| docs/agents/domain.md | Domain-specific guidance |
+| Document                     | Purpose                                            |
+| ---------------------------- | -------------------------------------------------- |
+| AGENTS.md                    | Repository workflow, architecture, coding patterns |
+| CONTEXT.md                   | Current project/domain context                     |
+| docs/adr/                    | Architectural decision records                     |
+| docs/agents/issue-tracker.md | GitHub issue workflow                              |
+| docs/agents/triage-labels.md | Standard label definitions                         |
+| docs/agents/domain.md        | Domain-specific guidance                           |
 
 ## Introduction
 
 Salutations! This in-progress document contains guidance for developing and maintaining Stellar.
+
+## Prose conventions
+
+Documentation and user-facing copy follow a few house rules:
+
+- **No pleonasm.** Cut redundant phrasing — "greetings and salutations" says one thing twice; "salutations" alone does the job.
+- **Plain over ceremonial.** Prefer the shorter, plainer wording; trim filler greetings and throat-clearing.
+- **Consistent voice across branches.** When the same copy lives on more than one branch, align it rather than letting phrasings drift.
 
 ## Connecting to the Database
 
