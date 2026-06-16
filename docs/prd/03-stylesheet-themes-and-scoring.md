@@ -12,25 +12,25 @@ Stellar is an invite-only `/private/` community site. Users want to theme their 
 
 ## Stylesheet types
 
-| Type                                       | Meaning                                                                                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Built-in / site stylesheets**            | Seeded themes: `kuro`, `layer-cake`, `postmod`, `proton`, `sublime`. **Sublime = default/base + selectable + contest reference** (net-new authoring; reset target).                  |
-| **ExternalStylesheet**                     | A URL on the user's profile (`profile.externalStylesheet`).                                                                                                                          |
-| **AuthorStylesheet / AuthorStylesheetUrl** | A user-authored `.scss`/`.css` saved for others to adopt. **Many per author** (cardinality decided 2026-06-13; rank-gated *count limit* deferred). The author is a **StylesheetAuthor** — shorthand for any member who has authored one, not a distinct role. |
-| **CommunityStylesheet**                    | Community-scoped theme, set by that Community's Staff; rendered to any viewer on that community's pages. Slot deferred (TBD — tied to Contests / Community Toolbox).                  |
-| **Global SCSS/CSS reset flag**             | Per-injection boundary so a user sheet can't leak into app chrome (see ADR-0003).                                                                                                    |
+| Type                                       | Meaning                                                                                                                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Built-in / site stylesheets**            | Seeded themes: `kuro`, `layer-cake`, `postmod`, `proton`, `sublime`. **Sublime = default/base + selectable + contest reference** (net-new authoring; reset target).                                                                                           |
+| **ExternalStylesheet**                     | A URL on the user's profile (`profile.externalStylesheet`).                                                                                                                                                                                                   |
+| **AuthorStylesheet / AuthorStylesheetUrl** | A user-authored `.scss`/`.css` saved for others to adopt. **Many per author** (cardinality decided 2026-06-13; rank-gated _count limit_ deferred). The author is a **StylesheetAuthor** — shorthand for any member who has authored one, not a distinct role. |
+| **CommunityStylesheet**                    | Community-scoped theme, set by that Community's Staff; rendered to any viewer on that community's pages. Slot deferred (TBD — tied to Contests / Community Toolbox).                                                                                          |
+| **Global SCSS/CSS reset flag**             | Per-injection boundary so a user sheet can't leak into app chrome (see ADR-0003).                                                                                                                                                                             |
 
 ### Slots & cascade (decided 2026-06-13)
 
 A stylesheet renders by being placed into one of three single-valued **slots**, selected by **page context** — not a single global "active theme":
 
-| Slot                     | Set by                | Rendered when                                            |
-| ------------------------ | --------------------- | ------------------------------------------------------- |
-| **Profile Stylesheet**   | the profile's owner   | any viewer is on *that owner's* profile page            |
-| **Site Stylesheet**      | the viewer            | the viewer is on the general site                       |
-| **Community Stylesheet** | that Community's Staff | any viewer is on *that* community's pages                |
+| Slot                     | Set by                 | Rendered when                                |
+| ------------------------ | ---------------------- | -------------------------------------------- |
+| **Profile Stylesheet**   | the profile's owner    | any viewer is on _that owner's_ profile page |
+| **Site Stylesheet**      | the viewer             | the viewer is on the general site            |
+| **Community Stylesheet** | that Community's Staff | any viewer is on _that_ community's pages    |
 
-**Precedence is page-context-first:** a Profile or Community page shows its own slot to *every* viewer, regardless of the viewer's Site Stylesheet. On the general site the viewer sees their own Site Stylesheet, falling back to the **Site Theme** (`Sublime`/Default) when they have not adopted one. A member has exactly one stylesheet per slot.
+**Precedence is page-context-first:** a Profile or Community page shows its own slot to _every_ viewer, regardless of the viewer's Site Stylesheet. On the general site the viewer sees their own Site Stylesheet, falling back to the **Site Theme** (`Sublime`/Default) when they have not adopted one. A member has exactly one stylesheet per slot.
 
 **Only the Site Stylesheet slot scores** (a **Stylesheet Adoption**): the viewer adopting another member's AuthorStylesheet credits the author. Slotting your own sheet as your Profile Stylesheet is not an adoption. Profile-slot and Community-slot designation are **deferred** (named here, not built in #119/#120).
 
@@ -60,7 +60,7 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 **Staff** (context): community staff earn **+50 CRS per week served** (Standards/Communities — cross-ref PRD-01).
 
-**Friends × Stylesheet — controlled vector (decided; not yet built — [#147](https://github.com/orphic-inc/stellar-api/issues/147)).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — *separate from and additive to* the stylesheet-dimension weights above. The keystone (#120) built the deduped adoption ledger this vector reads from, but wired only the stylesheet dimension; the Friends-dimension accrual is the follow-up:
+**Friends × Stylesheet — controlled vector (decided; not yet built — [#147](https://github.com/orphic-inc/stellar-api/issues/147)).** Adopting another user's AuthorStylesheet is also a weak social/trust edge, so it fires a **second** accrual in PRD-01's **Friends** dimension — _separate from and additive to_ the stylesheet-dimension weights above. The keystone (#120) built the deduped adoption ledger this vector reads from, but wired only the stylesheet dimension; the Friends-dimension accrual is the follow-up:
 
 - **Adopter: +0.2** (rewards active, organic curation — the adopter earns slightly more than the author, to favour participation).
 - **Author: +0.1** (recognition that someone vouched for your sheet).
@@ -96,23 +96,23 @@ The `/private/`, invite-only model is the primary control: a sock-puppeteer must
 
 ## Donor add-ons
 
-**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to PRD-02 Donations / `donor.ts`).
+**$tylesheets — donor-added slots**: donors unlock additional stylesheet slots (ties to PRD-07 Donations / `donor.ts`).
 
 ## Concept → existing code (the descent map)
 
-| Concept                                             | Lives in                                                                                                                                            |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CRS / CommunityScore                                | [PRD-01](01-Community-Score.md), [#75](https://github.com/orphic-inc/stellar-api/issues/75), `statsHistory.ts`, `getCommunityHealthPulse`           |
-| Stylesheet model + admin                            | `schemas/stylesheet.ts`, `schemas/profile.ts`, [#34](https://github.com/orphic-inc/stellar-api/issues/34) (closed), stellar-ui `StylesheetInjector` |
-| LinkHealth + bonus                                  | `linkHealth.ts`, `linkHealthJob.ts`, branch `feat/community-health-pulse`                                                                           |
-| ContributionScore / quality                         | [#76](https://github.com/orphic-inc/stellar-api/issues/76), branch `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102))                                               |
-| AccountingLedger / ratio                            | `ratio.ts`, `ratioPolicy.ts`, BigInt sizeInBytes ([#81](https://github.com/orphic-inc/stellar-api/pull/81))                                         |
-| Top10 / Wiki / Announce                             | `top10.ts`, wiki workbench, `schemas/announcement.ts`                                                                                               |
-| **AuthorStylesheetUrl, IRC scoring, exact weights** | **net-new** (this PRD)                                                                                                                              |
+| Concept                                             | Lives in                                                                                                                                                          |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CRS / CommunityScore                                | [PRD-01](01-Community-Score.md), [#75](https://github.com/orphic-inc/stellar-api/issues/75), `statsHistory.ts`, `getCommunityHealthPulse`                         |
+| Stylesheet model + admin                            | `schemas/stylesheet.ts`, `schemas/profile.ts`, [#34](https://github.com/orphic-inc/stellar-api/issues/34) (closed), stellar-ui `StylesheetInjector`               |
+| LinkHealth + bonus                                  | `linkHealth.ts`, `linkHealthJob.ts`, branch `feat/community-health-pulse`                                                                                         |
+| ContributionScore / quality                         | [#76](https://github.com/orphic-inc/stellar-api/issues/76), branch `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102)) |
+| AccountingLedger / ratio                            | `ratio.ts`, `ratioPolicy.ts`, BigInt sizeInBytes ([#81](https://github.com/orphic-inc/stellar-api/pull/81))                                                       |
+| Top10 / Wiki / Announce                             | `top10.ts`, wiki workbench, `schemas/announcement.ts`                                                                                                             |
+| **AuthorStylesheetUrl, IRC scoring, exact weights** | **net-new** (this PRD)                                                                                                                                            |
 
 ## Out of scope (other PRDs)
 
-- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02, PRD-04. Referenced here only where they feed stylesheet scoring.
+- LinkHealth lifecycle (cron/flapping/72h/sweep), MusicModel, Donations/IRC scoring → covered by PRD-01 (CRS dimensions), PRD-02 (IRC), PRD-04, PRD-07 (Donations). Referenced here only where they feed stylesheet scoring.
 
 ## Red-green descent targets
 
@@ -122,11 +122,13 @@ First testable slices (much of the substrate already exists):
 2. **Tiering escalation** — the curve that compounds the base multipliers as a user climbs tiers (the `/verbiagating`-style ladder). Next slice; curve TBD.
 3. **Dead-external penalty** — link-health-driven negative CRS for a dead `externalStylesheet`; red-green once the penalty magnitude is set.
 4. **AuthorStylesheet save → adopt → score** (the keystone — wires shipped `scoreStylesheetSelection` #84 to a real event). Three slices:
+
    - **4a save (#118, ✅ shipped):** `AuthorStylesheet` model + `POST`/`GET /api/stylesheet/author`.
    - **4b adopt (#119, ✅ shipped):** many-per-author (cardinality fixed here — `@unique authorId` dropped); a viewer adopts a sheet into their **Site Stylesheet** slot (`UserSettings.activeAuthorStylesheetId`) via `POST /api/stylesheet/author-stylesheet/:id/adopt`, idempotent.
    - **4c score (#120, ✅ shipped):** adoption fires `scoreStylesheetSelection`; non-self adoptions write a `CRS_STYLESHEET_ADOPTION` ledger row deduped **once per (adopter, author)** (ADR-0007), and a read-time **stylesheet** CRS dimension counts them → author's global CRS. Self-adoption renders, earns nothing.
 
-   **Deferred** (named, not built): Profile-slot + Community-slot designation · rank-gated stylesheet **count limit** + list pagination ([#146](https://github.com/orphic-inc/stellar-api/issues/146)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1 into the Friends dimension — the §"Friends × Stylesheet" decision; the `CRS_STYLESHEET_ADOPTION` ledger built here is its substrate, but the second Friends-dimension accrual is not yet wired — [#147](https://github.com/orphic-inc/stellar-api/issues/147)) · **byte-identical cross-author dedup** on submit (reject a duplicate sheet under a second author's name; UI offers the existing one — *ADR-when-built*: hard to reverse, needs a content hash + index, "is identical = exact bytes or normalized?" is a real trade-off).
+   **Deferred** (named, not built): Profile-slot + Community-slot designation · rank-gated stylesheet **count limit** + list pagination ([#146](https://github.com/orphic-inc/stellar-api/issues/146)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1 into the Friends dimension — the §"Friends × Stylesheet" decision; the `CRS_STYLESHEET_ADOPTION` ledger built here is its substrate, but the second Friends-dimension accrual is not yet wired — [#147](https://github.com/orphic-inc/stellar-api/issues/147)) · **byte-identical cross-author dedup** on submit (reject a duplicate sheet under a second author's name; UI offers the existing one — _ADR-when-built_: hard to reverse, needs a content hash + index, "is identical = exact bytes or normalized?" is a real trade-off).
+
 5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
 
 ## Open questions

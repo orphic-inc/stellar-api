@@ -1,7 +1,7 @@
 # PRD-04 — Contribution, Release & Music Model
 
 **Status:** Draft · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · **PRD-04 Contribution/Release/Music**
+**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · **PRD-04 Contribution/Release/Music** · PRD-05 Rules & Governance · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art
 
 > Lean PRD. The structured model has **landed on `main`** (#85 music model + ReleaseArtist/Edition, merged via #98 — `develop` retired in the [ADR-0010](../adr/0010-trunk-based-single-branch-workflow.md) trunk fold), with per-file rip metadata split out to a `ReleaseFile` satellite ([ADR-0008](../adr/0008-contribution-metadata-satellites.md)). The quality grade landed on `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102), supersedes #86). This documents the model + CRS weighting and flags TBDs. Prod is pre-alpha with disposable data, so the model was migrated destructively (no backfill).
 
@@ -38,7 +38,7 @@ Contributions/Releases are a **primary lifetime-CRS driver** — `downloads.ts`,
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Release / Edition / ReleaseArtist / ArtistRole | `feat/music-model-edition-tier` (#85) — landed on `main` via #98                                                                     |
 | ReleaseFile (per-file rip metadata)            | `schema.prisma` + migration `20260609171357_music_model_release_files` — [ADR-0008](../adr/0008-contribution-metadata-satellites.md) |
-| Contribution quality grade                     | `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102), supersedes #86) — `gradeContribution`  |
+| Contribution quality grade                     | `feat/contribution-quality-grade` ([#102](https://github.com/orphic-inc/stellar-api/pull/102), supersedes #86) — `gradeContribution` |
 | Release editing surface                        | `releaseWorkbench/*`                                                                                                                 |
 | Contribution create + accounting               | `contribution.ts`, `downloads.ts`, `ratio.ts`, sizeInBytes BigInt (#81)                                                              |
 
