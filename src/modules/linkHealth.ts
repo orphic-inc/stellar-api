@@ -171,6 +171,38 @@ export interface CommunityHealthPulse {
 }
 
 /**
+ * Pure pulse computation: turn a community's PASS/WARN/FAIL/UNKNOWN counts into
+ * the banded heartbeat. Shared by the read-time pulse and the snapshot capture
+ * (#75) so the coverage floor + banding logic lives in exactly one place.
+ *
+ * Only PASS/FAIL are definitive; WARN (transient) and UNKNOWN (unprobed) are
+ * indeterminate and excluded from the pulse. The band is withheld (`Unknown`)
+ * until coverage clears the floor — otherwise one PASS among thousands of
+ * UNKNOWN would read "Healthy".
+ */
+export const computePulse = (counts: {
+  pass: number;
+  warn: number;
+  fail: number;
+  unknown: number;
+}): CommunityHealthPulse => {
+  const checked = counts.pass + counts.fail;
+  const total = checked + counts.warn + counts.unknown;
+  const coverage = total === 0 ? null : checked / total;
+  const pulse = checked === 0 ? null : counts.pass / checked;
+  const status: CommunityPulseStatus =
+    pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
+      ? 'Unknown'
+      : pulse >= PULSE_HEALTHY
+      ? 'Healthy'
+      : pulse >= PULSE_AILING
+      ? 'Ailing'
+      : 'Critical';
+
+  return { ...counts, total, checked, coverage, pulse, status };
+};
+
+/**
  * The community's link-health "pulse": roll every contribution's linkStatus up
  * into a single heartbeat. A living community keeps its links alive; the pulse
  * weakens as they rot. Computed on read — no stored state.
@@ -203,22 +235,5 @@ export const getCommunityHealthPulse = async (
     }
   }
 
-  // Only PASS/FAIL are definitive; WARN (transient) and UNKNOWN (unprobed) are
-  // indeterminate and excluded from the pulse.
-  const checked = counts.pass + counts.fail;
-  const total = checked + counts.warn + counts.unknown;
-  const coverage = total === 0 ? null : checked / total;
-  const pulse = checked === 0 ? null : counts.pass / checked;
-  // Don't claim a confident band until enough links are actually probed —
-  // otherwise one PASS among thousands of UNKNOWN would read "Healthy".
-  const status: CommunityPulseStatus =
-    pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
-      ? 'Unknown'
-      : pulse >= PULSE_HEALTHY
-      ? 'Healthy'
-      : pulse >= PULSE_AILING
-      ? 'Ailing'
-      : 'Critical';
-
-  return { ...counts, total, checked, coverage, pulse, status };
+  return computePulse(counts);
 };

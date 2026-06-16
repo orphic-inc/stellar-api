@@ -2747,6 +2747,53 @@ registry.registerPath({
   }
 });
 
+const CommunityHealthSnapshot = z
+  .object({
+    id: z.number(),
+    communityId: z.number(),
+    period: z.enum(['Daily', 'Monthly', 'Yearly']),
+    bucketAt: z.string(),
+    capturedAt: z.string(),
+    pass: z.number(),
+    warn: z.number(),
+    fail: z.number(),
+    unknown: z.number(),
+    total: z.number(),
+    checked: z.number(),
+    coverage: z.number().nullable(),
+    pulse: z.number().nullable(),
+    status: z.string()
+  })
+  .openapi('CommunityHealthSnapshot');
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{id}/health/history',
+  tags: ['Communities'],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      period: z.enum(['Daily', 'Monthly', 'Yearly']).optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Community link-health pulse history (time series)',
+      content: {
+        'application/json': { schema: z.array(CommunityHealthSnapshot) }
+      }
+    },
+    403: {
+      description: 'Not a member of this community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/communities/{id}/releases',

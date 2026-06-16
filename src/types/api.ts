@@ -3542,6 +3542,63 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/communities/{id}/health/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          period?: 'Daily' | 'Monthly' | 'Yearly';
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Community link-health pulse history (time series) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['CommunityHealthSnapshot'][];
+          };
+        };
+        /** @description Not a member of this community */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/communities/{id}/releases': {
     parameters: {
       query?: never;
@@ -12575,6 +12632,23 @@ export interface components {
       pulse: number | null;
       /** @enum {string} */
       status: 'Healthy' | 'Ailing' | 'Critical' | 'Unknown';
+    };
+    CommunityHealthSnapshot: {
+      id: number;
+      communityId: number;
+      /** @enum {string} */
+      period: 'Daily' | 'Monthly' | 'Yearly';
+      bucketAt: string;
+      capturedAt: string;
+      pass: number;
+      warn: number;
+      fail: number;
+      unknown: number;
+      total: number;
+      checked: number;
+      coverage: number | null;
+      pulse: number | null;
+      status: string;
     };
   };
   responses: never;
