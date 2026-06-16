@@ -19,6 +19,7 @@ Related PRDs
 
 - [PRD-03](03-stylesheet-themes-and-scoring.md) — stylesheet scoring is a dimension of this CRS
 - [PRD-06](06-ratio.md) — the Ratio mechanism; a derived `RatioScore` feeds this CRS (one-way)
+- [PRD-08](08-collages-and-cover-art.md) — Collage contribution weighting feeds the `ContributionScore` dimension
 
 ⸻
 
@@ -177,7 +178,7 @@ CRS is a registry of bounded, pure dimension-scorers — not a hardcoded sum.
 - Dimensions self-register. New dimensions (RatioScore, stylesheet, LinkHealthBonusPoints, IRC, Feed) slot in by adding a registry entry — never by editing the aggregator.
 - v0.0.x dimension set: Friends, Invite, Donation, Longevity.
 
-Computation: the CRS value is always computed on read (no stored, stale score column). Only events that current state cannot reconstruct — e.g. the Friends×Stylesheet adoption edges and their once-per-pair dedup — are append-only logged to a CRS_* reason on the existing EconomyTransaction ledger. Time-series snapshots (trends) are a deferred additive layer. See ADR-0007.
+Computation: the CRS value is always computed on read (no stored, stale score column). Only events that current state cannot reconstruct — e.g. the Friends×Stylesheet adoption edges and their once-per-pair dedup — are append-only logged to a CRS\_\* reason on the existing EconomyTransaction ledger. Time-series snapshots (trends) are a deferred additive layer. See ADR-0007.
 
 Ratio independence (decided)
 
@@ -454,12 +455,12 @@ Out of Scope
 - Automated weighting algorithms
 - CommunityValueIndex calculation
 
-## Future direction — making CRS *bite* (noted 2026-06-13, not scoped)
+## Future direction — making CRS _bite_ (noted 2026-06-13, not scoped)
 
-Today CRS only *accrues* — unlike the **Ratio Mechanism**, which has real teeth (gates downloads, warns, bans), the reputation dimensions (stylesheet, IRC, …) sum into a number with no monitoring, display, or downstream effect yet. Recorded so the gap is explicit, not designed:
+Today CRS only _accrues_ — unlike the **Ratio Mechanism**, which has real teeth (gates downloads, warns, bans), the reputation dimensions (stylesheet, IRC, …) sum into a number with no monitoring, display, or downstream effect yet. Recorded so the gap is explicit, not designed:
 
-- **Positive-reinforcement teeth (privilege-granting).** High reputation should *unlock capability*, not gate downloads (CRS never gates downloads — that stays the Ratio Mechanism's job). E.g. a high **IRCScore** earns rights to create official channels or moderate specific community channels (see PRD-02). This is a distinct lever from ratio enforcement.
+- **Positive-reinforcement teeth (privilege-granting).** High reputation should _unlock capability_, not gate downloads (CRS never gates downloads — that stays the Ratio Mechanism's job). E.g. a high **IRCScore** earns rights to create official channels or moderate specific community channels (see PRD-02). This is a distinct lever from ratio enforcement.
 - **Staff Toolbox.** CRS (and its dimensions) surface to staff for monitoring/triage in a **Staff Toolbox** — the display/admin surface for the whole reputation system. Out of purview today.
-- **Community Toolbox.** A forward-looking surface letting **Community Staff** manage their *own* community (a la the Community Do-Not-Contribute list) — where Community-scoped levers (the Community Stylesheet slot, channel moderation grants) would live. Much further down the path.
+- **Community Toolbox.** A forward-looking surface letting **Community Staff** manage their _own_ community (a la the Community Do-Not-Contribute list) — where Community-scoped levers (the Community Stylesheet slot, channel moderation grants) would live. Much further down the path.
 
-These are the home for the eventual "what does a score *do*" decisions; capturing them here keeps the dimension work (stylesheet #120, IRC) honest about being substrate, not yet consequence.
+These are the home for the eventual "what does a score _do_" decisions; capturing them here keeps the dimension work (stylesheet #120, IRC) honest about being substrate, not yet consequence.
