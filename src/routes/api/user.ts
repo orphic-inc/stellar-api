@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../lib/errors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   getUserSettings,
@@ -8,6 +9,7 @@ import {
   createUser,
   getSnatchList,
   getInviteTree,
+  getMemberInviteTreeView,
   getDuplicateIps,
   warnUser,
   deleteWarning,
@@ -382,6 +384,28 @@ router.get(
     const pg = parsedPage(res);
     const { rows, total } = await getInviteTree(pg);
     paginatedResponse(res, rows, total, pg);
+  })
+);
+
+// GET /api/users/:id/invite-tree — a member's invite subtree + summary.
+// Own tree, or any tree with the invites-manage permission (which also lifts
+// the per-member paranoia gate for moderation).
+router.get(
+  '/:id/invite-tree',
+  requireAuth,
+  validateParams(userIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const isOwner = req.user.id === id;
+    const canManage = hasPermission(
+      await loadPermissions(req, res),
+      'invites_manage'
+    );
+    if (!isOwner && !canManage) {
+      throw new AppError(403, 'Forbidden');
+    }
+    const view = await getMemberInviteTreeView(id, canManage);
+    res.json(view);
   })
 );
 

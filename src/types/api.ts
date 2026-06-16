@@ -198,6 +198,10 @@ export interface paths {
           content: {
             'application/json': {
               installed: boolean;
+              /** @enum {string} */
+              registrationStatus: 'open' | 'invite' | 'closed';
+              configWarnings: string[];
+              setupChecklist: string[];
             };
           };
         };
@@ -354,8 +358,20 @@ export interface paths {
             siteAppearance?: string;
             externalStylesheet?: string | '';
             styledTooltips?: boolean;
-            paranoia?: number;
+            paranoia?: number | null;
             avatar?: string;
+            /** @enum {string} */
+            notificationMethod?:
+              | 'Disabled'
+              | 'Popup'
+              | 'Traditional'
+              | 'Push'
+              | 'Combined';
+            showEmail?: boolean;
+            showLastSeen?: boolean;
+            showContributedStats?: boolean;
+            showConsumedStats?: boolean;
+            showRatioStats?: boolean;
           };
         };
       };
@@ -452,6 +468,226 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/users/recovery-requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          status?: 'pending' | 'used' | 'expired';
+          page?: number;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated list of account recovery requests */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['RecoveryRequestItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/recovery-requests/{reqId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          reqId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Recovery request revoked */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Token already used */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/warnings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+          userId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated staff warning log */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['UserWarningItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/{id}/recovery': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Recovery email sent */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Email delivery not configured */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/profile/me': {
     parameters: {
       query?: never;
@@ -514,6 +750,19 @@ export interface paths {
             siteAppearance?: string;
             externalStylesheet?: string | '';
             styledTooltips?: boolean;
+            paranoia?: number | null;
+            /** @enum {string} */
+            notificationMethod?:
+              | 'Disabled'
+              | 'Popup'
+              | 'Traditional'
+              | 'Push'
+              | 'Combined';
+            showEmail?: boolean;
+            showLastSeen?: boolean;
+            showContributedStats?: boolean;
+            showConsumedStats?: boolean;
+            showRatioStats?: boolean;
           };
         };
       };
@@ -676,6 +925,7 @@ export interface paths {
           content: {
             'application/json': {
               inviteKey: string;
+              emailSent: boolean;
             };
           };
         };
@@ -699,6 +949,193 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/profile/me/donor-rewards': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Donor reward settings and active perks */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DonorRewards'];
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description No active donor rank */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            iconMouseOverText?: string;
+            avatarMouseOverText?: string;
+            customIcon?: string | '';
+            customIconLink?: string | '';
+            secondAvatar?: string | '';
+            profileInfoTitle1?: string;
+            profileInfo1?: string;
+            profileInfoTitle2?: string;
+            profileInfo2?: string;
+            profileInfoTitle3?: string;
+            profileInfo3?: string;
+            profileInfoTitle4?: string;
+            profileInfo4?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Updated donor reward settings */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DonorRewards'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description No active donor rank */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/profile/me/donor-title': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            prefix?: string;
+            suffix?: string;
+            useComma?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Updated forum title */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DonorForumTitle'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Perk not enabled for this rank */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -963,6 +1400,139 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/announcements/global-notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description All global notices */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['GlobalNotice'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/announcements/global-notice': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            message: string;
+            /** Format: uri */
+            url?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Global notice created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['GlobalNotice'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/announcements/global-notice/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Notice deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/stats': {
     parameters: {
       query?: never;
@@ -986,6 +1556,149 @@ export interface paths {
           };
           content: {
             'application/json': components['schemas']['SiteStats'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Site-wide historical stat snapshots */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Historical site stat snapshots (ascending by capturedAt) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['SiteStatSnapshot'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/snapshot': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Manually trigger a site stat snapshot (admin only) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Snapshot captured */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              msg: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/{id}/stats/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** User historical stat snapshots */
+    get: {
+      parameters: {
+        query: {
+          period: 'Daily' | 'Monthly' | 'Yearly';
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Historical user stat snapshots (ascending by capturedAt) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['UserStatSnapshot'][];
+          };
+        };
+        /** @description Stats are private */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              msg: string;
+            };
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              msg: string;
+            };
           };
         };
       };
@@ -1037,8 +1750,11 @@ export interface paths {
         content: {
           'application/json': {
             name: string;
-            /** Format: uri */
+            /** @default  */
+            description?: string;
             cssUrl: string;
+            /** @default false */
+            isDefault?: boolean;
           };
         };
       };
@@ -1063,6 +1779,41 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stylesheet/admin/stats': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Stylesheet user counts (admin only) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['StylesheetStat'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1107,7 +1858,55 @@ export interface paths {
         };
       };
     };
-    put?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name?: string;
+            description?: string;
+            cssUrl?: string;
+            isDefault?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Stylesheet updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Stylesheet'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
     post?: never;
     delete: {
       parameters: {
@@ -1126,6 +1925,15 @@ export interface paths {
             [name: string]: unknown;
           };
           content?: never;
+        };
+        /** @description Cannot delete the default stylesheet */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
         };
         /** @description Not found */
         404: {
@@ -1325,7 +2133,9 @@ export interface paths {
               | 'requests'
               | 'communities'
               | 'contributions'
-              | 'release';
+              | 'release'
+              | 'news'
+              | 'global_notices';
             pageId: number;
             /** @enum {string} */
             action: 'subscribe' | 'unsubscribe';
@@ -1358,7 +2168,6 @@ export interface paths {
     get: {
       parameters: {
         query: {
-          /** @enum {string} */
           page:
             | 'forums'
             | 'artist'
@@ -1366,7 +2175,9 @@ export interface paths {
             | 'requests'
             | 'communities'
             | 'contributions'
-            | 'release';
+            | 'release'
+            | 'news'
+            | 'global_notices';
           pageId: number;
         };
         header?: never;
@@ -1834,6 +2645,64 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/forums/{forumId}/topics/{topicId}/session': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path: {
+          forumId: string;
+          topicId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Topic session view model (forum + topic + posts + poll + subscription + affordances) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ForumTopicSession'];
+          };
+        };
+        /** @description Insufficient class */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Forum or topic not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/forums/{forumId}/topics/{topicId}': {
     parameters: {
       query?: never;
@@ -1944,6 +2813,62 @@ export interface paths {
         };
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/forums/{forumId}/topics/{topicId}/trash': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          forumId: string;
+          topicId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Topic moved to the trash board */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ForumTopic'];
+          };
+        };
+        /** @description Not authorized */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2149,6 +3074,65 @@ export interface paths {
         };
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/forums/{forumId}/topics/{topicId}/posts/{id}/edits': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          forumId: string;
+          topicId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Moderator edit history */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['ForumPostEdit'][];
+            };
+          };
+        };
+        /** @description Insufficient permission */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2503,6 +3487,61 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/communities/{id}/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Community link-health pulse */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['CommunityHealthPulse'];
+          };
+        };
+        /** @description Not a member of this community */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/communities/{id}/releases': {
     parameters: {
       query?: never;
@@ -2590,6 +3629,276 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/communities/{communityId}/releases/{releaseId}/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+          releaseId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated release history */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['ReleaseHistoryEntry'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+        /** @description Not a community member */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/releases/{releaseId}/history/{historyId}/revert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+          releaseId: string;
+          historyId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Release after revert */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Release'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not an edit revision */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/releases/{releaseId}/tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+          releaseId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Tag added */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ReleaseTag'];
+          };
+        };
+        /** @description Release already has this tag */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/releases/{releaseId}/tags/{tagId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+          releaseId: string;
+          tagId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tag removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/releases/{releaseId}/tags/{tagId}/vote': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+          releaseId: string;
+          tagId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            direction: 'up' | 'down';
+          };
+        };
+      };
+      responses: {
+        /** @description Updated tag with vote counts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ReleaseTagEnriched'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/communities/{communityId}/releases/{releaseId}/contributions': {
     parameters: {
       query?: never;
@@ -2642,6 +3951,35 @@ export interface paths {
             downloadUrl: string;
             sizeInBytes?: number;
             releaseDescription?: string;
+            /** @enum {string} */
+            bitrate?:
+              | 'Lossless'
+              | 'Lossless24'
+              | 'Kbps320'
+              | 'Kbps256'
+              | 'KbpsV0'
+              | 'Kbps192'
+              | 'KbpsV2'
+              | 'Kbps128'
+              | 'Other';
+            /** @enum {string} */
+            media?:
+              | 'CD'
+              | 'WEB'
+              | 'Vinyl'
+              | 'SACD'
+              | 'DVD'
+              | 'Cassette'
+              | 'BluRay'
+              | 'DAT'
+              | 'Soundboard'
+              | 'Other';
+            /** @default false */
+            hasLog?: boolean;
+            /** @default false */
+            hasCue?: boolean;
+            /** @default false */
+            isScene?: boolean;
           };
         };
       };
@@ -2767,6 +4105,57 @@ export interface paths {
             image?: string | '';
             description?: string;
             releaseDescription?: string;
+            /** @enum {string} */
+            bitrate?:
+              | 'Lossless'
+              | 'Lossless24'
+              | 'Kbps320'
+              | 'Kbps256'
+              | 'KbpsV0'
+              | 'Kbps192'
+              | 'KbpsV2'
+              | 'Kbps128'
+              | 'Other';
+            /** @enum {string} */
+            media?:
+              | 'CD'
+              | 'WEB'
+              | 'Vinyl'
+              | 'SACD'
+              | 'DVD'
+              | 'Cassette'
+              | 'BluRay'
+              | 'DAT'
+              | 'Soundboard'
+              | 'Other';
+            /** @enum {string} */
+            releaseCategory?:
+              | 'Album'
+              | 'Single'
+              | 'EP'
+              | 'Anthology'
+              | 'Compilation'
+              | 'DJMix'
+              | 'Live'
+              | 'Remix'
+              | 'Bootleg'
+              | 'Interview'
+              | 'Mixtape'
+              | 'Demo'
+              | 'ConcertRecording'
+              | 'Unknown';
+            recordLabel?: string;
+            catalogueNumber?: string;
+            editionTitle?: string;
+            editionYear?: number;
+            /** @default false */
+            isRemaster?: boolean;
+            /** @default false */
+            hasLog?: boolean;
+            /** @default false */
+            hasCue?: boolean;
+            /** @default false */
+            isScene?: boolean;
             collaborators: {
               artist: string;
               importance: string;
@@ -2851,10 +4240,57 @@ export interface paths {
             name: string;
             level: number;
             permissions?: {
-              [key: string]: boolean;
+              advanced_search?: boolean;
+              users_search?: boolean;
+              forums_read?: boolean;
+              forums_post?: boolean;
+              forums_moderate?: boolean;
+              forums_manage?: boolean;
+              communities_manage?: boolean;
+              contributions_manage?: boolean;
+              dnc_manage?: boolean;
+              collages_create?: boolean;
+              collages_manage?: boolean;
+              collages_moderate?: boolean;
+              requests_create?: boolean;
+              requests_moderate?: boolean;
+              wiki_edit?: boolean;
+              wiki_manage?: boolean;
+              news_manage?: boolean;
+              rules_manage?: boolean;
+              tags_manage?: boolean;
+              reports_manage?: boolean;
+              staff_inbox_manage?: boolean;
+              users_edit?: boolean;
+              users_warn?: boolean;
+              users_disable?: boolean;
+              users_view_ips?: boolean;
+              users_view_email?: boolean;
+              recovery_manage?: boolean;
+              invites_manage?: boolean;
+              ratio_policy_manage?: boolean;
+              site_history_manage?: boolean;
+              ip_bans_manage?: boolean;
+              email_blacklist_manage?: boolean;
+              donor_ranks_manage?: boolean;
+              donation_log_view?: boolean;
+              messages_mass_pm?: boolean;
+              login_watch_view?: boolean;
+              duplicate_ips_view?: boolean;
+              registration_log_view?: boolean;
+              staff?: boolean;
+              rank_permissions_manage?: boolean;
+              staff_groups_manage?: boolean;
+              admin?: boolean;
             };
+            secondary?: boolean;
+            /** @default [] */
+            permittedForumIds?: number[];
             color?: string;
             badge?: string;
+            personalCollageLimit?: number;
+            displayStaff?: boolean;
+            staffGroupId?: number | null;
           };
         };
       };
@@ -2877,8 +4313,69 @@ export interface paths {
             'application/json': components['schemas']['ValidationError'];
           };
         };
+        /** @description Duplicate rank name or level */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Staff group not found */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/tools/user-ranks/permissions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Permission catalog */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              key: string;
+              title: string;
+              permissions: {
+                key: components['schemas']['PermissionKey'];
+                label: string;
+                description: string;
+              }[];
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2938,10 +4435,56 @@ export interface paths {
             name?: string;
             level?: number;
             permissions?: {
-              [key: string]: boolean;
+              advanced_search?: boolean;
+              users_search?: boolean;
+              forums_read?: boolean;
+              forums_post?: boolean;
+              forums_moderate?: boolean;
+              forums_manage?: boolean;
+              communities_manage?: boolean;
+              contributions_manage?: boolean;
+              dnc_manage?: boolean;
+              collages_create?: boolean;
+              collages_manage?: boolean;
+              collages_moderate?: boolean;
+              requests_create?: boolean;
+              requests_moderate?: boolean;
+              wiki_edit?: boolean;
+              wiki_manage?: boolean;
+              news_manage?: boolean;
+              rules_manage?: boolean;
+              tags_manage?: boolean;
+              reports_manage?: boolean;
+              staff_inbox_manage?: boolean;
+              users_edit?: boolean;
+              users_warn?: boolean;
+              users_disable?: boolean;
+              users_view_ips?: boolean;
+              users_view_email?: boolean;
+              recovery_manage?: boolean;
+              invites_manage?: boolean;
+              ratio_policy_manage?: boolean;
+              site_history_manage?: boolean;
+              ip_bans_manage?: boolean;
+              email_blacklist_manage?: boolean;
+              donor_ranks_manage?: boolean;
+              donation_log_view?: boolean;
+              messages_mass_pm?: boolean;
+              login_watch_view?: boolean;
+              duplicate_ips_view?: boolean;
+              registration_log_view?: boolean;
+              staff?: boolean;
+              rank_permissions_manage?: boolean;
+              staff_groups_manage?: boolean;
+              admin?: boolean;
             };
+            secondary?: boolean;
+            permittedForumIds?: number[];
             color?: string;
             badge?: string;
+            personalCollageLimit?: number;
+            displayStaff?: boolean;
+            staffGroupId?: number | null;
           };
         };
       };
@@ -2957,6 +4500,24 @@ export interface paths {
         };
         /** @description Not found */
         404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Duplicate rank name or level */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Staff group not found */
+        422: {
           headers: {
             [name: string]: unknown;
           };
@@ -3010,6 +4571,282 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/tools/staff-groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Staff groups */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['StaffGroup'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name: string;
+            sortOrder: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Staff group created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['StaffGroup'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Duplicate name */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/tools/staff-groups/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name?: string;
+            sortOrder?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Staff group updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['StaffGroup'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Duplicate name */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Staff group deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Ranks still assigned */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Staff listing grouped by staff group */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              groups: components['schemas']['StaffGroupWithMembers'][];
+            };
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/{id}/staff-bio': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            staffBio: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Staff bio updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/comments': {
     parameters: {
       query?: never;
@@ -3020,7 +4857,15 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          page?: 'artist' | 'collages' | 'requests' | 'communities' | 'release';
+          page?: number;
+          limit?: number;
+          context?:
+            | 'artist'
+            | 'collages'
+            | 'contributions'
+            | 'requests'
+            | 'communities'
+            | 'release';
           pageId?: number;
         };
         header?: never;
@@ -3055,12 +4900,14 @@ export interface paths {
             page:
               | 'artist'
               | 'collages'
+              | 'contributions'
               | 'requests'
               | 'communities'
               | 'release';
             body: string;
             communityId?: number;
             contributionId?: number;
+            requestId?: number;
             artistId?: number;
             releaseId?: number;
             collageId?: number;
@@ -3367,6 +5214,100 @@ export interface paths {
           };
           content: {
             'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/artists/{id}/subscribe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Subscription status */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              subscribed: boolean;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Subscribed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              subscribed: boolean;
+            };
+          };
+        };
+        /** @description Artist not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Unsubscribed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              subscribed: boolean;
+            };
           };
         };
       };
@@ -4589,7 +6530,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/staff-inbox': {
+  '/staff-inbox/tickets': {
     parameters: {
       query?: never;
       header?: never;
@@ -4598,18 +6539,14 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: {
-          page?: number;
-          status?: 'Unanswered' | 'Open' | 'Resolved' | 'all';
-          assignedToMe?: boolean | null;
-        };
+        query?: never;
         header?: never;
         path?: never;
         cookie?: never;
       };
       requestBody?: never;
       responses: {
-        /** @description Staff ticket list */
+        /** @description My support tickets */
         200: {
           headers: {
             [name: string]: unknown;
@@ -4643,7 +6580,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['StaffInboxConversation'];
+            'application/json': components['schemas']['StaffInboxTicket'];
           };
         };
       };
@@ -4654,7 +6591,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/staff-inbox/unread-count': {
+  '/staff-inbox/tickets/count': {
     parameters: {
       query?: never;
       header?: never;
@@ -4670,7 +6607,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Open ticket count */
+        /** @description Count of tickets with unread staff replies */
         200: {
           headers: {
             [name: string]: unknown;
@@ -4691,7 +6628,47 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/staff-inbox/mine': {
+  '/staff-inbox/queue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          status?: 'all' | 'Unanswered' | 'Open' | 'Resolved';
+          assignedToMe?: 'true' | 'false';
+          unassigned?: 'true' | 'false';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Staff ticket queue */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['PaginatedTickets'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/queue/count': {
     parameters: {
       query?: never;
       header?: never;
@@ -4707,19 +6684,282 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description My tickets */
+        /** @description Unresolved ticket count */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['PaginatedTickets'];
+            'application/json': {
+              count: number;
+            };
           };
         };
       };
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/bulk-resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            ids: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Tickets bulk resolved */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              ok: boolean;
+              resolved: number;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/tickets/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Ticket with messages */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['StaffInboxTicket'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/tickets/{id}/reply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            body: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Reply sent */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Ticket resolved */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/tickets/{id}/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resolved */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/tickets/{id}/unresolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Unresolved */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/staff-inbox/tickets/{id}/assign': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            assignedUserId?: number | null;
+            assignedUsername?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Assigned */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -4859,51 +7099,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/staff-inbox/bulk-resolve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            ids: number[];
-          };
-        };
-      };
-      responses: {
-        /** @description Tickets resolved */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              ok: boolean;
-              resolved: number;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/staff-inbox/{id}': {
+  '/reports/stats': {
     parameters: {
       query?: never;
       header?: never;
@@ -4914,189 +7110,34 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          id: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
       responses: {
-        /** @description Ticket */
+        /** @description Report resolution statistics */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['StaffInboxConversation'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MsgResponse'];
+            'application/json': {
+              last24h: number;
+              lastWeek: number;
+              lastMonth: number;
+              allTime: number;
+              byStaff: {
+                userId: number;
+                username: string;
+                count: number;
+              }[];
+            };
           };
         };
       };
     };
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/staff-inbox/{id}/reply': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            body: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Reply sent */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['StaffInboxMsg'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/staff-inbox/{id}/assign': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            assignedUserId: number | null;
-          };
-        };
-      };
-      responses: {
-        /** @description Assigned */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/staff-inbox/{id}/resolve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Resolved */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/staff-inbox/{id}/unresolve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Unresolved */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
     delete?: never;
     options?: never;
     head?: never;
@@ -5176,6 +7217,7 @@ export interface paths {
                 createdAt: string;
                 resolvedAt: string | null;
                 resolution: string | null;
+                sourceUrl: string | null;
               }[];
             };
           };
@@ -5280,6 +7322,7 @@ export interface paths {
                 }[];
                 createdAt: string;
                 updatedAt: string;
+                sourceUrl: string | null;
               }[];
             };
           };
@@ -5299,7 +7342,8 @@ export interface paths {
           'application/json': {
             targetType: string;
             targetId: number;
-            category: string;
+            category?: string;
+            releaseCategory?: string;
             reason: string;
             evidence?: string;
           };
@@ -5376,6 +7420,7 @@ export interface paths {
               }[];
               createdAt: string;
               updatedAt: string;
+              sourceUrl: string | null;
             };
           };
         };
@@ -5475,6 +7520,7 @@ export interface paths {
               }[];
               createdAt: string;
               updatedAt: string;
+              sourceUrl: string | null;
             };
           };
         };
@@ -5807,6 +7853,3384 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/top10/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top releases */
+    get: {
+      parameters: {
+        query?: {
+          type?:
+            | 'day'
+            | 'week'
+            | 'month'
+            | 'year'
+            | 'overall'
+            | 'consumed'
+            | 'contributed';
+          limit?: number | null;
+          excludeTags?: string;
+          format?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Top releases list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: components['schemas']['Top10ReleaseItem'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/top10/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top users */
+    get: {
+      parameters: {
+        query?: {
+          type?:
+            | 'contributed'
+            | 'consumed'
+            | 'numContributions'
+            | 'contributionSpeed'
+            | 'consumeSpeed';
+          limit?: number | null;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Top users list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: components['schemas']['Top10UserItem'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/top10/tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top tags */
+    get: {
+      parameters: {
+        query?: {
+          type?: 'used' | 'voted';
+          limit?: number | null;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Top tags list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: components['schemas']['Top10TagItem'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/top10/votes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top voted releases (BPCI ranked) */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number | null;
+          tags?: string;
+          year?: number | null;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Top voted releases */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: components['schemas']['Top10VoteItem'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/top10/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top 10 history snapshot (staff) */
+    get: {
+      parameters: {
+        query?: {
+          type?: 'Daily' | 'Weekly';
+          date?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description History snapshot */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Top10Snapshot'];
+          };
+        };
+        /** @description No snapshot found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              msg: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/top10/snapshot': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Trigger a history snapshot (admin/cron) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            type?: 'Daily' | 'Weekly';
+          };
+        };
+      };
+      responses: {
+        /** @description Snapshot created */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              msg: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/rules/tree': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description The composable Rule/SubRule tree with CRS weights (PRD-05 #1) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Rule tree, each rule with its nested sub-rules */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              rules: components['schemas']['Rule'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/rules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Main rules page and sub-pages */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              main: components['schemas']['RulesPage'] & unknown;
+              pages: components['schemas']['RulesPage'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            title: string;
+            slug?: string;
+            body: string;
+            /** @default false */
+            isMain?: boolean;
+            /** @default 0 */
+            sortOrder?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Page created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RulesPage'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/rules/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          slug: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Single rules page */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RulesPage'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/rules/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            title?: string;
+            body?: string;
+            isMain?: boolean;
+            sortOrder?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Page updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RulesPage'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Page deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Cannot delete main page */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/friends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated friends list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['FriendEntry'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/friends/status/{userId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Friend status */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              isFriend: boolean;
+            };
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/friends/{userId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Friend added */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Cannot add self */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description Already friends */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Friend removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/friends/{userId}/comment': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            comment: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Comment updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Friend not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/tag-aliases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated tag alias list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['TagAliasItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            badTag: string;
+            goodTag: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Tag alias created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TagAliasItem'];
+          };
+        };
+        /** @description Validation error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ValidationError'];
+          };
+        };
+        /** @description Canonical tag not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/tag-aliases/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            badTag: string;
+            goodTag: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Tag alias updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TagAliasItem'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tag alias deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+          userId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated session list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['SessionItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/invites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+          status?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated invite list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['InviteItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/invite-tree': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated invite tree */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['InviteTreeItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/{id}/invite-tree': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description A member's invite subtree + summary */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              tree: components['schemas']['MemberInviteTreeNode'][];
+              summary: components['schemas']['InviteTreeSummary'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/users/ratio-watch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated ratio watch list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['RatioWatchItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/artists/vanity-house': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated vanity house artists */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['VanityHouseArtist'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/artists/{id}/vanity-house': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            vanityHouse: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Artist updated */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['VanityHouseArtist'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/announcements/album-of-month': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Featured album list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['FeaturedAlbumItem'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            groupId: number;
+            threadId: number;
+            title: string;
+            image?: string | '';
+            /** Format: date-time */
+            started: string;
+            /** Format: date-time */
+            ended: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['FeaturedAlbumItem'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/announcements/album-of-month/{albumId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          albumId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/collages/deleted': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated deleted collages */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['DeletedCollageItem'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/economy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Economy stats */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              grouped: components['schemas']['EconomyGroupedItem'][];
+              recent: components['schemas']['EconomyTransactionItem'][];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Release and contribution counts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              releases: number;
+              contributions: number;
+              artists: number;
+              byType: {
+                type: string;
+                _count: number;
+              }[];
+              byLinkStatus: {
+                linkStatus: string;
+                _count: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/clients': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Top user agent strings */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              userAgent: string | null;
+              count: number;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/user-flow': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Invite funnel and snapshot trend */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              inviteFunnel: {
+                status: string;
+                _count: number;
+              }[];
+              snapshots: {
+                bucketAt: string;
+                totalUsers: number;
+                activeThisMonth: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/stats/site-info': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Aggregate DB counts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              totalUsers: number;
+              enabledUsers: number;
+              disabledUsers: number;
+              releases: number;
+              artists: number;
+              contributions: number;
+              communities: number;
+              forumTopics: number;
+              forumPosts: number;
+              collages: number;
+              wikiPages: number;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/dnc': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description DNC list for the community */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DncEntry'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name: string;
+            comment: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Created DNC entry */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DncEntry'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/communities/{communityId}/dnc/{dncId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: number;
+          dncId: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/artists': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bookmark list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              artistId: number;
+              createdAt: string;
+              artist: {
+                id: number;
+                name: string;
+              };
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/artists/{artistId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          artistId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Toggled bookmark */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              bookmarked: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          artistId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bookmark list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              releaseId: number;
+              sort: number;
+              createdAt: string;
+              release: {
+                id: number;
+                communityId: number | null;
+                title: string;
+                artist: {
+                  id: number;
+                  name: string;
+                };
+              };
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/releases/{releaseId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          releaseId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Toggled bookmark */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              bookmarked: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          releaseId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/communities': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bookmark list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              communityId: number;
+              sort: number;
+              createdAt: string;
+              community: {
+                id: number;
+                name: string;
+              };
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/communities/{communityId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Toggled bookmark */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              bookmarked: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          communityId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bookmark list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              requestId: number;
+              createdAt: string;
+              request: {
+                id: number;
+                title: string;
+              };
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/bookmarks/requests/{requestId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          requestId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Toggled bookmark */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              bookmarked: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          requestId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Removed */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/random/release': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description A random release */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              communityId: number | null;
+              title: string;
+              year: number;
+              artist: {
+                id: number;
+                name: string;
+              };
+            };
+          };
+        };
+        /** @description No releases found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/random/artist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description A random artist */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              name: string;
+            };
+          };
+        };
+        /** @description No artists found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/search/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          tags?: string;
+          tagMode?: 'any' | 'all';
+          orderBy?:
+            | 'createdAt'
+            | 'year'
+            | 'consumers'
+            | 'contributors'
+            | 'random';
+          order?: 'asc' | 'desc';
+          communityId?: number | number[];
+          artist?: string;
+          title?: string;
+          recordLabel?: string;
+          catalogueNumber?: string;
+          year?: number;
+          yearTo?: number;
+          description?: string;
+          type?:
+            | 'Music'
+            | 'Applications'
+            | 'EBooks'
+            | 'ELearningVideos'
+            | 'Audiobooks'
+            | 'Comedy'
+            | 'Comics';
+          releaseType?:
+            | 'Album'
+            | 'Single'
+            | 'EP'
+            | 'Anthology'
+            | 'Compilation'
+            | 'DJMix'
+            | 'Live'
+            | 'Remix'
+            | 'Bootleg'
+            | 'Interview'
+            | 'Mixtape'
+            | 'Demo'
+            | 'ConcertRecording'
+            | 'Unknown';
+          format?:
+            | 'mp3'
+            | 'flac'
+            | 'wav'
+            | 'ogg'
+            | 'aac'
+            | 'm4a'
+            | 'm4b'
+            | 'mp4'
+            | 'mkv'
+            | 'avi'
+            | 'mov'
+            | 'zip'
+            | 'exe'
+            | 'dmg'
+            | 'apk'
+            | 'pdf'
+            | 'epub'
+            | 'mobi'
+            | 'cbz'
+            | 'cbr'
+            | 'jpg'
+            | 'png'
+            | 'gif'
+            | 'txt';
+          bitrate?:
+            | 'Lossless'
+            | 'Lossless24'
+            | 'Kbps320'
+            | 'Kbps256'
+            | 'KbpsV0'
+            | 'Kbps192'
+            | 'KbpsV2'
+            | 'Kbps128'
+            | 'Other';
+          media?:
+            | 'CD'
+            | 'WEB'
+            | 'Vinyl'
+            | 'SACD'
+            | 'DVD'
+            | 'Cassette'
+            | 'BluRay'
+            | 'DAT'
+            | 'Soundboard'
+            | 'Other';
+          hasLog?: boolean | null;
+          hasCue?: boolean | null;
+          isScene?: boolean | null;
+          vanityHouse?: boolean | null;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Release search results */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: {
+                id: number;
+                title: string;
+                year: number | null;
+                type: string;
+                releaseType: string;
+                communityId: number | null;
+                description: string;
+                createdAt: string;
+                artist: {
+                  id: number;
+                  name: string;
+                } | null;
+                tags: {
+                  id: number;
+                  name: string;
+                }[];
+                _count: {
+                  consumers: number;
+                  contributors: number;
+                };
+              }[];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/search/artists': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          tags?: string;
+          tagMode?: 'any' | 'all';
+          vanityHouse?: boolean | null;
+          orderBy?: 'name' | 'random';
+          order?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Artist search results */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: {
+                id: number;
+                name: string;
+                vanityHouse: boolean;
+                tags: {
+                  tag: {
+                    id: number;
+                    name: string;
+                  };
+                }[];
+                _count: {
+                  releases: number;
+                };
+              }[];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/search/requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          artist?: string;
+          type?:
+            | 'Music'
+            | 'Applications'
+            | 'EBooks'
+            | 'ELearningVideos'
+            | 'Audiobooks'
+            | 'Comedy'
+            | 'Comics';
+          year?: number;
+          status?: 'open' | 'filled' | 'deleted';
+          communityId?: number;
+          orderBy?: 'createdAt' | 'voteCount' | 'random';
+          order?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Request search results */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: {
+                id: number;
+                title: string;
+                description: string;
+                type: string;
+                year: number | null;
+                status: string;
+                voteCount: number;
+                communityId: number;
+                createdAt: string;
+                user: {
+                  id: number;
+                  username: string;
+                };
+                community?: {
+                  id: number;
+                  name: string;
+                };
+                artists: {
+                  artist: {
+                    id: number;
+                    name: string;
+                  };
+                }[];
+                totalBounty: string;
+                _count: {
+                  bounties: number;
+                };
+              }[];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/search/log': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          type?: 'topic' | 'post' | 'all';
+          authorId?: number;
+          orderBy?: 'createdAt';
+          order?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Forum log search results */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json':
+              | {
+                  data: {
+                    id: number;
+                    title: string;
+                    createdAt: string;
+                    isLocked: boolean;
+                    isSticky: boolean;
+                    numPosts: number;
+                    forumId: number;
+                    author: {
+                      id: number;
+                      username: string;
+                    };
+                  }[];
+                  meta: components['schemas']['PaginationMeta'];
+                }
+              | {
+                  data: {
+                    id: number;
+                    body: string;
+                    createdAt: string;
+                    forumTopicId: number;
+                    author: {
+                      id: number;
+                      username: string;
+                    };
+                  }[];
+                  meta: components['schemas']['PaginationMeta'];
+                }
+              | {
+                  topics: {
+                    data: {
+                      id: number;
+                      title: string;
+                      createdAt: string;
+                      isLocked: boolean;
+                      isSticky: boolean;
+                      numPosts: number;
+                      forumId: number;
+                      author: {
+                        id: number;
+                        username: string;
+                      };
+                    }[];
+                    meta: components['schemas']['PaginationMeta'];
+                  };
+                  posts: {
+                    data: {
+                      id: number;
+                      body: string;
+                      createdAt: string;
+                      forumTopicId: number;
+                      author: {
+                        id: number;
+                        username: string;
+                      };
+                    }[];
+                    meta: components['schemas']['PaginationMeta'];
+                  };
+                };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/search/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          orderBy?: 'username' | 'createdAt' | 'lastLogin';
+          order?: 'asc' | 'desc';
+          disabled?: boolean | null;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description User search results */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: {
+                id: number;
+                username: string;
+                createdAt: string;
+                userRank: {
+                  name: string;
+                  color: string | null;
+                };
+                email?: string;
+                lastLogin?: string | null;
+                disabled?: boolean;
+                ratio?: number | null;
+                contributed?: string;
+                consumed?: string;
+              }[];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/site-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Site history entries */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              authorId: number;
+              title: string;
+              body: string;
+              createdAt: string;
+              updatedAt: string;
+              author: {
+                id: number;
+                username: string;
+              };
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            title: string;
+            body: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Created entry */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              authorId: number;
+              title: string;
+              body: string;
+              createdAt: string;
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/site-history/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            title: string;
+            body: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Updated entry */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              authorId: number;
+              title: string;
+              body: string;
+              createdAt: string;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/contributions/{id}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            idempotencyKey?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Download access granted */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              grantId: number;
+              downloadUrl: string;
+              amountBytes: string;
+              status: string;
+              createdAt: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/contributions/{id}/access/latest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Most recent grant within the idempotency window */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              grantId: number;
+              downloadUrl: string;
+              amountBytes: string;
+              status: string;
+              createdAt: string;
+            };
+          };
+        };
+        /** @description No recent grant */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/downloads/{grantId}/reverse': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          grantId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            reason: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Grant reversed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              grantId: number;
+              status: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/donations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          userId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Donation log */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: {
+                id: number;
+                userId: number;
+                amount: number;
+                email: string;
+                donatedAt: string;
+                currency: string;
+                source: string;
+                reason: string;
+                user: {
+                  id: number;
+                  username: string;
+                };
+              }[];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            userId: number;
+            amount: number;
+            email: string;
+            donatedAt: string;
+            currency?: string;
+            source?: string;
+            reason: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Donation recorded */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              amount: number;
+              email: string;
+              donatedAt: string;
+              currency: string;
+              source: string;
+              reason: string;
+              user: {
+                id: number;
+                username: string;
+              };
+            };
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/donations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/email-blacklist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Blacklisted emails */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              email: string;
+              addedAt: string;
+              comment: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            email: string;
+            comment: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Created entry */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              userId: number;
+              email: string;
+              addedAt: string;
+              comment: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/email-blacklist/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/ip-bans': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description IP bans */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              fromIp: string;
+              toIp: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            fromIp: string;
+            toIp?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Created ban */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              fromIp: string;
+              toIp: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/ip-bans/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5853,6 +11277,9 @@ export interface components {
       isArtist?: boolean;
       isDonor?: boolean;
       canDownload?: boolean;
+      contributed?: string;
+      consumed?: string;
+      ratio?: number;
       userRank: {
         level: number;
         name: string;
@@ -5861,6 +11288,7 @@ export interface components {
         permissions?: {
           [key: string]: boolean;
         };
+        personalCollageLimit?: number;
       };
     };
     PublicUser: {
@@ -5893,6 +11321,7 @@ export interface components {
       name: string;
       color: string;
       badge?: string;
+      displayStaff?: boolean;
     };
     UserSettings: {
       id: number;
@@ -5900,12 +11329,129 @@ export interface components {
       externalStylesheet?: string | null;
       styledTooltips: boolean;
       paranoia: number;
+      /** @enum {string} */
+      notificationMethod:
+        | 'Disabled'
+        | 'Popup'
+        | 'Traditional'
+        | 'Push'
+        | 'Combined';
+      showEmail: boolean;
+      showLastSeen: boolean;
+      showContributedStats: boolean;
+      showConsumedStats: boolean;
+      showRatioStats: boolean;
+    };
+    ProfileStats: {
+      contributed: string | null;
+      consumed: string | null;
+      ratio: string | null;
+      buffer: string | null;
+    };
+    ProfileActivitySummary: {
+      contributions: number;
+      requestsCreated: number;
+      requestsFilled: number;
+      forumTopics: number;
+      forumPosts: number;
+      comments: number;
+      collagesStarted: number;
+      collageEntries: number;
+    };
+    ProfileContribution: {
+      id: number;
+      createdAt: string;
+      release: {
+        id: number;
+        title: string;
+        communityId: number | null;
+        image: string | null;
+        artist: {
+          id: number;
+          name: string;
+        } | null;
+      };
+    };
+    ProfilePercentile: {
+      percentile: number;
+      rank: number;
+      total: number;
+    };
+    ProfilePercentiles: {
+      contributed: components['schemas']['ProfilePercentile'];
+      consumed: components['schemas']['ProfilePercentile'];
+      contributions: components['schemas']['ProfilePercentile'];
+      forumPosts: components['schemas']['ProfilePercentile'];
+      requestsFilled: components['schemas']['ProfilePercentile'];
+    };
+    ProfileCollageShelf: {
+      id: number;
+      name: string;
+      categoryId: number;
+      isFeatured: boolean;
+      numEntries: number;
+      createdAt: string;
+      updatedAt: string;
+      coverImages: string[];
+    };
+    ProfileCollageShelves: {
+      featuredPersonalCollages: components['schemas']['ProfileCollageShelf'][];
+      publicCollages: components['schemas']['ProfileCollageShelf'][];
+    };
+    DonorPresentation: {
+      rank: {
+        name: string;
+        badge: string;
+        color: string;
+        grantedAt: string;
+        expiresAt: string | null;
+      } | null;
+      customIcon: string | null;
+      customIconLink: string | null;
+      secondAvatar: string | null;
+      iconMouseOverText: string | null;
+      avatarMouseOverText: string | null;
+      profileBlocks: {
+        title: string;
+        body: string;
+      }[];
+    };
+    ProfileStaffPmSummary: {
+      id: number;
+      subject: string;
+      /** @enum {string} */
+      status: 'Unanswered' | 'Open' | 'Resolved';
+      createdAt: string;
+      updatedAt: string;
+      assignedStaff: {
+        id: number;
+        username: string;
+      } | null;
+      replyCount: number;
+      viewerCanOpen: boolean;
+    };
+    ProfileStaffPmOverview: {
+      total: number;
+      unresolved: number;
+      recentConversations: components['schemas']['ProfileStaffPmSummary'][];
+    };
+    ProfileSnatch: {
+      id: number;
+      downloadedAt: string;
+      release: {
+        id: number;
+        title: string;
+        communityId: number | null;
+      };
+      artist: {
+        name: string;
+      } | null;
     };
     InviteNode: {
       id: number;
       username: string;
       /** Format: email */
-      email: string;
+      email?: string;
       joinedAt: string;
       lastSeen?: string | null;
       contributed?: string;
@@ -5917,33 +11463,129 @@ export interface components {
       id: number;
       username: string;
       avatar: string | null;
+      /** Format: email */
+      email: string | null;
       dateRegistered: string;
+      lastSeen: string | null;
       isArtist: boolean;
       isDonor: boolean;
-      userRank: components['schemas']['UserRankSummary'];
-      profile: components['schemas']['ProfileDetails'];
-      userSettings: {
-        siteAppearance?: string;
-        styledTooltips?: boolean;
+      disabled: boolean;
+      warned: string | null;
+      /** @enum {string} */
+      standing: 'pristine' | 'clean' | 'neutral' | 'poor' | 'hammer';
+      inviteCount: number | null;
+      staffBio: string | null;
+      stats: components['schemas']['ProfileStats'];
+      userRank: components['schemas']['UserRankSummary'] & {
+        id: number;
       };
+      profile: components['schemas']['ProfileDetails'];
+      activitySummary: components['schemas']['ProfileActivitySummary'];
+      percentiles: components['schemas']['ProfilePercentiles'];
+      donorPresentation: components['schemas']['DonorPresentation'] & unknown;
+      collageShelves: components['schemas']['ProfileCollageShelves'];
+      staffPmOverview: components['schemas']['ProfileStaffPmOverview'] &
+        unknown;
+      recentContributions: components['schemas']['ProfileContribution'][];
+      recentSnatches: components['schemas']['ProfileSnatch'][];
+      inviteTree: components['schemas']['InviteNode'][];
     };
     MyProfile: {
       id: number;
       username: string;
       avatar: string | null;
-      profile: components['schemas']['ProfileDetails'];
-      userSettings: components['schemas']['UserSettings'];
-      userRank: {
-        name: string;
-        color: string;
+      /** Format: email */
+      email: string | null;
+      dateRegistered: string;
+      lastSeen: string | null;
+      isArtist: boolean;
+      isDonor: boolean;
+      disabled: boolean;
+      warned: string | null;
+      /** @enum {string} */
+      standing: 'pristine' | 'clean' | 'neutral' | 'poor' | 'hammer';
+      inviteCount: number | null;
+      staffBio: string | null;
+      stats: components['schemas']['ProfileStats'];
+      userRank: components['schemas']['UserRankSummary'] & {
+        id: number;
       };
+      profile: components['schemas']['ProfileDetails'];
+      activitySummary: components['schemas']['ProfileActivitySummary'];
+      percentiles: components['schemas']['ProfilePercentiles'];
+      donorPresentation: components['schemas']['DonorPresentation'] & unknown;
+      collageShelves: components['schemas']['ProfileCollageShelves'];
+      staffPmOverview: components['schemas']['ProfileStaffPmOverview'] &
+        unknown;
+      recentContributions: components['schemas']['ProfileContribution'][];
+      recentSnatches: components['schemas']['ProfileSnatch'][];
       inviteTree: components['schemas']['InviteNode'][];
+      userSettings: components['schemas']['UserSettings'];
     };
     AdminCreatedUser: {
       id: number;
       username: string;
       /** Format: email */
       email: string;
+    };
+    RecoveryRequestItem: {
+      id: number;
+      userId: number;
+      username: string;
+      email: string;
+      /** @enum {string} */
+      status: 'pending' | 'used' | 'expired';
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: date-time */
+      usedAt: string | null;
+    };
+    UserWarningItem: {
+      id: number;
+      userId: number;
+      user: {
+        id: number;
+        username: string;
+      };
+      reason: string;
+      expiresAt: string | null;
+      createdAt: string;
+      warnedBy: {
+        id: number;
+        username: string;
+      } | null;
+    };
+    DonorRewards: {
+      rewards: {
+        iconMouseOverText: string;
+        avatarMouseOverText: string;
+        customIcon: string;
+        customIconLink: string;
+        secondAvatar: string;
+        profileInfoTitle1: string;
+        profileInfo1: string;
+        profileInfoTitle2: string;
+        profileInfo2: string;
+        profileInfoTitle3: string;
+        profileInfo3: string;
+        profileInfoTitle4: string;
+        profileInfo4: string;
+      };
+      perks: {
+        [key: string]: boolean;
+      };
+      forumTitle: {
+        prefix: string;
+        suffix: string;
+        useComma: boolean;
+      } | null;
+    };
+    DonorForumTitle: {
+      prefix: string;
+      suffix: string;
+      useComma: boolean;
     };
     HomepageFeaturedRelease: {
       id: number;
@@ -5999,8 +11641,37 @@ export interface components {
       contributedLinks: number;
       contributedLinkDownloads: number;
     };
+    SiteStatSnapshot: {
+      id: number;
+      capturedAt: string;
+      maxUsers: number;
+      totalUsers: number;
+      enabledUsers: number;
+      activeToday: number;
+      activeThisWeek: number;
+      activeThisMonth: number;
+      communities: number;
+      releases: number;
+      artists: number;
+      blogPosts: number;
+      announcements: number;
+      comments: number;
+      contributedLinks: number;
+      contributedLinkDownloads: number;
+    };
+    UserStatSnapshot: {
+      id: number;
+      userId: number;
+      /** @enum {string} */
+      period: 'Daily' | 'Monthly' | 'Yearly';
+      capturedAt: string;
+      contributed: string | null;
+      consumed: string | null;
+      contributionCount: number;
+    };
     Notification: {
       id: number;
+      /** @enum {string} */
       type:
         | 'forum_quote'
         | 'forum_sub'
@@ -6022,6 +11693,8 @@ export interface components {
       source?: {
         title: string;
         forumId?: number;
+        releaseId?: number;
+        communityId?: number;
       } | null;
     };
     Subscription: {
@@ -6031,8 +11704,26 @@ export interface components {
     Stylesheet: {
       id: number;
       name: string;
+      description: string;
       cssUrl: string;
+      isDefault: boolean;
       createdAt: string;
+    };
+    StylesheetStat: {
+      id: number;
+      name: string;
+      userCount: number;
+    };
+    GlobalNotice: {
+      id: number;
+      message: string;
+      url: string | null;
+      expiresAt: string | null;
+      createdAt: string;
+      createdBy: {
+        id: number;
+        username: string;
+      };
     };
     Forum: {
       id: number;
@@ -6094,12 +11785,22 @@ export interface components {
         username: string;
       };
     };
+    ForumPostLastEdit: {
+      id: number;
+      forumPostId: number;
+      editorId: number;
+      editedAt: string;
+      editor?: {
+        id: number;
+        username: string;
+      };
+    };
     ForumPost: {
       id: number;
       forumTopicId: number;
       authorId: number;
       body: string;
-      edits: components['schemas']['ForumPostEdit'][];
+      lastEdit?: components['schemas']['ForumPostLastEdit'];
       author?: {
         id: number;
         username: string;
@@ -6134,9 +11835,45 @@ export interface components {
       data: components['schemas']['ForumTopic'][];
       meta: components['schemas']['PaginationMeta'];
     };
+    ForumTopicSession: {
+      forum: {
+        id: number;
+        name: string;
+        forumCategoryId: number;
+        forumCategory?: {
+          id: number;
+          name: string;
+        } | null;
+      };
+      topic: components['schemas']['ForumTopic'];
+      posts: {
+        data: components['schemas']['ForumPost'][];
+        meta: components['schemas']['PaginationMeta'];
+      };
+      poll?: components['schemas']['ForumPoll'] & unknown;
+      subscription: {
+        isSubscribed: boolean;
+      };
+      affordances: {
+        canReply: boolean;
+        canModerate: boolean;
+        canVoteInPoll: boolean;
+        canSubscribe: boolean;
+        canCatchUp: boolean;
+      };
+      readState: {
+        lastVisiblePostId: number | null;
+      };
+    };
     CommunityStaffMember: {
       id: number;
       username: string;
+    };
+    CommunityConsumer: {
+      user: {
+        id: number;
+        username: string;
+      };
     };
     Community: {
       id: number;
@@ -6147,6 +11884,7 @@ export interface components {
       image?: string | null;
       allowDuplicateFormats: boolean;
       staff?: components['schemas']['CommunityStaffMember'][];
+      consumers?: components['schemas']['CommunityConsumer'][];
       _count?: {
         releases: number;
         contributors: number;
@@ -6191,6 +11929,9 @@ export interface components {
       type: string;
       downloadUrl: string;
       sizeInBytes?: number | null;
+      /** @enum {string} */
+      linkStatus: 'UNKNOWN' | 'PASS' | 'WARN' | 'FAIL';
+      linkCheckedAt?: string | null;
       collaborators: {
         id: number;
         name: string;
@@ -6198,18 +11939,132 @@ export interface components {
       releaseDescription?: string | null;
       createdAt?: string;
     };
+    ReleaseTagEnriched: {
+      id: number;
+      tagId: number;
+      name: string;
+      occurrences: number;
+      score: number;
+      positiveVotes: number;
+      negativeVotes: number;
+      addedBy?: {
+        id: number;
+        username: string;
+      } | null;
+      createdAt?: string | null;
+      myVotes?: {
+        up: boolean;
+        down: boolean;
+      };
+    };
+    ReleaseSnapshot: {
+      title: string;
+      description: string;
+      image: string | null;
+      year: number;
+      tagIds: number[];
+      tagNames: string[];
+    };
+    ReleaseHistoryEntry: {
+      id: number;
+      /** @enum {string} */
+      action:
+        | 'created'
+        | 'edit'
+        | 'tag_added'
+        | 'tag_removed'
+        | 'contribution_added';
+      summary: string;
+      changedFields: string[];
+      before?: {
+        [key: string]: unknown;
+      } | null;
+      after?: {
+        [key: string]: unknown;
+      } | null;
+      snapshot?: components['schemas']['ReleaseSnapshot'] & unknown;
+      createdAt: string;
+      actor: {
+        id: number;
+        username: string;
+      };
+    };
     Release: {
       id: number;
       title: string;
       communityId: number | null;
       year?: number | null;
       type?: string | null;
+      releaseType?: string | null;
       image?: string | null;
       description?: string | null;
       createdAt?: string;
-      artist?: components['schemas']['ReleaseArtist'];
+      artist?: components['schemas']['ReleaseArtist'] & unknown;
       tags?: components['schemas']['ReleaseTag'][];
+      releaseTags?: components['schemas']['ReleaseTagEnriched'][];
+      /** @enum {string|null} */
+      myVote?: 'up' | 'down' | null;
+      voteAggregate?: {
+        ups: number;
+        total: number;
+        score: number;
+      } | null;
       contributions?: components['schemas']['ReleaseContribution'][];
+      isContributor?: boolean;
+    };
+    /** @enum {string} */
+    PermissionKey:
+      | 'advanced_search'
+      | 'users_search'
+      | 'forums_read'
+      | 'forums_post'
+      | 'forums_moderate'
+      | 'forums_manage'
+      | 'communities_manage'
+      | 'contributions_manage'
+      | 'dnc_manage'
+      | 'collages_create'
+      | 'collages_manage'
+      | 'collages_moderate'
+      | 'requests_create'
+      | 'requests_moderate'
+      | 'wiki_edit'
+      | 'wiki_manage'
+      | 'news_manage'
+      | 'rules_manage'
+      | 'tags_manage'
+      | 'reports_manage'
+      | 'staff_inbox_manage'
+      | 'users_edit'
+      | 'users_warn'
+      | 'users_disable'
+      | 'users_view_ips'
+      | 'users_view_email'
+      | 'recovery_manage'
+      | 'invites_manage'
+      | 'ratio_policy_manage'
+      | 'site_history_manage'
+      | 'ip_bans_manage'
+      | 'email_blacklist_manage'
+      | 'donor_ranks_manage'
+      | 'donation_log_view'
+      | 'messages_mass_pm'
+      | 'login_watch_view'
+      | 'duplicate_ips_view'
+      | 'registration_log_view'
+      | 'staff'
+      | 'rank_permissions_manage'
+      | 'staff_groups_manage'
+      | 'admin';
+    PermissionEntry: {
+      key: components['schemas']['PermissionKey'];
+      label: string;
+      description: string;
+    };
+    PermissionGroup: {
+      key: string;
+      title: string;
+      permissions: components['schemas']['PermissionEntry'][];
     };
     UserRank: {
       id: number;
@@ -6220,7 +12075,30 @@ export interface components {
       };
       color?: string;
       badge?: string;
+      personalCollageLimit?: number;
+      displayStaff?: boolean;
+      staffGroupId?: number | null;
       userCount?: number;
+    };
+    StaffGroup: {
+      id: number;
+      name: string;
+      sortOrder: number;
+      rankCount?: number;
+    };
+    StaffMember: {
+      userId: number;
+      username: string;
+      rankName: string;
+      rankColor: string;
+      lastSeen: string | null;
+      staffBio: string | null;
+    };
+    StaffGroupWithMembers: {
+      id: number | null;
+      name: string;
+      sortOrder: number;
+      members: components['schemas']['StaffMember'][];
     };
     Comment: {
       id: number;
@@ -6263,11 +12141,20 @@ export interface components {
           name: string;
         };
       }[];
+      description?: string | null;
       releases?: {
         id: number;
         title: string;
         year?: number | null;
+        type?: string;
+        releaseType?: string;
+        communityId?: number | null;
+        community?: {
+          id: number;
+          name: string;
+        } | null;
       }[];
+      isSubscribed?: boolean;
     };
     ArtistHistory: {
       id: number;
@@ -6351,6 +12238,7 @@ export interface components {
       id: number;
       subject: string;
       createdAt: string;
+      updatedAt: string;
       participants?: components['schemas']['PrivateConversationParticipant'][];
       messages?: components['schemas']['PrivateMessage'][];
     };
@@ -6360,19 +12248,7 @@ export interface components {
       pageSize: number;
       conversations: components['schemas']['PrivateConversation'][];
     };
-    StaffInboxMessageUser: {
-      id: number;
-      username: string;
-      avatar?: string | null;
-    };
-    StaffInboxMsg: {
-      id: number;
-      conversationId: number;
-      body: string;
-      createdAt: string;
-      sender: components['schemas']['StaffInboxMessageUser'];
-    };
-    StaffInboxConversation: {
+    StaffInboxTicket: {
       id: number;
       subject: string;
       /** @enum {string} */
@@ -6380,16 +12256,21 @@ export interface components {
       isReadByUser: boolean;
       createdAt: string;
       updatedAt: string;
-      user: components['schemas']['StaffInboxMessageUser'];
-      assignedUser?: components['schemas']['StaffInboxMessageUser'] & unknown;
-      resolver?: components['schemas']['StaffInboxMessageUser'] & unknown;
-      messages?: components['schemas']['StaffInboxMsg'][];
+      user: components['schemas']['MessageUser'];
+      assignedUser?: components['schemas']['MessageUser'] & unknown;
+      resolver?: components['schemas']['MessageUser'] & unknown;
+      messages?: {
+        id: number;
+        body: string;
+        createdAt: string;
+        sender: components['schemas']['MessageUser'] & unknown;
+      }[];
     };
     PaginatedTickets: {
       total: number;
       page: number;
       pageSize: number;
-      conversations: components['schemas']['StaffInboxConversation'][];
+      conversations: components['schemas']['StaffInboxTicket'][];
     };
     StaffInboxResponse: {
       id: number;
@@ -6413,6 +12294,287 @@ export interface components {
       registrationStatus: 'open' | 'invite' | 'closed';
       maxUsers: number;
       updatedAt: string;
+    };
+    Top10Tag: {
+      id: number;
+      name: string;
+    };
+    Top10ReleaseItem: {
+      rank: number;
+      releaseId: number;
+      title: string;
+      year: number;
+      artistId: number;
+      artistName: string;
+      type: string;
+      releaseType: string;
+      tags: components['schemas']['Top10Tag'][];
+      consumerCount: number;
+      totalBytesConsumed: string;
+      contributionCount: number;
+    };
+    Top10UserItem: {
+      rank: number;
+      userId: number;
+      username: string;
+      avatar: string | null;
+      contributed: string;
+      consumed: string;
+      ratio: number;
+      numContributions: number;
+      contributionSpeed: number;
+      consumeSpeed: number;
+      joinedAt: string;
+      rankName: string;
+      rankLevel: number;
+    };
+    Top10TagItem: {
+      rank: number;
+      tagId: number;
+      name: string;
+      uses: number;
+      positiveVotes: number;
+      negativeVotes: number;
+    };
+    Top10VoteItem: {
+      rank: number;
+      releaseId: number;
+      title: string;
+      year: number;
+      artistName: string;
+      ups: number;
+      downs: number;
+      total: number;
+      score: number;
+      positivePercent: number;
+    };
+    Top10SnapshotEntry: {
+      rank: number;
+      releaseId: number | null;
+      releaseTitle: string;
+      tagString: string;
+      deleted: boolean;
+    };
+    Top10Snapshot: {
+      snapshotId: number;
+      /** @enum {string} */
+      type: 'Daily' | 'Weekly';
+      date: string;
+      entries: components['schemas']['Top10SnapshotEntry'][];
+    };
+    RulesPage: {
+      id: number;
+      slug: string;
+      title: string;
+      body: string;
+      isMain: boolean;
+      sortOrder: number;
+      authorId: number;
+      author: {
+        id: number;
+        username: string;
+      };
+      createdAt: string;
+      updatedAt: string;
+    };
+    SubRule: {
+      id: number;
+      ruleId: number;
+      code: string;
+      title: string;
+      description: string;
+      complianceWeight: number;
+      violationWeight: number;
+      sortOrder: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+    Rule: {
+      id: number;
+      code: string;
+      title: string;
+      description: string;
+      complianceWeight: number;
+      violationWeight: number;
+      sortOrder: number;
+      subRules: components['schemas']['SubRule'][];
+      createdAt: string;
+      updatedAt: string;
+    };
+    FriendEntry: {
+      id: number;
+      userId: number;
+      friendId: number;
+      comment: string;
+      friend: {
+        id: number;
+        username: string;
+        avatar: string | null;
+      };
+    };
+    TagAliasItem: {
+      id: number;
+      badTag: string;
+      goodTag: {
+        id: number;
+        name: string;
+      };
+      createdBy: {
+        id: number;
+        username: string;
+      };
+      createdAt: string;
+    };
+    SessionItem: {
+      id: string;
+      user: {
+        id: number;
+        username: string;
+      };
+      ipAddress: string;
+      userAgent: string | null;
+      createdAt: string;
+      lastActiveAt: string;
+      revokedAt: string | null;
+    };
+    InviteItem: {
+      id: number;
+      inviter: {
+        id: number;
+        username: string;
+      };
+      email: string;
+      expires: string;
+      reason: string;
+      status: string;
+    };
+    InviteTreeItem: {
+      id: number;
+      userId: number;
+      user: {
+        id: number;
+        username: string;
+      };
+      inviterId: number | null;
+      inviter: {
+        id: number;
+        username: string;
+      } | null;
+    };
+    MemberInviteTreeNode: {
+      userId: number;
+      username: string;
+      rankName: string;
+      isDonor: boolean;
+      disabled: boolean;
+      depth: number;
+      stats: {
+        contributed: string;
+        consumed: string;
+        ratio: string;
+      } | null;
+      children: components['schemas']['MemberInviteTreeNode'][];
+    };
+    InviteTreeSummary: {
+      entries: number;
+      branches: number;
+      depth: number;
+      disabledCount: number;
+      donorCount: number;
+      hiddenCount: number;
+      byRank: {
+        rankName: string;
+        count: number;
+      }[];
+      total: {
+        contributed: string;
+        consumed: string;
+        ratio: string;
+      };
+      topLevel: {
+        contributed: string;
+        consumed: string;
+        ratio: string;
+      };
+    };
+    RatioWatchItem: {
+      userId: number;
+      user: {
+        id: number;
+        username: string;
+      };
+      status: string;
+      watchStartedAt: string | null;
+      watchExpiresAt: string | null;
+      leechDisabledAt: string | null;
+      lastEvaluatedAt: string;
+    };
+    VanityHouseArtist: {
+      id: number;
+      name: string;
+      vanityHouse: boolean;
+      _count: {
+        releases: number;
+      };
+    };
+    FeaturedAlbumItem: {
+      id: number;
+      groupId: number;
+      threadId: number;
+      title: string;
+      started: string;
+      ended: string;
+    };
+    DeletedCollageItem: {
+      id: number;
+      name: string;
+      user: {
+        id: number;
+        username: string;
+      };
+      deletedAt: string | null;
+      createdAt: string;
+    };
+    EconomyGroupedItem: {
+      reason: string;
+      _sum: {
+        amount: string | null;
+      };
+      _count: number;
+    };
+    EconomyTransactionItem: {
+      id: number;
+      user: {
+        id: number;
+        username: string;
+      };
+      amount: string;
+      reason: string;
+      createdAt: string;
+    };
+    DncEntry: {
+      id: number;
+      name: string;
+      comment: string;
+      communityId: number;
+      userId: number;
+      createdAt: string;
+      addedBy: {
+        id: number;
+        username: string;
+      } | null;
+    };
+    CommunityHealthPulse: {
+      pass: number;
+      warn: number;
+      fail: number;
+      unknown: number;
+      total: number;
+      checked: number;
+      coverage: number | null;
+      pulse: number | null;
+      /** @enum {string} */
+      status: 'Healthy' | 'Ailing' | 'Critical' | 'Unknown';
     };
   };
   responses: never;

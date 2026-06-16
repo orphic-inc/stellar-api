@@ -4,6 +4,14 @@ import { audit } from '../lib/audit';
 import { AppError } from '../lib/errors';
 import { getDefaultStylesheetName } from './stylesheet';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
+import { computeRatio } from './ratio';
+import {
+  buildInviteSubtree,
+  summarizeInviteTree,
+  type InviteTreeRow,
+  type InviteTreeNode,
+  type InviteTreeSummary
+} from './inviteTree';
 
 export type SnatchItem = {
   id: number;
@@ -292,6 +300,64 @@ export const getInviteSubtreeRows = async (
       consumed: u.consumed
     };
   });
+};
+
+export interface InviteTreeViewNode {
+  userId: number;
+  username: string;
+  rankName: string;
+  isDonor: boolean;
+  disabled: boolean;
+  depth: number;
+  /** Null when the member's stats are paranoia-hidden from this viewer. */
+  stats: { contributed: string; consumed: string; ratio: string } | null;
+  children: InviteTreeViewNode[];
+}
+
+/**
+ * A member's invite subtree + summary, ready to serve. `canOverridePrivacy`
+ * (staff with `invites_manage`) sees every member's byte stats; otherwise a
+ * member's stats show only with their consent — but the aggregate totals always
+ * include everyone (an inviter is answerable for their whole tree's footprint).
+ */
+export const getMemberInviteTreeView = async (
+  rootUserId: number,
+  canOverridePrivacy: boolean
+): Promise<{ tree: InviteTreeViewNode[]; summary: InviteTreeSummary }> => {
+  const rows = await getInviteSubtreeRows(rootUserId);
+  const treeRows: InviteTreeRow[] = rows.map((r) => ({
+    userId: r.userId,
+    inviterId: r.inviterId,
+    username: r.username,
+    disabled: r.disabled,
+    rankName: r.rankName,
+    isDonor: r.isDonor,
+    contributed: r.contributed,
+    consumed: r.consumed,
+    statsVisible:
+      canOverridePrivacy || (r.showContributedStats && r.showConsumedStats)
+  }));
+
+  const nodes = buildInviteSubtree(treeRows, rootUserId);
+  const serialize = (ns: InviteTreeNode[]): InviteTreeViewNode[] =>
+    ns.map((n) => ({
+      userId: n.userId,
+      username: n.username,
+      rankName: n.rankName,
+      isDonor: n.isDonor,
+      disabled: n.disabled,
+      depth: n.depth,
+      stats: n.statsVisible
+        ? {
+            contributed: n.contributed.toString(),
+            consumed: n.consumed.toString(),
+            ratio: computeRatio(n.contributed, n.consumed).toFixed(2)
+          }
+        : null,
+      children: serialize(n.children)
+    }));
+
+  return { tree: serialize(nodes), summary: summarizeInviteTree(nodes) };
 };
 
 export const getDuplicateIps = async () => {
