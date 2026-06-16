@@ -167,7 +167,7 @@ describe('computeCrs — Friends dimension', () => {
   });
 
   // Friends × Stylesheet controlled vector (#147)
-  const friendsFull = (input: Parameters<typeof computeCrs>[0]) =>
+  const friendsFull = (input: Partial<Parameters<typeof computeCrs>[0]>) =>
     computeCrs({
       userId: 1,
       createdAt: NOW,
