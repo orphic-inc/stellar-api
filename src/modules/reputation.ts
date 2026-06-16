@@ -34,8 +34,13 @@ export interface DimensionInput {
   /** IRC nick linked to this account — used to look up the cached IRCScore. */
   ircNick?: string | null;
   /** Distinct (adopter, author) adoptions of this member's stylesheets — the
-   *  durable count from the CRS_* ledger (ADR-0007). Defaults to 0. */
+   *  durable count from the CRS_* ledger (ADR-0007), where this user is the
+   *  author (credited). Defaults to 0. */
   stylesheetAdoptions?: number;
+  /** Distinct adoptions this user *made* as the adopter (the `actorUserId` side
+   *  of the same CRS_* ledger). Feeds the Friends-dimension controlled vector
+   *  (#147). Defaults to 0. */
+  stylesheetAdoptionsMade?: number;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -116,12 +121,43 @@ const FRIENDS_CAP = 4;
 const FRIENDS_TAU = 5; // 5 friends → ~63% of cap; diminishing hard after
 const FRIENDS_WEIGHT = 1.0;
 
+// Friends × Stylesheet — controlled vector (PRD-03, #147). Adopting another
+// member's AuthorStylesheet is a weak social/trust edge, so each distinct
+// adoption fires a SECOND accrual here in the Friends dimension — additive to,
+// and separate from, the author reward in the `stylesheet` dimension. The
+// adopter earns slightly more than the author (favour active curation), and the
+// whole vector is bounded by its OWN per-user cap so ring/sock-puppet mass
+// adoption flattens out and plain friending stays the stronger signal. Both
+// counts are already deduped once-per-(adopter, author) by the ledger's partial
+// unique index — no extra dedup here.
+// PROVISIONAL (tier-0): the 0.2 / 0.1 weights are PRD-decided; ADOPTION_VECTOR_CAP
+// is an interim magnitude to tune alongside the PRD.
+const ADOPTION_ADOPTER_WEIGHT = 0.2;
+const ADOPTION_AUTHOR_WEIGHT = 0.1;
+const ADOPTION_VECTOR_CAP = 2;
+// The dimension ceiling holds both signals: the friend-count curve (asymptotic
+// to FRIENDS_CAP) plus the bounded adoption nudge, so the nudge is genuinely
+// additive rather than competing with friends under one shared cap.
+const FRIENDS_DIMENSION_CAP = FRIENDS_CAP + ADOPTION_VECTOR_CAP;
+
 const friendsScorer: DimensionScorer = {
   name: 'friends',
   weight: FRIENDS_WEIGHT,
-  cap: FRIENDS_CAP,
-  compute: ({ friendCount = 0 }) =>
-    FRIENDS_CAP * (1 - Math.exp(-Math.max(0, friendCount) / FRIENDS_TAU))
+  cap: FRIENDS_DIMENSION_CAP,
+  compute: ({
+    friendCount = 0,
+    stylesheetAdoptions = 0,
+    stylesheetAdoptionsMade = 0
+  }) => {
+    const friendSignal =
+      FRIENDS_CAP * (1 - Math.exp(-Math.max(0, friendCount) / FRIENDS_TAU));
+    const adoptionVector = Math.min(
+      ADOPTION_VECTOR_CAP,
+      Math.max(0, stylesheetAdoptionsMade) * ADOPTION_ADOPTER_WEIGHT +
+        Math.max(0, stylesheetAdoptions) * ADOPTION_AUTHOR_WEIGHT
+    );
+    return friendSignal + adoptionVector;
+  }
 };
 
 // ─── IRCScore ─────────────────────────────────────────────────────────────
@@ -196,24 +232,31 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
 export const getReputation = async (userId: number): Promise<CrsResult> => {
-  const [user, friendCount, stylesheetAdoptions] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        createdAt: true,
-        contributed: true,
-        consumed: true,
-        ircNick: true
-      }
-    }),
-    prisma.friend.count({ where: { userId } }),
-    // Distinct (adopter, author) pairs where this user is the author — one
-    // ledger row per pair (deduped at write), so a plain count is the distinct
-    // adoption count.
-    prisma.economyTransaction.count({
-      where: { userId, reason: 'CRS_STYLESHEET_ADOPTION' }
-    })
-  ]);
+  const [user, friendCount, stylesheetAdoptions, stylesheetAdoptionsMade] =
+    await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          createdAt: true,
+          contributed: true,
+          consumed: true,
+          ircNick: true
+        }
+      }),
+      prisma.friend.count({ where: { userId } }),
+      // Distinct (adopter, author) pairs where this user is the author — one
+      // ledger row per pair (deduped at write), so a plain count is the distinct
+      // adoption count. Feeds both the stylesheet (author reward) and friends
+      // (weak-tie nudge) dimensions.
+      prisma.economyTransaction.count({
+        where: { userId, reason: 'CRS_STYLESHEET_ADOPTION' }
+      }),
+      // The adopter side of the same ledger: distinct adoptions this user made.
+      // Friends-dimension controlled vector only (#147).
+      prisma.economyTransaction.count({
+        where: { actorUserId: userId, reason: 'CRS_STYLESHEET_ADOPTION' }
+      })
+    ]);
   if (!user) return { score: 0, dimensions: [] };
   return computeCrs({
     userId,
@@ -222,6 +265,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     contributed: user.contributed,
     friendCount,
     ircNick: user.ircNick,
-    stylesheetAdoptions
+    stylesheetAdoptions,
+    stylesheetAdoptionsMade
   });
 };

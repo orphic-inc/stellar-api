@@ -161,9 +161,46 @@ describe('computeCrs — Friends dimension', () => {
   });
 
   it('count cannot dominate: even thousands of friends stay under the low cap', () => {
-    // FRIENDS_CAP = 4, far below longevity (10) / ratio (8) — count alone can't win
+    // The friend-count signal asymptotes to FRIENDS_CAP = 4 — count alone can't win
     expect(friendsOf(10_000)).toBeLessThanOrEqual(4);
     expect(friendsOf(10_000)).toBeGreaterThan(3.9);
+  });
+
+  // Friends × Stylesheet controlled vector (#147)
+  const friendsFull = (input: Parameters<typeof computeCrs>[0]) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ...input
+    }).dimensions.find((d) => d.name === 'friends')!.subScore;
+
+  it('adoption is a weak-tie nudge additive to the friend-count signal', () => {
+    const base = friendsFull({ friendCount: 5 });
+    const withAdoption = friendsFull({
+      friendCount: 5,
+      stylesheetAdoptionsMade: 2,
+      stylesheetAdoptions: 1
+    });
+    // adopter 2×0.2 + author 1×0.1 = 0.5 added on top of the friend signal
+    expect(withAdoption - base).toBeCloseTo(0.5, 10);
+  });
+
+  it('adopter is weighted above author (favour active curation)', () => {
+    expect(friendsFull({ stylesheetAdoptionsMade: 1 })).toBeGreaterThan(
+      friendsFull({ stylesheetAdoptions: 1 })
+    );
+  });
+
+  it('the vector is bounded: mass adoption flattens out (ADOPTION_VECTOR_CAP = 2)', () => {
+    // 1000 adoptions as adopter would be 200 unbounded; capped at 2.
+    expect(friendsFull({ stylesheetAdoptionsMade: 1000 })).toBeCloseTo(2, 10);
+  });
+
+  it('friend-count + adoption together stay within the dimension cap (6)', () => {
+    expect(
+      friendsFull({ friendCount: 10_000, stylesheetAdoptionsMade: 1000 })
+    ).toBeLessThanOrEqual(6);
   });
 });
 
@@ -245,6 +282,30 @@ describe('getReputation', () => {
     );
     expect(
       result.dimensions.find((d) => d.name === 'stylesheet')!.subScore
+    ).toBeGreaterThan(0);
+  });
+
+  it('reads the adopter side of the ledger for the Friends controlled vector (#147)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    mockPrismaEconomy.count.mockResolvedValue(3);
+
+    const result = await getReputation(1);
+
+    // Both ledger sides are queried: author (userId) and adopter (actorUserId).
+    expect(mockPrismaEconomy.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { actorUserId: 1, reason: 'CRS_STYLESHEET_ADOPTION' }
+      })
+    );
+    // With zero friends, a non-zero friends subScore can only come from the
+    // adoption vector.
+    expect(
+      result.dimensions.find((d) => d.name === 'friends')!.subScore
     ).toBeGreaterThan(0);
   });
 });
