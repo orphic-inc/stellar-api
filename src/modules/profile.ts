@@ -13,6 +13,7 @@ import { getLogger } from './logging';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
 import { computeStanding } from './standing';
+import { getInviteSubtreeRows, type InviteSubtreeRow } from './user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -223,57 +224,43 @@ type ProfileUserRecord = Prisma.UserGetPayload<{
   select: typeof PROFILE_BASE_SELECT;
 }>;
 
+// Nest the flat subtree rows under `rootUserId` by their inviter pointer,
+// producing the profile's invite-tree contract. A `seen` set guards a corrupt
+// edge from looping; siblings are username-ordered for a stable render.
 const buildInviteTree = (
-  rows: Array<{
-    treeLevel: number;
-    treePosition: number;
-    user: {
-      id: number;
-      username: string;
-      email: string;
-      dateRegistered: Date;
-      lastLogin: Date | null;
-      contributed: bigint;
-      consumed: bigint;
-      ratio: number;
-    };
-  }>,
+  rows: InviteSubtreeRow[],
+  rootUserId: number,
   includeEmail: boolean
 ): InviteTreeNode[] => {
-  if (!rows.length) return [];
-
-  const minLevel = Math.min(...rows.map((row) => row.treeLevel));
-  const roots: InviteTreeNode[] = [];
-  const stack: Array<{ level: number; node: InviteTreeNode }> = [];
-
-  for (const row of rows.sort((a, b) => a.treePosition - b.treePosition)) {
-    const level = Math.max(0, row.treeLevel - minLevel);
-    const node: InviteTreeNode = {
-      id: row.user.id,
-      username: row.user.username,
-      ...(includeEmail ? { email: row.user.email } : {}),
-      joinedAt: row.user.dateRegistered.toISOString(),
-      lastSeen: row.user.lastLogin?.toISOString() ?? null,
-      contributed: row.user.contributed.toString(),
-      consumed: row.user.consumed.toString(),
-      ratio: computeRatio(row.user.contributed, row.user.consumed).toFixed(2),
-      children: []
-    };
-
-    while (stack.length && stack[stack.length - 1].level >= level) {
-      stack.pop();
-    }
-
-    if (stack.length) {
-      stack[stack.length - 1].node.children.push(node);
-    } else {
-      roots.push(node);
-    }
-
-    stack.push({ level, node });
+  const byInviter = new Map<number, InviteSubtreeRow[]>();
+  for (const row of rows) {
+    if (row.inviterId === null) continue;
+    const list = byInviter.get(row.inviterId);
+    if (list) list.push(row);
+    else byInviter.set(row.inviterId, [row]);
   }
 
-  return roots;
+  const seen = new Set<number>([rootUserId]);
+  const build = (inviterId: number): InviteTreeNode[] =>
+    (byInviter.get(inviterId) ?? [])
+      .filter((row) => !seen.has(row.userId))
+      .sort((a, b) => a.username.localeCompare(b.username))
+      .map((row) => {
+        seen.add(row.userId);
+        return {
+          id: row.userId,
+          username: row.username,
+          ...(includeEmail ? { email: row.email } : {}),
+          joinedAt: row.dateRegistered.toISOString(),
+          lastSeen: row.lastLogin?.toISOString() ?? null,
+          contributed: row.contributed.toString(),
+          consumed: row.consumed.toString(),
+          ratio: computeRatio(row.contributed, row.consumed).toFixed(2),
+          children: build(row.userId)
+        };
+      });
+
+  return build(rootUserId);
 };
 
 const loadViewerContext = async (
@@ -776,27 +763,8 @@ const buildProfileView = async (
     getRecentContributions(user.id),
     canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
     includeInviteTree
-      ? prisma.inviteTree.findMany({
-          where: { treeId: user.id },
-          orderBy: { treePosition: 'asc' },
-          select: {
-            treeLevel: true,
-            treePosition: true,
-            user: {
-              select: {
-                id: true,
-                username: true,
-                email: true,
-                dateRegistered: true,
-                lastLogin: true,
-                contributed: true,
-                consumed: true,
-                ratio: true
-              }
-            }
-          }
-        })
-      : Promise.resolve([]),
+      ? getInviteSubtreeRows(user.id)
+      : Promise.resolve([] as InviteSubtreeRow[]),
     getProfileCollages(user.id),
     viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null)
   ]);
@@ -879,7 +847,7 @@ const buildProfileView = async (
     recentSnatches,
     inviteTree:
       includeInviteTree && inviteRows.length
-        ? buildInviteTree(inviteRows, viewer.isOwner || viewer.isStaff)
+        ? buildInviteTree(inviteRows, user.id, viewer.isOwner || viewer.isStaff)
         : []
   };
 };

@@ -212,45 +212,18 @@ describe('invite tree list', () => {
 
     await testPrisma.inviteTree.createMany({
       data: [
-        {
-          userId: invitee1.id,
-          inviterId: inviter.id,
-          treeId: 1,
-          treeLevel: 1,
-          treePosition: 0
-        },
-        {
-          userId: invitee2.id,
-          inviterId: inviter.id,
-          treeId: 1,
-          treeLevel: 1,
-          treePosition: 1
-        }
+        { userId: invitee1.id, inviterId: inviter.id },
+        { userId: invitee2.id, inviterId: inviter.id }
       ]
     });
 
-    const trees = await testPrisma.inviteTree.findMany({
-      orderBy: [
-        { treeId: 'asc' },
-        { treeLevel: 'asc' },
-        { treePosition: 'asc' }
-      ],
-      include: { user: { select: { id: true, username: true } } }
+    const result = await testPrisma.inviteTree.findMany({
+      orderBy: [{ inviterId: 'asc' }, { userId: 'asc' }],
+      include: {
+        user: { select: { id: true, username: true } },
+        inviter: { select: { id: true, username: true } }
+      }
     });
-
-    const inviterIds = [
-      ...new Set(trees.map((t) => t.inviterId).filter(Boolean))
-    ] as number[];
-    const inviters = await testPrisma.user.findMany({
-      where: { id: { in: inviterIds } },
-      select: { id: true, username: true }
-    });
-    const inviterMap = new Map(inviters.map((u) => [u.id, u]));
-
-    const result = trees.map((t) => ({
-      ...t,
-      inviter: t.inviterId ? inviterMap.get(t.inviterId) ?? null : null
-    }));
 
     expect(result).toHaveLength(2);
     expect(result[0].inviter?.id).toBe(inviter.id);

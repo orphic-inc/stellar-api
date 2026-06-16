@@ -360,7 +360,8 @@ model User {
   updatedAt          DateTime            @updatedAt
 
   invitesSent              Invite[]
-  inviteTree               InviteTree[]
+  inviteTree               InviteTree?                      @relation("InviteTreeMember")
+  invitees                 InviteTree[]                     @relation("InviteTreeInviter")
   friends                  Friend[]                         @relation("UserFriends")
   friendOf                 Friend[]                         @relation("FriendOf")
   communityStaff           Community[]                      @relation("CommunityStaff")
@@ -480,15 +481,19 @@ model Invite {
   @@map("invites")
 }
 
+// Who-invited-whom topology (#61). Adjacency list: one row per member, pointing
+// at their inviter. Subtrees are read with a recursive walk over `inviterId`;
+// depth/ordering are derived at read time (no denormalized tree columns). The
+// same edges are what ADR-0004 Contagion traverses.
 model InviteTree {
-  id           Int  @id @default(autoincrement())
-  userId       Int
-  user         User @relation(fields: [userId], references: [id])
-  inviterId    Int
-  treePosition Int  @default(1)
-  treeId       Int  @default(1)
-  treeLevel    Int  @default(0)
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation("InviteTreeMember", fields: [userId], references: [id], onDelete: Cascade)
+  inviterId Int?
+  inviter   User?    @relation("InviteTreeInviter", fields: [inviterId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 
+  @@index([inviterId])
   @@map("invite_trees")
 }
 

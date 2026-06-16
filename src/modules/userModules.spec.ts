@@ -750,48 +750,40 @@ describe('user.getInviteTree', () => {
   it('returns total count separately from rows', async () => {
     prismaMock.inviteTree.findMany.mockResolvedValue([]);
     prismaMock.inviteTree.count.mockResolvedValue(5);
-    prismaMock.user.findMany.mockResolvedValue([]);
 
     const result = await getInviteTree({ skip: 0, limit: 20 });
     expect(result.total).toBe(5);
     expect(result.rows).toEqual([]);
   });
 
-  it('joins inviter data onto each tree row', async () => {
+  it('returns the included user + inviter relations on each row', async () => {
     prismaMock.inviteTree.findMany.mockResolvedValue([
       {
         id: 1,
         userId: 10,
         inviterId: 7,
-        treeId: 1,
-        treeLevel: 0,
-        treePosition: 0,
-        user: { id: 10, username: 'child' }
+        user: { id: 10, username: 'child' },
+        inviter: { id: 7, username: 'parent' }
       }
     ] as never);
     prismaMock.inviteTree.count.mockResolvedValue(1);
-    prismaMock.user.findMany.mockResolvedValue([
-      { id: 7, username: 'parent' }
-    ] as never);
 
     const result = await getInviteTree({ skip: 0, limit: 20 });
     expect(result.rows[0].inviter).toEqual({ id: 7, username: 'parent' });
+    expect(result.rows[0].user).toEqual({ id: 10, username: 'child' });
   });
 
-  it('sets inviter to null when inviter id is not in the user lookup', async () => {
+  it('inviter is null for a tree root (no inviter)', async () => {
     prismaMock.inviteTree.findMany.mockResolvedValue([
       {
         id: 1,
         userId: 10,
-        inviterId: 999,
-        treeId: 1,
-        treeLevel: 0,
-        treePosition: 0,
-        user: { id: 10, username: 'orphan' }
+        inviterId: null,
+        user: { id: 10, username: 'root' },
+        inviter: null
       }
     ] as never);
     prismaMock.inviteTree.count.mockResolvedValue(1);
-    prismaMock.user.findMany.mockResolvedValue([]);
 
     const result = await getInviteTree({ skip: 0, limit: 20 });
     expect(result.rows[0].inviter).toBeNull();

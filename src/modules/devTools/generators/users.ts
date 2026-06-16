@@ -338,13 +338,7 @@ export async function generateUsers(
 
         await prisma.inviteTree
           .create({
-            data: {
-              userId: inviteeId,
-              inviterId,
-              treePosition: i,
-              treeId: 1,
-              treeLevel: 1
-            }
+            data: { userId: inviteeId, inviterId }
           })
           .catch(() => {
             /* skip if already exists */

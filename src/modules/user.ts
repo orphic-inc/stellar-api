@@ -185,32 +185,113 @@ export const getSnatchList = async (
 };
 
 export const getInviteTree = async (pg: { skip: number; limit: number }) => {
-  const [trees, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     prisma.inviteTree.findMany({
-      include: { user: { select: { id: true, username: true } } },
-      orderBy: [
-        { treeId: 'asc' },
-        { treeLevel: 'asc' },
-        { treePosition: 'asc' }
-      ],
+      include: {
+        user: { select: { id: true, username: true } },
+        inviter: { select: { id: true, username: true } }
+      },
+      orderBy: [{ inviterId: 'asc' }, { userId: 'asc' }],
       skip: pg.skip,
       take: pg.limit
     }),
     prisma.inviteTree.count()
   ]);
 
-  const inviterIds = [...new Set(trees.map((t) => t.inviterId))];
-  const inviters = await prisma.user.findMany({
-    where: { id: { in: inviterIds } },
-    select: { id: true, username: true }
-  });
-  const inviterMap = new Map(inviters.map((u) => [u.id, u]));
-  const rows = trees.map((t) => ({
-    ...t,
-    inviter: inviterMap.get(t.inviterId) ?? null
-  }));
-
   return { rows, total };
+};
+
+/** A descendant of some root, enriched with the fields the tree views render. */
+export interface InviteSubtreeRow {
+  userId: number;
+  inviterId: number | null;
+  depth: number;
+  username: string;
+  email: string;
+  disabled: boolean;
+  isDonor: boolean;
+  rankName: string;
+  paranoia: number;
+  showContributedStats: boolean;
+  showConsumedStats: boolean;
+  dateRegistered: Date;
+  lastLogin: Date | null;
+  contributed: bigint;
+  consumed: bigint;
+}
+
+// Depth guard so a corrupt edge can't make the recursion walk forever.
+const MAX_INVITE_TREE_DEPTH = 50;
+
+/**
+ * All descendants of `rootUserId` in the invite tree (the root is the anchor,
+ * not included). The recursive walk touches only `invite_trees` (topology); the
+ * per-member render fields are then fetched type-safely via Prisma.
+ */
+export const getInviteSubtreeRows = async (
+  rootUserId: number
+): Promise<InviteSubtreeRow[]> => {
+  const edges = await prisma.$queryRaw<
+    { userId: number; inviterId: number | null; depth: number }[]
+  >`
+    WITH RECURSIVE subtree AS (
+      SELECT "userId", "inviterId", 1 AS depth
+      FROM "invite_trees"
+      WHERE "inviterId" = ${rootUserId}
+      UNION ALL
+      SELECT it."userId", it."inviterId", s.depth + 1
+      FROM "invite_trees" it
+      JOIN subtree s ON it."inviterId" = s."userId"
+      WHERE s.depth < ${MAX_INVITE_TREE_DEPTH}
+    )
+    SELECT "userId", "inviterId", depth FROM subtree
+  `;
+  if (!edges.length) return [];
+
+  const meta = new Map(edges.map((e) => [e.userId, e]));
+  const users = await prisma.user.findMany({
+    where: { id: { in: edges.map((e) => e.userId) } },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      disabled: true,
+      isDonor: true,
+      dateRegistered: true,
+      lastLogin: true,
+      contributed: true,
+      consumed: true,
+      userRank: { select: { name: true } },
+      userSettings: {
+        select: {
+          paranoia: true,
+          showContributedStats: true,
+          showConsumedStats: true
+        }
+      }
+    }
+  });
+
+  return users.map((u) => {
+    const e = meta.get(u.id);
+    return {
+      userId: u.id,
+      inviterId: e?.inviterId ?? null,
+      depth: e ? Number(e.depth) : 1,
+      username: u.username,
+      email: u.email,
+      disabled: u.disabled,
+      isDonor: u.isDonor,
+      rankName: u.userRank?.name ?? '',
+      paranoia: u.userSettings?.paranoia ?? 0,
+      showContributedStats: u.userSettings?.showContributedStats ?? true,
+      showConsumedStats: u.userSettings?.showConsumedStats ?? true,
+      dateRegistered: u.dateRegistered,
+      lastLogin: u.lastLogin,
+      contributed: u.contributed,
+      consumed: u.consumed
+    };
+  });
 };
 
 export const getDuplicateIps = async () => {
