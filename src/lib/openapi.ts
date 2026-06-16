@@ -5571,11 +5571,8 @@ const InviteTreeItem = registry.register(
     id: z.number(),
     userId: z.number(),
     user: StaffUserRef,
-    inviterId: z.number(),
-    inviter: StaffUserRef.nullable(),
-    treeId: z.number(),
-    treeLevel: z.number(),
-    treePosition: z.number()
+    inviterId: z.number().nullable(),
+    inviter: StaffUserRef.nullable()
   })
 );
 
@@ -5592,6 +5589,66 @@ registry.registerPath({
           schema: z.object({
             data: z.array(InviteTreeItem),
             meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+// A member's invite subtree + summary (GET /users/{id}/invite-tree).
+const InviteTreeRatioStats = z.object({
+  contributed: z.string(),
+  consumed: z.string(),
+  ratio: z.string()
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const MemberInviteTreeNodeSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    userId: z.number(),
+    username: z.string(),
+    rankName: z.string(),
+    isDonor: z.boolean(),
+    disabled: z.boolean(),
+    depth: z.number(),
+    stats: InviteTreeRatioStats.nullable(),
+    children: z.array(MemberInviteTreeNodeSchema)
+  })
+);
+const MemberInviteTreeNode = registry.register(
+  'MemberInviteTreeNode',
+  MemberInviteTreeNodeSchema
+);
+
+const InviteTreeSummary = registry.register(
+  'InviteTreeSummary',
+  z.object({
+    entries: z.number(),
+    branches: z.number(),
+    depth: z.number(),
+    disabledCount: z.number(),
+    donorCount: z.number(),
+    hiddenCount: z.number(),
+    byRank: z.array(z.object({ rankName: z.string(), count: z.number() })),
+    total: InviteTreeRatioStats,
+    topLevel: InviteTreeRatioStats
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/invite-tree',
+  tags: ['Users'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "A member's invite subtree + summary",
+      content: {
+        'application/json': {
+          schema: z.object({
+            tree: z.array(MemberInviteTreeNode),
+            summary: InviteTreeSummary
           })
         }
       }
