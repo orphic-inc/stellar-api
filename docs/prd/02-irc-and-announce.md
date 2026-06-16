@@ -2,7 +2,7 @@
 
 **Status:** In-repo build shipped ([#143](https://github.com/orphic-inc/stellar-api/pull/143)) — credentials, activity rollup, IRCScore, delegated SASL, and the announce feeds (RSS + JSON) are merged. Outstanding: magnitude pinning ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL) and infra ([#142](https://github.com/orphic-inc/stellar-api/issues/142), stellar-compose). · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
 **Decisions:** [ADR-0011 delegated IRC authentication](../adr/0011-delegated-irc-authentication.md), [ADR-0012 IRC activity rollup substrate](../adr/0012-irc-activity-rollup-substrate.md), [ADR-0007 CRS read-time + ledger](../adr/0007-crs-read-time-and-event-ledger.md), [ADR-0009 dependency/infra discipline](../adr/0009-fork-workflow-and-dependency-discipline.md)
-**Numbering:** PRD-01 Community-Score · **PRD-02 IRC & Announce** · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · PRD-05 Rules & Governance · PRD-06 Ratio
+**Numbering:** PRD-01 Community-Score · **PRD-02 IRC & Announce** · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · PRD-05 Rules & Governance · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art
 
 > Lean PRD. Covers **IRC + Announce together** (they share the credential + delivery substrate); **Donations are split into their own PRD** (overlaps [#62](https://github.com/orphic-inc/stellar-api/issues/62)); **RSS/XML feeds are a fast-follow slice** here (they reuse the announce substrate). IRC conduct rules live in [PRD-05](05-rules-and-governance.md) (IRCRules / [#126](https://github.com/orphic-inc/stellar-api/issues/126)); this PRD builds the feature, not the rule prose.
 
@@ -20,7 +20,7 @@ Stellar is a content-tracker-lineage community: members want a real-time **socia
 
 Two per-user credentials, **net-new** on `User` (the vestigial `communityPass` field is dropped in the same migration). Stored as unique, lazily-generated, rotatable 32-char URL-safe tokens.
 
-- **`AnnounceKey`** — authenticates the **Release-Announce Feed** (RSS + IRC announce): *receiving* the stream of new Contributions. It **never** authenticates a download — release consumption stays a session-authed accounted grant through the Ratio Mechanism. Rotating it dead-links the prior feed URL.
+- **`AnnounceKey`** — authenticates the **Release-Announce Feed** (RSS + IRC announce): _receiving_ the stream of new Contributions. It **never** authenticates a download — release consumption stays a session-authed accounted grant through the Ratio Mechanism. Rotating it dead-links the prior feed URL.
 - **`IRCKey`** — authenticates **IRC identity** (the SASL secret). Validated by **delegated auth**: Ergo calls an internal stellar-api endpoint per login; this API is the single source of truth, no credential mirror in the IRCd ([ADR-0011](../adr/0011-delegated-irc-authentication.md)). Rotating it drops any always-on session.
 - **Paired:** to receive personalized release announcements **pushed over IRC** a member needs both (IRCKey = who you are on IRC; AnnounceKey = authorized to receive the feed).
 
@@ -46,31 +46,31 @@ Anti-farming is structural: the per-channel/day cap defeats flooding, `consisten
 
 ## Concept → code (descent map)
 
-| Concept | Lives in / will live in |
-|---|---|
-| IRCKey + AnnounceKey | **net-new** on `User` (`prisma/schema.prisma`); drop vestigial `communityPass` |
-| Delegated SASL validation | **net-new** internal endpoint — [ADR-0011](../adr/0011-delegated-irc-authentication.md) |
-| Release-Announce Feed (RSS + IRC) | net-new feed route, AnnounceKey-gated, reusing `announcements` |
-| Announce relay + `!commands` bot | **net-new** worker in stellar-compose |
-| `IrcActivity` rollup | **net-new** table + bot upsert — [ADR-0012](../adr/0012-irc-activity-rollup-substrate.md) |
-| `IRCScore` dimension | `src/modules/reputation.ts` registry entry (pure scorer) + `DimensionInput` window fetch |
-| Infra (Ergo + bot + The Lounge) | **stellar-compose** — pinned services per [ADR-0009](../adr/0009-fork-workflow-and-dependency-discipline.md) |
-| IRCRules (conduct) | [PRD-05](05-rules-and-governance.md) + [#126](https://github.com/orphic-inc/stellar-api/issues/126) (HITL) |
+| Concept                           | Lives in / will live in                                                                                      |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| IRCKey + AnnounceKey              | **net-new** on `User` (`prisma/schema.prisma`); drop vestigial `communityPass`                               |
+| Delegated SASL validation         | **net-new** internal endpoint — [ADR-0011](../adr/0011-delegated-irc-authentication.md)                      |
+| Release-Announce Feed (RSS + IRC) | net-new feed route, AnnounceKey-gated, reusing `announcements`                                               |
+| Announce relay + `!commands` bot  | **net-new** worker in stellar-compose                                                                        |
+| `IrcActivity` rollup              | **net-new** table + bot upsert — [ADR-0012](../adr/0012-irc-activity-rollup-substrate.md)                    |
+| `IRCScore` dimension              | `src/modules/reputation.ts` registry entry (pure scorer) + `DimensionInput` window fetch                     |
+| Infra (Ergo + bot + The Lounge)   | **stellar-compose** — pinned services per [ADR-0009](../adr/0009-fork-workflow-and-dependency-discipline.md) |
+| IRCRules (conduct)                | [PRD-05](05-rules-and-governance.md) + [#126](https://github.com/orphic-inc/stellar-api/issues/126) (HITL)   |
 
 ## Red-green descent targets
 
-1. ✅ **`IRCKey` + `AnnounceKey` on `User`** — unique, generate/rotate endpoints, drop `communityPass`. The documented blocker; everything hangs off it. *(shipped [#134](https://github.com/orphic-inc/stellar-api/issues/134))*
-2. ✅ **Delegated SASL-validate endpoint** — internal, network-scoped; Ergo's auth callback (ADR-0011). *(shipped [#138](https://github.com/orphic-inc/stellar-api/issues/138))*
-3. ✅ **Release-Announce Feed** — AnnounceKey-gated feed of new Contributions (JSON `?since=` cursor for the relay; RSS/XML fast-follow on the same substrate). Notify-and-link delivery ([#136](https://github.com/orphic-inc/stellar-api/issues/136)). *(shipped [#139](https://github.com/orphic-inc/stellar-api/issues/139) + [#140](https://github.com/orphic-inc/stellar-api/issues/140))*
-4. ✅ **`IrcActivity` rollup + bot upsert** — messages-only, `user×channel×day` (ADR-0012). *(shipped [#135](https://github.com/orphic-inc/stellar-api/issues/135))*
-5. ✅ **`scoreIrcActivity(rows, weights, window)`** — pure, table-driven, unit-tested against fixtures **before** any IRC infra; then register `IRCScore` into the CRS registry. Magnitudes provisional, pinned in [#141](https://github.com/orphic-inc/stellar-api/issues/141) (HITL). *(shipped [#137](https://github.com/orphic-inc/stellar-api/issues/137))*
-6. ⏳ **The Lounge / bouncer** — web client surface; donor perks defer to the Donations PRD. *(infra, [#142](https://github.com/orphic-inc/stellar-api/issues/142))*
+1. ✅ **`IRCKey` + `AnnounceKey` on `User`** — unique, generate/rotate endpoints, drop `communityPass`. The documented blocker; everything hangs off it. _(shipped [#134](https://github.com/orphic-inc/stellar-api/issues/134))_
+2. ✅ **Delegated SASL-validate endpoint** — internal, network-scoped; Ergo's auth callback (ADR-0011). _(shipped [#138](https://github.com/orphic-inc/stellar-api/issues/138))_
+3. ✅ **Release-Announce Feed** — AnnounceKey-gated feed of new Contributions (JSON `?since=` cursor for the relay; RSS/XML fast-follow on the same substrate). Notify-and-link delivery ([#136](https://github.com/orphic-inc/stellar-api/issues/136)). _(shipped [#139](https://github.com/orphic-inc/stellar-api/issues/139) + [#140](https://github.com/orphic-inc/stellar-api/issues/140))_
+4. ✅ **`IrcActivity` rollup + bot upsert** — messages-only, `user×channel×day` (ADR-0012). _(shipped [#135](https://github.com/orphic-inc/stellar-api/issues/135))_
+5. ✅ **`scoreIrcActivity(rows, weights, window)`** — pure, table-driven, unit-tested against fixtures **before** any IRC infra; then register `IRCScore` into the CRS registry. Magnitudes provisional, pinned in [#141](https://github.com/orphic-inc/stellar-api/issues/141) (HITL). _(shipped [#137](https://github.com/orphic-inc/stellar-api/issues/137))_
+6. ⏳ **The Lounge / bouncer** — web client surface; donor perks defer to the Donations PRD. _(infra, [#142](https://github.com/orphic-inc/stellar-api/issues/142))_
 
 ## Open questions
 
 - Greenfield network, or is there an existing IRC network / nick reservations to migrate?
 - `IRCScore` magnitudes + the channel-weight map — TBD with the other CRS magnitudes (HITL, like #121/#122/#126).
-- **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers *earn capability* — rights to create new official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
+- **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers _earn capability_ — rights to create new official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
 
 ## Resolved decisions
 

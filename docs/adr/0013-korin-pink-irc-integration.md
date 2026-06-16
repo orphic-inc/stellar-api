@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-06-14
 **Repos:** orphic-inc/stellar-api, obrien-k/korin-pink
-**PRD:** [PRD-01 Community-Score](../prd/01-Community-Score.md) — IRCScore dimension (v0.1.x), [PRD-02 Donations/IRC/Announce](../prd/02-donations-irc-announce.md)
+**PRD:** [PRD-01 Community-Score](../prd/01-Community-Score.md) — IRCScore dimension (v0.1.x), [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
 **Supersedes:** [ADR-0011 — Delegated IRC authentication](0011-delegated-irc-authentication.md), [ADR-0012 — IRC activity rollup substrate](0012-irc-activity-rollup-substrate.md)
 
 > **Renumbered from ADR-0005** (2026-06-14). The earlier draft was authored on a stale branch and collided with main's `0005-contribution-model-from-upload-form`. It was also written greenfield — as if no IRC build existed. Both are corrected here.
