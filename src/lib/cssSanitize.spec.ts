@@ -61,4 +61,38 @@ describe('sanitizeStylesheetSource (ADR-0003 store-time CSS sanitizer)', () => {
     const clean = '.theme{color:#abc;margin:0}\n#nav{display:flex}';
     expect(sanitizeStylesheetSource(clean)).toBe(clean);
   });
+
+  // ─── CSS-escape bypass (#152) ───────────────────────────────────────────────
+  it('strips @import hidden behind an escaped @ (\\40 import)', () => {
+    const out = sanitizeStylesheetSource(
+      '\\40 import url("https://evil.test/x.css");\nbody{color:red}'
+    );
+    expect(out).not.toMatch(/@import/i);
+    expect(out).not.toContain('evil.test');
+    expect(out).toMatch(/body\{color:red\}/);
+  });
+
+  it('strips @import with an escaped keyword letter (@\\69mport)', () => {
+    const out = sanitizeStylesheetSource(
+      '@\\69mport url("https://evil.test/x.css");\nbody{}'
+    );
+    expect(out).not.toMatch(/@import/i);
+    expect(out).not.toContain('evil.test');
+  });
+
+  it('neutralizes a url() whose scheme is escaped (\\68 ttp:)', () => {
+    const out = sanitizeStylesheetSource(
+      'a{background:url(\\68ttp://evil.test/p.gif)}'
+    );
+    expect(out).not.toContain('evil.test');
+  });
+
+  it('reaches a fixed point when an escape decodes into another escape', () => {
+    // `\5c` → `\`, so this becomes `\40import …` then `@import …` across passes.
+    const out = sanitizeStylesheetSource(
+      '\\5c 40import url(http://evil.test/x)'
+    );
+    expect(out).not.toMatch(/@import/i);
+    expect(out).not.toContain('evil.test');
+  });
 });
