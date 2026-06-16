@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { RegistrationStatus } from '@prisma/client';
+import { RegistrationStatus, StatSnapshotPeriod } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { getCommunityHealthPulse } from '../../../modules/linkHealth';
+import { getCommunityHealthHistory } from '../../../modules/communityHealthHistory';
 import { requireAuth } from '../../../middleware/auth';
 import {
   requirePermission,
@@ -14,7 +15,8 @@ import {
   validate,
   validateParams,
   validateQuery,
-  parsedParams
+  parsedParams,
+  parsedQuery
 } from '../../../middleware/validate';
 import {
   createCommunitySchema,
@@ -44,6 +46,9 @@ const addMemberSchema = z.object({
 router.use('/:communityId/releases', releaseRouter);
 
 const communitiesQuerySchema = z.object({ ...paginationBase });
+const healthHistoryQuerySchema = z.object({
+  period: z.nativeEnum(StatSnapshotPeriod).default(StatSnapshotPeriod.Daily)
+});
 
 export async function isCommunityMember(
   communityId: number,
@@ -140,6 +145,30 @@ router.get(
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
     res.json(await getCommunityHealthPulse(id));
+  })
+);
+
+// GET /api/communities/:id/health/history — the pulse over time (#75).
+// ?period=Daily|Monthly|Yearly (default Daily). Same membership gate as /health.
+router.get(
+  '/:id/health/history',
+  requireAuth,
+  validateParams(communityIdParamsSchema),
+  validateQuery(healthHistoryQuerySchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { period } = parsedQuery<{ period: StatSnapshotPeriod }>(res);
+    const community = await prisma.community.findUnique({
+      where: { id },
+      select: { registrationStatus: true }
+    });
+    if (!community) return res.status(404).json({ msg: 'Community not found' });
+    if (
+      !(await isCommunityMember(id, req.user.id, community.registrationStatus))
+    ) {
+      return res.status(403).json({ msg: 'Not a member of this community' });
+    }
+    res.json(await getCommunityHealthHistory(id, period));
   })
 );
 

@@ -887,6 +887,7 @@ model Community {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   Request               Request[]
+  healthSnapshots       CommunityHealthSnapshot[]
 
   @@map("communities")
 }
@@ -2330,6 +2331,33 @@ model SiteStatSnapshot {
 
   @@index([capturedAt])
   @@map("site_stat_snapshots")
+}
+
+model CommunityHealthSnapshot {
+  id          Int                @id @default(autoincrement())
+  communityId Int
+  period      StatSnapshotPeriod
+  bucketAt    DateTime
+  capturedAt  DateTime           @default(now())
+  pass        Int                @default(0)
+  warn        Int                @default(0)
+  fail        Int                @default(0)
+  unknown     Int                @default(0)
+  total       Int                @default(0)
+  checked     Int                @default(0)
+  // Share of links definitively probed, and share of probed that PASS — both
+  // nullable, mirroring the read-time pulse shape (null when empty/unprobed).
+  coverage    Float?
+  pulse       Float?
+  // The band as computed at capture time (Healthy/Ailing/Critical/Unknown).
+  // Stored, not recomputed, so history is stable against threshold changes.
+  status      String
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, period, bucketAt])
+  @@index([communityId, period, capturedAt])
+  @@map("community_health_snapshots")
 }
 
 // ─── Dev Tools ────────────────────────────────────────────────────────────────

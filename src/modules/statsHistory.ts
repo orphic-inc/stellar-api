@@ -25,13 +25,13 @@ function weekBucket(d = new Date()): Date {
   );
 }
 
-function getBucket(period: StatSnapshotPeriod): Date {
+export function getBucket(period: StatSnapshotPeriod): Date {
   if (period === 'Daily') return hourBucket();
   if (period === 'Monthly') return dayBucket();
   return weekBucket();
 }
 
-function getRetentionCutoff(period: StatSnapshotPeriod): Date {
+export function getRetentionCutoff(period: StatSnapshotPeriod): Date {
   const now = new Date();
   if (period === 'Daily') return new Date(now.getTime() - 25 * 60 * 60 * 1000);
   if (period === 'Monthly')

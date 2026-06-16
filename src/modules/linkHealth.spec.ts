@@ -24,7 +24,8 @@ jest.mock('./logging', () => ({
 import {
   sweepStaleWarnLinks,
   checkContributionLink,
-  getCommunityHealthPulse
+  getCommunityHealthPulse,
+  computePulse
 } from './linkHealth';
 
 // ─── sweepStaleWarnLinks ──────────────────────────────────────────────────────
@@ -211,6 +212,50 @@ describe('getCommunityHealthPulse', () => {
     expect(r).toMatchObject({
       total: 0,
       checked: 0,
+      pulse: null,
+      status: 'Unknown'
+    });
+  });
+});
+
+// ─── computePulse (pure) ──────────────────────────────────────────────────────
+// The banding/coverage logic shared by the read-time pulse and the snapshot
+// capture (#75). getCommunityHealthPulse exercises it above; these lock the
+// pure contract directly.
+
+describe('computePulse', () => {
+  it('bands Healthy at/above the healthy threshold', () => {
+    expect(
+      computePulse({ pass: 9, warn: 0, fail: 1, unknown: 0 })
+    ).toMatchObject({
+      checked: 10,
+      total: 10,
+      coverage: 1,
+      pulse: 0.9,
+      status: 'Healthy'
+    });
+  });
+
+  it('bands Critical when failures dominate', () => {
+    const r = computePulse({ pass: 1, warn: 0, fail: 9, unknown: 0 });
+    expect(r.pulse).toBeCloseTo(0.1);
+    expect(r.status).toBe('Critical');
+  });
+
+  it('withholds a band as Unknown below the coverage floor', () => {
+    const r = computePulse({ pass: 1, warn: 0, fail: 0, unknown: 99 });
+    expect(r.pulse).toBe(1);
+    expect(r.coverage).toBeCloseTo(0.01);
+    expect(r.status).toBe('Unknown');
+  });
+
+  it('returns null pulse/coverage for empty counts', () => {
+    expect(
+      computePulse({ pass: 0, warn: 0, fail: 0, unknown: 0 })
+    ).toMatchObject({
+      total: 0,
+      checked: 0,
+      coverage: null,
       pulse: null,
       status: 'Unknown'
     });

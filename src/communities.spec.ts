@@ -166,6 +166,86 @@ describe('GET /api/communities/:id/health', () => {
   });
 });
 
+describe('GET /api/communities/:id/health/history', () => {
+  it('returns 404 when the community does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/health/history');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns the pulse history for a member (default period Daily)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.communityHealthSnapshot.findMany.mockResolvedValue([
+      {
+        id: 1,
+        communityId: 1,
+        period: 'Daily',
+        bucketAt: new Date('2026-06-16T00:00:00Z'),
+        capturedAt: new Date('2026-06-16T00:00:00Z'),
+        pass: 9,
+        warn: 0,
+        fail: 1,
+        unknown: 0,
+        total: 10,
+        checked: 10,
+        coverage: 1,
+        pulse: 0.9,
+        status: 'Healthy'
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/communities/1/health/history');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({ status: 'Healthy', pulse: 0.9 });
+    expect(prismaMock.communityHealthSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { communityId: 1, period: 'Daily' }
+      })
+    );
+  });
+
+  it('passes a valid period through to the query', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.communityHealthSnapshot.findMany.mockResolvedValue([] as never);
+
+    const res = await request(app).get(
+      '/api/communities/1/health/history?period=Monthly'
+    );
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.communityHealthSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { communityId: 1, period: 'Monthly' }
+      })
+    );
+  });
+
+  it('rejects an invalid period with 400', async () => {
+    const res = await request(app).get(
+      '/api/communities/1/health/history?period=Hourly'
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 when the user is not a member of a restricted community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
+    );
+    prismaMock.consumer.findFirst.mockResolvedValue(null);
+    prismaMock.contributor.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/health/history');
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.communityHealthSnapshot.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/communities/:id/members', () => {
   it('returns 404 when the community does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(null);
