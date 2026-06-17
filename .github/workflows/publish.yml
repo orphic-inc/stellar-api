@@ -61,6 +61,8 @@ jobs:
         run: npm test
       - name: OpenAPI freshness
         run: npm run openapi:export && git diff --exit-code openapi.json
+      - name: ERD freshness
+        run: npm run db:erd && git diff --exit-code docs/erd.md
       - name: Integration tests
         run: npm run test:integration
 

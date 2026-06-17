@@ -8,7 +8,10 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npx prisma generate
+# Client only: the ERD generator (prisma-erd-generator) is a devDependency and the
+# image needs just @prisma/client. A bare `prisma generate` runs every generator,
+# which breaks the runtime stage below (--omit=dev has no erd binary to resolve).
+RUN npx prisma generate --generator client
 RUN npm run build
 
 FROM node:24-alpine3.23
@@ -21,7 +24,8 @@ RUN npm ci --omit=dev
 COPY --from=build /usr/src/stellar-api/dist ./dist
 COPY --from=build /usr/src/stellar-api/prisma ./prisma
 
-RUN npx prisma generate
+# Client only — devDependencies (incl. prisma-erd-generator) are omitted here.
+RUN npx prisma generate --generator client
 
 USER node
 
