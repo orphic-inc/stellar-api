@@ -3,8 +3,10 @@
 **Status:** Proposed
 **Date:** 2026-06-16
 **Repos:** orphic-inc/stellar-api, obrien-k/korin-pink
-**PRD:** [PRD-02 Donations/IRC/Announce](../prd/02-donations-irc-announce.md)
-**Relates to:** [ADR-0013 — korin.pink IRC Integration](0013-korin-pink-irc-integration.md), [ADR-0011 — Delegated IRC authentication](0011-delegated-irc-authentication.md) (superseded), [ADR-0007 — CRS read-time + event ledger](0007-crs-read-time-and-event-ledger.md)
+**PRD:** [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
+**Relates to:** [ADR-0013 — korin.pink IRC Integration](0013-korin-pink-irc-integration.md), [ADR-0015 — Verified IRC nick link](0015-verified-irc-nick-link.md), [ADR-0011 — Delegated IRC authentication](0011-delegated-irc-authentication.md) (superseded), [ADR-0007 — CRS read-time + event ledger](0007-crs-read-time-and-event-ledger.md)
+
+> **Cross-reference — [ADR-0015](0015-verified-irc-nick-link.md).** This ADR and 0015 are siblings of the same discipline: neither mints a new stored per-user secret. The "covert consumption via a per-user token" job here is the legitimate descendant of the retired **AnnounceKey** (one of the four jobs ADR-0015 decomposes) — served by a _derived_ token, not a stored key. If a per-user feed ever needs to gate _private_-community content, it stands on ADR-0015's **Verified IRC Link** (identity), not on a token. For public contribution data, the derived token below stands alone.
 
 ---
 
