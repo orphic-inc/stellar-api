@@ -355,7 +355,14 @@ model User {
   warnedTimes        Int                 @default(0)
   lastIp             String?
   disablePm          Boolean             @default(false)
-  ircNick            String?             @unique
+  // Verified IRC Link (ADR-0015): ircNick holds only a *verified* nick, written
+  // on promotion. A Nick Claim (unproven) lives in pendingIrcNick + nonce, which
+  // reserve nothing — pendingIrcNick is intentionally NOT unique, so multiple
+  // members may claim the same nick; first to verify wins the unique ircNick slot.
+  ircNick               String?          @unique
+  pendingIrcNick        String?
+  ircNickNonce          String?
+  ircNickNonceExpiresAt DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

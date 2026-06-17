@@ -51,6 +51,13 @@ export const grantDonorSchema = z.object({
   expiresAt: z.string().optional()
 });
 
+// IRC Nick Verification relay (ADR-0015) — korin POSTs the authenticated IRC
+// sender nick + the Verification Code it received over a private query.
+export const ircNickVerifySchema = z.object({
+  nick: z.string().min(1).max(30),
+  code: z.string().min(1).max(16)
+});
+
 export const pmDraftSchema = z.object({
   toUserId: z.number().int().positive().optional(),
   toUsername: z.string().optional(),
@@ -81,6 +88,7 @@ export type ModerationNoteInput = z.infer<typeof moderationNoteSchema>;
 export type SetRankInput = z.infer<typeof setRankSchema>;
 export type DonorRankInput = z.infer<typeof donorRankSchema>;
 export type GrantDonorInput = z.infer<typeof grantDonorSchema>;
+export type IrcNickVerifyInput = z.infer<typeof ircNickVerifySchema>;
 export type PmDraftInput = z.infer<typeof pmDraftSchema>;
 export type MassPmInput = z.infer<typeof massPmSchema>;
 export type SiteHistoryInput = z.infer<typeof siteHistorySchema>;

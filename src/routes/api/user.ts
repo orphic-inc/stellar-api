@@ -47,14 +47,21 @@ import {
   setRankSchema,
   donorRankSchema,
   grantDonorSchema,
+  ircNickVerifySchema,
   type AdminCreateUserInput,
   type UserSettingsInput,
   type WarnUserInput,
   type ModerationNoteInput,
   type SetRankInput,
   type DonorRankInput,
-  type GrantDonorInput
+  type GrantDonorInput,
+  type IrcNickVerifyInput
 } from '../../schemas/user';
+import {
+  claimIrcNick,
+  clearIrcNick,
+  verifyIrcNick
+} from '../../modules/ircNick';
 import { audit } from '../../lib/audit';
 import {
   parsedPage,
@@ -239,6 +246,21 @@ router.get(
         .json({ msg: 'No account linked to that IRC nick' });
     }
     res.json({ id: user.id, username: user.username, ircNick: user.ircNick });
+  })
+);
+
+// POST /api/users/irc-nick/verify — complete a Nick Verification (ADR-0015).
+// korin relays the authenticated IRC sender nick + the Verification Code it
+// received over a private query. Always 200 — { verified, reason } is a
+// verification *result* the bot relays, not an HTTP error. Static path → before /:id.
+router.post(
+  '/irc-nick/verify',
+  requireServiceKey,
+  validate(ircNickVerifySchema),
+  asyncHandler(async (_req, res) => {
+    const { nick, code } = parsedBody<IrcNickVerifyInput>(res);
+    const result = await verifyIrcNick(nick, code);
+    res.json(result);
   })
 );
 
@@ -872,7 +894,10 @@ router.get(
   })
 );
 
-// PUT /api/users/:id/irc-nick — link or clear an IRC nick (self or admin)
+// PUT /api/users/:id/irc-nick — open a Nick Claim, or clear the link (self or
+// admin). Setting a nick does NOT bind it — it issues a Verification Code the
+// member must prove from that nick on IRC (ADR-0015). Admins can claim/clear on a
+// member's behalf but cannot mint verified status; only Nick Verification can.
 const ircNickSchema = z.object({
   ircNick: z
     .string()
@@ -901,25 +926,26 @@ router.put(
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
-    try {
-      await prisma.user.update({
-        where: { id },
-        data: { ircNick: ircNick ?? null }
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '';
-      if (
-        msg.includes('Unique constraint') ||
-        msg.includes('User_ircNick_key')
-      ) {
-        return res
-          .status(409)
-          .json({ msg: 'IRC nick already claimed by another account' });
-      }
-      throw err;
+    if (!ircNick) {
+      await clearIrcNick(id);
+      return res.json({ msg: 'IRC nick cleared' });
     }
 
-    res.json({ msg: ircNick ? 'IRC nick linked' : 'IRC nick cleared' });
+    // claimIrcNick throws AppError(409) if the nick is already verified elsewhere.
+    const { code, expiresAt, alreadyVerified } = await claimIrcNick(
+      id,
+      ircNick
+    );
+    if (alreadyVerified) {
+      return res.json({ msg: 'IRC nick already verified', ircNick });
+    }
+    res.json({
+      msg: 'Verification required',
+      ircNick,
+      code,
+      expiresAt,
+      instructions: `Send "!verify ${code}" in a private message to the stellar-bridge bot from the nick ${ircNick} within 30 minutes.`
+    });
   })
 );
 

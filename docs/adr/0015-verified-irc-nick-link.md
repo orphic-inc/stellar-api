@@ -55,10 +55,14 @@ report the authenticated sender; korin trusts Ergo's authentication of the nick.
 - **Verified links do not expire (v1).** Staleness — a member abandons an Ergo nick that is
   later re-registered by someone else — is accepted as a narrow, low-value window (strict
   nick-reservation makes re-registration slow). Periodic re-verification is a future option.
-- **Per-claim lockout** after 5 failed `(fromNick, code)` attempts (defense-in-depth; the
-  nick binding already makes brute force pointless). Failed/wrong/expired codes get an
-  explicit bot reply — no silent failure. A relay/network error does **not** consume the
-  code; the still-valid code works on retry.
+- **No attempt lockout** (revised during implementation). A per-_claim_ counter is ambiguous
+  because multiple members may claim the same nick (claims reserve nothing); a per-_nick_
+  counter is griefable — an attacker spamming wrong codes for `Alice` could lock the real
+  Alice out of verifying. Since the `(fromNick, code)` binding already makes brute force
+  pointless and the verify endpoint is service-key-gated (korin-only, not public), a lockout
+  adds a DoS surface for no real gain. Brute resistance rests on single-use codes + 30-min
+  expiry + the nick binding. Failed/wrong/expired codes still get an explicit bot reply — no
+  silent failure; a relay/network error does **not** consume the code (retry works).
 
 ## Considered options
 
@@ -89,8 +93,11 @@ the invariant that consumption is always a session-authed, ratio-accounted downl
 
 ## Consequences
 
-- New columns on `User`: `ircNickVerified`, `ircNickNonce`, `ircNickNonceExpiresAt`
-  (migration run interactively). `ircNick` now holds only verified values.
+- New columns on `User`: `pendingIrcNick` (the Nick Claim — **not** unique, so it reserves
+  nothing), `ircNickNonce`, `ircNickNonceExpiresAt` (migration run interactively). The
+  existing unique `ircNick` is written only on promotion and so holds **only** a verified
+  value — which is why the IRCScore scorer and `by-irc-nick` need no change (both already key
+  on `ircNick`, now verified-by-construction).
 - New wire flow added to ADR-0013's Integration-contract table: **`verify nick`** —
   korin → Stellar `POST /api/users/irc-nick/verify` (Bearer `STELLAR_SERVICE_KEY`).
 - Existing self-reported links become unverified-by-default; members re-prove to keep
