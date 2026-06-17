@@ -280,13 +280,12 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 | Model                                                | Status                              |
 | ---------------------------------------------------- | ----------------------------------- |
 | `CoverArt`                                           | Planned — release art management    |
-| `Donation`, `BitcoinDonation`, `DonorReward`         | Planned — donor system              |
+| `BitcoinDonation`, `DonorReward`                     | Planned — donor system              |
 | `DonorRank`, `UserDonorRank`, `DonorForumUsername`   | Planned — donor ranks               |
 | `Applicant`, `Thread`                                | Planned — application/thread system |
-| `Friend`                                             | Planned — social feature            |
 | `Concert`, `ContestType`                             | Planned — events/contests           |
 | `MassMessage`, `News`, `Note`                        | Planned — admin messaging/content   |
-| `IpBan`, `EmailBlacklist`, `BadPassword`             | Planned — admin moderation tools    |
+| `BadPassword`                                        | Planned — admin moderation tools    |
 | `EconomyTransaction`, `CurrencyConversionRate`       | Planned — economy system            |
 | `FeaturedMerch`                                      | Planned — merch feature             |
 | `AccountRecovery`, `UserEmailHistory`, `UserWarning` | Planned — user management           |
