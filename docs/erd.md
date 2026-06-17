@@ -966,19 +966,6 @@ Yearly Yearly
     }
   
 
-  "top_ten_leaderboards" {
-    Int id "🗝️"
-    Int contestId 
-    Int userId 
-    Int flacCount 
-    Int lastTorrentId 
-    String lastTorrentName 
-    String artistList 
-    String artistNames 
-    DateTime lastUpload 
-    }
-  
-
   "contest_types" {
     Int id "🗝️"
     String name 

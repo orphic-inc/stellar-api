@@ -1490,23 +1490,6 @@ model Blog {
   @@map("blogs")
 }
 
-model TopTenLeaderboard {
-  id              Int      @id @default(autoincrement())
-  contestId       Int
-  userId          Int
-  flacCount       Int
-  lastTorrentId   Int
-  lastTorrentName String
-  artistList      String   @db.Text
-  artistNames     String   @db.Text
-  lastUpload      DateTime
-
-  @@index([flacCount])
-  @@index([lastUpload])
-  @@index([userId])
-  @@map("top_ten_leaderboards")
-}
-
 model ContestType {
   id   Int    @id @default(autoincrement())
   name String @unique
