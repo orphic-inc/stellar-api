@@ -277,20 +277,19 @@ Five rounds of audit remediation have been applied to this codebase. Key items c
 
 These Prisma models exist in `schema.prisma` but have no API routes:
 
-| Model                                                | Status                              |
-| ---------------------------------------------------- | ----------------------------------- |
-| `CoverArt`                                           | Planned — release art management    |
-| `BitcoinDonation`, `DonorReward`                     | Planned — donor system              |
-| `DonorRank`, `UserDonorRank`, `DonorForumUsername`   | Planned — donor ranks               |
-| `Applicant`, `Thread`                                | Planned — application/thread system |
-| `Concert`, `ContestType`                             | Planned — events/contests           |
-| `MassMessage`, `News`, `Note`                        | Planned — admin messaging/content   |
-| `BadPassword`                                        | Planned — admin moderation tools    |
-| `EconomyTransaction`, `CurrencyConversionRate`       | Planned — economy system            |
-| `FeaturedMerch`                                      | Planned — merch feature             |
-| `AccountRecovery`, `UserEmailHistory`, `UserWarning` | Planned — user management           |
-| `PmDraft`, `GroupLog`                                | Planned — misc features             |
-| `ApiApplication`, `ApiUser`                          | Deferred indefinitely               |
+| Model                       | Status                                 |
+| --------------------------- | -------------------------------------- |
+| `CoverArt`                  | Planned — release art management       |
+| `BitcoinDonation`           | Planned — donor system                 |
+| `Applicant`, `Thread`       | Planned — application/thread system    |
+| `Concert`, `ContestType`    | Planned — events/contests              |
+| `ForumSpecificRule`         | Planned — per-forum/topic/thread rules |
+| `Note`                      | Planned — admin messaging/content      |
+| `BadPassword`               | Planned — admin moderation tools       |
+| `CurrencyConversionRate`    | Planned — economy system               |
+| `FeaturedMerch`             | Planned — merch feature                |
+| `GroupLog`                  | Planned — misc features                |
+| `ApiApplication`, `ApiUser` | Deferred indefinitely                  |
 
 ## Agent skills
 
