@@ -290,7 +290,7 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 | `EconomyTransaction`, `CurrencyConversionRate`       | Planned — economy system            |
 | `FeaturedMerch`                                      | Planned — merch feature             |
 | `AccountRecovery`, `UserEmailHistory`, `UserWarning` | Planned — user management           |
-| `InviteTree`, `PmDraft`, `GroupLog`                  | Planned — misc features             |
+| `PmDraft`, `GroupLog`                                | Planned — misc features             |
 | `ApiApplication`, `ApiUser`                          | Deferred indefinitely               |
 
 ## Agent skills
