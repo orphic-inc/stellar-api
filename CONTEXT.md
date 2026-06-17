@@ -96,8 +96,12 @@ The invite-tree suspicion that flows from an infected _trunk_ (a banned or ban-e
 _Avoid_: tree poisoning, ban inheritance, guilt by association
 
 **CommunityScore**:
-A *deferred* (#75) CRS **Dimension Scorer** that folds a Community's read-time health pulse (`getCommunityHealthPulse`, ADR-0002) into a member's **single, global** Community Reputation Score. It is **not** a separate per-community reputation: a member has one CRS; "their CommunityScore *for* a Community" is that community's health contributing one capped term to it. No parallel per-community score exists.
+A _deferred_ (#75) CRS **Dimension Scorer** that folds a Community's read-time health pulse (`getCommunityHealthPulse`, ADR-0002) into a member's **single, global** Community Reputation Score. It is **not** a separate per-community reputation: a member has one CRS; "their CommunityScore _for_ a Community" is that community's health contributing one capped term to it. No parallel per-community score exists. The pulse is now also **persisted** over time (see **Community Health Snapshot**), which is the trend substrate this fold will read — but the dimension itself is still unbuilt (#75).
 _Avoid_: community reputation, per-community CRS, community ranking
+
+**Community Health Snapshot**:
+A persisted time-series point of a Community's link-health pulse (`CommunityHealthSnapshot`: counts + `coverage`/`pulse`/`status`, per community × `StatSnapshotPeriod` × bucket), captured by the stats job at Daily/Monthly/Yearly cadence and read at `GET /api/communities/:id/health/history`. The live `getCommunityHealthPulse` and the snapshot share one banding via `computePulse` (`linkHealth.ts`); the snapshot stores the band **as computed at capture time**. It is a derived trend layer, never the source of truth (ADR-0007).
+_Avoid_: stored health score, community health table, denormalized pulse
 
 **Site Theme**:
 A built-in, admin-managed stylesheet (`Stylesheet` model: `Sublime`/Default + alternatives, referenced by `cssUrl`, one flagged `isDefault`). The base layer of the cascade, applied site-wide until a member or page context selects something else. Authored by staff/SysOps, not members.
@@ -108,7 +112,7 @@ A `.scss`/`.css` theme written by a member — the **StylesheetAuthor** (shortha
 _Avoid_: user theme, custom css, skin
 
 **Stylesheet Slot**:
-One of three single-valued placements a stylesheet occupies, chosen by **page context**, not a global toggle: the **Profile Stylesheet** (set by a profile's owner; rendered to any visitor on *that* profile), the **Site Stylesheet** (set by the viewer; rendered on the general site, falling back to the **Site Theme**/Default when unset), and the **Community Stylesheet** (set by a Community's Staff; rendered to anyone on *that* community's pages). Page context wins: a profile or community page shows its own slot to every viewer regardless of the viewer's Site Stylesheet.
+One of three single-valued placements a stylesheet occupies, chosen by **page context**, not a global toggle: the **Profile Stylesheet** (set by a profile's owner; rendered to any visitor on _that_ profile), the **Site Stylesheet** (set by the viewer; rendered on the general site, falling back to the **Site Theme**/Default when unset), and the **Community Stylesheet** (set by a Community's Staff; rendered to anyone on _that_ community's pages). Page context wins: a profile or community page shows its own slot to every viewer regardless of the viewer's Site Stylesheet.
 _Avoid_: active stylesheet, theme preference, selected skin
 
 **Stylesheet Adoption**:

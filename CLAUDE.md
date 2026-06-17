@@ -60,8 +60,9 @@ src/
     asyncHandler.ts         # Wraps async routes; catches errors, 10s timeout
     installState.ts         # In-memory cache for isInstalled() check
     logging.ts              # Winston logger factory (JSON in prod, pretty in dev)
-    linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports
+    linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse
     linkHealthJob.ts        # Background job: recheck stale contribution links every 24h
+    communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
     auth.ts                 # Password validation, auth user DB query helpers
     artist.ts               # Artist creation/update with history tracking
     comment.ts              # Comment soft-delete with audit logging
