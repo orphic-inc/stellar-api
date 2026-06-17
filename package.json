@@ -1,7 +1,7 @@
 {
   "name": "@stellar/api",
   "private": true,
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Stellar API",
   "author": "ayan4m1 <andrew@bulletlogic.com>, Kyle O'Brien <obrienk@webbhost.net>",
   "license": "MIT",
