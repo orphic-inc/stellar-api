@@ -83,6 +83,22 @@ _Avoid_: irc activity, chat score, presence score
 The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is _irreducible_ (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
 _Avoid_: irc log, activity table, message history
 
+**Verified IRC Link**:
+A _proven_ binding between a Stellar account and an IRC nick — the only state that credits **IRCScore** or resolves through the korin nick→account lookup. Established by **Nick Verification**, not self-assertion (ADR-0015). An unproven assertion is a **Nick Claim** and carries no weight.
+_Avoid_: nick mapping, IRC account, IRC identity
+
+**Nick Claim**:
+A member's asserted-but-unproven IRC nick plus its pending verification state (the **Verification Code** and its expiry). Reserves nothing — multiple members may hold a Nick Claim on the same nick at once; whoever completes **Nick Verification** first wins the binding (the **Verified IRC Link**). Only a verified nick occupies the unique slot.
+_Avoid_: pending nick, unverified link, nick reservation
+
+**Verification Code**:
+The single-use, time-boxed (30 min) code issued for a **Nick Claim**, proven by sending it _from the claimed nick_ in a private query to the bridge bot. Confidentiality is hygiene, not the boundary — the `(fromNick, code)` pairing is what makes a leaked code useless to anyone who doesn't control the nick.
+_Avoid_: nonce, token, **key**, passcode
+
+**Nick Verification**:
+The handshake that turns a **Nick Claim** into a **Verified IRC Link** by proving control of the claimed nick. Its security rests on the `(fromNick, code)` binding plus Ergo's `force-nick-equals-account` — only the nick's true owner can present the code as that nick. Distinct from the superseded delegated-SASL design (ADR-0011).
+_Avoid_: SASL auth, delegated auth, login
+
 **Chrome Layer**:
 The high-priority CSS `@layer` / `all: revert` boundary that renders critical app chrome (navigation, staff/admin and moderation controls) so an injected user stylesheet cannot override or hide it. The isolation half of the stylesheet trust boundary; user themes cascade everywhere else, and a store-time sanitizer + inject-time CSP cover the exfiltration half (ADR-0003).
 _Avoid_: sandbox, shadow root, reset wrapper

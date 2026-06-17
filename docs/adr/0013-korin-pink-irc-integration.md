@@ -60,6 +60,8 @@ Log-scaling on message and channel counts prevents volume abuse; the product of 
 
 Users link their Ergo nick to their Stellar account via `PUT /api/users/:id/irc-nick`, stored as `User.ircNick` (unique, nullable). Ownership is user-managed — Stellar trusts the self-reported nick and does not validate SASL credentials (that responsibility moved to korin.pink's irc-bridge, replacing ADR-0011's delegated callback). For v0.1.x this is acceptable; v0.2.x may add verification via a SASL challenge through the irc-bridge.
 
+> **Amended by [ADR-0015](0015-verified-irc-nick-link.md) (2026-06-17).** The deferred verification is pulled forward to v0.1.x — but via a challenge/nonce `(fromNick, code)` proof relayed through the bridge, **not** a SASL challenge and **not** ADR-0011's delegated SASL. A self-reported nick is now a _Nick Claim_ (reserves nothing, credits nothing); only a verified _Verified IRC Link_ sets `ircNick`, credits IRCScore, and resolves via `by-irc-nick`. See the new `verify nick` flow in the Integration contract below.
+
 ---
 
 ## Migration / reconcile (in-repo → external)
