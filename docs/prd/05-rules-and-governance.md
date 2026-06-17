@@ -12,7 +12,7 @@ Seven canonical rules govern the whole site. They are deliberately kept whole �
 
 1. **Accounts** — one account per person per lifetime; no sharing/trading/selling; keep it active.
 2. **Invites** — you are responsible for your invitees; no public trading/offering; do not request.
-3. **Contribution Integrity & Accounting** — no manipulating the contribute/consume ledger; Contributions must be honest, with **live links + accurate metadata**; protect your credentials (AnnounceKey / API). _(Content-tracker cast: a self-hosted host counts as a seedbox-class source; RSS/IRC announcements + idle/activity tracking stand in for a torrent announce.)_
+3. **Contribution Integrity & Accounting** — no manipulating the contribute/consume ledger; Contributions must be honest, with **live links + accurate metadata**; protect your credentials (account / API key). _(Content-tracker cast: a self-hosted host counts as a seedbox-class source; RSS/IRC announcements + idle/activity tracking stand in for a torrent announce.)_
 4. **Conduct** — no blackmail/scams/impersonation; civil discourse; no backseat-moderation.
 5. **Access & Automation** — no free VPN/Tor; automated access via the **API only** (rate-limited); no automated abuse of download credits.
 6. **Bugs & Exploits** — don't seek or exploit live bugs (responsible disclosure); don't publish exploits.

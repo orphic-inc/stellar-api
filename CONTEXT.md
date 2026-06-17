@@ -63,25 +63,25 @@ _Avoid_: metric, plugin, scorer module
 A bounded cross-dimension CRS edge — one signal nudging another dimension — capped and deduplicated to resist farming (e.g. stylesheet adoption feeding the Friends dimension).
 _Avoid_: cross-score, bonus link, coupling
 
+**korin.pink**:
+The external service (`obrien-k/korin-pink`) that owns the IRC substrate — the Ergo IRCd, the irc-bridge daemon, the wiki, and per-nick metrics — on its own VPS and release cadence. stellar-api **consumes** these signals across a fixed wire contract (ADR-0013): it pulls **Korin Metrics**, computes **IRCScore** on read, resolves the nick→account map, relays **Nick Verification**, and pushes the **Release-Announce Feed**. stellar-api hosts no IRCd, bot, or bouncer; the in-repo build (ADR-0011/0012) was removed in its favour.
+_Avoid_: the IRC server, the bot (these are korin's, not in-repo), Ergo (one component korin owns)
+
 **Release-Announce Feed**:
-The out-of-band stream of new Contributions delivered to a member over RSS/XML and IRC — the firehose of the Contribution Spine as it grows. Authenticated by the **AnnounceKey**, not the **Identity State** (the member is not carrying a session cookie on these channels). Distinct from consuming a release, which stays a session-authed accounted download.
-_Avoid_: rss feed, announce stream, the firehose
+The out-of-band stream of new Contributions surfaced to members over IRC (and RSS) — the firehose of the Contribution Spine as it grows. stellar-api **pushes** each new Contribution to **korin.pink** (`POST /irc/announce`, `announce.ts` / `announceJob.ts`, authenticated by `KORIN_PULL_KEY`); korin renders the newest artifact to `#announce`. There is no in-repo feed and no per-user feed key. Delivery is **notify-and-link** (#136): the item links into the app, never a tokenized URL — consuming a release stays a session-authed accounted download.
+_Avoid_: rss feed, announce stream, the firehose, AnnounceKey-gated feed
 
-**AnnounceKey**:
-A per-user credential authenticating a member's **Release-Announce Feed** (RSS + IRC announce). It gates _receiving_ the stream of new Contributions; it never authenticates a download — release consumption remains a session-authed grant through the **Ratio Mechanism**. Rotatable; rotating it invalidates the prior feed URL.
-_Avoid_: passkey, download key, torrent key
+**Service Key**:
+A shared secret gating the korin.pink seam — `KORIN_PULL_KEY` (stellar→korin: metrics pull + announce push) and `STELLAR_SERVICE_KEY` (korin→stellar Bearer: `by-irc-nick`, nick verify, reputation read). Each path **fails closed** until its key is set (`serviceAuth.ts`). These are service-to-service, not per-user; they replace the **retired** per-user `IRCKey` / `AnnounceKey` (ADR-0011), which were removed with the in-repo build and deliberately **not** revived (ADR-0015 §Scope).
+_Avoid_: IRCKey, AnnounceKey, irc password, download key
 
-**IRCKey**:
-A per-user credential authenticating a member's **identity on the IRC network** (presented as the SASL secret to the IRCd, validated against this API). Paired with the **AnnounceKey** it enables personalized release announcements pushed over IRC; alone it only establishes who a nick is. Distinct from the AnnounceKey — different channel, different rotation/threat model.
-_Avoid_: irc password, chat token, drone key
+**Korin Metrics**:
+The per-nick raw IRC signals korin.pink exposes at `GET /irc/metrics` — `{messageCount, presenceSeconds, channelCount, channels, window}` per user, keyed by nick. stellar-api pulls them on an interval and caches them in-process (TTL 2× the poll interval, `ircJob.ts`); **IRCScore** is computed on read over the latest flush window. Replaces the **retired** in-repo `IrcActivity` rollup (ADR-0012), which stored message counts in this database.
+_Avoid_: IrcActivity, irc log, activity table, message history
 
 **IRCScore**:
-A bounded CRS **Dimension Scorer** derived from a member's _message_ activity on IRC over a trailing window — message volume weighted by channel and scaled by how many distinct days they were active. Presence/idle never contributes (anti-farming); only messages count. Capped with diminishing returns like every dimension, so IRC cannot dominate reputation.
+A bounded CRS **Dimension Scorer** derived from a member's IRC activity over korin.pink's latest flush window — `activity × consistency × channelQuality`, each a log-/ratio-scaled factor in `[0, 1]`, clamped to the dimension cap. `activity` is log-scaled message volume, `consistency` is the fraction of the window the member was present, `channelQuality` is log-scaled channel breadth. Computed on read from **Korin Metrics** (`getIrcScore`, `irc.ts`); nothing stores a denormalized score. Capped with diminishing returns like every dimension, so IRC cannot dominate reputation. Magnitudes are HITL/TBD (#141).
 _Avoid_: irc activity, chat score, presence score
-
-**IRC Activity Rollup**:
-The durable, pre-aggregated substrate **IRCScore** reads — one row per member × channel × day of message counts, upserted by the IRC bot. The append/aggregate surface ADR-0007 calls for when a signal is _irreducible_ (not reconstructable from current state) yet too high-volume for the `CRS_*` event ledger. The score is still computed on read over a trailing window of these rows; nothing stores a denormalized IRCScore.
-_Avoid_: irc log, activity table, message history
 
 **Verified IRC Link**:
 A _proven_ binding between a Stellar account and an IRC nick — the only state that credits **IRCScore** or resolves through the korin nick→account lookup. Established by **Nick Verification**, not self-assertion (ADR-0015). An unproven assertion is a **Nick Claim** and carries no weight.
@@ -142,7 +142,7 @@ _Avoid_: applying a theme, selecting a stylesheet, using a skin
 - **Sanitized Values** must be extracted at the Controller layer using **Contract Schemas** before execution by domain services.
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 - A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
-- The **AnnounceKey** authenticates the **Release-Announce Feed** (RSS + IRC) and the **IRCKey** authenticates IRC identity; the two paired enable IRC-delivered release announcements. Neither replaces the **Identity State** on the session-authed download path — they authenticate out-of-band channels only, never a download.
+- IRC identity is the **Verified IRC Link** (`User.ircNick`, proven via **Nick Verification**), not a per-user secret — the retired `IRCKey` / `AnnounceKey` are not revived (ADR-0015). The **Release-Announce Feed** is pushed to **korin.pink** and delivered **notify-and-link** (#136). Neither the announce channel nor **IRCScore** touches the **Identity State** on the session-authed download path — they are out-of-band signals, never a download grant.
 - **Standing** is computed on read from **Warnings** / ban state / tenure and _scales_ rule impact on the CRS via `ruleImpact`; it is never a **Dimension Scorer** and never gates access (enforcement stays granular permissions). A member's own **confirmed** ban-evasion feeds the terminal `hammer` rung, whereas invite-tree **Contagion** feeds only a graded suspicion — suspect is not condemned.
 
 ## Flagged Ambiguities

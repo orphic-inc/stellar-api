@@ -1,77 +1,98 @@
 # PRD-02 — IRC & Announce
 
-**Status:** In-repo build shipped ([#143](https://github.com/orphic-inc/stellar-api/pull/143)) — credentials, activity rollup, IRCScore, delegated SASL, and the announce feeds (RSS + JSON) are merged. Outstanding: magnitude pinning ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL) and infra ([#142](https://github.com/orphic-inc/stellar-api/issues/142), stellar-compose). · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
-**Decisions:** [ADR-0011 delegated IRC authentication](../adr/0011-delegated-irc-authentication.md), [ADR-0012 IRC activity rollup substrate](../adr/0012-irc-activity-rollup-substrate.md), [ADR-0007 CRS read-time + ledger](../adr/0007-crs-read-time-and-event-ledger.md), [ADR-0009 dependency/infra discipline](../adr/0009-fork-workflow-and-dependency-discipline.md)
+**Status:** Shipped via **korin.pink** ([ADR-0013](../adr/0013-korin-pink-irc-integration.md)) — stellar-api consumes IRC signals from the external service: it pulls per-nick metrics, computes IRCScore on read, resolves the nick↔account map, and pushes new Contributions to korin's announce. Nick ownership is now **verified** ([ADR-0015](../adr/0015-verified-irc-nick-link.md)). Outstanding: IRCScore magnitude pinning ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL). · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
+**Decisions:** [ADR-0013 korin.pink IRC integration](../adr/0013-korin-pink-irc-integration.md), [ADR-0015 verified IRC nick link](../adr/0015-verified-irc-nick-link.md), [ADR-0007 CRS read-time + ledger](../adr/0007-crs-read-time-and-event-ledger.md). _Superseded by ADR-0013:_ [ADR-0011 delegated IRC authentication](../adr/0011-delegated-irc-authentication.md), [ADR-0012 IRC activity rollup substrate](../adr/0012-irc-activity-rollup-substrate.md).
 **Numbering:** PRD-01 Community-Score · **PRD-02 IRC & Announce** · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · PRD-05 Rules & Governance · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art
 
-> Lean PRD. Covers **IRC + Announce together** (they share the credential + delivery substrate); **Donations are split into their own PRD** (overlaps [#62](https://github.com/orphic-inc/stellar-api/issues/62)); **RSS/XML feeds are a fast-follow slice** here (they reuse the announce substrate). IRC conduct rules live in [PRD-05](05-rules-and-governance.md) (IRCRules / [#126](https://github.com/orphic-inc/stellar-api/issues/126)); this PRD builds the feature, not the rule prose.
+> Lean PRD. Covers **IRC + Announce together** (they share the korin.pink integration seam); **Donations are split into their own PRD** (overlaps [#62](https://github.com/orphic-inc/stellar-api/issues/62)). IRC conduct rules live in [PRD-05](05-rules-and-governance.md) (IRCRules / [#126](https://github.com/orphic-inc/stellar-api/issues/126)); this PRD covers what stellar-api owns, not the rule prose and not the IRC infrastructure (which is korin.pink's).
 
 ## Problem
 
-Stellar is a content-tracker-lineage community: members want a real-time **social hub** and a **release-announce channel** — the out-of-band firehose of new Contributions (the torrent-announce stand-in, Golden Rule 3). Neither exists. The feature was deferred pending a per-user IRC credential and its pairing with a release-feed credential, both of which touch the Contribution/Community model and are net-new on `User`.
+Stellar is a content-tracker-lineage community: members want a real-time **social hub** and a **release-announce channel** — the out-of-band firehose of new Contributions (the torrent-announce stand-in, Golden Rule 3). The IRC network itself (IRCd, bridge, web client, wiki) is operationally distinct from the core platform — different VPS, different release cadence — so it is **not** hosted in stellar-api. What stellar-api owns is the _integration_: turning IRC activity into reputation, mapping nicks to accounts, and feeding the announce channel.
 
-## Architecture (decided)
+## Architecture (decided — ADR-0013)
 
-- **Self-hosted modern IRCd (Ergo) + a web client (The Lounge).** Ergo collapses IRCd + accounts/SASL + always-on/bouncer into one component; The Lounge gives web-only members access and is the donor-bouncer surface (donor perks → the split-off Donations PRD). Matrix was considered and set aside (IRC authenticity for a content-tracker-lineage site).
-- **IRC is its own top-level section**, not a forum sub-area — gated on accepting the IRCRules ([PRD-05](05-rules-and-governance.md)) and having an **IRCKey** set.
-- **Infra** lives in stellar-compose as new pinned services (Ergo + bot + The Lounge), per [ADR-0009](../adr/0009-fork-workflow-and-dependency-discipline.md) dependency discipline.
+The IRC substrate lives in an **external service, `obrien-k/korin-pink`**, on its own VPS and release cadence. stellar-api **consumes** IRC signals across a fixed wire contract — it never hosts an IRCd, a bot, or a bouncer.
 
-## Identity — the two keys
+- **korin.pink owns the substrate and raw signals** — the Ergo IRCd, the irc-bridge daemon (TLS/SASL → Ergo), the wiki/web surface, and per-user metrics `{messageCount, presenceSeconds, channelCount, channels, window}`. It does **not** compute IRCScore.
+- **stellar-api owns the IRCScore formula, the nick↔account map, and the release data.** IRCScore is computed read-time from korin's raw signals; `User.ircNick` is the (verified) mapping; Contributions are the announce source.
+- **Ownership is non-overlapping by design.** The first integration cut under-specified direction and ownership, producing a circular IRCScore claim and an over-removed announce path; ADR-0013 §Integration contract is the source of truth for the wire shape and is mirrored in korin.pink's own docs.
 
-Two per-user credentials, **net-new** on `User` (the vestigial `communityPass` field is dropped in the same migration). Stored as unique, lazily-generated, rotatable 32-char URL-safe tokens.
+## Integration contract (the wire seam)
 
-- **`AnnounceKey`** — authenticates the **Release-Announce Feed** (RSS + IRC announce): _receiving_ the stream of new Contributions. It **never** authenticates a download — release consumption stays a session-authed accounted grant through the Ratio Mechanism. Rotating it dead-links the prior feed URL.
-- **`IRCKey`** — authenticates **IRC identity** (the SASL secret). Validated by **delegated auth**: Ergo calls an internal stellar-api endpoint per login; this API is the single source of truth, no credential mirror in the IRCd ([ADR-0011](../adr/0011-delegated-irc-authentication.md)). Rotating it drops any always-on session.
-- **Paired:** to receive personalized release announcements **pushed over IRC** a member needs both (IRCKey = who you are on IRC; AnnounceKey = authorized to receive the feed).
+Five flows, each fails closed until its key is set. Keys: `KORIN_API_URL` / `KORIN_PULL_KEY` (stellar→korin, both directions of stellar-initiated calls) and `STELLAR_SERVICE_KEY` (korin→stellar Bearer).
+
+| Flow             | Direction                | Endpoint                                        | Auth                            | Lives in                                      |
+| ---------------- | ------------------------ | ----------------------------------------------- | ------------------------------- | --------------------------------------------- |
+| IRC metrics      | **stellar pulls korin**  | `GET {KORIN_API_URL}/irc/metrics`               | `x-pull-key: KORIN_PULL_KEY`    | `irc.ts` poll client + `ircJob.ts` cache      |
+| Release announce | **stellar pushes korin** | `POST {KORIN_API_URL}/irc/announce`             | `x-pull-key: KORIN_PULL_KEY`    | `announce.ts` + `announceJob.ts`              |
+| nick → account   | **korin calls stellar**  | `GET /api/users/by-irc-nick/:nick`              | `Bearer STELLAR_SERVICE_KEY`    | `user.ts` / route + `serviceAuth.ts` gate     |
+| link nick        | self/korin               | `PUT /api/users/:id/irc-nick` `{ircNick}`       | Bearer (or session, self/admin) | profile/user route — creates a **Nick Claim** |
+| verify nick      | **korin calls stellar**  | `POST /api/users/irc-nick/verify` `{nick,code}` | `Bearer STELLAR_SERVICE_KEY`    | `ircNick.ts` (ADR-0015)                       |
+
+The metrics pull is cached in-process (TTL 2× poll interval); both stellar→korin calls present `KORIN_PULL_KEY`; all korin→stellar calls are Bearer `STELLAR_SERVICE_KEY` and gated by `serviceAuth.ts` (fails closed when unset).
+
+## Identity — the verified nick link (ADR-0015)
+
+A member's IRC identity is a single unique, nullable field: **`User.ircNick`**. There are **no per-user IRC secrets** — the old `IRCKey` / `AnnounceKey` pair was retired with the in-repo build and is **not** revived (ADR-0015 §Scope). Ownership is **proven**, not self-asserted, via a challenge/nonce handshake:
+
+1. **Claim (Stellar):** `PUT /api/users/:id/irc-nick {ircNick}` creates a **Nick Claim** — the asserted nick plus a single-use **Verification Code** (8-char, 30-min expiry). It does **not** yet write `User.ircNick`. A claim reserves nothing; multiple members may claim the same nick.
+2. **Prove (IRC):** the member sends `!verify <code>` in a **private query** to the bridge bot, from the claimed nick.
+3. **Relay (korin → Stellar):** the bridge → korin → `POST /api/users/irc-nick/verify {nick, code}` (Bearer `STELLAR_SERVICE_KEY`), a synchronous stateless pass-through so the bot can reply.
+4. **Confirm (Stellar):** on a matching, unexpired `(fromNick, code)`, the claim is promoted to a **Verified IRC Link** (`ircNickVerified = true`, `ircNick` set, code cleared).
+5. **Gate:** only a Verified IRC Link credits IRCScore or resolves through `GET /by-irc-nick/:nick`.
+
+The security boundary is the `(fromNick, code)` binding plus Ergo's `force-nick-equals-account`: a leaked code is useless to anyone who can't already present it _as that nick_. Admins may set/clear a nick but cannot mint verified status (verification asserts Ergo-control). See [ADR-0015](../adr/0015-verified-irc-nick-link.md) for the full threat model, the no-lockout decision, and the retired-keys mapping.
 
 ## Announce
 
-A **Node bot/worker** in stellar-compose bridges this API and the network:
+stellar-api **pushes** each new Contribution to korin; there is no in-repo RSS feed, no per-user feed key, and no bot worker.
 
-- **Announce relay** — stellar-api emits a new-Contribution event → the bot relays to `#announce` and to the per-member feed; gated by AnnounceKey. Reuses the existing `announcements` surface.
-- **`!commands`** — `!stats` / `!enroll` / support, backed by the public API with a scoped token (Golden Rule 5: automation via the API only).
-- **Activity capture** — the bot upserts the **IRC Activity Rollup** (below). It does **not** store message content — counts only.
+- **`announceJob.ts`** runs a cursor over new Contributions and, for each, builds a one-item RSS artifact and `POST`s it to `{KORIN_API_URL}/irc/announce` (`announce.ts`), authenticated by `KORIN_PULL_KEY`. korin renders the newest artifact to `#announce`. This **reverses the direction** of the superseded in-repo AnnounceKey-gated feed — stellar emits, korin delivers.
+- **Delivery shape (#136): notify-and-link.** The announce item carries a plain link into the app (the release page), never a tokenized one-shot URL. The download still resolves to a session-authed, ratio-accounted grant; the link only saves a click. This is why **key-authenticated access to content over IRC is deliberately not reintroduced** (Golden Rule 3).
+- **`!commands` / bot automation** live in korin.pink and reach back through the public/service API only (Golden Rule 5: automation via the API).
 
 ## IRCScore (CRS dimension)
 
-`IRCScore` is a bounded CRS **Dimension Scorer** (PRD-01) over **message** activity — presence/idle never counts ([ADR-0012](../adr/0012-irc-activity-rollup-substrate.md)). Durable substrate is the **`IrcActivity` rollup** (one row per member × channel × day of message counts), computed on read over a trailing **90-day** window — no stored score (ADR-0007 rule 1 holds).
+`IRCScore` is a bounded CRS **Dimension Scorer** (PRD-01) computed **on read** from korin's last polled flush window — no stored score, no in-repo activity table (ADR-0007 holds; the superseded `IrcActivity` rollup is gone). The pure scorer is `getIrcScore` in `src/modules/irc.ts`, reading the window cached by `ircJob.ts`.
 
 ```
-IRCScore = CAP × (1 − exp(−(weightedVolume × consistency) / TAU))
-weightedVolume = Σ_channel  min(msgs_per_day, DAILY_CAP) × channelWeight     (over the window)
-consistency    = distinctActiveDays / windowDays      // active day = ≥ MIN_MSGS messages
+IRCScore = activity × consistency × channelQuality        (then clamped to the dimension cap)
+activity       = log1p(messageCount)  / log1p(ACTIVITY_REF)   → [0, 1]
+consistency    = min(presenceSeconds / windowDuration, 1)     → [0, 1]
+channelQuality = log1p(channelCount)  / log1p(CHANNEL_REF)    → [0, 1]
 ```
 
-Anti-farming is structural: the per-channel/day cap defeats flooding, `consistency` defeats one-session marathons, `channelWeight` defeats spamming low-value channels. Magnitudes (`CAP`/`TAU`/`DAILY_CAP`/`MIN_MSGS`/weights) are **HITL/TBD**, hand-pinned like every other CRS magnitude.
+Anti-farming is structural: log-scaling on message count gives hard diminishing returns, `consistency` rewards sustained presence over one-session marathons, and `channelQuality` (also log-scaled) defeats single-channel spamming. The reputation registry applies the per-dimension cap (`IRC_CAP`, currently 6) so IRC can never dominate the CRS. Magnitudes (`ACTIVITY_REF` = 50, `CHANNEL_REF` = 5, the cap, and any channel-weight map) are **HITL/TBD**, hand-pinned like every other CRS magnitude ([#141](https://github.com/orphic-inc/stellar-api/issues/141)).
 
 ## Concept → code (descent map)
 
-| Concept                           | Lives in / will live in                                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| IRCKey + AnnounceKey              | **net-new** on `User` (`prisma/schema.prisma`); drop vestigial `communityPass`                               |
-| Delegated SASL validation         | **net-new** internal endpoint — [ADR-0011](../adr/0011-delegated-irc-authentication.md)                      |
-| Release-Announce Feed (RSS + IRC) | net-new feed route, AnnounceKey-gated, reusing `announcements`                                               |
-| Announce relay + `!commands` bot  | **net-new** worker in stellar-compose                                                                        |
-| `IrcActivity` rollup              | **net-new** table + bot upsert — [ADR-0012](../adr/0012-irc-activity-rollup-substrate.md)                    |
-| `IRCScore` dimension              | `src/modules/reputation.ts` registry entry (pure scorer) + `DimensionInput` window fetch                     |
-| Infra (Ergo + bot + The Lounge)   | **stellar-compose** — pinned services per [ADR-0009](../adr/0009-fork-workflow-and-dependency-discipline.md) |
-| IRCRules (conduct)                | [PRD-05](05-rules-and-governance.md) + [#126](https://github.com/orphic-inc/stellar-api/issues/126) (HITL)   |
+| Concept                            | Lives in                                                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| IRC substrate (IRCd, bridge, wiki) | **external** — `obrien-k/korin-pink` (not stellar-api) ([ADR-0013](../adr/0013-korin-pink-irc-integration.md))   |
+| `User.ircNick` (verified link)     | `prisma/schema.prisma` — unique, nullable; written only on verified promotion                                    |
+| Nick claim + verify                | `src/modules/ircNick.ts` + `POST /api/users/irc-nick/verify` ([ADR-0015](../adr/0015-verified-irc-nick-link.md)) |
+| IRC metrics pull + cache           | `src/modules/irc.ts` (poll client) + `src/modules/ircJob.ts` (poll job)                                          |
+| `IRCScore` dimension               | `src/modules/reputation.ts` registry entry → `getIrcScore` pure scorer (`irc.ts`)                                |
+| Announce push                      | `src/modules/announce.ts` + `src/modules/announceJob.ts` → korin `POST /irc/announce`                            |
+| nick → account resolve             | `GET /api/users/by-irc-nick/:nick`, Bearer-gated (`serviceAuth.ts`)                                              |
+| Service keys                       | `KORIN_API_URL` / `KORIN_PULL_KEY` / `STELLAR_SERVICE_KEY` (`modules/config.ts`)                                 |
+| IRCRules (conduct)                 | [PRD-05](05-rules-and-governance.md) + [#126](https://github.com/orphic-inc/stellar-api/issues/126) (HITL)       |
 
-## Red-green descent targets
+## Status — what shipped
 
-1. ✅ **`IRCKey` + `AnnounceKey` on `User`** — unique, generate/rotate endpoints, drop `communityPass`. The documented blocker; everything hangs off it. _(shipped [#134](https://github.com/orphic-inc/stellar-api/issues/134))_
-2. ✅ **Delegated SASL-validate endpoint** — internal, network-scoped; Ergo's auth callback (ADR-0011). _(shipped [#138](https://github.com/orphic-inc/stellar-api/issues/138))_
-3. ✅ **Release-Announce Feed** — AnnounceKey-gated feed of new Contributions (JSON `?since=` cursor for the relay; RSS/XML fast-follow on the same substrate). Notify-and-link delivery ([#136](https://github.com/orphic-inc/stellar-api/issues/136)). _(shipped [#139](https://github.com/orphic-inc/stellar-api/issues/139) + [#140](https://github.com/orphic-inc/stellar-api/issues/140))_
-4. ✅ **`IrcActivity` rollup + bot upsert** — messages-only, `user×channel×day` (ADR-0012). _(shipped [#135](https://github.com/orphic-inc/stellar-api/issues/135))_
-5. ✅ **`scoreIrcActivity(rows, weights, window)`** — pure, table-driven, unit-tested against fixtures **before** any IRC infra; then register `IRCScore` into the CRS registry. Magnitudes provisional, pinned in [#141](https://github.com/orphic-inc/stellar-api/issues/141) (HITL). _(shipped [#137](https://github.com/orphic-inc/stellar-api/issues/137))_
-6. ⏳ **The Lounge / bouncer** — web client surface; donor perks defer to the Donations PRD. _(infra, [#142](https://github.com/orphic-inc/stellar-api/issues/142))_
+- ✅ **korin.pink integration** — metrics pull + in-process cache, IRCScore read-time scorer registered into the CRS, announce push, and the Bearer-gated `by-irc-nick` / `reputation` inbound calls (ADR-0013; in-repo build #134–140 shipped-then-superseded, removed via #148/#150).
+- ✅ **Verified nick link** — challenge/nonce claim → `!verify` → `POST /irc-nick/verify` → promotion; only verified links credit IRCScore or resolve (ADR-0015; #175).
+- ⏳ **IRCScore magnitudes** — `ACTIVITY_REF` / `CHANNEL_REF` / cap / channel-weight map pinned with the other CRS magnitudes ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL).
 
 ## Open questions
 
-- Greenfield network, or is there an existing IRC network / nick reservations to migrate?
-- `IRCScore` magnitudes + the channel-weight map — TBD with the other CRS magnitudes (HITL, like #121/#122/#126).
-- **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers _earn capability_ — rights to create new official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
+- **IRCScore magnitudes + the channel-weight map** — TBD with the other CRS magnitudes (HITL, like #121/#122/#126).
+- **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers _earn capability_ — rights to create official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
+- **Periodic re-verification.** Verified links don't expire in v1 (ADR-0015); a member abandoning a nick later re-registered by someone else is an accepted narrow window. Re-verification cadence is a future option.
 
 ## Resolved decisions
 
-- **Announce delivery shape (#136, 2026-06-13): notify-and-link-into-the-app.** The announce item carries a plain link into the app (the release page), not a one-shot tokenized URL — no new token-mint/expiry/replay surface. The download still resolves to a session-authed accounted grant; the link only saves a click.
+- **Announce delivery shape (#136, 2026-06-13): notify-and-link-into-the-app.** The announce item carries a plain link to the release page, not a one-shot tokenized URL — no token-mint/expiry/replay surface. The download still resolves to a session-authed accounted grant; the link only saves a click.
+- **Nick ownership is proven, not self-reported (ADR-0015).** ADR-0013 shipped self-reported `ircNick` and deferred verification to "v0.2.x"; ADR-0015 pulled it forward to close the IRCScore-harvest hole via challenge/nonce rather than reviving delegated SASL.
+- **The keys stay retired (ADR-0015 §Scope).** `IRCKey` / `AnnounceKey` each conflated jobs now served without a secret: identity → the Verified IRC Link; announce attribution → public metadata on the announce item; crediting on consumption → the session-authed accounted download (unchanged); private-community announce delivery → a separate, unmodeled access-control feature tracked elsewhere.
