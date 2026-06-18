@@ -1,7 +1,7 @@
 /**
  * Dev seed — recreates default user ranks and forum structure so the /install
  * flow is available after a database reset.  Does NOT create users; complete
- * the install flow at http://localhost:3000/install after running this.
+ * the install flow at http://localhost:9000/install after running this.
  *
  * Runs automatically after `prisma migrate dev` resets the database.
  * Can also be run manually: npx prisma db seed
@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 async function main() {
   await seedRanks(prisma);
   await seedForums(prisma);
-  console.log('→ Complete setup at http://localhost:3000/install');
+  console.log('→ Complete setup at http://localhost:9000/install');
 }
 
 main()
