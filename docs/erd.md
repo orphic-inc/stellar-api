@@ -440,6 +440,9 @@ Yearly Yearly
     String lastIp "❓"
     Boolean disablePm 
     String ircNick "❓"
+    String pendingIrcNick "❓"
+    String ircNickNonce "❓"
+    DateTime ircNickNonceExpiresAt "❓"
     DateTime createdAt 
     DateTime updatedAt 
     }
