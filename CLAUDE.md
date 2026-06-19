@@ -295,7 +295,7 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 
 ### Issue tracker
 
-Issues live in GitHub Issues at `orphic-inc/stellar-api`. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues at `orphic-inc/stellar-api` (external PRs are not a triage surface). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -303,4 +303,4 @@ Default label vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-h
 
 ### Domain docs
 
-Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Multi-context — `CONTEXT-MAP.md` at the repo root indexes the per-repo `CONTEXT.md` files across the Stellar constellation (stellar-api, stellar-ui, external korin.pink). See `docs/agents/domain.md`.

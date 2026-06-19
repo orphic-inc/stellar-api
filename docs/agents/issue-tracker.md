@@ -2,6 +2,8 @@
 
 Issues and PRDs for this repo live as GitHub issues at `orphic-inc/stellar-api`. Use the `gh` CLI for all operations.
 
+**External PRs are not a triage surface.** `/triage` processes GitHub Issues only; pull requests (including external/feature-request PRs) are left out of the triage queue.
+
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
