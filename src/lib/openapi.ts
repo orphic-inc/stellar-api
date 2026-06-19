@@ -5323,6 +5323,7 @@ const FriendEntry = registry.register(
     userId: z.number(),
     friendId: z.number(),
     comment: z.string(),
+    isMutual: z.boolean(),
     friend: z.object({
       id: z.number(),
       username: z.string(),
@@ -5367,7 +5368,7 @@ registry.registerPath({
       description: 'Friend status',
       content: {
         'application/json': {
-          schema: z.object({ isFriend: z.boolean() })
+          schema: z.object({ isFriend: z.boolean(), isMutual: z.boolean() })
         }
       }
     },
@@ -5384,7 +5385,10 @@ registry.registerPath({
   tags: ['Friends'],
   request: { params: z.object({ userId: z.string() }) },
   responses: {
-    201: { description: 'Friend added' },
+    201: {
+      description: 'Friend added',
+      content: { 'application/json': { schema: FriendEntry } }
+    },
     400: {
       description: 'Cannot add self',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5429,7 +5433,10 @@ registry.registerPath({
     }
   },
   responses: {
-    200: { description: 'Comment updated' },
+    200: {
+      description: 'Comment updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
