@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
+import { DEFAULT_RANKS } from './modules/bootstrap';
 
 beforeEach(() => resetApiTestState());
 
@@ -20,6 +21,9 @@ function mockPreseededBootstrap() {
     level: 1000,
     name: 'SysOp'
   } as never);
+  // seedRankPromotionRules loads the seeded ranks; empty is fine for these tests
+  // (no rule rungs resolve, nothing to assert on here).
+  prismaMock.userRank.findMany.mockResolvedValue([] as never);
 }
 
 function mockSysopTransaction() {
@@ -239,17 +243,14 @@ describe('POST /api/install', () => {
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
 
-    // seedRanks checks canonical levels individually.
-    prismaMock.userRank.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
-    prismaMock.userRank.create
-      .mockResolvedValueOnce({ id: 10, level: 100 } as never)
-      .mockResolvedValueOnce({ id: 11, level: 200 } as never)
-      .mockResolvedValueOnce({ id: 12, level: 500 } as never)
-      .mockResolvedValueOnce({ id: 13, level: 1000 } as never);
+    // seedRanks checks each canonical level individually; none exist yet.
+    prismaMock.userRank.findUnique.mockResolvedValue(null);
+    prismaMock.userRank.create.mockResolvedValue({
+      id: 13,
+      level: 1000
+    } as never);
+    // seedRankPromotionRules then loads the freshly seeded ranks.
+    prismaMock.userRank.findMany.mockResolvedValue([] as never);
 
     // seedForums: no existing categories → creates them
     prismaMock.forumCategory.count.mockResolvedValue(0);
@@ -269,7 +270,10 @@ describe('POST /api/install', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(prismaMock.userRank.create).toHaveBeenCalledTimes(4);
+    // One create per rung of the full class ladder.
+    expect(prismaMock.userRank.create).toHaveBeenCalledTimes(
+      DEFAULT_RANKS.length
+    );
     expect(prismaMock.forumCategory.create).toHaveBeenCalled();
   });
 
