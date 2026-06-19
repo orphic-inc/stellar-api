@@ -9,7 +9,7 @@ const mockPrismaEconomy = { count: jest.fn() };
 const mockPrismaInviteTree = { findMany: jest.fn() };
 const mockPrismaDonation = { aggregate: jest.fn() };
 const mockPrismaCommunitySnapshot = { findMany: jest.fn() };
-const mockPrismaQueryRaw = jest.fn();
+const mockPrismaContribution = { findMany: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
   prisma: {
@@ -19,7 +19,7 @@ jest.mock('../lib/prisma', () => ({
     inviteTree: mockPrismaInviteTree,
     donation: mockPrismaDonation,
     communityHealthSnapshot: mockPrismaCommunitySnapshot,
-    $queryRaw: mockPrismaQueryRaw
+    contribution: mockPrismaContribution
   }
 }));
 
@@ -350,15 +350,15 @@ describe('computeCrs — Donation dimension', () => {
 // ─── computeCrs / Community dimension ─────────────────────────────────────────
 
 describe('computeCrs — Community dimension', () => {
-  const healthy = (count: number) => ({
+  const healthy = (weight: number) => ({
     pulse: 1.0,
     coverage: 0.9,
-    contributionCount: count
+    weight
   });
-  const critical = (count: number) => ({
+  const critical = (weight: number) => ({
     pulse: 0.0,
     coverage: 0.9,
-    contributionCount: count
+    weight
   });
   const communityOf = (
     communityHealth: NonNullable<
@@ -385,21 +385,23 @@ describe('computeCrs — Community dimension', () => {
   });
 
   it('is neutral at the Critical-edge pulse 0.60', () => {
-    expect(
-      communityOf([{ pulse: 0.6, coverage: 0.9, contributionCount: 5 }])
-    ).toBeCloseTo(0, 10);
+    expect(communityOf([{ pulse: 0.6, coverage: 0.9, weight: 5 }])).toBeCloseTo(
+      0,
+      10
+    );
   });
 
   it('excludes Unknown communities (coverage below 0.5)', () => {
     // The only community is unprobed → no signal, term 0.
-    expect(
-      communityOf([{ pulse: 0.2, coverage: 0.4, contributionCount: 5 }])
-    ).toBe(0);
+    expect(communityOf([{ pulse: 0.2, coverage: 0.4, weight: 5 }])).toBe(0);
   });
 
-  it('weights by the member’s contribution count', () => {
+  it('weights by the member’s quality stake (heavier weight dominates)', () => {
     // 9× weight healthy (+4), 1× weight critical (−1): (9·4 + 1·−1)/10 = 3.5
     expect(communityOf([healthy(9), critical(1)])).toBeCloseTo(3.5, 10);
+    // The same two communities, but the member's quality investment is reversed:
+    // now the critical one carries the heavier weight → the average flips negative-ward.
+    expect(communityOf([healthy(1), critical(9)])).toBeCloseTo(-0.5, 10);
   });
 
   it('stays bounded in [−1, +4]', () => {
@@ -418,7 +420,7 @@ describe('computeCrs — signed dimension floor', () => {
       userId: 1,
       createdAt: NOW,
       now: NOW,
-      communityHealth: [{ pulse: 0.0, coverage: 0.9, contributionCount: 1 }]
+      communityHealth: [{ pulse: 0.0, coverage: 0.9, weight: 1 }]
     }).dimensions.find((d) => d.name === 'community')!;
     // Without the floor the clamp would force this to 0; with floor −1 it survives.
     expect(community.subScore).toBe(-1);
@@ -434,7 +436,7 @@ describe('getReputation', () => {
     mockPrismaEconomy.count.mockResolvedValue(0);
     mockPrismaInviteTree.findMany.mockResolvedValue([]);
     mockPrismaDonation.aggregate.mockResolvedValue(emptyDonationAgg);
-    mockPrismaQueryRaw.mockResolvedValue([]);
+    mockPrismaContribution.findMany.mockResolvedValue([]);
     mockPrismaCommunitySnapshot.findMany.mockResolvedValue([]);
   });
 
@@ -527,15 +529,27 @@ describe('getReputation', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('folds contributed-to community health into the signed Community dimension', async () => {
+  it('quality-grades contributions into the signed Community dimension weight', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({
       createdAt: NOW,
       contributed: 0n,
       consumed: 0n
     });
     mockPrismaFriend.count.mockResolvedValue(0);
-    // One contributed-to community (id 10, 3 contributions)...
-    mockPrismaQueryRaw.mockResolvedValue([{ communityId: 10, count: 3n }]);
+    // Two contributions to community 10: a Perfect flac rip (log+cue → 1.0) and
+    // an mp3 with no bitrate (ungradeable → 0.3 fallback weight).
+    mockPrismaContribution.findMany.mockResolvedValue([
+      {
+        type: 'flac',
+        release: { communityId: 10 },
+        releaseFile: { bitrate: null, hasLog: true, hasCue: true }
+      },
+      {
+        type: 'mp3',
+        release: { communityId: 10 },
+        releaseFile: { bitrate: null, hasLog: false, hasCue: false }
+      }
+    ]);
     // ...reading Critical health → the dimension should go negative.
     mockPrismaCommunitySnapshot.findMany.mockResolvedValue([
       { communityId: 10, pulse: 0.1, coverage: 0.9 }
@@ -543,6 +557,7 @@ describe('getReputation', () => {
 
     const result = await getReputation(1);
 
+    expect(mockPrismaContribution.findMany).toHaveBeenCalled();
     expect(
       result.dimensions.find((d) => d.name === 'community')!.subScore
     ).toBeLessThan(0);

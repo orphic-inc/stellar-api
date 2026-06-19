@@ -20,6 +20,7 @@ import { computeRatio } from './ratio';
 import { getIrcScore } from './irc';
 import { scoreStylesheetSelection } from './stylesheetScore';
 import { communityHealthFor } from './communityHealthHistory';
+import { gradeContribution } from './contributionQuality';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
@@ -61,12 +62,14 @@ export interface DimensionInput {
    *  0 when fewer than two donations. Defaults to 0. */
   donationSpanYears?: number;
   /** Per contributed-to community: that community's latest link-health pulse +
-   *  coverage, and the member's contribution count there (the weight). Feeds the
-   *  signed CommunityScore dimension (#75 / ADR-0017). Defaults to []. */
+   *  coverage, and the member's weight there. The weight is the sum of the
+   *  member's per-contribution quality grades in that community (#76), so a
+   *  lossless/logged/cued rip pulls more than a transcode. Feeds the signed
+   *  CommunityScore dimension (#75 / ADR-0017). Defaults to []. */
   communityHealth?: Array<{
     pulse: number | null;
     coverage: number | null;
-    contributionCount: number;
+    weight: number;
   }>;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
@@ -325,17 +328,22 @@ const donationScorer: DimensionScorer = {
 // around the Critical-edge neutral (0.60 = PULSE_AILING): at/above neutral →
 // 0…+CAP toward a perfect 1.0; below → 0…−FLOOR toward 0. Communities reading
 // Unknown (coverage below PULSE_MIN_COVERAGE 0.5) are excluded. The per-community
-// values are averaged weighted by the member's contribution count there, so the
-// result is inherently bounded in [−FLOOR, +CAP].
+// values are averaged weighted by the member's stake there — the SUM of their
+// per-contribution quality grades (#76, `gradeContribution`), so lossless/logged/
+// cued rips pull more than transcodes and the member is more answerable (reward
+// AND penalty) for communities they invested quality in. Inherently bounded in
+// [−FLOOR, +CAP]. The weight is assembled upstream; the scorer stays pure.
 //
-// PROVISIONAL (tier-0): caps/floor are interim. #76 will quality-weight each
-// community's term (a lossless/logged/cued release counts for more) — it multiplies
-// in at the per-community loop below without touching this shape.
+// PROVISIONAL (tier-0): caps/floor are interim.
 const COMMUNITY_POS_CAP = 4;
 const COMMUNITY_NEG_FLOOR = 1; // shallow — the soft penalty
 const COMMUNITY_NEUTRAL = 0.6; // = linkHealth PULSE_AILING (Critical edge)
 const COMMUNITY_MIN_COVERAGE = 0.5; // = linkHealth PULSE_MIN_COVERAGE (Unknown floor)
 const COMMUNITY_WEIGHT = 1.0;
+// Ungradeable contributions (no bitrate / no ReleaseFile) still count toward the
+// community weight, at the lowest tier — so legacy/unprobed data isn't erased,
+// but verifiable quality counts more (#76). Matches LowLossy's grade score.
+const UNKNOWN_GRADE_WEIGHT = 0.3;
 
 const communityScorer: DimensionScorer = {
   name: 'community',
@@ -354,7 +362,7 @@ const communityScorer: DimensionScorer = {
       ) {
         continue;
       }
-      const weight = Math.max(0, c.contributionCount);
+      const weight = Math.max(0, c.weight);
       if (weight === 0) continue;
       const value =
         c.pulse >= COMMUNITY_NEUTRAL
@@ -409,7 +417,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     stylesheetAdoptionsMade,
     invitees,
     donationAgg,
-    contributedCommunities
+    contributedContributions
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -468,30 +476,56 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
       _min: { donatedAt: true },
       _max: { donatedAt: true }
     }),
-    // Communities this user has contributed to, with their contribution count
-    // (the CommunityScore weight). Grouped via release → communityId (ADR-0002);
-    // a relation-field groupBy isn't expressible in Prisma, so a raw aggregate.
-    prisma.$queryRaw<{ communityId: number; count: bigint }[]>`
-      SELECT r."communityId" AS "communityId", COUNT(*)::bigint AS "count"
-      FROM "contributions" c
-      JOIN "releases" r ON c."releaseId" = r."id"
-      WHERE c."userId" = ${userId} AND r."communityId" IS NOT NULL
-      GROUP BY r."communityId"
-    `
+    // The user's contributions on community releases, with the grade inputs
+    // (`type` off the spine, `bitrate`/`hasLog`/`hasCue` off the ReleaseFile
+    // satellite). Each is graded by `gradeContribution` and summed per community
+    // to form the CommunityScore weight (#76), so quality pulls more than count.
+    // NOTE (read-path cost): this fetches every contribution on each reputation
+    // read (every profile view, #193) — the grade lives in TS, so it can't move
+    // to a SQL aggregate without duplicating the logic. Memoising the per-(user,
+    // community) weight is folded into the substrate follow-up (#195).
+    prisma.contribution.findMany({
+      where: { userId, release: { communityId: { not: null } } },
+      select: {
+        type: true,
+        release: { select: { communityId: true } },
+        releaseFile: {
+          select: { bitrate: true, hasLog: true, hasCue: true }
+        }
+      }
+    })
   ]);
   if (!user) return { score: 0, dimensions: [] };
 
-  // Fold each contributed-to community's latest pulse into the signed
-  // CommunityScore (#75). The health source is a pluggable port (ADR-0017).
-  const communityIds = contributedCommunities.map((c) => Number(c.communityId));
+  // Sum each contributed-to community's quality-graded weight (#76).
+  const weightByCommunity = new Map<number, number>();
+  for (const contribution of contributedContributions) {
+    const communityId = contribution.release.communityId;
+    if (communityId === null) continue;
+    const { score } = gradeContribution({
+      type: contribution.type,
+      bitrate: contribution.releaseFile?.bitrate ?? null,
+      hasLog: contribution.releaseFile?.hasLog,
+      hasCue: contribution.releaseFile?.hasCue
+    });
+    // Ungradeable → lowest-tier weight, so legacy/unprobed data still counts.
+    const weight = score ?? UNKNOWN_GRADE_WEIGHT;
+    weightByCommunity.set(
+      communityId,
+      (weightByCommunity.get(communityId) ?? 0) + weight
+    );
+  }
+
+  // Fold each community's latest pulse (via the pluggable port, ADR-0017) and the
+  // member's quality weight into the signed CommunityScore (#75 / #76).
+  const communityIds = [...weightByCommunity.keys()];
   const pulses = await communityHealthFor(communityIds);
-  const communityHealth = contributedCommunities.map((c) => {
-    const id = Number(c.communityId);
+  const communityHealth = communityIds.map((id) => {
     const health = pulses.get(id);
     return {
       pulse: health?.pulse ?? null,
       coverage: health?.coverage ?? null,
-      contributionCount: Number(c.count)
+      weight: weightByCommunity.get(id) ?? 0
     };
   });
 
