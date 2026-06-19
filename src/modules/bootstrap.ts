@@ -4,6 +4,10 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { ALL_PERMISSIONS } from '../lib/rankPermissions';
+import {
+  DEFAULT_RANKS as EVALUATOR_RANKS,
+  DEFAULT_RULES
+} from './rankProgression';
 
 export const DEFAULT_RANKS = [
   {
@@ -23,6 +27,25 @@ export const DEFAULT_RANKS = [
     }
   },
   {
+    level: 150,
+    name: 'Member',
+    secondary: false,
+    permittedForumIds: [],
+    color: '',
+    badge: '',
+    personalCollageLimit: 1,
+    // One step past User: unlocks advanced discovery. Identity stays understated
+    // (no color/badge) — the first earned rung, not yet a "notable" tier.
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      collages_create: true,
+      requests_create: true,
+      wiki_edit: true
+    }
+  },
+  {
     level: 200,
     name: 'Power User',
     secondary: false,
@@ -34,6 +57,87 @@ export const DEFAULT_RANKS = [
       forums_read: true,
       forums_post: true,
       advanced_search: true,
+      collages_create: true,
+      collages_manage: true,
+      requests_create: true,
+      wiki_edit: true
+    }
+  },
+  {
+    level: 300,
+    name: 'Elite',
+    secondary: false,
+    permittedForumIds: [],
+    color: '#3a9bd9',
+    badge: '',
+    personalCollageLimit: 3,
+    // Top of the "earns new powers" range: adds elevated user search and collage
+    // management. The auto ladder above Elite is prestige — identity, not new perms.
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      users_search: true,
+      collages_create: true,
+      collages_manage: true,
+      requests_create: true,
+      wiki_edit: true
+    }
+  },
+  // Prestige tiers (USER_CLASSES_PLAN §11, names confirmed): no member-level
+  // permissions remain to grant below staff, so these differentiate on identity
+  // (color/badge) and personal-collage headroom rather than new capability.
+  {
+    level: 350,
+    name: 'Stellarific',
+    secondary: false,
+    permittedForumIds: [],
+    color: '#9b59d0',
+    badge: '',
+    personalCollageLimit: 4,
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      users_search: true,
+      collages_create: true,
+      collages_manage: true,
+      requests_create: true,
+      wiki_edit: true
+    }
+  },
+  {
+    level: 400,
+    name: 'Stellartastic',
+    secondary: false,
+    permittedForumIds: [],
+    color: '#c061e8',
+    badge: '',
+    personalCollageLimit: 5,
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      users_search: true,
+      collages_create: true,
+      collages_manage: true,
+      requests_create: true,
+      wiki_edit: true
+    }
+  },
+  {
+    level: 450,
+    name: 'Stellarige',
+    secondary: false,
+    permittedForumIds: [],
+    color: '#d4a5ff',
+    badge: '',
+    personalCollageLimit: 6,
+    permissions: {
+      forums_read: true,
+      forums_post: true,
+      advanced_search: true,
+      users_search: true,
       collages_create: true,
       collages_manage: true,
       requests_create: true,
@@ -303,6 +407,55 @@ export async function seedRanks(client: PrismaClient): Promise<void> {
         badge: rank.badge,
         personalCollageLimit: rank.personalCollageLimit,
         permissions: rank.permissions
+      }
+    });
+  }
+}
+
+// The evaluator (rankProgression.ts) encodes the ladder against fixture rank ids
+// 1–9; the DB assigns real autoincrement ids. Map fixture id → ladder level so the
+// seeded rules are exactly DEFAULT_RULES, projected onto whatever ids the DB gave
+// each level — one source of truth for the thresholds, no duplicated magnitudes.
+const evaluatorLevelOf = (fixtureRankId: number): number => {
+  const rank = EVALUATOR_RANKS.find((r) => r.id === fixtureRankId);
+  if (!rank)
+    throw new Error(
+      `rankProgression DEFAULT_RANKS has no rank id ${fixtureRankId}`
+    );
+  return rank.level;
+};
+
+/**
+ * Seed the promotion-rule ladder (USER_CLASSES_PLAN §5). Create-if-absent: once a
+ * rule exists, re-seeding leaves it alone so runtime tuning via the admin editor
+ * (#170) stays authoritative. A rung whose from/to rank isn't seeded yet is
+ * skipped rather than failing the bootstrap.
+ */
+export async function seedRankPromotionRules(
+  client: PrismaClient
+): Promise<void> {
+  const ranks = await client.userRank.findMany({
+    select: { id: true, level: true }
+  });
+  const idByLevel = new Map(ranks.map((r) => [r.level, r.id]));
+
+  for (const rule of DEFAULT_RULES) {
+    const fromRankId = idByLevel.get(evaluatorLevelOf(rule.fromRankId));
+    const toRankId = idByLevel.get(evaluatorLevelOf(rule.toRankId));
+    if (fromRankId === undefined || toRankId === undefined) continue;
+
+    await client.rankPromotionRule.upsert({
+      where: { fromRankId_toRankId: { fromRankId, toRankId } },
+      update: {},
+      create: {
+        fromRankId,
+        toRankId,
+        minContributed: rule.minContributed,
+        minRatio: rule.minRatio,
+        minContributions: rule.minContributions,
+        minAccountAgeDays: rule.minAccountAgeDays,
+        extra: rule.extra,
+        enabled: rule.enabled
       }
     });
   }

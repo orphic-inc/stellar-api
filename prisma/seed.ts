@@ -7,12 +7,17 @@
  * Can also be run manually: npx prisma db seed
  */
 import { PrismaClient } from '@prisma/client';
-import { seedRanks, seedForums } from '../src/modules/bootstrap';
+import {
+  seedRanks,
+  seedRankPromotionRules,
+  seedForums
+} from '../src/modules/bootstrap';
 
 const prisma = new PrismaClient();
 
 async function main() {
   await seedRanks(prisma);
+  await seedRankPromotionRules(prisma);
   await seedForums(prisma);
   console.log('→ Complete setup at http://localhost:9000/install');
 }

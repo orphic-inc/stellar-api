@@ -124,41 +124,41 @@ describe('evaluateRankChange — demotion', () => {
 // ─── extra predicates ───────────────────────────────────────────────────────────
 
 describe('evaluateRankChange — extra predicates', () => {
-  it('holds a Curator below Master Curator without 500 distinct releases', () => {
+  it('holds a Stellarific below Stellartastic without 500 distinct releases', () => {
     const result = evaluateRankChange(
-      maxed({ currentRankId: rankId('Curator'), distinctReleaseCount: 499 })
+      maxed({ currentRankId: rankId('Stellarific'), distinctReleaseCount: 499 })
     );
     expect(result.direction).toBe('none');
   });
 
-  it('promotes a Curator to Master Curator once 500 distinct releases is met', () => {
+  it('promotes a Stellarific to Stellartastic once 500 distinct releases is met', () => {
     const result = evaluateRankChange(
-      maxed({ currentRankId: rankId('Curator'), distinctReleaseCount: 500 })
+      maxed({ currentRankId: rankId('Stellarific'), distinctReleaseCount: 500 })
     );
     expect(result.direction).toBe('promote');
-    expect(result.targetRankId).toBe(rankId('Master Curator'));
+    expect(result.targetRankId).toBe(rankId('Stellartastic'));
   });
 
-  it('demotes a Master Curator who falls below 500 distinct releases', () => {
+  it('demotes a Stellartastic who falls below 500 distinct releases', () => {
     const result = evaluateRankChange(
       maxed({
-        currentRankId: rankId('Master Curator'),
+        currentRankId: rankId('Stellartastic'),
         distinctReleaseCount: 499
       })
     );
     expect(result.direction).toBe('demote');
-    expect(result.targetRankId).toBe(rankId('Curator'));
+    expect(result.targetRankId).toBe(rankId('Stellarific'));
   });
 
-  it('promotes a Master Curator to Grand Curator on 500 quality contributions', () => {
+  it('promotes a Stellartastic to Stellarige on 500 quality contributions', () => {
     const result = evaluateRankChange(
       maxed({
-        currentRankId: rankId('Master Curator'),
+        currentRankId: rankId('Stellartastic'),
         qualityContributionCount: 500
       })
     );
     expect(result.direction).toBe('promote');
-    expect(result.targetRankId).toBe(rankId('Grand Curator'));
+    expect(result.targetRankId).toBe(rankId('Stellarige'));
   });
 });
 
@@ -176,9 +176,9 @@ describe('evaluateRankChange — guards', () => {
     expect(result.direction).toBe('none');
   });
 
-  it('never promotes into an assigned class (Grand Curator → Staff)', () => {
+  it('never promotes into an assigned class (Stellarige → Staff)', () => {
     const result = evaluateRankChange(
-      maxed({ currentRankId: rankId('Grand Curator') })
+      maxed({ currentRankId: rankId('Stellarige') })
     );
     expect(result.direction).toBe('none');
   });
@@ -223,15 +223,15 @@ describe('describeGapToNext', () => {
 
   it('surfaces the unmet Extra predicate on prestige rungs', () => {
     const gap = describeGapToNext(
-      maxed({ currentRankId: rankId('Curator'), distinctReleaseCount: 10 })
+      maxed({ currentRankId: rankId('Stellarific'), distinctReleaseCount: 10 })
     );
-    expect(gap?.toRankName).toBe('Master Curator');
+    expect(gap?.toRankName).toBe('Stellartastic');
     expect(gap?.extraUnmet).toBe('DISTINCT_RELEASES_500');
   });
 
-  it('returns null at the top of the auto ladder (Grand Curator)', () => {
+  it('returns null at the top of the auto ladder (Stellarige)', () => {
     expect(
-      describeGapToNext(maxed({ currentRankId: rankId('Grand Curator') }))
+      describeGapToNext(maxed({ currentRankId: rankId('Stellarige') }))
     ).toBeNull();
   });
 });

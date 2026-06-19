@@ -61,9 +61,9 @@ export const DEFAULT_RANKS: Rank[] = [
   { id: 2, level: 150, name: 'Member', autoManaged: true },
   { id: 3, level: 200, name: 'Power User', autoManaged: true },
   { id: 4, level: 300, name: 'Elite', autoManaged: true },
-  { id: 5, level: 350, name: 'Curator', autoManaged: true },
-  { id: 6, level: 400, name: 'Master Curator', autoManaged: true },
-  { id: 7, level: 450, name: 'Grand Curator', autoManaged: true },
+  { id: 5, level: 350, name: 'Stellarific', autoManaged: true },
+  { id: 6, level: 400, name: 'Stellartastic', autoManaged: true },
+  { id: 7, level: 450, name: 'Stellarige', autoManaged: true },
   { id: 8, level: 500, name: 'Staff', autoManaged: false },
   { id: 9, level: 1000, name: 'SysOp', autoManaged: false }
 ];

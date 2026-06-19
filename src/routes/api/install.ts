@@ -13,7 +13,11 @@ import { requirePermission } from '../../middleware/permissions';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 import { getSettings } from '../../modules/settings';
-import { seedRanks, seedForums } from '../../modules/bootstrap';
+import {
+  seedRanks,
+  seedRankPromotionRules,
+  seedForums
+} from '../../modules/bootstrap';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
 import { getDefaultStylesheetName } from '../../modules/stylesheet';
@@ -169,6 +173,7 @@ router.post(
     // Bootstrap ranks and forums outside the user transaction so they exist
     // even if user creation fails, and so the transaction stays minimal.
     await seedRanks(prisma);
+    await seedRankPromotionRules(prisma);
     await seedForums(prisma);
 
     const sysopRank = await prisma.userRank.findFirst({
