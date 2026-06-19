@@ -31,6 +31,15 @@ export const economy = {
   minimumBounty: parseInt(process.env.STELLAR_MINIMUM_BOUNTY || '104857600', 10)
 };
 
+export const ranks = {
+  // Interval for the automated rank-progression sweep (USER_CLASSES_PLAN §6).
+  // Default hourly — promotion is not time-critical and the sweep is read-heavy.
+  progressionIntervalMs: parseInt(
+    process.env.RANK_PROGRESSION_INTERVAL_MS ?? '3600000',
+    10
+  )
+};
+
 export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };
