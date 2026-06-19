@@ -125,6 +125,17 @@ enum NotificationType {
   artist_release
   site_news
   global_notice
+  rank_promoted
+  rank_demoted
+}
+
+// Extra, non-numeric criteria a promotion rule may layer on top of the stock
+// byte/ratio/contribution/age thresholds — the prestige-tier gates encoded by
+// the evaluator (rankProgression.ts RankExtraPredicate). Mirrors that TS union
+// exactly so a Prisma row maps onto the evaluator's rule shape unchanged.
+enum RankExtraPredicate {
+  DISTINCT_RELEASES_500
+  QUALITY_CONTRIB_500
 }
 
 enum ThreadType {
@@ -300,6 +311,8 @@ model UserRank {
   staffGroup           StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
   users                User[]
   secondaryUsers       UserSecondaryRank[]
+  promotionRulesFrom   RankPromotionRule[] @relation("RankPromotionFrom")
+  promotionRulesTo     RankPromotionRule[] @relation("RankPromotionTo")
 
   @@unique([level])
   @@unique([name])
@@ -308,73 +321,105 @@ model UserRank {
   @@map("user_ranks")
 }
 
+// Declarative, data-driven criteria for one rung of automated class progression
+// (USER_CLASSES_PLAN §4). One row = "a user on fromRank advances to toRank once
+// they clear these thresholds." Tunable without a deploy. The pure evaluator in
+// rankProgression.ts owns the decision logic; rankProgressionJob loads these rows
+// and maps them onto the evaluator's RankPromotionRule interface field-for-field.
+// minContributed is BigInt (bytes) — deliberately NOT UserRank.uploadRequired Int,
+// which overflows past ~2 GiB.
+model RankPromotionRule {
+  id                Int                 @id @default(autoincrement())
+  fromRankId        Int
+  fromRank          UserRank            @relation("RankPromotionFrom", fields: [fromRankId], references: [id], onDelete: Cascade)
+  toRankId          Int
+  toRank            UserRank            @relation("RankPromotionTo", fields: [toRankId], references: [id], onDelete: Cascade)
+  minContributed    BigInt              @default(0)
+  minRatio          Float               @default(0)
+  minContributions  Int                 @default(0)
+  minAccountAgeDays Int                 @default(0)
+  extra             RankExtraPredicate?
+  enabled           Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([fromRankId, toRankId])
+  @@index([fromRankId])
+  @@index([toRankId])
+  @@map("rank_promotion_rules")
+}
+
 model UserSettings {
-  id                   Int                @id @default(autoincrement())
-  siteAppearance       String             @default("sublime")
-  externalStylesheet   String?
-  styledTooltips       Boolean            @default(true)
-  paranoia             Int                @default(0)
-  notificationMethod   NotificationMethod @default(Traditional)
-  showEmail            Boolean            @default(false)
-  showLastSeen         Boolean            @default(false)
-  showContributedStats Boolean            @default(true)
-  showConsumedStats    Boolean            @default(true)
-  showRatioStats       Boolean            @default(true)
-  user                 User?
+  id                       Int                @id @default(autoincrement())
+  siteAppearance           String             @default("sublime")
+  externalStylesheet       String?
+  styledTooltips           Boolean            @default(true)
+  paranoia                 Int                @default(0)
+  notificationMethod       NotificationMethod @default(Traditional)
+  showEmail                Boolean            @default(false)
+  showLastSeen             Boolean            @default(false)
+  showContributedStats     Boolean            @default(true)
+  showConsumedStats        Boolean            @default(true)
+  showRatioStats           Boolean            @default(true)
+  user                     User?
   // The AuthorStylesheet adopted into this member's Site Stylesheet slot
   // (PRD-03 #119): what they see on the general site. Null = on the Site Theme
   // (Sublime/Default). SetNull on delete so a pruned sheet clears its adopters'
   // pointers rather than orphaning them. Profile/Community slots are deferred.
   activeAuthorStylesheetId Int?
-  activeAuthorStylesheet   AuthorStylesheet? @relation(fields: [activeAuthorStylesheetId], references: [id])
+  activeAuthorStylesheet   AuthorStylesheet?  @relation(fields: [activeAuthorStylesheetId], references: [id])
 
   @@index([activeAuthorStylesheetId])
   @@map("user_settings")
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
-  username           String              @unique
-  email              String              @unique
-  password           String
-  avatar             String?
-  userRankId         Int
-  userRank           UserRank            @relation(fields: [userRankId], references: [id])
-  secondaryRanks     UserSecondaryRank[]
-  userSettingsId     Int                 @unique
-  userSettings       UserSettings        @relation(fields: [userSettingsId], references: [id])
-  profileId          Int                 @unique
-  profile            Profile             @relation(fields: [profileId], references: [id])
-  inviteCount        Int                 @default(0)
-  contributed        BigInt              @default(0)
-  consumed           BigInt              @default(0)
-  totalEarned        BigInt              @default(0)
-  ratio              Float               @default(1)
-  ratioWatchDownload Int?
-  lastLogin          DateTime?
-  dateRegistered     DateTime            @default(now())
-  disabled           Boolean             @default(false)
-  isArtist           Boolean             @default(false)
-  isDonor            Boolean             @default(false)
-  canDownload        Boolean             @default(true)
-  adminComment       String?
-  staffBio           String?             @db.VarChar(500)
-  banDate            DateTime?
-  banReason          String?
-  warned             DateTime?
-  warnedTimes        Int                 @default(0)
-  lastIp             String?
-  disablePm          Boolean             @default(false)
+  id                    Int                 @id @default(autoincrement())
+  username              String              @unique
+  email                 String              @unique
+  password              String
+  avatar                String?
+  userRankId            Int
+  userRank              UserRank            @relation(fields: [userRankId], references: [id])
+  secondaryRanks        UserSecondaryRank[]
+  userSettingsId        Int                 @unique
+  userSettings          UserSettings        @relation(fields: [userSettingsId], references: [id])
+  profileId             Int                 @unique
+  profile               Profile             @relation(fields: [profileId], references: [id])
+  inviteCount           Int                 @default(0)
+  contributed           BigInt              @default(0)
+  consumed              BigInt              @default(0)
+  totalEarned           BigInt              @default(0)
+  ratio                 Float               @default(1)
+  ratioWatchDownload    Int?
+  lastLogin             DateTime?
+  dateRegistered        DateTime            @default(now())
+  disabled              Boolean             @default(false)
+  isArtist              Boolean             @default(false)
+  isDonor               Boolean             @default(false)
+  canDownload           Boolean             @default(true)
+  // Staff-pinned rank: when true the automated progression engine
+  // (rankProgressionJob) will not promote or demote this user (USER_CLASSES_PLAN
+  // §4). Set by staff via the manual override; the evaluator treats it as a freeze.
+  rankLocked            Boolean             @default(false)
+  adminComment          String?
+  staffBio              String?             @db.VarChar(500)
+  banDate               DateTime?
+  banReason             String?
+  warned                DateTime?
+  warnedTimes           Int                 @default(0)
+  lastIp                String?
+  disablePm             Boolean             @default(false)
   // Verified IRC Link (ADR-0015): ircNick holds only a *verified* nick, written
   // on promotion. A Nick Claim (unproven) lives in pendingIrcNick + nonce, which
   // reserve nothing — pendingIrcNick is intentionally NOT unique, so multiple
   // members may claim the same nick; first to verify wins the unique ircNick slot.
-  ircNick               String?          @unique
+  ircNick               String?             @unique
   pendingIrcNick        String?
   ircNickNonce          String?
   ircNickNonceExpiresAt DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   invitesSent              Invite[]
   inviteTree               InviteTree?                      @relation("InviteTreeMember")
@@ -467,7 +512,6 @@ model User {
   @@index([userRankId])
   @@map("users")
 }
-
 
 model UserSecondaryRank {
   userId       Int
@@ -887,22 +931,22 @@ model SimilarArtist {
 // ─── Community ────────────────────────────────────────────────────────────────
 
 model Community {
-  id                    Int                 @id @default(autoincrement())
-  name                  String              @unique
-  description           String?             @db.Text
+  id                    Int                       @id @default(autoincrement())
+  name                  String                    @unique
+  description           String?                   @db.Text
   image                 String
   registrationStatus    RegistrationStatus
   type                  CommunityType
-  allowDuplicateFormats Boolean             @default(true)
-  consumers             Consumer[]          @relation("CommunityConsumers")
+  allowDuplicateFormats Boolean                   @default(true)
+  consumers             Consumer[]                @relation("CommunityConsumers")
   contributors          Contributor[]
   releases              Release[]
   comments              Comment[]
-  staff                 User[]              @relation("CommunityStaff")
+  staff                 User[]                    @relation("CommunityStaff")
   doNotContribute       DoNotContribute[]
   bookmarks             BookmarkCommunity[]
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
   Request               Request[]
   healthSnapshots       CommunityHealthSnapshot[]
 
@@ -2187,19 +2231,19 @@ model RulesPage {
 /// (src/modules/ruleImpact.ts) reads these weights — no logic lives in the row.
 /// Magnitudes are PRD-05 TBD; the model is the shape, the values are placeholders.
 model Rule {
-  id          Int    @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   /// Machine-stable key, e.g. "golden.accounts" — distinct from the display title.
-  code        String @unique @db.VarChar(100)
-  title       String @db.VarChar(200)
-  description String @default("") @db.Text
+  code             String    @unique @db.VarChar(100)
+  title            String    @db.VarChar(200)
+  description      String    @default("") @db.Text
   /// CRS reward when the rule is adhered to (>= 0). Magnitude PRD-05 TBD.
-  complianceWeight Float @default(0)
+  complianceWeight Float     @default(0)
   /// CRS penalty magnitude when the rule is breached (>= 0; ruleImpact negates it).
-  violationWeight  Float @default(0)
-  sortOrder        Int   @default(0)
+  violationWeight  Float     @default(0)
+  sortOrder        Int       @default(0)
   subRules         SubRule[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([sortOrder])
   @@map("rules")
@@ -2208,16 +2252,16 @@ model Rule {
 /// A child node of a `Rule` (PRD-05: "5 rules with 2 SubRules each"). Its weight
 /// composes additively on top of its parent rule's in `ruleImpact()`.
 model SubRule {
-  id          Int    @id @default(autoincrement())
-  ruleId      Int
-  rule        Rule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  id               Int      @id @default(autoincrement())
+  ruleId           Int
+  rule             Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   /// Stable key, unique within the parent rule (e.g. "no-sharing").
-  code        String @db.VarChar(100)
-  title       String @db.VarChar(200)
-  description String @default("") @db.Text
-  complianceWeight Float @default(0)
-  violationWeight  Float @default(0)
-  sortOrder        Int   @default(0)
+  code             String   @db.VarChar(100)
+  title            String   @db.VarChar(200)
+  description      String   @default("") @db.Text
+  complianceWeight Float    @default(0)
+  violationWeight  Float    @default(0)
+  sortOrder        Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

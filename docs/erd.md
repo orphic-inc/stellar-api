@@ -123,6 +123,15 @@ comment_sub comment_sub
 artist_release artist_release
 site_news site_news
 global_notice global_notice
+rank_promoted rank_promoted
+rank_demoted rank_demoted
+        }
+    
+
+
+        RankExtraPredicate {
+            DISTINCT_RELEASES_500 DISTINCT_RELEASES_500
+QUALITY_CONTRIB_500 QUALITY_CONTRIB_500
         }
     
 
@@ -398,6 +407,19 @@ Yearly Yearly
     }
   
 
+  "rank_promotion_rules" {
+    Int id "🗝️"
+    BigInt minContributed 
+    Float minRatio 
+    Int minContributions 
+    Int minAccountAgeDays 
+    RankExtraPredicate extra "❓"
+    Boolean enabled 
+    DateTime createdAt 
+    DateTime updatedAt 
+    }
+  
+
   "user_settings" {
     Int id "🗝️"
     String siteAppearance 
@@ -431,6 +453,7 @@ Yearly Yearly
     Boolean isArtist 
     Boolean isDonor 
     Boolean canDownload 
+    Boolean rankLocked 
     String adminComment "❓"
     String staffBio "❓"
     DateTime banDate "❓"
@@ -440,6 +463,9 @@ Yearly Yearly
     String lastIp "❓"
     Boolean disablePm 
     String ircNick "❓"
+    String pendingIrcNick "❓"
+    String ircNickNonce "❓"
+    DateTime ircNickNonceExpiresAt "❓"
     DateTime createdAt 
     DateTime updatedAt 
     }
@@ -1539,6 +1565,9 @@ Yearly Yearly
     }
   
     "user_ranks" }o--|o staff_groups : "staffGroup"
+    "rank_promotion_rules" }o--|| user_ranks : "fromRank"
+    "rank_promotion_rules" }o--|| user_ranks : "toRank"
+    "rank_promotion_rules" |o--|o "RankExtraPredicate" : "enum:extra"
     "user_settings" |o--|| "NotificationMethod" : "enum:notificationMethod"
     "user_settings" }o--|o author_stylesheets : "activeAuthorStylesheet"
     "users" }o--|| user_ranks : "userRank"
