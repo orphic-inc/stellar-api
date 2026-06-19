@@ -8,6 +8,7 @@ import { LinkHealthStatus } from '@prisma/client';
 
 const mockPrismaContribution = {
   findUnique: jest.fn(),
+  findMany: jest.fn(),
   update: jest.fn(),
   updateMany: jest.fn(),
   groupBy: jest.fn()
@@ -21,40 +22,95 @@ jest.mock('./logging', () => ({
   getLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() })
 }));
 
+jest.mock('./pm', () => ({
+  sendSystemMessage: jest.fn().mockResolvedValue({ ok: true })
+}));
+
 import {
   sweepStaleWarnLinks,
   checkContributionLink,
   getCommunityHealthPulse,
   computePulse
 } from './linkHealth';
+import { sendSystemMessage } from './pm';
+
+const mockSendSystemMessage = sendSystemMessage as jest.Mock;
 
 // ─── sweepStaleWarnLinks ──────────────────────────────────────────────────────
 
 describe('sweepStaleWarnLinks', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('promotes WARN links stuck past the 72h window to FAIL', async () => {
+  const warn = (id: number, userId: number, title: string) => ({
+    id,
+    userId,
+    release: { title }
+  });
+
+  it('promotes the stuck WARN links it found to FAIL', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([
+      warn(1, 10, 'A'),
+      warn(2, 11, 'B')
+    ]);
     mockPrismaContribution.updateMany.mockResolvedValue({ count: 2 });
+
     await sweepStaleWarnLinks();
+
     expect(mockPrismaContribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          linkStatus: 'WARN',
-          linkStatusChangedAt: expect.objectContaining({ lt: expect.any(Date) })
-        }),
+        where: { id: { in: [1, 2] } },
         data: expect.objectContaining({ linkStatus: 'FAIL' })
       })
     );
   });
 
-  it('uses a cutoff ~72h in the past (not last-checked, but stuck-since)', async () => {
-    mockPrismaContribution.updateMany.mockResolvedValue({ count: 0 });
+  it('selects WARN links stuck since a cutoff ~72h in the past', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([]);
     await sweepStaleWarnLinks();
-    const arg = mockPrismaContribution.updateMany.mock.calls[0][0];
-    const cutoff: Date = arg.where.linkStatusChangedAt.lt;
-    const ageHours = (Date.now() - cutoff.getTime()) / 3_600_000;
+    const arg = mockPrismaContribution.findMany.mock.calls[0][0];
+    expect(arg.where.linkStatus).toBe('WARN');
+    const ageHours =
+      (Date.now() - arg.where.linkStatusChangedAt.lt.getTime()) / 3_600_000;
     expect(ageHours).toBeGreaterThan(71);
     expect(ageHours).toBeLessThan(73);
+  });
+
+  it('no-ops (no update, no PM) when nothing is stale', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([]);
+    await sweepStaleWarnLinks();
+    expect(mockPrismaContribution.updateMany).not.toHaveBeenCalled();
+    expect(mockSendSystemMessage).not.toHaveBeenCalled();
+  });
+
+  it('sends one System PM per affected contributor, batching their dead links', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([
+      warn(1, 10, 'Album One'),
+      warn(2, 10, 'Album Two'),
+      warn(3, 20, 'Album Three')
+    ]);
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 3 });
+
+    await sweepStaleWarnLinks();
+
+    // One PM to user 10 (covering both their links), one to user 20.
+    expect(mockSendSystemMessage).toHaveBeenCalledTimes(2);
+    const recipients = mockSendSystemMessage.mock.calls.map((c) => c[0]);
+    expect(recipients.sort()).toEqual([10, 20]);
+
+    const user10Body = mockSendSystemMessage.mock.calls.find(
+      (c) => c[0] === 10
+    )![2];
+    expect(user10Body).toContain('Album One');
+    expect(user10Body).toContain('Album Two');
+  });
+
+  it('does not let a PM failure block the sweep', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([warn(1, 10, 'A')]);
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 1 });
+    mockSendSystemMessage.mockRejectedValueOnce(new Error('pm down'));
+
+    await expect(sweepStaleWarnLinks()).resolves.toBeUndefined();
+    expect(mockPrismaContribution.updateMany).toHaveBeenCalled();
   });
 });
 

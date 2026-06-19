@@ -139,6 +139,51 @@ export async function sendMessage(
   return { ok: true as const, conversation };
 }
 
+/**
+ * Send a one-way "System" private message: a conversation with the recipient as
+ * the sole participant and a message whose senderId is null. A null sender has
+ * no profile to click and no inbox to reply into, so the UI renders it as an
+ * unclickable, no-reply "System" notice. Used for operational notices (e.g. a
+ * contribution link going dead, #125) rather than user-to-user mail, so it
+ * bypasses the recipient's disablePm preference — but still skips disabled
+ * accounts, which can receive nothing.
+ */
+export async function sendSystemMessage(
+  toId: number,
+  subject: string,
+  body: string
+) {
+  const recipient = await prisma.user.findUnique({
+    where: { id: toId },
+    select: { id: true, disabled: true }
+  });
+  if (!recipient) return { ok: false as const, reason: 'recipient_not_found' };
+  if (recipient.disabled)
+    return { ok: false as const, reason: 'recipient_disabled' };
+
+  const conversation = await prisma.privateConversation.create({
+    data: {
+      subject,
+      messages: { create: { senderId: null, body } },
+      participants: {
+        create: {
+          userId: toId,
+          inInbox: true,
+          inSentbox: false,
+          isRead: false,
+          receivedAt: new Date()
+        }
+      }
+    },
+    include: {
+      messages: { include: { sender: { select: senderSelect } } },
+      participants: true
+    }
+  });
+
+  return { ok: true as const, conversation };
+}
+
 export async function replyToConversation(
   conversationId: number,
   senderId: number,

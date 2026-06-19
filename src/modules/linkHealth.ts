@@ -1,6 +1,7 @@
 import { LinkHealthStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
+import { sendSystemMessage } from './pm';
 
 const log = getLogger('linkHealth');
 
@@ -72,14 +73,69 @@ export const checkContributionLink = async (
 export const sweepStaleWarnLinks = async (): Promise<void> => {
   const cutoff = new Date(Date.now() - WARN_SWEEP_AFTER_MS);
   const now = new Date();
-  const { count } = await prisma.contribution.updateMany({
+
+  // Capture who/what is about to be promoted BEFORE the bulk update, so the
+  // affected contributors can be PM'd (updateMany returns only a count). The
+  // window between this read and the update is harmless: at worst a link that
+  // recovered in between is re-PM'd, and the update's own WHERE is the source of
+  // truth for the status change.
+  const promoting = await prisma.contribution.findMany({
     where: {
       linkStatus: LinkHealthStatus.WARN,
       linkStatusChangedAt: { lt: cutoff }
     },
+    select: { id: true, userId: true, release: { select: { title: true } } }
+  });
+  if (promoting.length === 0) return;
+
+  await prisma.contribution.updateMany({
+    where: { id: { in: promoting.map((c) => c.id) } },
     data: { linkStatus: LinkHealthStatus.FAIL, linkStatusChangedAt: now }
   });
-  if (count > 0) log.info('Swept stale WARN links to FAIL', { count });
+  log.info('Swept stale WARN links to FAIL', { count: promoting.length });
+
+  await notifyContributorsOfDeadLinks(promoting);
+};
+
+type PromotedContribution = { userId: number; release: { title: string } };
+
+/**
+ * PRD-06 #2: tell each contributor when a link of theirs is swept to FAIL, so a
+ * silent ratio-relief loss doesn't blindside them. Batched to one System PM per
+ * contributor (a sweep can fail several of a user's links at once). Best-effort:
+ * a PM failure is logged but never blocks the status change, which already
+ * landed above.
+ */
+const notifyContributorsOfDeadLinks = async (
+  promoted: PromotedContribution[]
+): Promise<void> => {
+  const titlesByUser = new Map<number, string[]>();
+  for (const c of promoted) {
+    const titles = titlesByUser.get(c.userId) ?? [];
+    titles.push(c.release.title);
+    titlesByUser.set(c.userId, titles);
+  }
+
+  for (const [userId, titles] of titlesByUser) {
+    const one = titles.length === 1;
+    const list = titles.map((t) => `• ${t}`).join('\n');
+    const subject = `Contribution ${
+      one ? 'link' : 'links'
+    } no longer reachable`;
+    const body =
+      `A health check could not reach the download ${one ? 'link' : 'links'} ` +
+      `for the following contribution${one ? '' : 's'} of yours, so ` +
+      `${one ? 'it has' : 'they have'} been marked dead and no longer count ` +
+      `toward your ratio relief:\n\n${list}\n\n` +
+      `Re-upload or refresh the link to restore relief. This is an automated ` +
+      `notice — replies are not monitored.`;
+
+    try {
+      await sendSystemMessage(userId, subject, body);
+    } catch (err) {
+      log.warn('System link-fail PM failed', { userId, err });
+    }
+  }
 };
 
 export const recheckStaleLinks = async (): Promise<void> => {

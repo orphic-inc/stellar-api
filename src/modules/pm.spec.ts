@@ -17,7 +17,8 @@ jest.mock('../lib/prisma', () => ({
     privateConversation: {
       count: jest.fn(),
       findMany: jest.fn(),
-      findUnique: jest.fn()
+      findUnique: jest.fn(),
+      create: jest.fn()
     },
     privateConversationParticipant: {
       findFirst: jest.fn(),
@@ -44,6 +45,7 @@ import {
   listSentbox,
   replyToConversation,
   sendMessage,
+  sendSystemMessage,
   updateConversationFlags,
   viewConversation
 } from './pm';
@@ -53,6 +55,7 @@ const prismaMock = prisma as unknown as {
     count: jest.Mock;
     findMany: jest.Mock;
     findUnique: jest.Mock;
+    create: jest.Mock;
   };
   privateConversationParticipant: {
     findFirst: jest.Mock;
@@ -214,6 +217,47 @@ describe('sendMessage', () => {
         })
       })
     );
+  });
+});
+
+describe('sendSystemMessage', () => {
+  it('creates a no-sender, single-recipient conversation', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: 9, disabled: false });
+    prismaMock.privateConversation.create.mockResolvedValue(
+      makeConversation({ id: 5 })
+    );
+
+    const result = await sendSystemMessage(9, 'Subj', 'Body');
+
+    expect(result).toEqual({
+      ok: true,
+      conversation: expect.objectContaining({ id: 5 })
+    });
+    const arg = prismaMock.privateConversation.create.mock.calls[0][0];
+    expect(arg.data.subject).toBe('Subj');
+    // System notice: null sender (unclickable / no-reply), one participant.
+    expect(arg.data.messages.create).toEqual({ senderId: null, body: 'Body' });
+    expect(arg.data.participants.create).toEqual(
+      expect.objectContaining({ userId: 9, inInbox: true, isRead: false })
+    );
+  });
+
+  it('returns recipient_not_found for a missing user', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    await expect(sendSystemMessage(9, 'S', 'B')).resolves.toEqual({
+      ok: false,
+      reason: 'recipient_not_found'
+    });
+    expect(prismaMock.privateConversation.create).not.toHaveBeenCalled();
+  });
+
+  it('returns recipient_disabled for a disabled user', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: 9, disabled: true });
+    await expect(sendSystemMessage(9, 'S', 'B')).resolves.toEqual({
+      ok: false,
+      reason: 'recipient_disabled'
+    });
+    expect(prismaMock.privateConversation.create).not.toHaveBeenCalled();
   });
 });
 
