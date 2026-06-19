@@ -601,6 +601,7 @@ describe('API auth/profile/user flows', () => {
         displayStaff: false
       },
       inviteTree: [],
+      community: null,
       email: null,
       dateRegistered: '2026-04-24T00:00:00.000Z',
       lastSeen: null,
@@ -730,7 +731,8 @@ describe('API auth/profile/user flows', () => {
       staffBio: null,
       recentContributions: [],
       recentSnatches: [],
-      inviteTree: []
+      inviteTree: [],
+      community: null
     });
 
     const res = await request(app).get('/api/profile/me');
@@ -801,7 +803,8 @@ describe('API auth/profile/user flows', () => {
       recentContributions: [],
       recentSnatches: [],
       userSettings: undefined,
-      inviteTree: []
+      inviteTree: [],
+      community: null
     });
 
     const res = await request(app).get('/api/profile/user/target-user');

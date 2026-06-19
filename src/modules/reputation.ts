@@ -276,3 +276,27 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     stylesheetAdoptionsMade
   });
 };
+
+// Dimensions derived from a member's snatches (downloads/consumed). When a
+// viewer's paranoia hides consumed stats, these are dropped from the reputation
+// VIEW too, so the score they see can't leak the hidden activity. RatioScore is
+// the only consumed-derived dimension (ratio = contributed / consumed).
+export const SNATCH_DERIVED_DIMENSIONS = ['ratio'];
+
+/**
+ * Project a computed CRS into a viewer-safe view. When `includeSnatchDerived`
+ * is false, the snatch-derived dimensions are removed and the displayed score is
+ * recomputed from the remaining weighted subscores — so a paranoia-gated viewer
+ * neither sees the dimension nor can back it out of the total. Pure.
+ */
+export const filterReputationView = (
+  crs: CrsResult,
+  opts: { includeSnatchDerived: boolean }
+): CrsResult => {
+  if (opts.includeSnatchDerived) return crs;
+  const dimensions = crs.dimensions.filter(
+    (d) => !SNATCH_DERIVED_DIMENSIONS.includes(d.name)
+  );
+  const score = dimensions.reduce((sum, d) => sum + d.weighted, 0);
+  return { score, dimensions };
+};

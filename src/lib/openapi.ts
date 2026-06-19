@@ -528,6 +528,31 @@ const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
 
 const InviteNode = registry.register('InviteNode', InviteNodeSchema);
 
+// PRD-01 Profile Integration: community-stats block. Null when the target's
+// paranoia hides all stats from this viewer; the reputation `ratio` dimension is
+// omitted (and the score recomputed) when consumed stats are hidden.
+const CommunityStats = registry.register(
+  'CommunityStats',
+  z.object({
+    friends: z.number(),
+    invites: z.object({
+      direct: z.number(),
+      total: z.number(),
+      depth: z.number()
+    }),
+    reputation: z.object({
+      score: z.number(),
+      dimensions: z.array(
+        z.object({
+          name: z.string(),
+          subScore: z.number(),
+          weighted: z.number()
+        })
+      )
+    })
+  })
+);
+
 const PublicProfile = registry.register(
   'PublicProfile',
   z.object({
@@ -556,7 +581,8 @@ const PublicProfile = registry.register(
     staffPmOverview: ProfileStaffPmOverview.nullable(),
     recentContributions: z.array(ProfileContribution),
     recentSnatches: z.array(ProfileSnatch),
-    inviteTree: z.array(InviteNode)
+    inviteTree: z.array(InviteNode),
+    community: CommunityStats.nullable()
   })
 );
 

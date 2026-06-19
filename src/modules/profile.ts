@@ -13,7 +13,16 @@ import { getLogger } from './logging';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
 import { computeStanding } from './standing';
-import { getInviteSubtreeRows, type InviteSubtreeRow } from './user';
+import {
+  getInviteSubtreeRows,
+  getMemberInviteTreeView,
+  type InviteSubtreeRow
+} from './user';
+import {
+  getReputation,
+  filterReputationView,
+  type CrsResult
+} from './reputation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -727,6 +736,44 @@ const getStaffPmOverview = async (
   };
 };
 
+/** A member's invite-tree summary, as far as the community block needs it. */
+interface InviteSummaryView {
+  summary: { branches: number; entries: number; depth: number };
+}
+
+/**
+ * Shape the PRD-01 Profile Integration community-stats block from already-fetched
+ * inputs. Pure so the paranoia gating is testable without a DB:
+ *  - any input `null` (the caller didn't fetch it because the top paranoia tier
+ *    hides every stat) → the whole block is `null`.
+ *  - `includeSnatchDerived` false (consumed stats hidden, paranoia ≥ 2) → the
+ *    snatch-derived (`ratio`) dimension drops out of the reputation view and its
+ *    score is recomputed (see `filterReputationView`).
+ */
+export const buildCommunityStats = (
+  friendCount: number | null,
+  inviteView: InviteSummaryView | null,
+  reputation: CrsResult | null,
+  includeSnatchDerived: boolean
+): {
+  friends: number;
+  invites: { direct: number; total: number; depth: number };
+  reputation: CrsResult;
+} | null => {
+  if (friendCount === null || inviteView === null || reputation === null) {
+    return null;
+  }
+  return {
+    friends: friendCount,
+    invites: {
+      direct: inviteView.summary.branches,
+      total: inviteView.summary.entries,
+      depth: inviteView.summary.depth
+    },
+    reputation: filterReputationView(reputation, { includeSnatchDerived })
+  };
+};
+
 const buildProfileView = async (
   user: ProfileUserRecord,
   viewer: ViewerContext,
@@ -751,13 +798,20 @@ const buildProfileView = async (
     viewer.isOwner || viewer.isStaff || settings.showRatioStats;
   const canSeeSnatches = viewer.isOwner || viewer.isStaff;
 
+  // PRD-01 Profile Integration: the community-stats block (friends count, invite
+  // summary, reputation) is visible unless the highest paranoia tier hides every
+  // stat — same gate as ratio/buffer (`canSeeRatio`). Compute it only when
+  // visible so non-visible profile loads don't pay for the extra queries.
   const [
     activitySummary,
     recentContributions,
     recentSnatches,
     inviteRows,
     collageShelves,
-    staffPmOverview
+    staffPmOverview,
+    friendCount,
+    inviteView,
+    reputation
   ] = await Promise.all([
     getActivitySummary(user.id),
     getRecentContributions(user.id),
@@ -766,8 +820,27 @@ const buildProfileView = async (
       ? getInviteSubtreeRows(user.id)
       : Promise.resolve([] as InviteSubtreeRow[]),
     getProfileCollages(user.id),
-    viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null)
+    viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null),
+    canSeeRatio
+      ? prisma.friendRelationship.count({
+          where: {
+            status: 'accepted',
+            OR: [{ requesterId: user.id }, { recipientId: user.id }]
+          }
+        })
+      : Promise.resolve(null),
+    canSeeRatio
+      ? getMemberInviteTreeView(user.id, viewer.isStaff)
+      : Promise.resolve(null),
+    canSeeRatio ? getReputation(user.id) : Promise.resolve(null)
   ]);
+
+  const community = buildCommunityStats(
+    friendCount,
+    inviteView,
+    reputation,
+    canSeeDownloaded
+  );
   const percentiles = await getPercentileSummary(user, activitySummary);
   const donorPresentation = buildDonorPresentation(user);
   const derivedRatio = computeRatio(user.contributed, user.consumed);
@@ -848,7 +921,8 @@ const buildProfileView = async (
     inviteTree:
       includeInviteTree && inviteRows.length
         ? buildInviteTree(inviteRows, user.id, viewer.isOwner || viewer.isStaff)
-        : []
+        : [],
+    community
   };
 };
 

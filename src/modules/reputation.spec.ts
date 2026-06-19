@@ -15,7 +15,7 @@ jest.mock('../lib/prisma', () => ({
   }
 }));
 
-import { computeCrs, getReputation } from './reputation';
+import { computeCrs, getReputation, filterReputationView } from './reputation';
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-06-08T00:00:00Z');
@@ -307,5 +307,45 @@ describe('getReputation', () => {
     expect(
       result.dimensions.find((d) => d.name === 'friends')!.subScore
     ).toBeGreaterThan(0);
+  });
+});
+
+// ─── filterReputationView (paranoia-gated projection) ─────────────────────────
+
+describe('filterReputationView', () => {
+  const crs = {
+    score: 12,
+    dimensions: [
+      { name: 'longevity', subScore: 6, weighted: 6 },
+      { name: 'ratio', subScore: 4, weighted: 4 },
+      { name: 'friends', subScore: 2, weighted: 2 }
+    ]
+  };
+
+  it('passes through unchanged when snatch-derived dimensions are included', () => {
+    expect(filterReputationView(crs, { includeSnatchDerived: true })).toBe(crs);
+  });
+
+  it('drops the ratio dimension and recomputes the score when excluded', () => {
+    const view = filterReputationView(crs, { includeSnatchDerived: false });
+    expect(view.dimensions.map((d) => d.name)).toEqual([
+      'longevity',
+      'friends'
+    ]);
+    // score recomputed from the remaining weighted subscores: 6 + 2 = 8
+    expect(view.score).toBe(8);
+  });
+
+  it('is a no-op when there is no snatch-derived dimension present', () => {
+    const noRatio = {
+      score: 8,
+      dimensions: [
+        { name: 'longevity', subScore: 6, weighted: 6 },
+        { name: 'friends', subScore: 2, weighted: 2 }
+      ]
+    };
+    const view = filterReputationView(noRatio, { includeSnatchDerived: false });
+    expect(view.dimensions).toHaveLength(2);
+    expect(view.score).toBe(8);
   });
 });

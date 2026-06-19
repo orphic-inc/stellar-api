@@ -11686,6 +11686,22 @@ export interface components {
       ratio?: string;
       children?: components['schemas']['InviteNode'][];
     };
+    CommunityStats: {
+      friends: number;
+      invites: {
+        direct: number;
+        total: number;
+        depth: number;
+      };
+      reputation: {
+        score: number;
+        dimensions: {
+          name: string;
+          subScore: number;
+          weighted: number;
+        }[];
+      };
+    };
     PublicProfile: {
       id: number;
       username: string;
@@ -11716,6 +11732,7 @@ export interface components {
       recentContributions: components['schemas']['ProfileContribution'][];
       recentSnatches: components['schemas']['ProfileSnatch'][];
       inviteTree: components['schemas']['InviteNode'][];
+      community: components['schemas']['CommunityStats'] & unknown;
     };
     MyProfile: {
       id: number;
@@ -11747,6 +11764,7 @@ export interface components {
       recentContributions: components['schemas']['ProfileContribution'][];
       recentSnatches: components['schemas']['ProfileSnatch'][];
       inviteTree: components['schemas']['InviteNode'][];
+      community: components['schemas']['CommunityStats'] & unknown;
       userSettings: components['schemas']['UserSettings'];
     };
     AdminCreatedUser: {
