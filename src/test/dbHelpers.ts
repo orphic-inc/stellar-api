@@ -7,7 +7,17 @@ export const testPrisma = new PrismaClient({
   log: []
 });
 
-/** Truncates every table (except _prisma_migrations) and resets sequences. */
+/**
+ * Truncates every table (except _prisma_migrations) and resets sequences.
+ *
+ * Deliberately a per-table loop, NOT a single `TRUNCATE a, b, c … CASCADE`: the
+ * batched form takes ACCESS EXCLUSIVE locks on every table at once, which
+ * deadlocks (40P01) under CI when a prior test's fire-and-forget query (e.g. the
+ * downloads ratio-policy eval) still holds a lock. Truncating one table at a
+ * time keeps the lock set per statement small enough to avoid that. The #165
+ * flake was setup running slow under load, not this being wrong — the fix is the
+ * hook-timeout headroom in devTools.integration.ts, not batching the locks.
+ */
 export const truncateAll = async (): Promise<void> => {
   await testPrisma.$executeRawUnsafe(`
     DO $$ DECLARE r RECORD; BEGIN

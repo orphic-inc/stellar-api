@@ -55,7 +55,12 @@ beforeEach(async () => {
     }
   });
   actorId = actor.id;
-}, 30_000);
+  // truncateAll + seed + a few inserts, run before every test in the suite that
+  // generates the most data. It can run slow (not hung) when the CI box is
+  // loaded or a prior test's fire-and-forget query still holds a lock the
+  // truncate waits on; the original 30s ceiling tipped over there (#165). 60s of
+  // headroom absorbs that variance without masking a genuine hang.
+}, 60_000);
 
 afterAll(async () => {
   await testPrisma.$disconnect();
