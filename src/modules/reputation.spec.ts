@@ -6,14 +6,25 @@
 const mockPrismaUser = { findUnique: jest.fn() };
 const mockPrismaFriend = { count: jest.fn() };
 const mockPrismaEconomy = { count: jest.fn() };
+const mockPrismaInviteTree = { findMany: jest.fn() };
+const mockPrismaDonation = { aggregate: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
   prisma: {
     user: mockPrismaUser,
     friendRelationship: mockPrismaFriend,
-    economyTransaction: mockPrismaEconomy
+    economyTransaction: mockPrismaEconomy,
+    inviteTree: mockPrismaInviteTree,
+    donation: mockPrismaDonation
   }
 }));
+
+// A donation aggregate with no rows.
+const emptyDonationAgg = {
+  _count: { _all: 0 },
+  _min: { donatedAt: null },
+  _max: { donatedAt: null }
+};
 
 import { computeCrs, getReputation, filterReputationView } from './reputation';
 
@@ -229,12 +240,117 @@ describe('computeCrs — Stylesheet dimension', () => {
   });
 });
 
+// ─── computeCrs / Invite dimension ────────────────────────────────────────────
+
+describe('computeCrs — Invite dimension', () => {
+  const inviteOf = (input: Partial<Parameters<typeof computeCrs>[0]>) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ...input
+    }).dimensions.find((d) => d.name === 'invite')!.subScore;
+
+  it('no invitees → 0', () => {
+    expect(inviteOf({})).toBe(0);
+  });
+
+  it('active + contributing invitees raise it, with diminishing returns', () => {
+    expect(inviteOf({ inviteActiveContributing: 4 })).toBeGreaterThan(
+      inviteOf({ inviteActiveContributing: 1 })
+    );
+    const gainEarly = inviteOf({ inviteActiveContributing: 1 }) - inviteOf({});
+    const gainLate =
+      inviteOf({ inviteActiveContributing: 20 }) -
+      inviteOf({ inviteActiveContributing: 19 });
+    expect(gainLate).toBeLessThan(gainEarly);
+  });
+
+  it('long-lived invitees add a weaker positive than active+contributing', () => {
+    expect(inviteOf({ inviteLongLived: 1 })).toBeGreaterThan(0);
+    expect(inviteOf({ inviteActiveContributing: 1 })).toBeGreaterThan(
+      inviteOf({ inviteLongLived: 1 })
+    );
+  });
+
+  it('banned and low-quality invitees erode the positive', () => {
+    const clean = inviteOf({ inviteActiveContributing: 4 });
+    expect(
+      inviteOf({ inviteActiveContributing: 4, inviteBanned: 2 })
+    ).toBeLessThan(clean);
+    expect(
+      inviteOf({ inviteActiveContributing: 4, inviteLowQuality: 2 })
+    ).toBeLessThan(clean);
+  });
+
+  it('net is floored at 0 — invite abuse cannot push the dimension negative', () => {
+    expect(inviteOf({ inviteActiveContributing: 1, inviteBanned: 100 })).toBe(
+      0
+    );
+  });
+
+  it('is bounded by INVITE_CAP = 5', () => {
+    expect(inviteOf({ inviteActiveContributing: 10_000 })).toBeLessThanOrEqual(
+      5
+    );
+    expect(inviteOf({ inviteActiveContributing: 10_000 })).toBeGreaterThan(4.9);
+  });
+});
+
+// ─── computeCrs / Donation dimension ──────────────────────────────────────────
+
+describe('computeCrs — Donation dimension', () => {
+  const donationOf = (input: Partial<Parameters<typeof computeCrs>[0]>) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      ...input
+    }).dimensions.find((d) => d.name === 'donation')!.subScore;
+
+  it('no donations → 0', () => {
+    expect(donationOf({})).toBe(0);
+  });
+
+  it('more donations raise it (consistency), with diminishing returns', () => {
+    expect(donationOf({ donationCount: 5 })).toBeGreaterThan(
+      donationOf({ donationCount: 1 })
+    );
+    const gainEarly = donationOf({ donationCount: 1 }) - donationOf({});
+    const gainLate =
+      donationOf({ donationCount: 50 }) - donationOf({ donationCount: 49 });
+    expect(gainLate).toBeLessThan(gainEarly);
+  });
+
+  it('a longer support span raises it (longevity)', () => {
+    expect(donationOf({ donationSpanYears: 4 })).toBeGreaterThan(
+      donationOf({ donationSpanYears: 1 })
+    );
+  });
+
+  it('is amount-agnostic: amount is not even an input (recognition, not pay-to-win)', () => {
+    // The only donation inputs are count + span. Identical count/span ⇒ identical
+    // score regardless of any dollar value, which the scorer never sees.
+    expect(donationOf({ donationCount: 3, donationSpanYears: 2 })).toBe(
+      donationOf({ donationCount: 3, donationSpanYears: 2 })
+    );
+  });
+
+  it('is bounded by DONATION_CAP = 3 — the lowest dimension cap', () => {
+    expect(
+      donationOf({ donationCount: 10_000, donationSpanYears: 10_000 })
+    ).toBeLessThanOrEqual(3);
+  });
+});
+
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPrismaEconomy.count.mockResolvedValue(0);
+    mockPrismaInviteTree.findMany.mockResolvedValue([]);
+    mockPrismaDonation.aggregate.mockResolvedValue(emptyDonationAgg);
   });
 
   it('computes CRS from the user createdAt + ratio + friends', async () => {
@@ -282,6 +398,70 @@ describe('getReputation', () => {
     );
     expect(
       result.dimensions.find((d) => d.name === 'stylesheet')!.subScore
+    ).toBeGreaterThan(0);
+  });
+
+  it('classifies direct invitees into the Invite signals and scores them', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    const oldEnough = new Date(NOW.getTime() - 3 * YEAR_MS);
+    mockPrismaInviteTree.findMany.mockResolvedValue([
+      // active + contributing + long-lived, no warnings, recent login
+      {
+        user: {
+          disabled: false,
+          contributed: 5n,
+          dateRegistered: oldEnough,
+          lastLogin: NOW,
+          warnings: []
+        }
+      },
+      // banned — counts only as a negative
+      {
+        user: {
+          disabled: true,
+          contributed: 9n,
+          dateRegistered: oldEnough,
+          lastLogin: NOW,
+          warnings: []
+        }
+      }
+    ]);
+
+    const result = await getReputation(1);
+
+    expect(mockPrismaInviteTree.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { inviterId: 1 } })
+    );
+    expect(
+      result.dimensions.find((d) => d.name === 'invite')!.subScore
+    ).toBeGreaterThan(0);
+  });
+
+  it('feeds DonationScore from the amount-agnostic aggregate (count + span)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    mockPrismaDonation.aggregate.mockResolvedValue({
+      _count: { _all: 4 },
+      _min: { donatedAt: new Date(NOW.getTime() - 2 * YEAR_MS) },
+      _max: { donatedAt: NOW }
+    });
+
+    const result = await getReputation(1);
+
+    expect(mockPrismaDonation.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 1 } })
+    );
+    expect(
+      result.dimensions.find((d) => d.name === 'donation')!.subScore
     ).toBeGreaterThan(0);
   });
 

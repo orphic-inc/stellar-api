@@ -41,6 +41,24 @@ export interface DimensionInput {
    *  of the same CRS_* ledger). Feeds the Friends-dimension controlled vector
    *  (#147). Defaults to 0. */
   stylesheetAdoptionsMade?: number;
+  /** Direct invitees that are active (not disabled) AND contributing (>0 bytes).
+   *  The core "successful invitation" positive signal. Defaults to 0. */
+  inviteActiveContributing?: number;
+  /** Direct invitees whose account age is past the long-lived threshold — a
+   *  weaker positive (durable referrals). Defaults to 0. */
+  inviteLongLived?: number;
+  /** Direct invitees that are banned (disabled) — penalises invitation abuse /
+   *  disposable accounts. Defaults to 0. */
+  inviteBanned?: number;
+  /** Direct invitees that are low-quality — an active warning, or dormant
+   *  (no recent login). Penalises weak referrals. Defaults to 0. */
+  inviteLowQuality?: number;
+  /** Number of donations this user has made — feeds supportConsistency.
+   *  Amount is deliberately NOT read (recognition, not pay-to-win). Defaults to 0. */
+  donationCount?: number;
+  /** Years between this user's first and last donation — feeds supportLongevity.
+   *  0 when fewer than two donations. Defaults to 0. */
+  donationSpanYears?: number;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -211,12 +229,84 @@ const stylesheetScorer: DimensionScorer = {
     STYLESHEET_AUTHOR_PER_ADOPTION * Math.max(0, stylesheetAdoptions)
 };
 
+// ─── InviteScore ──────────────────────────────────────────────────────────
+// Referral genealogy (PRD-01 InviteTree): "users inherit reputation from
+// successful invitations." Scored over the inviter's DIRECT invitees only (v1;
+// subtree trust-inheritance deferred). Positive signals — active+contributing
+// and (weaker) long-lived invitees — raise it with diminishing returns; banned
+// and low-quality (warned/dormant) invitees erode it. Floored at 0 so invite
+// abuse can't push the dimension negative (the other dimensions are non-negative
+// too — penalties bound the *gain*, not the floor).
+// PROVISIONAL (tier-0): caps/weights/thresholds are interim, to tune with the PRD.
+const INVITE_CAP = 5;
+const INVITE_TAU = 4; // ~4 good invitees → ~63% of cap
+const INVITE_LONGLIVED_WEIGHT = 0.5;
+const INVITE_BANNED_WEIGHT = 1.0;
+const INVITE_LOWQUALITY_WEIGHT = 0.5;
+const INVITE_WEIGHT = 1.0;
+// Classification thresholds (read by the assembler, not the pure scorer):
+const INVITE_LONGLIVED_YEARS = 1; // invitee account age past this = long-lived
+const INVITE_DORMANT_DAYS = 180; // no login in this window = dormant (low-quality)
+
+const inviteScorer: DimensionScorer = {
+  name: 'invite',
+  weight: INVITE_WEIGHT,
+  cap: INVITE_CAP,
+  compute: ({
+    inviteActiveContributing = 0,
+    inviteLongLived = 0,
+    inviteBanned = 0,
+    inviteLowQuality = 0
+  }) => {
+    const positive =
+      Math.max(0, inviteActiveContributing) +
+      INVITE_LONGLIVED_WEIGHT * Math.max(0, inviteLongLived);
+    const penalty =
+      INVITE_BANNED_WEIGHT * Math.max(0, inviteBanned) +
+      INVITE_LOWQUALITY_WEIGHT * Math.max(0, inviteLowQuality);
+    const net = Math.max(0, positive - penalty);
+    return INVITE_CAP * (1 - Math.exp(-net / INVITE_TAU));
+  }
+};
+
+// ─── DonationScore ──────────────────────────────────────────────────────────
+// Financial support (PRD-01 Donations): "recognition, not pay-to-win" —
+// donation *value must never dominate*. So this is AMOUNT-AGNOSTIC: it never
+// reads `amount`. DonationScore = supportConsistency (how many donations, with
+// diminishing returns) + supportLongevity (how long support has been sustained,
+// first→last span). The dimension cap is deliberately the lowest of all
+// dimensions so donations can't outweigh participation/trust.
+// PROVISIONAL (tier-0): caps/taus interim, to tune with the PRD.
+const DONATION_CONSISTENCY_CAP = 2;
+const DONATION_CONSISTENCY_TAU = 3; // 3 donations → ~63% of the consistency cap
+const DONATION_LONGEVITY_CAP = 1;
+const DONATION_LONGEVITY_TAU = 2; // 2 years of support → ~63% of the longevity cap
+const DONATION_CAP = DONATION_CONSISTENCY_CAP + DONATION_LONGEVITY_CAP;
+const DONATION_WEIGHT = 1.0;
+
+const donationScorer: DimensionScorer = {
+  name: 'donation',
+  weight: DONATION_WEIGHT,
+  cap: DONATION_CAP,
+  compute: ({ donationCount = 0, donationSpanYears = 0 }) => {
+    const consistency =
+      DONATION_CONSISTENCY_CAP *
+      (1 - Math.exp(-Math.max(0, donationCount) / DONATION_CONSISTENCY_TAU));
+    const longevity =
+      DONATION_LONGEVITY_CAP *
+      (1 - Math.exp(-Math.max(0, donationSpanYears) / DONATION_LONGEVITY_TAU));
+    return consistency + longevity;
+  }
+};
+
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
 // picks it up unchanged.
 const REGISTRY: DimensionScorer[] = [
   longevityScorer,
   ratioScorer,
   friendsScorer,
+  inviteScorer,
+  donationScorer,
   ircScorer,
   stylesheetScorer
 ];
@@ -233,38 +323,106 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
 export const getReputation = async (userId: number): Promise<CrsResult> => {
-  const [user, friendCount, stylesheetAdoptions, stylesheetAdoptionsMade] =
-    await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          createdAt: true,
-          contributed: true,
-          consumed: true,
-          ircNick: true
+  const now = new Date();
+  const longLivedBefore = new Date(
+    now.getTime() - INVITE_LONGLIVED_YEARS * YEAR_MS
+  );
+  const dormantBefore = new Date(
+    now.getTime() - INVITE_DORMANT_DAYS * 24 * 60 * 60 * 1000
+  );
+
+  const [
+    user,
+    friendCount,
+    stylesheetAdoptions,
+    stylesheetAdoptionsMade,
+    invitees,
+    donationAgg
+  ] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        createdAt: true,
+        contributed: true,
+        consumed: true,
+        ircNick: true
+      }
+    }),
+    // Accepted friendships in either direction (requester or recipient).
+    prisma.friendRelationship.count({
+      where: {
+        status: 'accepted',
+        OR: [{ requesterId: userId }, { recipientId: userId }]
+      }
+    }),
+    // Distinct (adopter, author) pairs where this user is the author — one
+    // ledger row per pair (deduped at write), so a plain count is the distinct
+    // adoption count. Feeds both the stylesheet (author reward) and friends
+    // (weak-tie nudge) dimensions.
+    prisma.economyTransaction.count({
+      where: { userId, reason: 'CRS_STYLESHEET_ADOPTION' }
+    }),
+    // The adopter side of the same ledger: distinct adoptions this user made.
+    // Friends-dimension controlled vector only (#147).
+    prisma.economyTransaction.count({
+      where: { actorUserId: userId, reason: 'CRS_STYLESHEET_ADOPTION' }
+    }),
+    // Direct invitees (depth 1) with the fields needed to classify each into the
+    // InviteScore signals. N is small (a user's direct referrals), so classify
+    // in JS rather than running four count queries.
+    prisma.inviteTree.findMany({
+      where: { inviterId: userId },
+      select: {
+        user: {
+          select: {
+            disabled: true,
+            contributed: true,
+            dateRegistered: true,
+            lastLogin: true,
+            // One active warning is enough to flag low-quality.
+            warnings: {
+              where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+              select: { id: true },
+              take: 1
+            }
+          }
         }
-      }),
-      // Accepted friendships in either direction (requester or recipient).
-      prisma.friendRelationship.count({
-        where: {
-          status: 'accepted',
-          OR: [{ requesterId: userId }, { recipientId: userId }]
-        }
-      }),
-      // Distinct (adopter, author) pairs where this user is the author — one
-      // ledger row per pair (deduped at write), so a plain count is the distinct
-      // adoption count. Feeds both the stylesheet (author reward) and friends
-      // (weak-tie nudge) dimensions.
-      prisma.economyTransaction.count({
-        where: { userId, reason: 'CRS_STYLESHEET_ADOPTION' }
-      }),
-      // The adopter side of the same ledger: distinct adoptions this user made.
-      // Friends-dimension controlled vector only (#147).
-      prisma.economyTransaction.count({
-        where: { actorUserId: userId, reason: 'CRS_STYLESHEET_ADOPTION' }
-      })
-    ]);
+      }
+    }),
+    // Amount-agnostic: only the count and the first→last span feed DonationScore.
+    prisma.donation.aggregate({
+      where: { userId },
+      _count: { _all: true },
+      _min: { donatedAt: true },
+      _max: { donatedAt: true }
+    })
+  ]);
   if (!user) return { score: 0, dimensions: [] };
+
+  // Classify direct invitees into the four InviteScore signal counts.
+  let inviteActiveContributing = 0;
+  let inviteLongLived = 0;
+  let inviteBanned = 0;
+  let inviteLowQuality = 0;
+  for (const { user: invitee } of invitees) {
+    if (invitee.disabled) {
+      inviteBanned++;
+      continue; // a banned invitee is only a negative signal
+    }
+    if (invitee.contributed > 0n) inviteActiveContributing++;
+    if (invitee.dateRegistered <= longLivedBefore) inviteLongLived++;
+    const dormant = !invitee.lastLogin || invitee.lastLogin < dormantBefore;
+    if (invitee.warnings.length > 0 || dormant) inviteLowQuality++;
+  }
+
+  const donationCount = donationAgg._count._all;
+  const firstAt = donationAgg._min.donatedAt;
+  const lastAt = donationAgg._max.donatedAt;
+  const donationSpanYears =
+    firstAt && lastAt
+      ? Math.max(0, lastAt.getTime() - firstAt.getTime()) / YEAR_MS
+      : 0;
+
   return computeCrs({
     userId,
     createdAt: user.createdAt,
@@ -273,7 +431,14 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     friendCount,
     ircNick: user.ircNick,
     stylesheetAdoptions,
-    stylesheetAdoptionsMade
+    stylesheetAdoptionsMade,
+    inviteActiveContributing,
+    inviteLongLived,
+    inviteBanned,
+    inviteLowQuality,
+    donationCount,
+    donationSpanYears,
+    now
   });
 };
 
