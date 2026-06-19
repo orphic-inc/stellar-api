@@ -19,6 +19,7 @@ import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
 import { getIrcScore } from './irc';
 import { scoreStylesheetSelection } from './stylesheetScore';
+import { communityHealthFor } from './communityHealthHistory';
 
 /** What dimension scorers may read. Grows as dimensions are added; the
  *  assembler (`getReputation`) fetches it, keeping each scorer pure. */
@@ -59,6 +60,14 @@ export interface DimensionInput {
   /** Years between this user's first and last donation — feeds supportLongevity.
    *  0 when fewer than two donations. Defaults to 0. */
   donationSpanYears?: number;
+  /** Per contributed-to community: that community's latest link-health pulse +
+   *  coverage, and the member's contribution count there (the weight). Feeds the
+   *  signed CommunityScore dimension (#75 / ADR-0017). Defaults to []. */
+  communityHealth?: Array<{
+    pulse: number | null;
+    coverage: number | null;
+    contributionCount: number;
+  }>;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -67,6 +76,11 @@ export interface DimensionScorer {
   name: string;
   weight: number;
   cap: number;
+  /** Lower bound for the subScore. Defaults to 0 (non-negative, like every
+   *  dimension to date). A *signed* dimension — CommunityScore, whose poor-health
+   *  term subtracts (#75) — sets a negative floor so the aggregator keeps the
+   *  penalty instead of clamping it to 0. */
+  floor?: number;
   /** Pure: no DB, no clock except `input.now`. Returns the raw (pre-clamp) subScore. */
   compute: (input: DimensionInput) => number;
 }
@@ -82,8 +96,8 @@ export interface CrsResult {
   dimensions: DimensionResult[];
 }
 
-const clamp = (value: number, cap: number): number =>
-  Math.max(0, Math.min(cap, value));
+const clamp = (value: number, cap: number, floor = 0): number =>
+  Math.max(floor, Math.min(cap, value));
 
 // ─── LongevityScore ───────────────────────────────────────────────────────
 // Continuity matters (PRD-01): account age positively influences reputation,
@@ -299,6 +313,62 @@ const donationScorer: DimensionScorer = {
   }
 };
 
+// ─── CommunityScore ─────────────────────────────────────────────────────────
+// Community stewardship (PRD-01 / ADR-0002 / ADR-0017). Folds the link-health of
+// the communities a member has CONTRIBUTED to into their single global CRS — a
+// contribution-gated collective signal (mere membership earns nothing, so a
+// lurker in a healthy community can't farm it). It is *signed*: a healthy
+// community rewards, a Critical one penalises, with a deliberately shallow
+// negative floor so others' link-rot nudges rather than craters a member's score.
+//
+// Per community, the live pulse (`pass/checked`, ADR-0002) maps to a signed value
+// around the Critical-edge neutral (0.60 = PULSE_AILING): at/above neutral →
+// 0…+CAP toward a perfect 1.0; below → 0…−FLOOR toward 0. Communities reading
+// Unknown (coverage below PULSE_MIN_COVERAGE 0.5) are excluded. The per-community
+// values are averaged weighted by the member's contribution count there, so the
+// result is inherently bounded in [−FLOOR, +CAP].
+//
+// PROVISIONAL (tier-0): caps/floor are interim. #76 will quality-weight each
+// community's term (a lossless/logged/cued release counts for more) — it multiplies
+// in at the per-community loop below without touching this shape.
+const COMMUNITY_POS_CAP = 4;
+const COMMUNITY_NEG_FLOOR = 1; // shallow — the soft penalty
+const COMMUNITY_NEUTRAL = 0.6; // = linkHealth PULSE_AILING (Critical edge)
+const COMMUNITY_MIN_COVERAGE = 0.5; // = linkHealth PULSE_MIN_COVERAGE (Unknown floor)
+const COMMUNITY_WEIGHT = 1.0;
+
+const communityScorer: DimensionScorer = {
+  name: 'community',
+  weight: COMMUNITY_WEIGHT,
+  cap: COMMUNITY_POS_CAP,
+  floor: -COMMUNITY_NEG_FLOOR,
+  compute: ({ communityHealth = [] }) => {
+    let weighted = 0;
+    let weightSum = 0;
+    for (const c of communityHealth) {
+      // Unknown (unprobed / low coverage) contributes neither + nor −.
+      if (
+        c.pulse === null ||
+        c.coverage === null ||
+        c.coverage < COMMUNITY_MIN_COVERAGE
+      ) {
+        continue;
+      }
+      const weight = Math.max(0, c.contributionCount);
+      if (weight === 0) continue;
+      const value =
+        c.pulse >= COMMUNITY_NEUTRAL
+          ? (COMMUNITY_POS_CAP * (c.pulse - COMMUNITY_NEUTRAL)) /
+            (1 - COMMUNITY_NEUTRAL)
+          : (-COMMUNITY_NEG_FLOOR * (COMMUNITY_NEUTRAL - c.pulse)) /
+            COMMUNITY_NEUTRAL;
+      weighted += weight * value;
+      weightSum += weight;
+    }
+    return weightSum === 0 ? 0 : weighted / weightSum;
+  }
+};
+
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
 // picks it up unchanged.
 const REGISTRY: DimensionScorer[] = [
@@ -307,6 +377,7 @@ const REGISTRY: DimensionScorer[] = [
   friendsScorer,
   inviteScorer,
   donationScorer,
+  communityScorer,
   ircScorer,
   stylesheetScorer
 ];
@@ -314,7 +385,7 @@ const REGISTRY: DimensionScorer[] = [
 /** Pure aggregator: sum each capped dimension's weighted subScore. */
 export const computeCrs = (input: DimensionInput): CrsResult => {
   const dimensions = REGISTRY.map((d) => {
-    const subScore = clamp(d.compute(input), d.cap);
+    const subScore = clamp(d.compute(input), d.cap, d.floor ?? 0);
     return { name: d.name, subScore, weighted: d.weight * subScore };
   });
   const score = dimensions.reduce((sum, d) => sum + d.weighted, 0);
@@ -337,7 +408,8 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     stylesheetAdoptions,
     stylesheetAdoptionsMade,
     invitees,
-    donationAgg
+    donationAgg,
+    contributedCommunities
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -395,9 +467,33 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
       _count: { _all: true },
       _min: { donatedAt: true },
       _max: { donatedAt: true }
-    })
+    }),
+    // Communities this user has contributed to, with their contribution count
+    // (the CommunityScore weight). Grouped via release → communityId (ADR-0002);
+    // a relation-field groupBy isn't expressible in Prisma, so a raw aggregate.
+    prisma.$queryRaw<{ communityId: number; count: bigint }[]>`
+      SELECT r."communityId" AS "communityId", COUNT(*)::bigint AS "count"
+      FROM "contributions" c
+      JOIN "releases" r ON c."releaseId" = r."id"
+      WHERE c."userId" = ${userId} AND r."communityId" IS NOT NULL
+      GROUP BY r."communityId"
+    `
   ]);
   if (!user) return { score: 0, dimensions: [] };
+
+  // Fold each contributed-to community's latest pulse into the signed
+  // CommunityScore (#75). The health source is a pluggable port (ADR-0017).
+  const communityIds = contributedCommunities.map((c) => Number(c.communityId));
+  const pulses = await communityHealthFor(communityIds);
+  const communityHealth = contributedCommunities.map((c) => {
+    const id = Number(c.communityId);
+    const health = pulses.get(id);
+    return {
+      pulse: health?.pulse ?? null,
+      coverage: health?.coverage ?? null,
+      contributionCount: Number(c.count)
+    };
+  });
 
   // Classify direct invitees into the four InviteScore signal counts.
   let inviteActiveContributing = 0;
@@ -438,6 +534,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     inviteLowQuality,
     donationCount,
     donationSpanYears,
+    communityHealth,
     now
   });
 };

@@ -8,6 +8,8 @@ const mockPrismaFriend = { count: jest.fn() };
 const mockPrismaEconomy = { count: jest.fn() };
 const mockPrismaInviteTree = { findMany: jest.fn() };
 const mockPrismaDonation = { aggregate: jest.fn() };
+const mockPrismaCommunitySnapshot = { findMany: jest.fn() };
+const mockPrismaQueryRaw = jest.fn();
 
 jest.mock('../lib/prisma', () => ({
   prisma: {
@@ -15,7 +17,9 @@ jest.mock('../lib/prisma', () => ({
     friendRelationship: mockPrismaFriend,
     economyTransaction: mockPrismaEconomy,
     inviteTree: mockPrismaInviteTree,
-    donation: mockPrismaDonation
+    donation: mockPrismaDonation,
+    communityHealthSnapshot: mockPrismaCommunitySnapshot,
+    $queryRaw: mockPrismaQueryRaw
   }
 }));
 
@@ -343,6 +347,85 @@ describe('computeCrs — Donation dimension', () => {
   });
 });
 
+// ─── computeCrs / Community dimension ─────────────────────────────────────────
+
+describe('computeCrs — Community dimension', () => {
+  const healthy = (count: number) => ({
+    pulse: 1.0,
+    coverage: 0.9,
+    contributionCount: count
+  });
+  const critical = (count: number) => ({
+    pulse: 0.0,
+    coverage: 0.9,
+    contributionCount: count
+  });
+  const communityOf = (
+    communityHealth: NonNullable<
+      Parameters<typeof computeCrs>[0]['communityHealth']
+    >
+  ) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      communityHealth
+    }).dimensions.find((d) => d.name === 'community')!.subScore;
+
+  it('no contributed-to communities → 0', () => {
+    expect(communityOf([])).toBe(0);
+  });
+
+  it('a fully-healthy community rewards up to the positive cap (+4)', () => {
+    expect(communityOf([healthy(5)])).toBeCloseTo(4, 10);
+  });
+
+  it('a critical community penalises down to the soft floor (−1)', () => {
+    expect(communityOf([critical(5)])).toBeCloseTo(-1, 10);
+  });
+
+  it('is neutral at the Critical-edge pulse 0.60', () => {
+    expect(
+      communityOf([{ pulse: 0.6, coverage: 0.9, contributionCount: 5 }])
+    ).toBeCloseTo(0, 10);
+  });
+
+  it('excludes Unknown communities (coverage below 0.5)', () => {
+    // The only community is unprobed → no signal, term 0.
+    expect(
+      communityOf([{ pulse: 0.2, coverage: 0.4, contributionCount: 5 }])
+    ).toBe(0);
+  });
+
+  it('weights by the member’s contribution count', () => {
+    // 9× weight healthy (+4), 1× weight critical (−1): (9·4 + 1·−1)/10 = 3.5
+    expect(communityOf([healthy(9), critical(1)])).toBeCloseTo(3.5, 10);
+  });
+
+  it('stays bounded in [−1, +4]', () => {
+    expect(communityOf([healthy(10_000), healthy(5)])).toBeLessThanOrEqual(4);
+    expect(communityOf([critical(10_000), critical(5)])).toBeGreaterThanOrEqual(
+      -1
+    );
+  });
+});
+
+// ─── signed dimension floor (aggregator) ──────────────────────────────────────
+
+describe('computeCrs — signed dimension floor', () => {
+  it('keeps a negative subScore instead of clamping it to 0', () => {
+    const community = computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      communityHealth: [{ pulse: 0.0, coverage: 0.9, contributionCount: 1 }]
+    }).dimensions.find((d) => d.name === 'community')!;
+    // Without the floor the clamp would force this to 0; with floor −1 it survives.
+    expect(community.subScore).toBe(-1);
+    expect(community.weighted).toBe(-1);
+  });
+});
+
 // ─── getReputation (read-time assembler) ──────────────────────────────────────
 
 describe('getReputation', () => {
@@ -351,6 +434,8 @@ describe('getReputation', () => {
     mockPrismaEconomy.count.mockResolvedValue(0);
     mockPrismaInviteTree.findMany.mockResolvedValue([]);
     mockPrismaDonation.aggregate.mockResolvedValue(emptyDonationAgg);
+    mockPrismaQueryRaw.mockResolvedValue([]);
+    mockPrismaCommunitySnapshot.findMany.mockResolvedValue([]);
   });
 
   it('computes CRS from the user createdAt + ratio + friends', async () => {
@@ -440,6 +525,27 @@ describe('getReputation', () => {
     expect(
       result.dimensions.find((d) => d.name === 'invite')!.subScore
     ).toBeGreaterThan(0);
+  });
+
+  it('folds contributed-to community health into the signed Community dimension', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    // One contributed-to community (id 10, 3 contributions)...
+    mockPrismaQueryRaw.mockResolvedValue([{ communityId: 10, count: 3n }]);
+    // ...reading Critical health → the dimension should go negative.
+    mockPrismaCommunitySnapshot.findMany.mockResolvedValue([
+      { communityId: 10, pulse: 0.1, coverage: 0.9 }
+    ]);
+
+    const result = await getReputation(1);
+
+    expect(
+      result.dimensions.find((d) => d.name === 'community')!.subScore
+    ).toBeLessThan(0);
   });
 
   it('feeds DonationScore from the amount-agnostic aggregate (count + span)', async () => {
