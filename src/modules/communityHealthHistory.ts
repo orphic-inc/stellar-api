@@ -108,3 +108,37 @@ export async function getCommunityHealthHistory(
     orderBy: { capturedAt: 'asc' }
   });
 }
+
+// ─── CommunityScore read port (#75) ──────────────────────────────────────────
+
+export type CommunityPulse = {
+  pulse: number | null;
+  coverage: number | null;
+};
+
+/**
+ * The CommunityScore CRS dimension's pluggable health source (ADR-0017). Returns
+ * each community's most recent Daily pulse/coverage from the persisted snapshot
+ * series (#161) — O(1) per community, ≤1 day stale, cheap on the reputation read
+ * path. Per ADR-0007 the snapshot is a trend layer, not the source of truth; the
+ * dimension accepts that for a bounded tier-0 signal. The scorer only consumes
+ * the returned shape, so this source can later be swapped for a top10-style /
+ * korin-ledger-backed read model without touching `reputation.ts`.
+ */
+export async function communityHealthFor(
+  communityIds: number[]
+): Promise<Map<number, CommunityPulse>> {
+  if (communityIds.length === 0) return new Map();
+  const rows = await prisma.communityHealthSnapshot.findMany({
+    where: {
+      communityId: { in: communityIds },
+      period: StatSnapshotPeriod.Daily
+    },
+    orderBy: { bucketAt: 'desc' },
+    distinct: ['communityId'],
+    select: { communityId: true, pulse: true, coverage: true }
+  });
+  return new Map(
+    rows.map((r) => [r.communityId, { pulse: r.pulse, coverage: r.coverage }])
+  );
+}
