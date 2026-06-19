@@ -30,7 +30,10 @@ describe('GET /api/friends', () => {
       comment: 'Good person',
       friend: { id: 42, username: 'alice', avatar: null }
     };
-    prismaMock.friend.findMany.mockResolvedValue([mockFriend] as never);
+    // First findMany = page query; second = reverse mutual lookup (none)
+    prismaMock.friend.findMany
+      .mockResolvedValueOnce([mockFriend] as never)
+      .mockResolvedValueOnce([] as never);
     prismaMock.friend.count.mockResolvedValue(1);
 
     const res = await request(app).get('/api/friends');
@@ -38,35 +41,80 @@ describe('GET /api/friends', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].friend.username).toBe('alice');
+    expect(res.body.data[0].isMutual).toBe(false);
     expect(res.body.meta.total).toBe(1);
     expect(res.body.meta).toHaveProperty('totalPages');
+  });
+
+  it('flags isMutual true when the friend follows back', async () => {
+    const mockFriend = {
+      id: 1,
+      userId: 7,
+      friendId: 42,
+      comment: '',
+      friend: { id: 42, username: 'alice', avatar: null }
+    };
+    prismaMock.friend.findMany
+      .mockResolvedValueOnce([mockFriend] as never)
+      .mockResolvedValueOnce([{ userId: 42 }] as never);
+    prismaMock.friend.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/friends');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].isMutual).toBe(true);
   });
 });
 
 // ─── GET /api/friends/status/:userId ─────────────────────────────────────────
 
 describe('GET /api/friends/status/:userId', () => {
-  it('returns isFriend: false when not friends', async () => {
+  it('returns isFriend/isMutual false when not friends', async () => {
+    // forward + reverse both null
     prismaMock.friend.findUnique.mockResolvedValue(null);
 
     const res = await request(app).get('/api/friends/status/42');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ isFriend: false });
+    expect(res.body).toEqual({ isFriend: false, isMutual: false });
   });
 
-  it('returns isFriend: true when friendship exists', async () => {
-    prismaMock.friend.findUnique.mockResolvedValue({
-      id: 1,
-      userId: 7,
-      friendId: 42,
-      comment: ''
-    } as never);
+  it('returns isFriend true, isMutual false when only the user follows', async () => {
+    // forward exists, reverse null
+    prismaMock.friend.findUnique
+      .mockResolvedValueOnce({
+        id: 1,
+        userId: 7,
+        friendId: 42,
+        comment: ''
+      } as never)
+      .mockResolvedValueOnce(null);
 
     const res = await request(app).get('/api/friends/status/42');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ isFriend: true });
+    expect(res.body).toEqual({ isFriend: true, isMutual: false });
+  });
+
+  it('returns isMutual true when both follow each other', async () => {
+    prismaMock.friend.findUnique
+      .mockResolvedValueOnce({
+        id: 1,
+        userId: 7,
+        friendId: 42,
+        comment: ''
+      } as never)
+      .mockResolvedValueOnce({
+        id: 2,
+        userId: 42,
+        friendId: 7,
+        comment: ''
+      } as never);
+
+    const res = await request(app).get('/api/friends/status/42');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ isFriend: true, isMutual: true });
   });
 
   it('rejects non-numeric userId with 400', async () => {
@@ -78,18 +126,36 @@ describe('GET /api/friends/status/:userId', () => {
 // ─── POST /api/friends/:userId ────────────────────────────────────────────────
 
 describe('POST /api/friends/:userId', () => {
-  it('adds a friend and returns 201', async () => {
+  it('adds a friend and returns 201 with the created resource', async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       id: 42,
       disabled: false
     } as never);
-    prismaMock.friend.create.mockResolvedValue({} as never);
+    prismaMock.friend.create.mockResolvedValue({
+      id: 5,
+      userId: 7,
+      friendId: 42,
+      comment: '',
+      friend: { id: 42, username: 'alice', avatar: null }
+    } as never);
+    // reverse mutual lookup — not followed back
+    prismaMock.friend.findUnique.mockResolvedValue(null);
 
     const res = await request(app).post('/api/friends/42');
 
     expect(res.status).toBe(201);
     expect(prismaMock.friend.create).toHaveBeenCalledWith({
-      data: { userId: 7, friendId: 42 }
+      data: { userId: 7, friendId: 42 },
+      include: {
+        friend: { select: { id: true, username: true, avatar: true } }
+      }
+    });
+    expect(res.body).toMatchObject({
+      id: 5,
+      friendId: 42,
+      comment: '',
+      friend: { username: 'alice' },
+      isMutual: false
     });
   });
 
@@ -203,6 +269,7 @@ describe('PUT /api/friends/:userId/comment', () => {
       .send({ comment: 'Great contributor' });
 
     expect(res.status).toBe(200);
+    expect(res.body.msg).toMatch(/updated/i);
     expect(prismaMock.friend.updateMany).toHaveBeenCalledWith({
       where: { userId: 7, friendId: 42 },
       data: { comment: 'Great contributor' }

@@ -38,10 +38,18 @@ router.get(
   validateParams(userIdParams),
   authHandler(async (req, res) => {
     const { userId: friendId } = parsedParams<{ userId: number }>(res);
-    const existing = await prisma.friend.findUnique({
-      where: { userId_friendId: { userId: req.user.id, friendId } }
+    const [forward, reverse] = await Promise.all([
+      prisma.friend.findUnique({
+        where: { userId_friendId: { userId: req.user.id, friendId } }
+      }),
+      prisma.friend.findUnique({
+        where: { userId_friendId: { userId: friendId, friendId: req.user.id } }
+      })
+    ]);
+    res.json({
+      isFriend: forward !== null,
+      isMutual: forward !== null && reverse !== null
     });
-    res.json({ isFriend: existing !== null });
   })
 );
 
@@ -63,7 +71,21 @@ router.get(
       }),
       prisma.friend.count({ where: { userId: req.user.id } })
     ]);
-    paginatedResponse(res, friends, total, pg);
+
+    const friendIds = friends.map((f) => f.friendId);
+    const mutuals = friendIds.length
+      ? await prisma.friend.findMany({
+          where: { userId: { in: friendIds }, friendId: req.user.id },
+          select: { userId: true }
+        })
+      : [];
+    const mutualSet = new Set(mutuals.map((m) => m.userId));
+    const data = friends.map((f) => ({
+      ...f,
+      isMutual: mutualSet.has(f.friendId)
+    }));
+
+    paginatedResponse(res, data, total, pg);
   })
 );
 
@@ -87,8 +109,14 @@ router.post(
       throw new AppError(404, 'User not found');
     }
 
+    let created;
     try {
-      await prisma.friend.create({ data: { userId: req.user.id, friendId } });
+      created = await prisma.friend.create({
+        data: { userId: req.user.id, friendId },
+        include: {
+          friend: { select: { id: true, username: true, avatar: true } }
+        }
+      });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') throw new AppError(409, 'Already friends');
@@ -97,7 +125,18 @@ router.post(
       throw err;
     }
 
-    res.status(201).json({});
+    const reverse = await prisma.friend.findUnique({
+      where: { userId_friendId: { userId: friendId, friendId: req.user.id } }
+    });
+
+    res.status(201).json({
+      id: created.id,
+      userId: created.userId,
+      friendId: created.friendId,
+      comment: created.comment,
+      friend: created.friend,
+      isMutual: reverse !== null
+    });
   })
 );
 
@@ -132,7 +171,7 @@ router.put(
       throw new AppError(404, 'Friend not found');
     }
 
-    res.json({});
+    res.json({ msg: 'Comment updated' });
   })
 );
 
