@@ -8454,6 +8454,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
+    /** List accepted friends */
     get: {
       parameters: {
         query?: {
@@ -8466,7 +8467,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Paginated friends list */
+        /** @description Paginated accepted-friends list */
         200: {
           headers: {
             [name: string]: unknown;
@@ -8497,6 +8498,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/friends/requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List incoming pending friend requests */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated incoming-requests list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              data: components['schemas']['FriendRequest'][];
+              meta: components['schemas']['PaginationMeta'];
+            };
+          };
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/friends/status/{userId}': {
     parameters: {
       query?: never;
@@ -8504,6 +8556,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
+    /** Relationship status with a user */
     get: {
       parameters: {
         query?: never;
@@ -8522,6 +8575,13 @@ export interface paths {
           };
           content: {
             'application/json': {
+              /** @enum {string} */
+              status:
+                | 'none'
+                | 'pending_sent'
+                | 'pending_received'
+                | 'accepted'
+                | 'rejected';
               isFriend: boolean;
             };
           };
@@ -8554,6 +8614,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
+    /** Send a friend request (or accept a reciprocal pending one) */
     post: {
       parameters: {
         query?: never;
@@ -8565,12 +8626,23 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Friend added */
+        /** @description A reciprocal pending request existed and was accepted (now friends) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['FriendEntry'];
+          };
+        };
+        /** @description Friend request sent (pending) */
         201: {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            'application/json': components['schemas']['FriendRequestSent'];
+          };
         };
         /** @description Cannot add self */
         400: {
@@ -8590,7 +8662,7 @@ export interface paths {
             'application/json': components['schemas']['MsgResponse'];
           };
         };
-        /** @description Already friends */
+        /** @description Already friends or a request is already pending */
         409: {
           headers: {
             [name: string]: unknown;
@@ -8601,6 +8673,7 @@ export interface paths {
         };
       };
     };
+    /** Remove a friend or cancel a request */
     delete: {
       parameters: {
         query?: never;
@@ -8612,7 +8685,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Friend removed */
+        /** @description Friendship/request removed */
         204: {
           headers: {
             [name: string]: unknown;
@@ -8635,6 +8708,100 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/friends/{userId}/accept': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Accept a pending request from a user */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Request accepted — now friends */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['FriendEntry'];
+          };
+        };
+        /** @description No pending request from this user */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/friends/{userId}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject a pending request from a user */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Request rejected */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+        /** @description No pending request from this user */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/friends/{userId}/comment': {
     parameters: {
       query?: never;
@@ -8643,6 +8810,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
+    /** Set a note on an accepted friendship */
     put: {
       parameters: {
         query?: never;
@@ -8665,7 +8833,9 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            'application/json': components['schemas']['MsgResponse'];
+          };
         };
         /** @description Validation error */
         400: {
@@ -12458,16 +12628,34 @@ export interface components {
       createdAt: string;
       updatedAt: string;
     };
+    FriendUserSummary: {
+      id: number;
+      username: string;
+      avatar: string | null;
+    };
     FriendEntry: {
       id: number;
-      userId: number;
       friendId: number;
       comment: string;
-      friend: {
-        id: number;
-        username: string;
-        avatar: string | null;
-      };
+      /** @enum {string} */
+      status: 'pending' | 'accepted' | 'rejected';
+      createdAt: string;
+      friend: components['schemas']['FriendUserSummary'];
+    };
+    FriendRequest: {
+      id: number;
+      requesterId: number;
+      createdAt: string;
+      requester: components['schemas']['FriendUserSummary'];
+    };
+    FriendRequestSent: {
+      id: number;
+      requesterId: number;
+      recipientId: number;
+      /** @enum {string} */
+      status: 'pending' | 'accepted' | 'rejected';
+      createdAt: string;
+      recipient: components['schemas']['FriendUserSummary'];
     };
     TagAliasItem: {
       id: number;

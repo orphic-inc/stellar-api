@@ -5316,19 +5316,51 @@ registry.registerPath({
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
+const FriendStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
+
+const UserSummary = registry.register(
+  'FriendUserSummary',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable()
+  })
+);
+
+// An accepted friendship as seen by the current user — `friend` is the other party.
 const FriendEntry = registry.register(
   'FriendEntry',
   z.object({
     id: z.number(),
-    userId: z.number(),
     friendId: z.number(),
     comment: z.string(),
-    isMutual: z.boolean(),
-    friend: z.object({
-      id: z.number(),
-      username: z.string(),
-      avatar: z.string().nullable()
-    })
+    status: FriendStatusEnum,
+    createdAt: z.string(),
+    friend: UserSummary
+  })
+);
+
+// An incoming pending request.
+const FriendRequest = registry.register(
+  'FriendRequest',
+  z.object({
+    id: z.number(),
+    requesterId: z.number(),
+    createdAt: z.string(),
+    requester: UserSummary
+  })
+);
+
+// The row returned when a request is sent (still pending).
+const FriendRequestSent = registry.register(
+  'FriendRequestSent',
+  z.object({
+    id: z.number(),
+    requesterId: z.number(),
+    recipientId: z.number(),
+    status: FriendStatusEnum,
+    createdAt: z.string(),
+    recipient: UserSummary
   })
 );
 
@@ -5336,6 +5368,7 @@ registry.registerPath({
   method: 'get',
   path: '/friends',
   tags: ['Friends'],
+  summary: 'List accepted friends',
   request: {
     query: z.object({
       page: z.coerce.number().int().positive().optional(),
@@ -5344,7 +5377,7 @@ registry.registerPath({
   },
   responses: {
     200: {
-      description: 'Paginated friends list',
+      description: 'Paginated accepted-friends list',
       content: {
         'application/json': {
           schema: z.object({ data: z.array(FriendEntry), meta: PaginationMeta })
@@ -5360,15 +5393,55 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
+  path: '/friends/requests',
+  tags: ['Friends'],
+  summary: 'List incoming pending friend requests',
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated incoming-requests list',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(FriendRequest),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/friends/status/{userId}',
   tags: ['Friends'],
+  summary: 'Relationship status with a user',
   request: { params: z.object({ userId: z.string() }) },
   responses: {
     200: {
       description: 'Friend status',
       content: {
         'application/json': {
-          schema: z.object({ isFriend: z.boolean(), isMutual: z.boolean() })
+          schema: z.object({
+            status: z.enum([
+              'none',
+              'pending_sent',
+              'pending_received',
+              'accepted',
+              'rejected'
+            ]),
+            isFriend: z.boolean()
+          })
         }
       }
     },
@@ -5383,10 +5456,16 @@ registry.registerPath({
   method: 'post',
   path: '/friends/{userId}',
   tags: ['Friends'],
+  summary: 'Send a friend request (or accept a reciprocal pending one)',
   request: { params: z.object({ userId: z.string() }) },
   responses: {
     201: {
-      description: 'Friend added',
+      description: 'Friend request sent (pending)',
+      content: { 'application/json': { schema: FriendRequestSent } }
+    },
+    200: {
+      description:
+        'A reciprocal pending request existed and was accepted (now friends)',
       content: { 'application/json': { schema: FriendEntry } }
     },
     400: {
@@ -5398,7 +5477,43 @@ registry.registerPath({
       content: { 'application/json': { schema: MsgResponse } }
     },
     409: {
-      description: 'Already friends',
+      description: 'Already friends or a request is already pending',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/friends/{userId}/accept',
+  tags: ['Friends'],
+  summary: 'Accept a pending request from a user',
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Request accepted — now friends',
+      content: { 'application/json': { schema: FriendEntry } }
+    },
+    404: {
+      description: 'No pending request from this user',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/friends/{userId}/reject',
+  tags: ['Friends'],
+  summary: 'Reject a pending request from a user',
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: 'Request rejected',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'No pending request from this user',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -5408,9 +5523,10 @@ registry.registerPath({
   method: 'delete',
   path: '/friends/{userId}',
   tags: ['Friends'],
+  summary: 'Remove a friend or cancel a request',
   request: { params: z.object({ userId: z.string() }) },
   responses: {
-    204: { description: 'Friend removed' },
+    204: { description: 'Friendship/request removed' },
     401: {
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5422,6 +5538,7 @@ registry.registerPath({
   method: 'put',
   path: '/friends/{userId}/comment',
   tags: ['Friends'],
+  summary: 'Set a note on an accepted friendship',
   request: {
     params: z.object({ userId: z.string() }),
     body: {

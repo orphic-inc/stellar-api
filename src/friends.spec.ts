@@ -8,12 +8,17 @@ import { Prisma } from '@prisma/client';
 
 beforeEach(() => resetApiTestState());
 
-// ─── GET /api/friends ─────────────────────────────────────────────────────────
+// Actor is user id 7 (set by the test harness auth stub).
+const ME = 7;
+const OTHER = 42;
+const summary = { id: OTHER, username: 'alice', avatar: null };
+
+// ─── GET /api/friends — accepted friends ──────────────────────────────────────
 
 describe('GET /api/friends', () => {
   it('returns paginated empty list when user has no friends', async () => {
-    prismaMock.friend.findMany.mockResolvedValue([]);
-    prismaMock.friend.count.mockResolvedValue(0);
+    prismaMock.friendRelationship.findMany.mockResolvedValue([]);
+    prismaMock.friendRelationship.count.mockResolvedValue(0);
 
     const res = await request(app).get('/api/friends');
 
@@ -22,99 +27,127 @@ describe('GET /api/friends', () => {
     expect(res.body.meta.total).toBe(0);
   });
 
-  it('returns paginated friend list ordered by username', async () => {
-    const mockFriend = {
-      id: 1,
-      userId: 7,
-      friendId: 42,
-      comment: 'Good person',
-      friend: { id: 42, username: 'alice', avatar: null }
-    };
-    // First findMany = page query; second = reverse mutual lookup (none)
-    prismaMock.friend.findMany
-      .mockResolvedValueOnce([mockFriend] as never)
-      .mockResolvedValueOnce([] as never);
-    prismaMock.friend.count.mockResolvedValue(1);
+  it('maps the friend to the other party when the actor is the requester', async () => {
+    prismaMock.friendRelationship.findMany.mockResolvedValue([
+      {
+        id: 1,
+        requesterId: ME,
+        recipientId: OTHER,
+        status: 'accepted',
+        comment: 'Good person',
+        createdAt: new Date(),
+        requester: { id: ME, username: 'me', avatar: null },
+        recipient: summary
+      }
+    ] as never);
+    prismaMock.friendRelationship.count.mockResolvedValue(1);
 
     const res = await request(app).get('/api/friends');
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].friendId).toBe(OTHER);
     expect(res.body.data[0].friend.username).toBe('alice');
-    expect(res.body.data[0].isMutual).toBe(false);
-    expect(res.body.meta.total).toBe(1);
+    expect(res.body.data[0].status).toBe('accepted');
     expect(res.body.meta).toHaveProperty('totalPages');
   });
 
-  it('flags isMutual true when the friend follows back', async () => {
-    const mockFriend = {
-      id: 1,
-      userId: 7,
-      friendId: 42,
-      comment: '',
-      friend: { id: 42, username: 'alice', avatar: null }
-    };
-    prismaMock.friend.findMany
-      .mockResolvedValueOnce([mockFriend] as never)
-      .mockResolvedValueOnce([{ userId: 42 }] as never);
-    prismaMock.friend.count.mockResolvedValue(1);
+  it('maps the friend to the other party when the actor is the recipient', async () => {
+    prismaMock.friendRelationship.findMany.mockResolvedValue([
+      {
+        id: 2,
+        requesterId: OTHER,
+        recipientId: ME,
+        status: 'accepted',
+        comment: '',
+        createdAt: new Date(),
+        requester: summary,
+        recipient: { id: ME, username: 'me', avatar: null }
+      }
+    ] as never);
+    prismaMock.friendRelationship.count.mockResolvedValue(1);
 
     const res = await request(app).get('/api/friends');
 
     expect(res.status).toBe(200);
-    expect(res.body.data[0].isMutual).toBe(true);
+    expect(res.body.data[0].friendId).toBe(OTHER);
+    expect(res.body.data[0].friend.username).toBe('alice');
+  });
+});
+
+// ─── GET /api/friends/requests — incoming pending ─────────────────────────────
+
+describe('GET /api/friends/requests', () => {
+  it('returns incoming pending requests', async () => {
+    prismaMock.friendRelationship.findMany.mockResolvedValue([
+      {
+        id: 9,
+        requesterId: OTHER,
+        recipientId: ME,
+        createdAt: new Date(),
+        requester: summary
+      }
+    ] as never);
+    prismaMock.friendRelationship.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/friends/requests');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].requesterId).toBe(OTHER);
+    expect(res.body.data[0].requester.username).toBe('alice');
   });
 });
 
 // ─── GET /api/friends/status/:userId ─────────────────────────────────────────
 
 describe('GET /api/friends/status/:userId', () => {
-  it('returns isFriend/isMutual false when not friends', async () => {
-    // forward + reverse both null
-    prismaMock.friend.findUnique.mockResolvedValue(null);
+  it('returns none when there is no relationship', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue(null);
 
-    const res = await request(app).get('/api/friends/status/42');
+    const res = await request(app).get(`/api/friends/status/${OTHER}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ isFriend: false, isMutual: false });
+    expect(res.body).toEqual({ status: 'none', isFriend: false });
   });
 
-  it('returns isFriend true, isMutual false when only the user follows', async () => {
-    // forward exists, reverse null
-    prismaMock.friend.findUnique
-      .mockResolvedValueOnce({
-        id: 1,
-        userId: 7,
-        friendId: 42,
-        comment: ''
-      } as never)
-      .mockResolvedValueOnce(null);
+  it('returns pending_sent when the actor sent the request', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 1,
+      requesterId: ME,
+      recipientId: OTHER,
+      status: 'pending'
+    } as never);
 
-    const res = await request(app).get('/api/friends/status/42');
+    const res = await request(app).get(`/api/friends/status/${OTHER}`);
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ isFriend: true, isMutual: false });
+    expect(res.body).toEqual({ status: 'pending_sent', isFriend: false });
   });
 
-  it('returns isMutual true when both follow each other', async () => {
-    prismaMock.friend.findUnique
-      .mockResolvedValueOnce({
-        id: 1,
-        userId: 7,
-        friendId: 42,
-        comment: ''
-      } as never)
-      .mockResolvedValueOnce({
-        id: 2,
-        userId: 42,
-        friendId: 7,
-        comment: ''
-      } as never);
+  it('returns pending_received when the other user sent the request', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 1,
+      requesterId: OTHER,
+      recipientId: ME,
+      status: 'pending'
+    } as never);
 
-    const res = await request(app).get('/api/friends/status/42');
+    const res = await request(app).get(`/api/friends/status/${OTHER}`);
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ isFriend: true, isMutual: true });
+    expect(res.body).toEqual({ status: 'pending_received', isFriend: false });
+  });
+
+  it('returns accepted/isFriend true when friends', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 1,
+      requesterId: ME,
+      recipientId: OTHER,
+      status: 'accepted'
+    } as never);
+
+    const res = await request(app).get(`/api/friends/status/${OTHER}`);
+
+    expect(res.body).toEqual({ status: 'accepted', isFriend: true });
   });
 
   it('rejects non-numeric userId with 400', async () => {
@@ -123,44 +156,71 @@ describe('GET /api/friends/status/:userId', () => {
   });
 });
 
-// ─── POST /api/friends/:userId ────────────────────────────────────────────────
+// ─── POST /api/friends/:userId — send request ─────────────────────────────────
 
 describe('POST /api/friends/:userId', () => {
-  it('adds a friend and returns 201 with the created resource', async () => {
+  it('sends a pending request and returns 201', async () => {
     prismaMock.user.findUnique.mockResolvedValue({
-      id: 42,
+      id: OTHER,
       disabled: false
     } as never);
-    prismaMock.friend.create.mockResolvedValue({
+    prismaMock.friendRelationship.findFirst.mockResolvedValue(null);
+    prismaMock.friendRelationship.create.mockResolvedValue({
       id: 5,
-      userId: 7,
-      friendId: 42,
-      comment: '',
-      friend: { id: 42, username: 'alice', avatar: null }
+      requesterId: ME,
+      recipientId: OTHER,
+      status: 'pending',
+      createdAt: new Date(),
+      recipient: summary
     } as never);
-    // reverse mutual lookup — not followed back
-    prismaMock.friend.findUnique.mockResolvedValue(null);
 
-    const res = await request(app).post('/api/friends/42');
+    const res = await request(app).post(`/api/friends/${OTHER}`);
 
     expect(res.status).toBe(201);
-    expect(prismaMock.friend.create).toHaveBeenCalledWith({
-      data: { userId: 7, friendId: 42 },
+    expect(prismaMock.friendRelationship.create).toHaveBeenCalledWith({
+      data: { requesterId: ME, recipientId: OTHER },
       include: {
-        friend: { select: { id: true, username: true, avatar: true } }
+        recipient: { select: { id: true, username: true, avatar: true } }
       }
     });
     expect(res.body).toMatchObject({
       id: 5,
-      friendId: 42,
-      comment: '',
-      friend: { username: 'alice' },
-      isMutual: false
+      status: 'pending',
+      recipient: { username: 'alice' }
     });
   });
 
+  it('accepts a reciprocal pending request instead of duplicating (200)', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: OTHER,
+      disabled: false
+    } as never);
+    // a pending request from OTHER → ME already exists
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 8,
+      requesterId: OTHER,
+      recipientId: ME,
+      status: 'pending'
+    } as never);
+    prismaMock.friendRelationship.update.mockResolvedValue({
+      id: 8,
+      requesterId: OTHER,
+      recipientId: ME,
+      status: 'accepted',
+      comment: '',
+      requester: summary,
+      recipient: { id: ME, username: 'me', avatar: null }
+    } as never);
+
+    const res = await request(app).post(`/api/friends/${OTHER}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'accepted', friendId: OTHER });
+    expect(prismaMock.friendRelationship.create).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when adding self (actor id = 7)', async () => {
-    const res = await request(app).post('/api/friends/7');
+    const res = await request(app).post(`/api/friends/${ME}`);
     expect(res.status).toBe(400);
     expect(res.body.msg).toMatch(/yourself/i);
   });
@@ -184,44 +244,56 @@ describe('POST /api/friends/:userId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 409 on duplicate friendship (P2002)', async () => {
+  it('returns 409 when already friends', async () => {
     prismaMock.user.findUnique.mockResolvedValue({
-      id: 42,
+      id: OTHER,
       disabled: false
     } as never);
-    prismaMock.friend.create.mockRejectedValue(
-      Object.assign(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '5.0.0'
-        }),
-        {}
-      )
-    );
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 1,
+      requesterId: ME,
+      recipientId: OTHER,
+      status: 'accepted'
+    } as never);
 
-    const res = await request(app).post('/api/friends/42');
+    const res = await request(app).post(`/api/friends/${OTHER}`);
 
     expect(res.status).toBe(409);
   });
 
-  it('returns 404 on FK violation (P2003 — user deleted between check and create)', async () => {
+  it('returns 409 when a request is already pending from the actor', async () => {
     prismaMock.user.findUnique.mockResolvedValue({
-      id: 42,
+      id: OTHER,
       disabled: false
     } as never);
-    prismaMock.friend.create.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError(
-        'Foreign key constraint failed',
-        {
-          code: 'P2003',
-          clientVersion: '5.0.0'
-        }
-      )
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 1,
+      requesterId: ME,
+      recipientId: OTHER,
+      status: 'pending'
+    } as never);
+
+    const res = await request(app).post(`/api/friends/${OTHER}`);
+
+    expect(res.status).toBe(409);
+  });
+
+  it('returns 409 on a duplicate-create race (P2002)', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: OTHER,
+      disabled: false
+    } as never);
+    prismaMock.friendRelationship.findFirst.mockResolvedValue(null);
+    prismaMock.friendRelationship.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0'
+      })
     );
 
-    const res = await request(app).post('/api/friends/42');
+    const res = await request(app).post(`/api/friends/${OTHER}`);
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(409);
   });
 
   it('rejects non-numeric userId with 400', async () => {
@@ -230,22 +302,86 @@ describe('POST /api/friends/:userId', () => {
   });
 });
 
-// ─── DELETE /api/friends/:userId ──────────────────────────────────────────────
+// ─── POST /api/friends/:userId/accept ─────────────────────────────────────────
 
-describe('DELETE /api/friends/:userId', () => {
-  it('removes friendship and returns 204', async () => {
-    prismaMock.friend.deleteMany.mockResolvedValue({ count: 1 });
+describe('POST /api/friends/:userId/accept', () => {
+  it('accepts a pending request and returns the friendship', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue({
+      id: 8,
+      requesterId: OTHER,
+      recipientId: ME,
+      status: 'pending'
+    } as never);
+    prismaMock.friendRelationship.update.mockResolvedValue({
+      id: 8,
+      requesterId: OTHER,
+      recipientId: ME,
+      status: 'accepted',
+      comment: '',
+      requester: summary
+    } as never);
 
-    const res = await request(app).delete('/api/friends/42');
+    const res = await request(app).post(`/api/friends/${OTHER}/accept`);
 
-    expect(res.status).toBe(204);
-    expect(prismaMock.friend.deleteMany).toHaveBeenCalledWith({
-      where: { userId: 7, friendId: 42 }
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      status: 'accepted',
+      friendId: OTHER,
+      friend: { username: 'alice' }
     });
   });
 
-  it('returns 204 even when friendship does not exist (graceful)', async () => {
-    prismaMock.friend.deleteMany.mockResolvedValue({ count: 0 });
+  it('returns 404 when there is no pending request from the user', async () => {
+    prismaMock.friendRelationship.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).post(`/api/friends/${OTHER}/accept`);
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── POST /api/friends/:userId/reject ─────────────────────────────────────────
+
+describe('POST /api/friends/:userId/reject', () => {
+  it('rejects a pending request and returns a message', async () => {
+    prismaMock.friendRelationship.updateMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).post(`/api/friends/${OTHER}/reject`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.msg).toMatch(/rejected/i);
+  });
+
+  it('returns 404 when there is no pending request', async () => {
+    prismaMock.friendRelationship.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app).post(`/api/friends/${OTHER}/reject`);
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── DELETE /api/friends/:userId ──────────────────────────────────────────────
+
+describe('DELETE /api/friends/:userId', () => {
+  it('removes the relationship in either direction and returns 204', async () => {
+    prismaMock.friendRelationship.deleteMany.mockResolvedValue({ count: 1 });
+
+    const res = await request(app).delete(`/api/friends/${OTHER}`);
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.friendRelationship.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { requesterId: ME, recipientId: OTHER },
+          { requesterId: OTHER, recipientId: ME }
+        ]
+      }
+    });
+  });
+
+  it('returns 204 even when nothing exists (graceful)', async () => {
+    prismaMock.friendRelationship.deleteMany.mockResolvedValue({ count: 0 });
 
     const res = await request(app).delete('/api/friends/999');
 
@@ -261,23 +397,29 @@ describe('DELETE /api/friends/:userId', () => {
 // ─── PUT /api/friends/:userId/comment ────────────────────────────────────────
 
 describe('PUT /api/friends/:userId/comment', () => {
-  it('updates the comment and returns 200', async () => {
-    prismaMock.friend.updateMany.mockResolvedValue({ count: 1 });
+  it('updates the comment on an accepted friendship and returns 200', async () => {
+    prismaMock.friendRelationship.updateMany.mockResolvedValue({ count: 1 });
 
     const res = await request(app)
-      .put('/api/friends/42/comment')
+      .put(`/api/friends/${OTHER}/comment`)
       .send({ comment: 'Great contributor' });
 
     expect(res.status).toBe(200);
     expect(res.body.msg).toMatch(/updated/i);
-    expect(prismaMock.friend.updateMany).toHaveBeenCalledWith({
-      where: { userId: 7, friendId: 42 },
+    expect(prismaMock.friendRelationship.updateMany).toHaveBeenCalledWith({
+      where: {
+        status: 'accepted',
+        OR: [
+          { requesterId: ME, recipientId: OTHER },
+          { requesterId: OTHER, recipientId: ME }
+        ]
+      },
       data: { comment: 'Great contributor' }
     });
   });
 
-  it('returns 404 when friendship does not exist', async () => {
-    prismaMock.friend.updateMany.mockResolvedValue({ count: 0 });
+  it('returns 404 when no accepted friendship exists', async () => {
+    prismaMock.friendRelationship.updateMany.mockResolvedValue({ count: 0 });
 
     const res = await request(app)
       .put('/api/friends/999/comment')
@@ -288,17 +430,17 @@ describe('PUT /api/friends/:userId/comment', () => {
 
   it('rejects comment longer than 500 chars with 400', async () => {
     const res = await request(app)
-      .put('/api/friends/42/comment')
+      .put(`/api/friends/${OTHER}/comment`)
       .send({ comment: 'x'.repeat(501) });
 
     expect(res.status).toBe(400);
   });
 
   it('accepts empty string as comment', async () => {
-    prismaMock.friend.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.friendRelationship.updateMany.mockResolvedValue({ count: 1 });
 
     const res = await request(app)
-      .put('/api/friends/42/comment')
+      .put(`/api/friends/${OTHER}/comment`)
       .send({ comment: '' });
 
     expect(res.status).toBe(200);

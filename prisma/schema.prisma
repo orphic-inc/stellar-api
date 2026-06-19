@@ -424,8 +424,8 @@ model User {
   invitesSent              Invite[]
   inviteTree               InviteTree?                      @relation("InviteTreeMember")
   invitees                 InviteTree[]                     @relation("InviteTreeInviter")
-  friends                  Friend[]                         @relation("UserFriends")
-  friendOf                 Friend[]                         @relation("FriendOf")
+  friendRequestsSent       FriendRelationship[]             @relation("FriendRequester")
+  friendRequestsReceived   FriendRelationship[]             @relation("FriendRecipient")
   communityStaff           Community[]                      @relation("CommunityStaff")
   consumer                 Consumer?
   contributor              Contributor?
@@ -558,16 +558,29 @@ model InviteTree {
   @@map("invite_trees")
 }
 
-model Friend {
-  id       Int    @id @default(autoincrement())
-  userId   Int
-  user     User   @relation("UserFriends", fields: [userId], references: [id])
-  friendId Int
-  friend   User   @relation("FriendOf", fields: [friendId], references: [id])
-  comment  String @default("")
+enum FriendStatus {
+  pending
+  accepted
+  rejected
+}
 
-  @@unique([userId, friendId])
-  @@map("friends")
+// PRD-01 Friends System: a friend-request lifecycle (pending → accepted /
+// rejected). One row per directed request; an accepted row represents the
+// symmetric friendship between requester and recipient. `comment` is a note on
+// the relationship.
+model FriendRelationship {
+  id          Int          @id @default(autoincrement())
+  requesterId Int
+  requester   User         @relation("FriendRequester", fields: [requesterId], references: [id])
+  recipientId Int
+  recipient   User         @relation("FriendRecipient", fields: [recipientId], references: [id])
+  status      FriendStatus @default(pending)
+  comment     String       @default("")
+  createdAt   DateTime     @default(now())
+
+  @@unique([requesterId, recipientId])
+  @@index([recipientId, status])
+  @@map("friend_relationships")
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────

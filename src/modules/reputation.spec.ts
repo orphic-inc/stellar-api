@@ -10,7 +10,7 @@ const mockPrismaEconomy = { count: jest.fn() };
 jest.mock('../lib/prisma', () => ({
   prisma: {
     user: mockPrismaUser,
-    friend: mockPrismaFriend,
+    friendRelationship: mockPrismaFriend,
     economyTransaction: mockPrismaEconomy
   }
 }));

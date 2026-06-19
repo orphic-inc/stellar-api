@@ -313,6 +313,14 @@ WrongSpecifiedMedia WrongSpecifiedMedia
     
 
 
+        FriendStatus {
+            pending pending
+accepted accepted
+rejected rejected
+        }
+    
+
+
         ReleaseTagVoteDirection {
             up up
 down down
@@ -492,9 +500,11 @@ Yearly Yearly
     }
   
 
-  "friends" {
+  "friend_relationships" {
     Int id "🗝️"
+    FriendStatus status 
     String comment 
+    DateTime createdAt 
     }
   
 
@@ -1581,8 +1591,9 @@ Yearly Yearly
     "invites" |o--|| "InviteStatus" : "enum:status"
     "invite_trees" |o--|| users : "user"
     "invite_trees" }o--|o users : "inviter"
-    "friends" }o--|| users : "user"
-    "friends" }o--|| users : "friend"
+    "friend_relationships" }o--|| users : "requester"
+    "friend_relationships" }o--|| users : "recipient"
+    "friend_relationships" |o--|| "FriendStatus" : "enum:status"
     "author_stylesheets" }o--|| users : "author"
     "forums" }o--|| forum_categories : "forumCategory"
     "forums" }o--|o forum_topics : "lastTopic"

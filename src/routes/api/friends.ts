@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { Prisma, FriendStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { sanitizePlain } from '../../lib/sanitize';
@@ -31,139 +31,283 @@ const commentSchema = z.object({
   comment: z.string().max(500)
 });
 
-// GET /status/:userId before /:userId/* to avoid shadowing
+const userSummary = { id: true, username: true, avatar: true } as const;
+
+// Either-direction match for a relationship between the actor and `otherId`.
+const betweenUsers = (actorId: number, otherId: number) => ({
+  OR: [
+    { requesterId: actorId, recipientId: otherId },
+    { requesterId: otherId, recipientId: actorId }
+  ]
+});
+
+// ─── GET /status/:userId ──────────────────────────────────────────────────────
+// Static/specific segments registered before /:userId to avoid shadowing.
 router.get(
   '/status/:userId',
   requireAuth,
   validateParams(userIdParams),
   authHandler(async (req, res) => {
-    const { userId: friendId } = parsedParams<{ userId: number }>(res);
-    const [forward, reverse] = await Promise.all([
-      prisma.friend.findUnique({
-        where: { userId_friendId: { userId: req.user.id, friendId } }
-      }),
-      prisma.friend.findUnique({
-        where: { userId_friendId: { userId: friendId, friendId: req.user.id } }
-      })
-    ]);
-    res.json({
-      isFriend: forward !== null,
-      isMutual: forward !== null && reverse !== null
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const rel = await prisma.friendRelationship.findFirst({
+      where: betweenUsers(req.user.id, otherId)
     });
+
+    let status:
+      | 'none'
+      | 'pending_sent'
+      | 'pending_received'
+      | 'accepted'
+      | 'rejected' = 'none';
+    if (rel) {
+      if (rel.status === FriendStatus.accepted) status = 'accepted';
+      else if (rel.status === FriendStatus.rejected) status = 'rejected';
+      else
+        status =
+          rel.requesterId === req.user.id ? 'pending_sent' : 'pending_received';
+    }
+
+    res.json({ status, isFriend: status === 'accepted' });
   })
 );
 
+// ─── GET /requests — incoming pending requests ────────────────────────────────
+router.get(
+  '/requests',
+  requireAuth,
+  validateQuery(friendsQuerySchema),
+  authHandler(async (req, res) => {
+    const pg = parsedPage(res);
+    const where = {
+      recipientId: req.user.id,
+      status: FriendStatus.pending
+    };
+    const [rows, total] = await Promise.all([
+      prisma.friendRelationship.findMany({
+        where,
+        include: { requester: { select: userSummary } },
+        orderBy: { createdAt: 'desc' },
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.friendRelationship.count({ where })
+    ]);
+    const data = rows.map((r) => ({
+      id: r.id,
+      requesterId: r.requesterId,
+      requester: r.requester,
+      createdAt: r.createdAt
+    }));
+    paginatedResponse(res, data, total, pg);
+  })
+);
+
+// ─── GET / — accepted friends (either direction) ──────────────────────────────
 router.get(
   '/',
   requireAuth,
   validateQuery(friendsQuerySchema),
   authHandler(async (req, res) => {
     const pg = parsedPage(res);
-    const [friends, total] = await Promise.all([
-      prisma.friend.findMany({
-        where: { userId: req.user.id },
+    const where = {
+      status: FriendStatus.accepted,
+      OR: [{ requesterId: req.user.id }, { recipientId: req.user.id }]
+    };
+    const [rows, total] = await Promise.all([
+      prisma.friendRelationship.findMany({
+        where,
         include: {
-          friend: { select: { id: true, username: true, avatar: true } }
+          requester: { select: userSummary },
+          recipient: { select: userSummary }
         },
-        orderBy: { friend: { username: 'asc' } },
+        orderBy: { createdAt: 'desc' },
         skip: pg.skip,
         take: pg.limit
       }),
-      prisma.friend.count({ where: { userId: req.user.id } })
+      prisma.friendRelationship.count({ where })
     ]);
-
-    const friendIds = friends.map((f) => f.friendId);
-    const mutuals = friendIds.length
-      ? await prisma.friend.findMany({
-          where: { userId: { in: friendIds }, friendId: req.user.id },
-          select: { userId: true }
-        })
-      : [];
-    const mutualSet = new Set(mutuals.map((m) => m.userId));
-    const data = friends.map((f) => ({
-      ...f,
-      isMutual: mutualSet.has(f.friendId)
-    }));
-
+    const data = rows.map((r) => {
+      const friend = r.requesterId === req.user.id ? r.recipient : r.requester;
+      return {
+        id: r.id,
+        friendId: friend.id,
+        comment: r.comment,
+        status: r.status,
+        createdAt: r.createdAt,
+        friend
+      };
+    });
     paginatedResponse(res, data, total, pg);
   })
 );
 
+// ─── POST /:userId — send a friend request ────────────────────────────────────
+// If the target has already sent the actor a pending request, this accepts it
+// (so two opposite-direction pending rows never coexist).
 router.post(
   '/:userId',
   requireAuth,
   validateParams(userIdParams),
   authHandler(async (req, res) => {
-    const { userId: friendId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
 
-    if (friendId === req.user.id) {
+    if (otherId === req.user.id) {
       throw new AppError(400, 'Cannot add yourself as a friend');
     }
 
     const target = await prisma.user.findUnique({
-      where: { id: friendId },
+      where: { id: otherId },
       select: { id: true, disabled: true }
     });
-
     if (!target || target.disabled) {
       throw new AppError(404, 'User not found');
     }
 
+    const existing = await prisma.friendRelationship.findFirst({
+      where: betweenUsers(req.user.id, otherId)
+    });
+
+    if (existing) {
+      if (existing.status === FriendStatus.accepted) {
+        throw new AppError(409, 'Already friends');
+      }
+      if (existing.status === FriendStatus.pending) {
+        if (existing.requesterId === req.user.id) {
+          throw new AppError(409, 'Friend request already pending');
+        }
+        // Reverse pending request exists → accept it instead of duplicating.
+        const accepted = await prisma.friendRelationship.update({
+          where: { id: existing.id },
+          data: { status: FriendStatus.accepted },
+          include: {
+            requester: { select: userSummary },
+            recipient: { select: userSummary }
+          }
+        });
+        const friend = accepted.requester;
+        res.status(200).json({
+          id: accepted.id,
+          friendId: friend.id,
+          status: accepted.status,
+          comment: accepted.comment,
+          friend
+        });
+        return;
+      }
+      // A prior rejected row exists — clear it so a fresh request can be made.
+      await prisma.friendRelationship.delete({ where: { id: existing.id } });
+    }
+
     let created;
     try {
-      created = await prisma.friend.create({
-        data: { userId: req.user.id, friendId },
-        include: {
-          friend: { select: { id: true, username: true, avatar: true } }
-        }
+      created = await prisma.friendRelationship.create({
+        data: { requesterId: req.user.id, recipientId: otherId },
+        include: { recipient: { select: userSummary } }
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') throw new AppError(409, 'Already friends');
+        if (err.code === 'P2002') {
+          throw new AppError(409, 'Friend request already pending');
+        }
         if (err.code === 'P2003') throw new AppError(404, 'User not found');
       }
       throw err;
     }
 
-    const reverse = await prisma.friend.findUnique({
-      where: { userId_friendId: { userId: friendId, friendId: req.user.id } }
-    });
-
     res.status(201).json({
       id: created.id,
-      userId: created.userId,
-      friendId: created.friendId,
-      comment: created.comment,
-      friend: created.friend,
-      isMutual: reverse !== null
+      requesterId: created.requesterId,
+      recipientId: created.recipientId,
+      status: created.status,
+      createdAt: created.createdAt,
+      recipient: created.recipient
     });
   })
 );
 
+// ─── POST /:userId/accept — accept a pending request from :userId ─────────────
+router.post(
+  '/:userId/accept',
+  requireAuth,
+  validateParams(userIdParams),
+  authHandler(async (req, res) => {
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const pending = await prisma.friendRelationship.findFirst({
+      where: {
+        requesterId: otherId,
+        recipientId: req.user.id,
+        status: FriendStatus.pending
+      }
+    });
+    if (!pending) {
+      throw new AppError(404, 'No pending friend request from this user');
+    }
+    const accepted = await prisma.friendRelationship.update({
+      where: { id: pending.id },
+      data: { status: FriendStatus.accepted },
+      include: { requester: { select: userSummary } }
+    });
+    res.json({
+      id: accepted.id,
+      friendId: accepted.requester.id,
+      status: accepted.status,
+      comment: accepted.comment,
+      friend: accepted.requester
+    });
+  })
+);
+
+// ─── POST /:userId/reject — reject a pending request from :userId ─────────────
+router.post(
+  '/:userId/reject',
+  requireAuth,
+  validateParams(userIdParams),
+  authHandler(async (req, res) => {
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const result = await prisma.friendRelationship.updateMany({
+      where: {
+        requesterId: otherId,
+        recipientId: req.user.id,
+        status: FriendStatus.pending
+      },
+      data: { status: FriendStatus.rejected }
+    });
+    if (result.count === 0) {
+      throw new AppError(404, 'No pending friend request from this user');
+    }
+    res.json({ msg: 'Friend request rejected' });
+  })
+);
+
+// ─── DELETE /:userId — remove friend / cancel request (either direction) ──────
 router.delete(
   '/:userId',
   requireAuth,
   validateParams(userIdParams),
   authHandler(async (req, res) => {
-    const { userId: friendId } = parsedParams<{ userId: number }>(res);
-    await prisma.friend.deleteMany({
-      where: { userId: req.user.id, friendId }
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    await prisma.friendRelationship.deleteMany({
+      where: betweenUsers(req.user.id, otherId)
     });
     res.status(204).send();
   })
 );
 
+// ─── PUT /:userId/comment — note on an accepted friendship ────────────────────
 router.put(
   '/:userId/comment',
   requireAuth,
   validateParams(userIdParams),
   validate(commentSchema),
   authHandler(async (req, res) => {
-    const { userId: friendId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = parsedParams<{ userId: number }>(res);
     const { comment } = parsedBody<{ comment: string }>(res);
 
-    const result = await prisma.friend.updateMany({
-      where: { userId: req.user.id, friendId },
+    const result = await prisma.friendRelationship.updateMany({
+      where: {
+        status: FriendStatus.accepted,
+        ...betweenUsers(req.user.id, otherId)
+      },
       data: { comment: sanitizePlain(comment) }
     });
 

@@ -114,9 +114,10 @@ const ratioScorer: DimensionScorer = {
 // explicit that "friend count alone should not determine score", so this is
 // deliberately the weakest dimension: a LOW cap and heavy diminishing returns,
 // so even a huge friend list can't dominate longevity/ratio — and ring-farming
-// (the model is a directed add, no reciprocity yet, #60) hits the cap fast.
-// Quality-weighting (mutuality, friend account age, network diversity) is
-// future work per the PRD.
+// hits the cap fast. The count is *accepted* friendships only (#60 request →
+// accept lifecycle), so a one-sided request earns nothing until reciprocated.
+// Further quality-weighting (friend account age, network diversity) is future
+// work per the PRD.
 const FRIENDS_CAP = 4;
 const FRIENDS_TAU = 5; // 5 friends → ~63% of cap; diminishing hard after
 const FRIENDS_WEIGHT = 1.0;
@@ -243,7 +244,13 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
           ircNick: true
         }
       }),
-      prisma.friend.count({ where: { userId } }),
+      // Accepted friendships in either direction (requester or recipient).
+      prisma.friendRelationship.count({
+        where: {
+          status: 'accepted',
+          OR: [{ requesterId: userId }, { recipientId: userId }]
+        }
+      }),
       // Distinct (adopter, author) pairs where this user is the author — one
       // ledger row per pair (deduped at write), so a plain count is the distinct
       // adoption count. Feeds both the stylesheet (author reward) and friends
