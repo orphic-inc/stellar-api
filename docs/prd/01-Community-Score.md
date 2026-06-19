@@ -188,15 +188,18 @@ Ratio (the contributed/consumed download gate, PRD-06) and CRS are layered stric
 - A derived RatioScore flows one-way into this CRS (and the eventual CommunityValueIndex) as one bounded dimension among many.
 - CRS never gates downloads. It is a status/trust signal, not an enforcement lever.
 
-Implementation status (PR #96)
+Implementation status
 
-The registry + aggregator (computed-on-read) ship with three bounded dimensions:
+The registry + aggregator (computed-on-read, PR #96) ship the full v0.0.x dimension formula plus dimensions brought forward from later versions:
 
 - ✅ LongevityScore — account age, diminishing returns, cap 10.
 - ✅ RatioScore — current ratio health, one-way, cap 8; gated on contributed > 0.
-- ✅ FriendsScore — friend count, deliberately low cap 4 (count can't dominate).
-- ⏳ InviteScore, DonationScore — next dimensions (#61, #62).
-- Surfaced at GET /api/profile/me/reputation (score + per-dimension breakdown).
+- ✅ FriendsScore — accepted friendships, deliberately low cap 4 (count can't dominate); also carries the Friends×Stylesheet controlled vector (PRD-03 #147).
+- ✅ InviteScore — direct invitees only, cap 5; active+contributing and long-lived invitees raise it, banned and warned/dormant invitees erode it, net floored at 0 (#61 substrate + #192 dimension).
+- ✅ DonationScore — supportConsistency + supportLongevity, cap 3 (the lowest), deliberately amount-agnostic so value can't dominate (#62 substrate + #192 dimension).
+- ✅ IRCScore (cap 6, brought forward from v0.1.x, ADR-0013) and StylesheetScore (cap 6, PRD-03) — registered ahead of the v0.0.x roadmap.
+- **The v0.0.x formula (Friends + Invite + Donation + Longevity) is therefore complete.** Subsequent dimensions (CommunityScore #75/#76, LinkHealthBonusPoints #95) slot into the same registry.
+- Surfaced two ways: GET /api/profile/me/reputation (own score + per-dimension breakdown), and — as of #193 — a paranoia-gated `community` block on every profile (GET /api/profile/me and /user/:id) carrying friends count, invite summary, and the reputation view. The block is hidden at the top paranoia tier, and its snatch-derived `ratio` dimension drops out when the viewer can't see consumed stats.
 
 ⸻
 
@@ -367,6 +370,8 @@ Invite Tree Depth
 Donation History
 Community Reputation
 Community Participation
+
+Status (#193): Member Since, Friends count, Invited Users + Invite Tree Depth, and Community Reputation are surfaced via the paranoia-gated `community` block on the profile; Community Participation is approximated by the existing activity summary. **Donation History on the profile is the remaining unbuilt field** — deferred pending the donation-visibility/anonymity decision (donations are admin-only today, and the PRD allows anonymous donations).
 
 ⸻
 
