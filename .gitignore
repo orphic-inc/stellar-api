@@ -7,6 +7,5 @@ node_modules/
 dist/
 src/**/*.js
 src/**/*.js.map
-openapi.json
 .DS_Store
 .playwright-mcp/
