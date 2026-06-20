@@ -1,3 +1,4 @@
 # Generated artifacts — leave byte-identical to their generators so the
 # committed file never drifts from a fresh `prisma generate` / export.
 docs/erd.md
+openapi.json
