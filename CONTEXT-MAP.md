@@ -8,7 +8,7 @@ Stellar's domain spans multiple repositories; one of them (`korin.pink`) is **ex
 | **Frontend**                 | `orphic-inc/stellar-ui`              | [stellar-ui `CONTEXT.md`](https://github.com/orphic-inc/stellar-ui/blob/main/CONTEXT.md)    | stellar-ui `docs/adr/`     | React/TS client; the theming subsystem glossary                               |
 | **IRC + accounting sidecar** | `obrien-k/korin-pink` _(external)_   | [korin `docs/CONTEXT.md`](https://github.com/obrien-k/korin-pink/blob/main/docs/CONTEXT.md) | korin `docs/adr/`          | IRC substrate (Ergo + bridge + wiki) and the Go `ledger` accounting authority |
 
-**Cross-repo / system-wide decisions live in this repo's `docs/adr/`** — notably [ADR-0013](./docs/adr/0013-korin-pink-irc-integration.md) (the korin↔stellar integration boundary) and [ADR-0016](./docs/adr/0016-ledger-accounting-contract.md) (the consumption-accounting & ratio-gate contract). Each other repo carries its own context-scoped ADRs.
+**Cross-repo / system-wide decisions live in this repo's `docs/adr/`** — notably [ADR-0013](./docs/adr/0013-korin-pink-irc-integration.md) (the korin↔stellar integration boundary), [ADR-0016](./docs/adr/0016-ledger-accounting-contract.md) (the consumption-accounting & ratio-gate contract), and [ADR-0018](./docs/adr/0018-development-lifecycle-and-contract-gate.md) (the development lifecycle and the enforced API/UI contract gate). Each other repo carries its own context-scoped ADRs.
 
 ## Contract hygiene — pairing API surfaces with UI tracking
 
