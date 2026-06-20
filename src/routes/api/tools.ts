@@ -18,8 +18,12 @@ import {
 import {
   createRankSchema,
   updateRankSchema,
+  createPromotionRuleSchema,
+  updatePromotionRuleSchema,
   type CreateRankInput,
-  type UpdateRankInput
+  type UpdateRankInput,
+  type CreatePromotionRuleInput,
+  type UpdatePromotionRuleInput
 } from '../../schemas/tools';
 import {
   createStaffGroupSchema,
@@ -35,6 +39,33 @@ const userRankIdParamsSchema = z.object({
 });
 const staffGroupIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
+});
+const promotionRuleIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+
+const formatPromotionRule = (
+  r: Prisma.RankPromotionRuleGetPayload<{
+    include: {
+      fromRank: { select: { name: true } };
+      toRank: { select: { name: true } };
+    };
+  }>
+) => ({
+  id: r.id,
+  fromRankId: r.fromRankId,
+  fromRankName: r.fromRank?.name ?? null,
+  toRankId: r.toRankId,
+  toRankName: r.toRank?.name ?? null,
+  // bytes — serialized as a string to survive values past MAX_SAFE_INTEGER
+  minContributed: r.minContributed.toString(),
+  minRatio: r.minRatio,
+  minContributions: r.minContributions,
+  minAccountAgeDays: r.minAccountAgeDays,
+  extra: r.extra,
+  enabled: r.enabled,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt
 });
 
 const formatRank = (
@@ -304,6 +335,206 @@ router.delete(
           actorId: req.user.id,
           action: 'rank.delete',
           targetType: 'UserRank',
+          targetId: id
+        }
+      })
+    ]);
+    res.status(204).send();
+  })
+);
+
+// ─── Rank Promotion Rules (#170) ─────────────────────────────────────────────────
+// CRUD over the auto-class evaluator's rule table. Same gate as the rest of the
+// rank tooling (rank_permissions_manage). The unique [fromRankId, toRankId] pair
+// surfaces as a 409.
+
+const promotionRuleInclude = {
+  fromRank: { select: { name: true } },
+  toRank: { select: { name: true } }
+} as const;
+
+// GET /api/tools/promotion-rules — list all promotion rules
+router.get(
+  '/promotion-rules',
+  ...requirePermission('rank_permissions_manage'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const rules = await prisma.rankPromotionRule.findMany({
+      orderBy: [{ fromRankId: 'asc' }, { toRankId: 'asc' }],
+      include: promotionRuleInclude
+    });
+    res.json(rules.map(formatPromotionRule));
+  })
+);
+
+// GET /api/tools/promotion-rules/:id — single promotion rule
+router.get(
+  '/promotion-rules/:id',
+  ...requirePermission('rank_permissions_manage'),
+  validateParams(promotionRuleIdParamsSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const rule = await prisma.rankPromotionRule.findUnique({
+      where: { id },
+      include: promotionRuleInclude
+    });
+    if (!rule) return res.status(404).json({ msg: 'Promotion rule not found' });
+    res.json(formatPromotionRule(rule));
+  })
+);
+
+// POST /api/tools/promotion-rules — create a promotion rule
+router.post(
+  '/promotion-rules',
+  ...requirePermission('rank_permissions_manage'),
+  validate(createPromotionRuleSchema),
+  authHandler(async (req, res) => {
+    const data = parsedBody<CreatePromotionRuleInput>(res);
+
+    const rankCount = await prisma.userRank.count({
+      where: { id: { in: [data.fromRankId, data.toRankId] } }
+    });
+    if (rankCount !== 2) {
+      return res.status(422).json({ msg: 'fromRank or toRank does not exist' });
+    }
+
+    try {
+      const rule = await prisma.rankPromotionRule.create({
+        data: {
+          fromRankId: data.fromRankId,
+          toRankId: data.toRankId,
+          minContributed: data.minContributed,
+          minRatio: data.minRatio,
+          minContributions: data.minContributions,
+          minAccountAgeDays: data.minAccountAgeDays,
+          extra: data.extra,
+          enabled: data.enabled
+        },
+        include: promotionRuleInclude
+      });
+
+      await audit(
+        prisma,
+        req.user.id,
+        'promotionRule.create',
+        'RankPromotionRule',
+        rule.id,
+        { fromRankId: rule.fromRankId, toRankId: rule.toRankId }
+      );
+      res.status(201).json(formatPromotionRule(rule));
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return res
+          .status(409)
+          .json({ msg: 'A rule for this rank pair already exists' });
+      }
+      throw err;
+    }
+  })
+);
+
+// PUT /api/tools/promotion-rules/:id — update a promotion rule
+router.put(
+  '/promotion-rules/:id',
+  ...requirePermission('rank_permissions_manage'),
+  validateParams(promotionRuleIdParamsSchema),
+  validate(updatePromotionRuleSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+
+    const existing = await prisma.rankPromotionRule.findUnique({
+      where: { id }
+    });
+    if (!existing) {
+      return res.status(404).json({ msg: 'Promotion rule not found' });
+    }
+
+    const body = parsedBody<UpdatePromotionRuleInput>(res);
+
+    const rankIds = [body.fromRankId, body.toRankId].filter(
+      (v): v is number => v !== undefined
+    );
+    if (rankIds.length > 0) {
+      const rankCount = await prisma.userRank.count({
+        where: { id: { in: rankIds } }
+      });
+      if (rankCount !== rankIds.length) {
+        return res
+          .status(422)
+          .json({ msg: 'fromRank or toRank does not exist' });
+      }
+    }
+
+    try {
+      const rule = await prisma.rankPromotionRule.update({
+        where: { id },
+        data: {
+          ...(body.fromRankId !== undefined && { fromRankId: body.fromRankId }),
+          ...(body.toRankId !== undefined && { toRankId: body.toRankId }),
+          ...(body.minContributed !== undefined && {
+            minContributed: body.minContributed
+          }),
+          ...(body.minRatio !== undefined && { minRatio: body.minRatio }),
+          ...(body.minContributions !== undefined && {
+            minContributions: body.minContributions
+          }),
+          ...(body.minAccountAgeDays !== undefined && {
+            minAccountAgeDays: body.minAccountAgeDays
+          }),
+          ...(body.extra !== undefined && { extra: body.extra }),
+          ...(body.enabled !== undefined && { enabled: body.enabled })
+        },
+        include: promotionRuleInclude
+      });
+
+      await audit(
+        prisma,
+        req.user.id,
+        'promotionRule.update',
+        'RankPromotionRule',
+        id,
+        { ...body, minContributed: body.minContributed?.toString() }
+      );
+      res.json(formatPromotionRule(rule));
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return res
+          .status(409)
+          .json({ msg: 'A rule for this rank pair already exists' });
+      }
+      throw err;
+    }
+  })
+);
+
+// DELETE /api/tools/promotion-rules/:id — delete a promotion rule
+router.delete(
+  '/promotion-rules/:id',
+  ...requirePermission('rank_permissions_manage'),
+  validateParams(promotionRuleIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+
+    const existing = await prisma.rankPromotionRule.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+    if (!existing) {
+      return res.status(404).json({ msg: 'Promotion rule not found' });
+    }
+
+    await prisma.$transaction([
+      prisma.rankPromotionRule.delete({ where: { id } }),
+      prisma.auditLog.create({
+        data: {
+          actorId: req.user.id,
+          action: 'promotionRule.delete',
+          targetType: 'RankPromotionRule',
           targetId: id
         }
       })

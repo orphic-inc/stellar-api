@@ -917,6 +917,51 @@ registry.registerPath({
   }
 });
 
+const ProgressionGap = registry.register(
+  'ProgressionGap',
+  z.object({
+    toRankName: z.string().nullable(),
+    contributedShortBytes: z.string(),
+    ratioShort: z.number(),
+    contributionsShort: z.number(),
+    ageShortDays: z.number(),
+    extraUnmet: z
+      .enum(['DISTINCT_RELEASES_500', 'QUALITY_CONTRIB_500'])
+      .nullable()
+  })
+);
+
+const ProfileProgression = registry.register(
+  'ProfileProgression',
+  z.object({
+    currentRankId: z.number(),
+    currentRankName: z.string().nullable(),
+    rankLocked: z.boolean(),
+    // null at the top of the auto ladder
+    gap: ProgressionGap.nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/progression',
+  tags: ['Profile'],
+  responses: {
+    200: {
+      description: 'Gap to the next auto-class rung',
+      content: { 'application/json': { schema: ProfileProgression } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Profile not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/profile/user/{userId}',
@@ -3294,6 +3339,147 @@ registry.registerPath({
     },
     409: {
       description: 'Rank still assigned to users',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Rank Promotion Rules (#170) ─────────────────────────────────────────────────
+// minContributed is bytes and crosses the wire as a string (past MAX_SAFE_INTEGER).
+
+const RankExtraPredicateEnum = z
+  .enum(['DISTINCT_RELEASES_500', 'QUALITY_CONTRIB_500'])
+  .nullable();
+
+const PromotionRule = registry.register(
+  'PromotionRule',
+  z.object({
+    id: z.number(),
+    fromRankId: z.number(),
+    fromRankName: z.string().nullable(),
+    toRankId: z.number(),
+    toRankName: z.string().nullable(),
+    minContributed: z.string(),
+    minRatio: z.number(),
+    minContributions: z.number(),
+    minAccountAgeDays: z.number(),
+    extra: RankExtraPredicateEnum,
+    enabled: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+const PromotionRuleCreateBody = z.object({
+  fromRankId: z.number().int().positive(),
+  toRankId: z.number().int().positive(),
+  minContributed: z.string().optional(),
+  minRatio: z.number().min(0).optional(),
+  minContributions: z.number().int().min(0).optional(),
+  minAccountAgeDays: z.number().int().min(0).optional(),
+  extra: RankExtraPredicateEnum.optional(),
+  enabled: z.boolean().optional()
+});
+
+const PromotionRuleUpdateBody = PromotionRuleCreateBody.partial();
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/promotion-rules',
+  tags: ['Tools'],
+  responses: {
+    200: {
+      description: 'Promotion rules',
+      content: { 'application/json': { schema: z.array(PromotionRule) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/tools/promotion-rules/{id}',
+  tags: ['Tools'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Promotion rule',
+      content: { 'application/json': { schema: PromotionRule } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/tools/promotion-rules',
+  tags: ['Tools'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: PromotionRuleCreateBody } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Promotion rule created',
+      content: { 'application/json': { schema: PromotionRule } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    409: {
+      description: 'Duplicate rank pair',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'fromRank or toRank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/tools/promotion-rules/{id}',
+  tags: ['Tools'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: PromotionRuleUpdateBody } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Promotion rule updated',
+      content: { 'application/json': { schema: PromotionRule } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Duplicate rank pair',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'fromRank or toRank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/tools/promotion-rules/{id}',
+  tags: ['Tools'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Promotion rule deleted' },
+    404: {
+      description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }

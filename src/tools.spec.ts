@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -347,6 +348,193 @@ describe('DELETE /api/tools/staff-groups/:id', () => {
     prismaMock.staffGroup.findUnique.mockResolvedValue(null);
 
     const res = await request(app).delete('/api/tools/staff-groups/999');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Promotion rules (#170) ─────────────────────────────────────────────────────
+
+const makePromotionRule = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  fromRankId: 1,
+  toRankId: 2,
+  fromRank: { name: 'User' },
+  toRank: { name: 'Member' },
+  minContributed: BigInt('536870912000'),
+  minRatio: 1.05,
+  minContributions: 5,
+  minAccountAgeDays: 14,
+  extra: null,
+  enabled: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  ...overrides
+});
+
+const dupPairError = () =>
+  new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+    code: 'P2002',
+    clientVersion: 'test'
+  });
+
+describe('GET /api/tools/promotion-rules', () => {
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('lists rules with minContributed serialized as a string', async () => {
+    prismaMock.rankPromotionRule.findMany.mockResolvedValue([
+      makePromotionRule()
+    ] as never);
+
+    const res = await request(app).get('/api/tools/promotion-rules');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].minContributed).toBe('536870912000');
+    expect(res.body[0].fromRankName).toBe('User');
+    expect(res.body[0].toRankName).toBe('Member');
+  });
+
+  it('returns 403 without rank_permissions_manage permission', async () => {
+    setCurrentUserPermissions(
+      makeUserRank().permissions as Record<string, boolean>
+    );
+
+    const res = await request(app).get('/api/tools/promotion-rules');
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/tools/promotion-rules/:id', () => {
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('returns a single rule', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(
+      makePromotionRule() as never
+    );
+
+    const res = await request(app).get('/api/tools/promotion-rules/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.minContributed).toBe('536870912000');
+  });
+
+  it('returns 404 when the rule does not exist', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/tools/promotion-rules/999');
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/tools/promotion-rules', () => {
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('creates a rule and returns 201 with string minContributed', async () => {
+    prismaMock.userRank.count.mockResolvedValue(2);
+    prismaMock.rankPromotionRule.create.mockResolvedValue(
+      makePromotionRule() as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 2, minContributed: '536870912000' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.minContributed).toBe('536870912000');
+  });
+
+  it('returns 422 when a referenced rank does not exist', async () => {
+    prismaMock.userRank.count.mockResolvedValue(1);
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 99 });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 400 when fromRankId equals toRankId', async () => {
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 1 });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 409 on a duplicate rank pair', async () => {
+    prismaMock.userRank.count.mockResolvedValue(2);
+    prismaMock.rankPromotionRule.create.mockRejectedValue(dupPairError());
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 2 });
+
+    expect(res.status).toBe(409);
+  });
+});
+
+describe('PUT /api/tools/promotion-rules/:id', () => {
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('updates a rule and returns 200', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(
+      makePromotionRule() as never
+    );
+    prismaMock.rankPromotionRule.update.mockResolvedValue(
+      makePromotionRule({ minRatio: 1.2 }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .put('/api/tools/promotion-rules/1')
+      .send({ minRatio: 1.2 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.minRatio).toBe(1.2);
+  });
+
+  it('returns 404 when the rule does not exist', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/tools/promotion-rules/999')
+      .send({ enabled: false });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('DELETE /api/tools/promotion-rules/:id', () => {
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('deletes a rule and returns 204', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue({
+      id: 1
+    } as never);
+    prismaMock.$transaction.mockResolvedValue([{}, {}] as never);
+
+    const res = await request(app).delete('/api/tools/promotion-rules/1');
+
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 404 when the rule does not exist', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/tools/promotion-rules/999');
 
     expect(res.status).toBe(404);
   });

@@ -17,14 +17,29 @@ jest.mock('./modules/ratioPolicy', () => ({
   getPolicyState: jest.fn()
 }));
 
+jest.mock('./modules/rankProgressionJob', () => ({
+  // startRankProgressionJob is invoked at app bootstrap — keep it a noop
+  startRankProgressionJob: jest.fn(),
+  loadLadder: jest.fn(),
+  buildProgressionInput: jest.fn()
+}));
+
 import { getRatioStats } from './modules/ratio';
 import { getPolicyState } from './modules/ratioPolicy';
+import {
+  loadLadder,
+  buildProgressionInput
+} from './modules/rankProgressionJob';
 
 const getRatioStatsMock = getRatioStats as jest.MockedFunction<
   typeof getRatioStats
 >;
 const getPolicyStateMock = getPolicyState as jest.MockedFunction<
   typeof getPolicyState
+>;
+const loadLadderMock = loadLadder as jest.MockedFunction<typeof loadLadder>;
+const buildProgressionInputMock = buildProgressionInput as jest.MockedFunction<
+  typeof buildProgressionInput
 >;
 
 const mockProfile = {
@@ -199,5 +214,79 @@ describe('POST /api/profile/referral/create-invite', () => {
       .send({ reason: 'No email provided' });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/profile/me/progression (#171) ──────────────────────────────────────
+
+describe('GET /api/profile/me/progression', () => {
+  const ladderWithOneRung = {
+    ranks: [{ id: 2, level: 150, name: 'Member', autoManaged: true }],
+    rules: [
+      {
+        fromRankId: 1,
+        toRankId: 2,
+        minContributed: BigInt(10),
+        minRatio: 0.7,
+        minContributions: 0,
+        minAccountAgeDays: 7,
+        extra: null,
+        enabled: true
+      }
+    ]
+  };
+
+  const midLadderInput = {
+    currentRankId: 1,
+    contributed: BigInt(0),
+    consumed: BigInt(0),
+    contributionCount: 0,
+    distinctReleaseCount: 0,
+    qualityContributionCount: 0,
+    accountAgeDays: 0,
+    hasActiveWarning: false,
+    rankLocked: false
+  };
+
+  beforeEach(() => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 7,
+      userRankId: 1,
+      consumed: BigInt(0),
+      dateRegistered: new Date('2026-01-01T00:00:00Z'),
+      rankLocked: false,
+      userRank: { name: 'User' }
+    } as never);
+    buildProgressionInputMock.mockResolvedValue(midLadderInput as never);
+  });
+
+  it('returns a shaped gap with contributedShortBytes as a string', async () => {
+    loadLadderMock.mockResolvedValue(ladderWithOneRung as never);
+
+    const res = await request(app).get('/api/profile/me/progression');
+
+    expect(res.status).toBe(200);
+    expect(res.body.currentRankName).toBe('User');
+    expect(res.body.gap.toRankName).toBe('Member');
+    expect(res.body.gap.contributedShortBytes).toBe('10');
+    expect(typeof res.body.gap.contributedShortBytes).toBe('string');
+  });
+
+  it('returns a null gap at the top of the auto ladder', async () => {
+    loadLadderMock.mockResolvedValue({ ranks: [], rules: [] } as never);
+
+    const res = await request(app).get('/api/profile/me/progression');
+
+    expect(res.status).toBe(200);
+    expect(res.body.gap).toBeNull();
+  });
+
+  it('returns 404 when the user record is missing', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    loadLadderMock.mockResolvedValue(ladderWithOneRung as never);
+
+    const res = await request(app).get('/api/profile/me/progression');
+
+    expect(res.status).toBe(404);
   });
 });
