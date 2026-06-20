@@ -620,6 +620,63 @@ registry.registerPath({
   }
 });
 
+// IRC nick link (ADR-0015) — the user-facing claim. Setting a nick issues a
+// Verification Code the member must prove from that nick on IRC; it does not
+// bind the nick. The companion POST /users/irc-nick/verify is a korin
+// service-key inbound call and, like the other korin endpoints
+// (/users/{id}/reputation, by-irc-nick), is intentionally kept out of the
+// public contract.
+const IrcNickClaimBody = z.object({
+  ircNick: z
+    .string()
+    .max(30)
+    .regex(
+      /^[a-zA-Z_\-[\]\\^{}|`][a-zA-Z0-9_\-[\]\\^{}|`]*$/,
+      'Invalid IRC nick'
+    )
+    .nullable()
+});
+
+const IrcNickLinkResult = registry.register(
+  'IrcNickLinkResult',
+  z.object({
+    msg: z.string(),
+    ircNick: z.string().nullable().optional(),
+    code: z.string().optional(),
+    expiresAt: z.string().datetime().optional(),
+    instructions: z.string().optional()
+  })
+);
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/{id}/irc-nick',
+  tags: ['Users'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: IrcNickClaimBody } } }
+  },
+  responses: {
+    200: {
+      description:
+        'Nick claim opened (returns the verification code + instructions), nick cleared, or already verified',
+      content: { 'application/json': { schema: IrcNickLinkResult } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Not self or admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Nick already verified by another account',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/users/settings',
