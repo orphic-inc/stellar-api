@@ -10,4 +10,13 @@ Stellar's domain spans multiple repositories; one of them (`korin.pink`) is **ex
 
 **Cross-repo / system-wide decisions live in this repo's `docs/adr/`** — notably [ADR-0013](./docs/adr/0013-korin-pink-irc-integration.md) (the korin↔stellar integration boundary) and [ADR-0016](./docs/adr/0016-ledger-accounting-contract.md) (the consumption-accounting & ratio-gate contract). Each other repo carries its own context-scoped ADRs.
 
+## Contract hygiene — pairing API surfaces with UI tracking
+
+When an API PR adds or changes a **UI-consumable surface** — a new route, a response-shape change, or a new OpenAPI schema — it carries a paired obligation on the frontend. Before considering the work done:
+
+1. **Register the route in the OpenAPI contract** (`src/lib/openapi.ts`). The registry is manual: a route that exists but isn't registered is invisible to `openapi.json`, so stellar-ui's generated `src/types/api.ts` can't see it and the UI can't consume it type-safely. An unregistered route is a silent contract gap (e.g. the IRC nick-link routes shipped in #175 without registration — see #198).
+2. **File a paired stellar-ui tracking issue**, linking the API PR — or explicitly note that no UI consumes the surface. A backend feature with no UI issue is how features ship half-built and untracked; the stellar-ui side does not auto-discover API work.
+
+This keeps the API↔UI seam honest in both directions: the contract exposes what the UI needs, and the tracker reflects what's actually left to build.
+
 > stellar-ui's `CONTEXT.md` currently lands via the `wip/theming-corpus` branch (PR pending); the link resolves once merged.
