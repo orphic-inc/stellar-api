@@ -1,6 +1,6 @@
 # ADR-0018: Development lifecycle and the API/UI contract gate
 
-**Status:** Proposed
+**Status:** Accepted (2026-06-20)
 **Date:** 2026-06-20
 **Repos:** orphic-inc/stellar-api, orphic-inc/stellar-ui (+ external obrien-k/korin-pink)
 **Relates:** [ADR-0009 — fork workflow & dependency discipline](0009-fork-workflow-and-dependency-discipline.md), [ADR-0010 — trunk-based single-branch workflow](0010-trunk-based-single-branch-workflow.md), [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md), [ADR-0016 — consumption accounting & ratio-gate contract](0016-ledger-accounting-contract.md)
