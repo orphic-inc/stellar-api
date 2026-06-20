@@ -1,0 +1,38 @@
+name: Security review gate
+
+# ADR-0018, step 7: changes to auth-sensitive middleware must not merge without a
+# /security-review. The gate is deliberately scoped to src/middleware/** (auth,
+# permissions, serviceAuth, rate limiting, validation) — the genuinely security-
+# critical surface — rather than every route change, so it stays high-signal and
+# does not erode into reflexive rubber-stamping. New-route coverage is author-
+# attested via the PR template checklist.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - 'src/middleware/**'
+
+permissions:
+  pull-requests: read
+
+jobs:
+  require-security-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a completed security review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body="$(gh pr view "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" --json body --jq '.body // ""')"
+          if printf '%s' "$body" | grep -qiE '^\s*-\s*\[x\].*security[ -]review'; then
+            echo "Security review confirmed in the PR description."
+          else
+            echo "::error::This PR changes auth-sensitive middleware (src/middleware/**)." \
+                 "Run /security-review and tick the 'security-review completed' box in the PR description."
+            exit 1
+          fi
