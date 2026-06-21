@@ -63,6 +63,7 @@ src/
     linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse
     linkHealthJob.ts        # Background job: recheck stale contribution links every 24h
     communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
+    crsHistory.ts           # Capture/query CRS as a time-series snapshot (#94, ADR-0007 trend layer); active-users-only, Monthly+Yearly cadence (no hourly), self-read only — captured by statsJob
     auth.ts                 # Password validation, auth user DB query helpers
     artist.ts               # Artist creation/update with history tracking
     comment.ts              # Comment soft-delete with audit logging

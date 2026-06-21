@@ -1,6 +1,7 @@
 import { getLogger } from './logging';
 import { captureUserStats, captureSiteStats } from './statsHistory';
 import { captureCommunityHealth } from './communityHealthHistory';
+import { captureCrsSnapshots } from './crsHistory';
 
 const log = getLogger('statsJob');
 
@@ -15,6 +16,8 @@ export const startStatsJob = (): void => {
       captureUserStats('Daily'),
       captureSiteStats(),
       captureCommunityHealth('Daily')
+      // CRS is intentionally not captured hourly — it moves on a multi-day
+      // scale, so it's snapshotted only on the daily/weekly cascades (#94).
     ]).catch((err) => log.error('Hourly stats capture failed', { err }));
   const hourlyDelay = setTimeout(() => {
     runHourly();
@@ -26,7 +29,8 @@ export const startStatsJob = (): void => {
   const runDaily = () =>
     Promise.all([
       captureUserStats('Monthly'),
-      captureCommunityHealth('Monthly')
+      captureCommunityHealth('Monthly'),
+      captureCrsSnapshots('Monthly')
     ]).catch((err) => log.error('Daily stats capture failed', { err }));
   const dailyDelay = setTimeout(() => {
     runDaily();
@@ -38,7 +42,8 @@ export const startStatsJob = (): void => {
   const runWeekly = () =>
     Promise.all([
       captureUserStats('Yearly'),
-      captureCommunityHealth('Yearly')
+      captureCommunityHealth('Yearly'),
+      captureCrsSnapshots('Yearly')
     ]).catch((err) => log.error('Weekly stats capture failed', { err }));
   const weeklyDelay = setTimeout(() => {
     runWeekly();

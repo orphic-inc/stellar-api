@@ -1540,6 +1540,16 @@ Yearly Yearly
     }
   
 
+  "crs_snapshots" {
+    Int id "🗝️"
+    StatSnapshotPeriod period 
+    DateTime bucketAt 
+    DateTime capturedAt 
+    Float score 
+    Json dimensions 
+    }
+  
+
   "dev_seed_runs" {
     String id "🗝️"
     String label "❓"
@@ -1795,6 +1805,8 @@ Yearly Yearly
     "user_stat_snapshots" }o--|| users : "user"
     "community_health_snapshots" |o--|| "StatSnapshotPeriod" : "enum:period"
     "community_health_snapshots" }o--|| communities : "community"
+    "crs_snapshots" |o--|| "StatSnapshotPeriod" : "enum:period"
+    "crs_snapshots" }o--|| users : "user"
     "dev_seed_records" }o--|| dev_seed_runs : "run"
     "dev_seed_mutations" }o--|| dev_seed_runs : "run"
 ```

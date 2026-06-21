@@ -506,6 +506,7 @@ model User {
   wikiAliasesCreated       WikiAlias[]                      @relation("WikiAliasCreator")
   rulesPagesAuthored       RulesPage[]                      @relation("RulesPageAuthor")
   userStatSnapshots        UserStatSnapshot[]
+  crsSnapshots             CrsSnapshot[]
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
   authoredStylesheets      AuthorStylesheet[]
 
@@ -2415,6 +2416,31 @@ model CommunityHealthSnapshot {
   @@unique([communityId, period, bucketAt])
   @@index([communityId, period, capturedAt])
   @@map("community_health_snapshots")
+}
+
+// A captured CRS read for one user at a point in time — the additive trend
+// layer deferred by ADR-0007 (#94). The score itself is always computed on read
+// (`reputation.ts`); this is a read-model for trends only and never feeds back
+// into the scorer, so a snapshot bug can never corrupt a real score. Mirrors
+// CommunityHealthSnapshot's bucket/period/retention shape.
+model CrsSnapshot {
+  id         Int                @id @default(autoincrement())
+  userId     Int
+  period     StatSnapshotPeriod
+  bucketAt   DateTime
+  capturedAt DateTime           @default(now())
+  // The overall CRS at capture time.
+  score      Float
+  // The per-dimension breakdown ([{ name, subScore, weighted }]) as captured.
+  // JSON keeps this flexible while the dimension registry is still growing
+  // (#94); a follow-up migrates to typed columns once the shape settles.
+  dimensions Json
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, bucketAt])
+  @@index([userId, period, capturedAt])
+  @@map("crs_snapshots")
 }
 
 // ─── Dev Tools ────────────────────────────────────────────────────────────────
