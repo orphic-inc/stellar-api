@@ -63,6 +63,11 @@ jobs:
         run: npm run openapi:export && git diff --exit-code openapi.json
       - name: ERD freshness
         run: npm run db:erd && git diff --exit-code docs/erd.md
+      - name: Version consistency
+        run: npm run version:check
+      - name: Version consistency (tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: git fetch --tags --force && npm run version:check -- --check-tag
       - name: Integration tests
         run: npm run test:integration
 

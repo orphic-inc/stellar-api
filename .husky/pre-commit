@@ -2,3 +2,7 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 npx lint-staged
+
+# Version-consistency guardrail (#79). Internal axes only — the git-tag axis is
+# enforced in CI on tag pushes so a release bump commit isn't blocked here.
+npm run version:check
