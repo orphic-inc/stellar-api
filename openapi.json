@@ -373,6 +373,10 @@
           },
           "showRatioStats": {
             "type": "boolean"
+          },
+          "ircNick": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [

@@ -353,7 +353,10 @@ const UserSettings = registry.register(
     showLastSeen: z.boolean(),
     showContributedStats: z.boolean(),
     showConsumedStats: z.boolean(),
-    showRatioStats: z.boolean()
+    showRatioStats: z.boolean(),
+    // Verified IRC nick (ADR-0015, #201) — self-only read path for the UI's
+    // "currently linked: X" display. Non-null ⇒ verified; null ⇒ unlinked.
+    ircNick: z.string().nullable().optional()
   })
 );
 

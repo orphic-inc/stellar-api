@@ -23,10 +23,18 @@ export type SnatchItem = {
 export const getUserSettings = async (userId: number) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { userSettingsId: true }
+    select: { userSettingsId: true, ircNick: true }
   });
   if (!user) return null;
-  return prisma.userSettings.findUnique({ where: { id: user.userSettingsId } });
+  const settings = await prisma.userSettings.findUnique({
+    where: { id: user.userSettingsId }
+  });
+  if (!settings) return null;
+  // ircNick holds only a *verified* nick (ADR-0015), so non-null ⇒ verified. We
+  // surface it self-only here (this route reads the caller's own settings) so the
+  // UI can render "currently linked: X" — the public profile deliberately omits it
+  // (paranoia) since it's not in PROFILE_BASE_SELECT (#201).
+  return { ...settings, ircNick: user.ircNick };
 };
 
 export const updateUserSettings = async (

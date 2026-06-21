@@ -844,7 +844,8 @@ describe('API auth/profile/user flows', () => {
       showContributedStats: true,
       showConsumedStats: true,
       showRatioStats: true,
-      activeAuthorStylesheetId: null
+      activeAuthorStylesheetId: null,
+      ircNick: 'stargazer'
     });
 
     const res = await request(app).get('/api/users/settings');
@@ -852,6 +853,7 @@ describe('API auth/profile/user flows', () => {
     expect(res.status).toBe(200);
     expect(getUserSettingsMock).toHaveBeenCalledWith(7);
     expect(res.body.siteAppearance).toBe('dark');
+    expect(res.body.ircNick).toBe('stargazer');
   });
 
   it('returns the updated settings payload from /api/users/settings', async () => {
