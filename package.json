@@ -19,6 +19,7 @@
     "test:watch": "jest --watch --forceExit",
     "test:integration": "DOTENV_CONFIG_PATH=.env.test node -r dotenv/config ./node_modules/jest/bin/jest.js --runInBand --config jest.integration.cjs",
     "openapi:export": "ts-node src/scripts/export-openapi.ts",
+    "version:check": "ts-node src/scripts/check-version-consistency.ts",
     "db:generate": "prisma generate",
     "db:erd": "prisma generate --generator erd",
     "db:migrate": "prisma migrate dev",
