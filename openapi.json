@@ -5526,6 +5526,52 @@
           "addedBy"
         ]
       },
+      "CrsSnapshot": {
+        "type": "object",
+        "properties": {
+          "capturedAt": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "Monthly",
+              "Yearly"
+            ]
+          },
+          "score": {
+            "type": "number"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "subScore": {
+                  "type": "number"
+                },
+                "weighted": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name",
+                "subScore",
+                "weighted"
+              ]
+            }
+          }
+        },
+        "required": [
+          "capturedAt",
+          "period",
+          "score",
+          "dimensions"
+        ]
+      },
       "CommunityHealthPulse": {
         "type": "object",
         "properties": {
@@ -6681,6 +6727,53 @@
           },
           "404": {
             "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/me/reputation/history": {
+      "get": {
+        "summary": "Community Reputation Score over time (own trend series)",
+        "tags": [
+          "Profile"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Yearly"
+              ]
+            },
+            "required": true,
+            "name": "period",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CRS snapshot history (ascending by capturedAt)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CrsSnapshot"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {

@@ -965,6 +965,47 @@ registry.registerPath({
   }
 });
 
+// A captured CRS read in the trend series (#94). The score stays computed on
+// read; this is the snapshot read-model only. The korin service surface
+// (/users/{id}/reputation/history) is intentionally kept out of the public
+// contract, like its sibling /users/{id}/reputation.
+const CrsSnapshot = z
+  .object({
+    capturedAt: z.string(),
+    period: z.enum(['Monthly', 'Yearly']),
+    score: z.number(),
+    dimensions: z.array(
+      z.object({
+        name: z.string(),
+        subScore: z.number(),
+        weighted: z.number()
+      })
+    )
+  })
+  .openapi('CrsSnapshot');
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/reputation/history',
+  summary: 'Community Reputation Score over time (own trend series)',
+  tags: ['Profile'],
+  request: {
+    // CRS is captured only daily/weekly (it moves on a multi-day scale), so the
+    // series offers Monthly and Yearly periods — Daily is rejected.
+    query: z.object({ period: z.enum(['Monthly', 'Yearly']) })
+  },
+  responses: {
+    200: {
+      description: 'CRS snapshot history (ascending by capturedAt)',
+      content: { 'application/json': { schema: z.array(CrsSnapshot) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/profile/user/{userId}',

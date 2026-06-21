@@ -9,6 +9,11 @@ import {
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
 import { getReputation } from '../../modules/reputation';
+import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
+import {
+  reputationHistoryPeriodQuerySchema,
+  type ReputationHistoryPeriodQuery
+} from '../../schemas/statsHistory';
 import {
   loadLadder,
   buildProgressionInput
@@ -17,7 +22,12 @@ import { describeGapToNext } from '../../modules/rankProgression';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../lib/audit';
-import { validate, parsedBody } from '../../middleware/validate';
+import {
+  validate,
+  validateQuery,
+  parsedBody,
+  parsedQuery
+} from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -96,6 +106,19 @@ router.get(
   requireAuth,
   authHandler(async (req, res) => {
     res.json(await getReputation(req.user.id));
+  })
+);
+
+// GET /api/profile/me/reputation/history — CRS over time (#94). The score is
+// still computed-on-read; this reads the captured trend series.
+// ?period=Daily|Monthly|Yearly.
+router.get(
+  '/me/reputation/history',
+  requireAuth,
+  validateQuery(reputationHistoryPeriodQuerySchema),
+  authHandler(async (req, res) => {
+    const { period } = parsedQuery<ReputationHistoryPeriodQuery>(res);
+    res.json(await getCrsHistory(req.user.id, period as CrsHistoryPeriod));
   })
 );
 
