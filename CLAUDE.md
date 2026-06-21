@@ -234,7 +234,7 @@ paginatedResponse(res, rows, total, pg);
 
 ### Typed errors
 
-Throw `new AppError('message', statusCode)` from modules; the global handler in `app.ts` catches it and sends `{ msg }` with the correct status.
+Throw `new AppError(statusCode, 'message')` from modules; the global handler in `app.ts` catches it and sends `{ msg }` with the correct status.
 
 ### Soft delete
 
