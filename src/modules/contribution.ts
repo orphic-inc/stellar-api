@@ -9,6 +9,7 @@ import { prisma } from '../lib/prisma';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
 import { checkContributionLink } from './linkHealth';
+import { assertWithinSizeCap } from './contributionLimits';
 import { resolveTagNames } from './tag';
 import type {
   AddContributionToReleaseInput,
@@ -81,6 +82,10 @@ export const createContributionSubmission = async ({
     isScene,
     collaborators
   } = input;
+
+  // Reject oversized contributions before any DB work (#93). The release type
+  // is in the body on this path.
+  assertWithinSizeCap(type, sizeInBytes);
 
   const community = await prisma.community.findUnique({
     where: { id: communityId }
@@ -272,6 +277,10 @@ export const addContributionToRelease = async ({
     where: { id: releaseId, communityId }
   });
   if (!release) return null;
+
+  // Reject oversized contributions (#93). On this path the category comes from
+  // the release the file is being attached to, not the request body.
+  assertWithinSizeCap(release.type, input.sizeInBytes);
 
   return prisma
     .$transaction(async (tx: Prisma.TransactionClient) => {

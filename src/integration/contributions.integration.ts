@@ -118,9 +118,10 @@ describe('createContributionSubmission', () => {
     const user = await createUser('big');
     const community = await createCommunity();
 
-    // 1_040_503_013_376 = 992301 MB * 1048576 — well past INT4 max (2_147_483_647).
+    // 5_000_000_000 (5 GB) — well past INT4 max (2_147_483_647) so it proves
+    // 64-bit storage, while staying under the 20 GB Music contribution cap (#93).
     // Lossless discographies routinely exceed 2 GiB, so sizeInBytes must be 64-bit.
-    const bigSize = 1_040_503_013_376;
+    const bigSize = 5_000_000_000;
 
     const result = await createContributionSubmission({
       userId: user.id,
@@ -284,6 +285,25 @@ describe('createContributionSubmission', () => {
     expect(roleByName['Featured Guest']).toBe('Guest');
     expect(roleByName['The Remixer']).toBe('Remixer');
   });
+
+  it('rejects a contribution above the per-type size cap before touching the DB (#93)', async () => {
+    const user = await createUser('toobig');
+    const community = await createCommunity();
+
+    // baseInput is a Music release; the Music ceiling is 20 GB.
+    await expect(
+      createContributionSubmission({
+        userId: user.id,
+        input: {
+          ...baseInput(community.id),
+          sizeInBytes: 20_000_000_001
+        }
+      })
+    ).rejects.toThrow(/limit for Music/);
+
+    const contributions = await testPrisma.contribution.count();
+    expect(contributions).toBe(0);
+  });
 });
 
 describe('addContributionToRelease', () => {
@@ -323,6 +343,45 @@ describe('addContributionToRelease', () => {
       where: { releaseId: first!.releaseId }
     });
     expect(contributions).toHaveLength(2);
+  });
+
+  it('rejects an oversized file using the release type, not the request body (#93)', async () => {
+    const owner = await createUser('cap-owner');
+    const contributor = await createUser('cap-contrib');
+    const community = await createCommunity();
+
+    // The release is Music (baseInput), so the 20 GB Music cap applies even
+    // though this path carries no `type` in the body.
+    const first = await createContributionSubmission({
+      userId: owner.id,
+      input: baseInput(community.id)
+    });
+    expect(first).not.toBeNull();
+
+    await expect(
+      addContributionToRelease({
+        userId: contributor.id,
+        communityId: community.id,
+        releaseId: first!.releaseId,
+        input: {
+          fileType: FileType.flac,
+          downloadUrl: 'https://example.com/huge.torrent',
+          sizeInBytes: 20_000_000_001,
+          releaseDescription: undefined,
+          bitrate: undefined,
+          media: undefined,
+          hasLog: false,
+          hasCue: false,
+          isScene: false
+        }
+      })
+    ).rejects.toThrow(/limit for Music/);
+
+    // The original contribution is untouched; no second row was created.
+    const contributions = await testPrisma.contribution.count({
+      where: { releaseId: first!.releaseId }
+    });
+    expect(contributions).toBe(1);
   });
 
   it('returns null when the release does not belong to the given community', async () => {
