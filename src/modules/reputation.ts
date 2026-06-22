@@ -71,6 +71,14 @@ export interface DimensionInput {
     coverage: number | null;
     weight: number;
   }>;
+  /** Mean per-contribution confirmed-PASS uptime fraction (R), in [0,1] — the
+   *  reliability term of the lifetime link-health dimension (#95 / ADR-0019).
+   *  Defaults to 0. */
+  linkHealthReliability?: number;
+  /** Total banked confirmed-PASS time across this member's contributions, in
+   *  healthy-link-years (H) — the volume×duration term of the same dimension.
+   *  Defaults to 0. */
+  linkHealthYears?: number;
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -377,6 +385,45 @@ const communityScorer: DimensionScorer = {
   }
 };
 
+// ─── LinkHealthScore ──────────────────────────────────────────────────────────
+// Cumulative lifetime link-health (PRD-01 "Reliability Matters"; #95 / ADR-0019).
+// The positive mirror of the dead-link/flapping penalties: rewards a member for
+// keeping THEIR OWN contributions' download links alive over the account's life.
+// Distinct from `community` (the COMMUNITY's pulse weighted by your stake —
+// signed/collective) and from `longevity` (account age, no links needed).
+//
+// Two factors, both derived from the per-contribution confirmed-PASS accumulator
+// (Contribution.healthyMs/healthySince, fed by linkHealth.ts):
+//   R = mean per-contribution PASS fraction (passMs / age), [0,1] — "are your
+//       links rotting?"; volume-agnostic, so dumping links can't farm it, and a
+//       rotted catalogue lowers lifetime reliability (the point).
+//   H = banked confirmed-PASS time in healthy-link-years — "how much uptime have
+//       you actually accumulated?"; captures volume AND duration in one term.
+//   subScore = CAP × R × (1 − exp(−H / H_TAU))
+// Both factors ∈ [0,1] ⇒ bounded by CAP by construction (the PRD "no single axis
+// dominates" guardrail). R leads as a true multiplier (rotted links ⇒ ~0 whatever
+// H is); a fresh account dumping links has R≈1 but H≈0 ⇒ ~0, so the dimension
+// can't be farmed instantly — only sustained uptime banks H. PASS-only accrual
+// lives in the substrate; this scorer is pure.
+//
+// PROVISIONAL (tier-0): CAP tied with RatioScore (both read the contribution-
+// availability substrate — current vs lifetime timescale), H_TAU mirrors
+// LONGEVITY_TAU_YEARS. Tune alongside the PRD.
+const LINK_HEALTH_CAP = 8;
+const LINK_HEALTH_TAU_YEARS = 3; // ~63% of the volume curve at 3 banked link-years
+const LINK_HEALTH_WEIGHT = 1.0;
+
+const linkHealthScorer: DimensionScorer = {
+  name: 'linkHealth',
+  weight: LINK_HEALTH_WEIGHT,
+  cap: LINK_HEALTH_CAP,
+  compute: ({ linkHealthReliability = 0, linkHealthYears = 0 }) => {
+    const r = Math.max(0, Math.min(1, linkHealthReliability));
+    const h = Math.max(0, linkHealthYears);
+    return LINK_HEALTH_CAP * r * (1 - Math.exp(-h / LINK_HEALTH_TAU_YEARS));
+  }
+};
+
 // Registry — add a dimension here (Invite, Donation, …) and the aggregator
 // picks it up unchanged.
 const REGISTRY: DimensionScorer[] = [
@@ -386,6 +433,7 @@ const REGISTRY: DimensionScorer[] = [
   inviteScorer,
   donationScorer,
   communityScorer,
+  linkHealthScorer,
   ircScorer,
   stylesheetScorer
 ];
@@ -476,18 +524,27 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
       _min: { donatedAt: true },
       _max: { donatedAt: true }
     }),
-    // The user's contributions on community releases, with the grade inputs
-    // (`type` off the spine, `bitrate`/`hasLog`/`hasCue` off the ReleaseFile
-    // satellite). Each is graded by `gradeContribution` and summed per community
-    // to form the CommunityScore weight (#76), so quality pulls more than count.
+    // ALL of the user's contributions — one widened fetch feeding two dimensions
+    // (#95 / ADR-0019): the grade inputs (`type` off the spine, `bitrate`/`hasLog`/
+    // `hasCue` off the ReleaseFile satellite) summed per community for the
+    // CommunityScore weight (#76, community contributions only — non-community
+    // ones skip the weight loop below), AND the per-contribution confirmed-PASS
+    // uptime (`createdAt`/`linkStatus`/`healthyMs`/`healthySince`) reduced to the
+    // R/H of the lifetime link-health dimension. Widened from community-only so a
+    // non-community release's link still counts toward link health.
     // NOTE (read-path cost): this fetches every contribution on each reputation
     // read (every profile view, #193) — the grade lives in TS, so it can't move
-    // to a SQL aggregate without duplicating the logic. Memoising the per-(user,
+    // to a SQL aggregate without duplicating the logic, and the R/H reduction now
+    // rides the same scan (extra CPU, no extra query). Memoising the per-(user,
     // community) weight is folded into the substrate follow-up (#195).
     prisma.contribution.findMany({
-      where: { userId, release: { communityId: { not: null } } },
+      where: { userId },
       select: {
         type: true,
+        createdAt: true,
+        linkStatus: true,
+        healthyMs: true,
+        healthySince: true,
         release: { select: { communityId: true } },
         releaseFile: {
           select: { bitrate: true, hasLog: true, hasCue: true }
@@ -529,6 +586,32 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     };
   });
 
+  // Lifetime link-health (#95 / ADR-0019), from the same widened fetch: reliability
+  // R = mean per-contribution confirmed-PASS fraction; H = total banked PASS time
+  // in healthy-link-years. The live open segment (`healthySince`) is folded in at
+  // read time. A contribution with no banked uptime (dead/never-PASS) contributes
+  // a 0 fraction, dragging R down — a rotted catalogue lowers lifetime reliability.
+  let reliabilitySum = 0;
+  let healthyMsTotal = 0n;
+  for (const contribution of contributedContributions) {
+    const liveHealthyMs =
+      contribution.healthyMs +
+      (contribution.healthySince
+        ? BigInt(
+            Math.max(0, now.getTime() - contribution.healthySince.getTime())
+          )
+        : 0n);
+    healthyMsTotal += liveHealthyMs;
+    const ageMs = now.getTime() - contribution.createdAt.getTime();
+    reliabilitySum +=
+      ageMs > 0 ? Math.min(1, Number(liveHealthyMs) / ageMs) : 0;
+  }
+  const linkHealthReliability =
+    contributedContributions.length > 0
+      ? reliabilitySum / contributedContributions.length
+      : 0;
+  const linkHealthYears = Number(healthyMsTotal) / YEAR_MS;
+
   // Classify direct invitees into the four InviteScore signal counts.
   let inviteActiveContributing = 0;
   let inviteLongLived = 0;
@@ -569,6 +652,8 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     donationCount,
     donationSpanYears,
     communityHealth,
+    linkHealthReliability,
+    linkHealthYears,
     now
   });
 };

@@ -745,6 +745,8 @@ Yearly Yearly
     LinkHealthStatus linkStatus 
     DateTime linkCheckedAt "❓"
     DateTime linkStatusChangedAt "❓"
+    BigInt healthyMs 
+    DateTime healthySince "❓"
     FileType type 
     DateTime createdAt 
     DateTime updatedAt 
