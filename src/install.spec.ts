@@ -27,6 +27,10 @@ function mockPreseededBootstrap() {
 }
 
 function mockSysopTransaction() {
+  // The flagship-community seed runs right after the user transaction commits.
+  prismaMock.community.findFirst.mockResolvedValue(null);
+  prismaMock.community.create.mockResolvedValue({ id: 1 } as never);
+  prismaMock.consumer.upsert.mockResolvedValue({ id: 1 } as never);
   prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) => {
     const tx = prismaMock;
     tx.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
@@ -354,5 +358,32 @@ describe('POST /api/install', () => {
         })
       })
     );
+  });
+
+  it('seeds the flagship community owned by the SysOp', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    const res = await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    expect(res.status).toBe(201);
+    // Named after the site, public, with the SysOp connected as CommunityStaff.
+    expect(prismaMock.community.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Stellar',
+          registrationStatus: 'open',
+          staff: { connect: { id: 1 } }
+        })
+      })
+    );
+    // Owner is also registered as a Consumer (mirrors POST /api/communities).
+    expect(prismaMock.consumer.upsert).toHaveBeenCalled();
   });
 });

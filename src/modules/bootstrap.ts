@@ -2,12 +2,17 @@
  * Idempotent bootstrap helpers shared by prisma/seed.ts and the install route.
  * Each function is a no-op when the relevant rows already exist.
  */
-import { PrismaClient } from '@prisma/client';
+import {
+  PrismaClient,
+  CommunityType,
+  RegistrationStatus
+} from '@prisma/client';
 import { ALL_PERMISSIONS } from '../lib/rankPermissions';
 import {
   DEFAULT_RANKS as EVALUATOR_RANKS,
   DEFAULT_RULES
 } from './rankProgression';
+import { site } from './config';
 
 export const DEFAULT_RANKS = [
   {
@@ -483,4 +488,43 @@ export async function seedForums(client: PrismaClient): Promise<void> {
       });
     }
   }
+}
+
+/**
+ * Seed the flagship public community named after the site, led by the first
+ * SysOp. Runs from the install flow (needs the SysOp user), not prisma/seed.ts.
+ * Leadership follows POST /api/communities (ADR-0021): the leader is a superset
+ * of staff, so the SysOp is set as leaderId, folded into staff, and upserted as
+ * a Consumer. Idempotent — skipped once a community with the site name exists.
+ */
+export async function seedDefaultCommunity(
+  client: PrismaClient,
+  ownerUserId: number
+): Promise<void> {
+  const existing = await client.community.findFirst({
+    where: { name: site.name },
+    select: { id: true }
+  });
+  if (existing) return;
+
+  const community = await client.community.create({
+    data: {
+      name: site.name,
+      description: `The official ${site.name} community.`,
+      type: CommunityType.Music,
+      registrationStatus: RegistrationStatus.open,
+      image: '/images/defaults/music.png',
+      leader: { connect: { id: ownerUserId } },
+      staff: { connect: { id: ownerUserId } }
+    }
+  });
+
+  await client.consumer.upsert({
+    where: { userId: ownerUserId },
+    create: {
+      userId: ownerUserId,
+      communities: { connect: { id: community.id } }
+    },
+    update: { communities: { connect: { id: community.id } } }
+  });
 }

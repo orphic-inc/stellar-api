@@ -16,7 +16,8 @@ import { getSettings, markInstalled } from '../../modules/settings';
 import {
   seedRanks,
   seedRankPromotionRules,
-  seedForums
+  seedForums,
+  seedDefaultCommunity
 } from '../../modules/bootstrap';
 import { seedGoldenRules } from '../../modules/goldenRules';
 import { AppError } from '../../lib/errors';
@@ -213,6 +214,10 @@ router.post(
       await markInstalled(tx);
       return user;
     });
+
+    // Flagship community (named after the site) owned by the SysOp — needs the
+    // user to exist, so it runs after the user transaction commits.
+    await seedDefaultCommunity(prisma, rawUser.id);
 
     const token = await issueToken(rawUser.id);
     res.cookie('token', token, {
