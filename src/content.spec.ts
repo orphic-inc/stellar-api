@@ -188,6 +188,7 @@ describe('API content and shared flows', () => {
       registrationStatus: 'open',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 
@@ -215,6 +216,7 @@ describe('API content and shared flows', () => {
       registrationStatus: 'open',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 

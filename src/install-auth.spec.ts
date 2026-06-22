@@ -57,6 +57,7 @@ describe('API auth/profile/user flows', () => {
       registrationStatus: 'closed',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 
@@ -77,6 +78,7 @@ describe('API auth/profile/user flows', () => {
       registrationStatus: 'invite',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 

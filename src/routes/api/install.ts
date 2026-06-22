@@ -12,7 +12,7 @@ import { installLimiter } from '../../middleware/rateLimiter';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
-import { getSettings } from '../../modules/settings';
+import { getSettings, markInstalled } from '../../modules/settings';
 import {
   seedRanks,
   seedRankPromotionRules,
@@ -115,13 +115,9 @@ const router = express.Router();
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
-    const [rankCount, userCount, settings] = await Promise.all([
-      prisma.userRank.count(),
-      prisma.user.count(),
-      getSettings()
-    ]);
+    const settings = await getSettings();
     res.json({
-      installed: rankCount > 0 && userCount > 0,
+      installed: settings.installedAt != null,
       registrationStatus: settings.registrationStatus,
       configWarnings: getConfigWarnings().map((item) => item.message),
       setupChecklist: getSetupChecklist(settings as SettingsWithDismissals)
@@ -159,8 +155,8 @@ router.post(
   installLimiter,
   validate(installSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const userCount = await prisma.user.count();
-    if (userCount > 0)
+    const settings = await getSettings();
+    if (settings.installedAt != null)
       return res.status(409).json({ msg: 'Application already installed' });
 
     const { username, email, password } = parsedBody<InstallInput>(res);
@@ -192,24 +188,28 @@ router.post(
 
     const rawUser = await prisma.$transaction(async (tx) => {
       const defaultTheme = await getDefaultStylesheetName(tx);
-      const settings = await tx.userSettings.create({
+      const userSettings = await tx.userSettings.create({
         data: { siteAppearance: defaultTheme }
       });
       const profile = await tx.profile.create({ data: {} });
-      return tx.user.create({
+      const user = await tx.user.create({
         data: {
           username,
           email: email.toLowerCase(),
           password: hashedPassword,
           // avatar left null — UI falls back to the bundled default avatar.
           userRankId: sysopRank.id,
-          userSettingsId: settings.id,
+          userSettingsId: userSettings.id,
           profileId: profile.id,
           inviteCount: 100,
           contributed: STARTUP_BUFFER
         },
         select: authUserSelect
       });
+      // Stamp install state in the same transaction: installedAt commits iff the
+      // SysOp does, so the barrier can never report installed without an owner.
+      await markInstalled(tx);
+      return user;
     });
 
     const token = await issueToken(rawUser.id);

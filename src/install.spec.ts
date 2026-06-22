@@ -63,9 +63,16 @@ function mockSysopTransaction() {
 // ─── GET /api/install ─────────────────────────────────────────────────────────
 
 describe('GET /api/install', () => {
-  it('reports installed when ranks and users exist', async () => {
-    prismaMock.userRank.count.mockResolvedValue(4);
-    prismaMock.user.count.mockResolvedValue(1);
+  it('reports installed when installedAt is stamped', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: new Date(),
+      updatedAt: new Date()
+    } as never);
 
     const res = await request(app).get('/api/install');
 
@@ -74,9 +81,16 @@ describe('GET /api/install', () => {
     expect(res.body.registrationStatus).toBe('open');
   });
 
-  it('reports not installed when no users exist', async () => {
-    prismaMock.userRank.count.mockResolvedValue(0);
-    prismaMock.user.count.mockResolvedValue(0);
+  it('reports not installed when installedAt is null', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: null,
+      updatedAt: new Date()
+    } as never);
 
     const res = await request(app).get('/api/install');
 
@@ -178,7 +192,15 @@ describe('POST /api/install/checklist/:id/dismiss', () => {
 
 describe('POST /api/install', () => {
   it('returns 409 when already installed', async () => {
-    prismaMock.user.count.mockResolvedValue(1);
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: new Date(),
+      updatedAt: new Date()
+    } as never);
 
     const res = await request(app).post('/api/install').send({
       username: 'sysop',
@@ -291,6 +313,26 @@ describe('POST /api/install', () => {
 
     expect(prismaMock.userRank.create).not.toHaveBeenCalled();
     expect(prismaMock.forumCategory.create).not.toHaveBeenCalled();
+  });
+
+  it('stamps installedAt as the install transition', async () => {
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    // markInstalled() upserts SiteSettings with a stamped installedAt.
+    expect(prismaMock.siteSettings.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ installedAt: expect.any(Date) })
+      })
+    );
   });
 
   it('assigns the 5 GiB startup buffer to the SysOp user', async () => {

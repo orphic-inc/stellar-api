@@ -363,6 +363,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       registrationStatus: 'open',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 
@@ -380,6 +381,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       registrationStatus: 'open',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
+      installedAt: null,
       updatedAt: new Date()
     });
 
