@@ -1568,7 +1568,7 @@ Yearly Yearly
   "dev_seed_records" {
     String id "🗝️"
     String entityType 
-    Json pk 
+    Json primaryKey 
     DateTime createdAt 
     }
   
@@ -1576,7 +1576,7 @@ Yearly Yearly
   "dev_seed_mutations" {
     String id "🗝️"
     String entityType 
-    Json pk 
+    Json primaryKey 
     String mutation 
     Json before "❓"
     Json after "❓"

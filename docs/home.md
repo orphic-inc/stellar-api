@@ -10,6 +10,7 @@
 | docs/agents/issue-tracker.md | GitHub issue workflow                              |
 | docs/agents/triage-labels.md | Standard label definitions                         |
 | docs/agents/domain.md        | Domain-specific guidance                           |
+| CODE_OF_CONDUCT.md           | Stellar Golden Rules — canonical behavioral prose  |
 
 ## Introduction
 

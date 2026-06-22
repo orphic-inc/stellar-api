@@ -827,7 +827,7 @@ export async function cleanupRun(
     if (!mutation.reversible || mutation.before === null) {
       warnings.push(
         `Non-reversible mutation on ${mutation.entityType} (${JSON.stringify(
-          mutation.pk
+          mutation.primaryKey
         )}) not reverted`
       );
       continue;
@@ -839,7 +839,7 @@ export async function cleanupRun(
       mutation.mutation === 'counter_increment'
     ) {
       try {
-        const pk = mutation.pk as { id: number };
+        const pk = mutation.primaryKey as { id: number };
         const before = mutation.before as Record<string, number>;
         await prisma.forum.update({
           where: { id: pk.id },

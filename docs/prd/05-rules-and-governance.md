@@ -4,7 +4,7 @@
 **Decisions:** [ADR-0001 granular permissions](../adr/0001-granular-permission-checks.md) (enforcement), [ADR-0002 community-health-pulse](../adr/0002-community-health-pulse.md) (standing trend), [ADR-0004 standing → CRS + warnings/bans](../adr/0004-standing-warnings-bans.md)
 **Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance** · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art
 
-> The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose (that lives in `RulesPage`).
+> The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose. The canonical prose lives in two mirrors: the in-app `RulesPage` (rendered per-site with `${...}` placeholders) and the repo's [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) (the prose home). The 7-rule **model** stays here in the PRD.
 
 ## The Golden Rules (7 — canonical, site-wide)
 
