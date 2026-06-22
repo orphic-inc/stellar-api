@@ -1294,6 +1294,7 @@ Yearly Yearly
     RegistrationStatus registrationStatus 
     Int maxUsers 
     String dismissedLaunchChecklist 
+    DateTime installedAt "❓"
     DateTime updatedAt 
     }
   

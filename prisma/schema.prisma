@@ -2012,6 +2012,10 @@ model SiteSettings {
   registrationStatus       RegistrationStatus @default(open)
   maxUsers                 Int                @default(7000)
   dismissedLaunchChecklist String[]
+  // The one recorded fact for "is this instance installed?" — stamped once by
+  // POST /install. null = awaiting setup. Install state is read from this, never
+  // inferred from row counts (see installState.ts).
+  installedAt              DateTime?
   updatedAt                DateTime           @updatedAt
 
   @@map("site_settings")
