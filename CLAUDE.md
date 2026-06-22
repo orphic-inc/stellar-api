@@ -37,17 +37,22 @@ Run every step before committing. All must pass clean on new/changed files.
 
 Copy `.env.default` → `.env`.
 
-| Variable                   | Purpose                                                                                  |
-| -------------------------- | ---------------------------------------------------------------------------------------- |
-| `STELLAR_PSQL_URI`         | PostgreSQL connection string                                                             |
-| `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                       |
-| `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                               |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                      |
-| `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                       |
-| `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)              |
-| `KORIN_PULL_KEY`           | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013) |
-| `KORIN_POLL_INTERVAL_MS`   | IRC metrics poll + announce push interval (default 300000 = 5 min)                       |
-| `STELLAR_SERVICE_KEY`      | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed     |
+| Variable                   | Purpose                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| `STELLAR_PSQL_URI`         | PostgreSQL connection string                                                                |
+| `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                          |
+| `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                                  |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                         |
+| `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                          |
+| `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)                 |
+| `KORIN_PULL_KEY`           | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013)    |
+| `KORIN_POLL_INTERVAL_MS`   | IRC metrics poll + announce push interval (default 300000 = 5 min)                          |
+| `STELLAR_SERVICE_KEY`      | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed        |
+| `STELLAR_SITE_NAME`        | Site name resolved into Golden Rules `${site_name}` (PRD-09; default `Stellar`)             |
+| `STELLAR_IRC_URL`          | UI route `${irc}` resolves to (PRD-09; default `/irc`)                                      |
+| `STELLAR_DISABLED_CHANNEL` | IRC channel `${disabled_channel}` resolves to (PRD-09; default `#disabled`)                 |
+| `STELLAR_STAFFPM_PATH`     | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                          |
+| `STELLAR_PUBLIC_KB_BASE`   | Stellar Public KB root for `${*_article}` guidance links (PRD-09; default kb.stellargra.ph) |
 
 ## Architecture
 
@@ -87,6 +92,8 @@ src/
     ircJob.ts               # Background poll job — fetches korin.pink IRC metrics into the in-process cache (ADR-0013)
     announce.ts             # Release-Announce publisher — builds new-contribution RSS, pushes to korin POST /irc/announce (ADR-0013)
     announceJob.ts          # Background job — cursor over new contributions, pushes each to korin (ADR-0013)
+    goldenRules.ts            # The 6 immutable Golden Rules (PRD-05/09): GOLDEN_RULES table mirroring CODE_OF_CONDUCT.md verbatim + idempotent seedGoldenRules(); drift-guarded by goldenRules.spec.ts
+    siteVariables.ts          # resolveSiteVariables() — read-time token→values map for GET /rules/tree (PRD-09, ADR-0020); config + Bugs-forum lookup, single-sourced for UI substitution
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user
     permissions.ts          # requirePermission, requireAuth, isModerator

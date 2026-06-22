@@ -168,6 +168,13 @@ jest.mock('../modules/config', () => ({
     pullKey: '',
     pollIntervalMs: 300000,
     serviceKey: 'test-service-key'
+  },
+  site: {
+    name: 'Stellar',
+    ircUrl: '/irc',
+    disabledChannel: '#disabled',
+    staffPmPath: '/inbox/staff',
+    publicKbBase: 'https://kb.stellargra.ph'
   }
 }));
 

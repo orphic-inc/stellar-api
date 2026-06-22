@@ -21,6 +21,7 @@ import {
   type CreateRulesPageInput,
   type UpdateRulesPageInput
 } from '../../schemas/rules';
+import { resolveSiteVariables } from '../../modules/siteVariables';
 
 const router = Router();
 
@@ -57,21 +58,25 @@ router.get(
   })
 );
 
-// GET /tree — the composable Rule/SubRule tree with CRS weights (PRD-05 #1).
-// Static segment — MUST be before /:slug or it'd be read as a rules-page slug.
-// Read-only substrate for ruleImpact(); login-gated only (rules are site-wide
-// and visible to every member).
+// GET /tree — the composable Rule/SubRule tree with CRS weights (PRD-05 #1),
+// plus the resolved `variables` map for the `${...}` tokens carried verbatim in
+// the rule bodies (PRD-09 / ADR-0020 — the API single-sources the values, the UI
+// substitutes). Static segment — MUST be before /:slug or it'd be read as a
+// rules-page slug. Login-gated only (rules are site-wide, visible to every member).
 router.get(
   '/tree',
   requireAuth,
   authHandler(async (_req, res) => {
-    const rules = await prisma.rule.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-      include: {
-        subRules: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }
-      }
-    });
-    res.json({ rules });
+    const [rules, variables] = await Promise.all([
+      prisma.rule.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        include: {
+          subRules: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }
+        }
+      }),
+      resolveSiteVariables(prisma)
+    ]);
+    res.json({ rules, variables });
   })
 );
 

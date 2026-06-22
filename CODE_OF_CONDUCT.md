@@ -1,12 +1,12 @@
 # Code of Conduct — Stellar Golden Rules
 
-These are Stellar's site-wide Golden Rules — the canonical behavioral standard for every member. `${...}` placeholders are rendered per-site by the in-app RulesPage (see PRD-05). The rule _model_ lives in `docs/prd/05-rules-and-governance.md`; this file is the prose.
+These are Stellar's six site-wide Golden Rules — the non-negotiable behavioral standard baked into the software. Per-Community rules may only ever be a subset or extension of these six. `${...}` placeholders (including the links below) are resolved at read time: `GET /api/rules/tree` ships a `variables` map the UI substitutes (see PRD-09 / ADR-0020); public guidance articles live in the Stellar Public KB. The rule _model_ lives in `docs/prd/05-rules-and-governance.md`; this file is the canonical prose, mirrored into the seed by a CI drift-guard.
 
 **1.1 Do not create more than one account.** Users are allowed one account per lifetime. If your account is disabled, contact staff in ${disabled_channel} on ${irc}.
 
 **1.2 Do not trade, sell, give away, or offer accounts.** If you no longer wish to use your account, send a ${staffpm} and request that your account be disabled.
 
-**1.3 Do not share accounts.** Accounts are for personal use only. Granting access to your account in any way (e.g., shared login details, external programs) is prohibited. [Invite](wiki.php?action=article&name=invite) friends or direct them to the [IRC Interview](http://www.whatinterviewprep.com/).
+**1.3 Do not share accounts.** Accounts are for personal use only. Granting access to your account in any way (e.g., shared login details, external programs) is prohibited. [Invite](${invite_article}) friends or direct them to the [IRC Interview](${interview_article}).
 
 ---
 
@@ -14,15 +14,15 @@ These are Stellar's site-wide Golden Rules — the canonical behavioral standard
 
 **2.2 Do not trade, sell, publicly give away, or publicly offer invites.** Only invite people you know and trust. Do not offer invites via other trackers, forums, social media, or other public locations. Responding to public invite requests is prohibited. Exception: Staff-designated recruiters may offer invites in approved locations.
 
-**2.3 Do not request invites or accounts.** Requesting invites to—or accounts on—${site_name} or other trackers is prohibited. Invites may be _offered_, but not requested, in the site's Invites forum (restricted to the [Power User class](wiki.php?action=article&name=classes) and above). You may request invites by messaging users only when they have offered them in the Invites Forum. Unsolicited invite requests, even by private message, are prohibited.
+**2.3 Do not request invites or accounts.** Requesting invites to—or accounts on—${site_name} or other trackers is prohibited. Invites may be _offered_, but not requested, in the site's Invites forum (restricted to the [Power User class](${classes_article}) and above). You may request invites by messaging users only when they have offered them in the Invites Forum. Unsolicited invite requests, even by private message, are prohibited.
 
 ---
 
-**3.1 Do not engage in ratio manipulation.** Transferring buffer—or increasing your buffer—through unintended uses of the IRC protocol or site features (e.g., [request abuse](rules.php?p=requests)) constitutes ratio manipulation. When in doubt, send a ${staffpm} asking for more information.
+**3.1 Do not engage in ratio manipulation.** Transferring buffer—or increasing your buffer—through unintended uses of the IRC protocol or site features (e.g., [request abuse](${requests_article})) constitutes ratio manipulation. When in doubt, send a ${staffpm} asking for more information.
 
 **3.2 Do not report incorrect data to the tracker (i.e., cheating).** Reporting incorrect data to the tracker constitutes cheating, whether it is accomplished through the use of a modified "cheat API call" or through manipulation of an approved interface (stellar-ui).
 
-**3.3 Do not use unapproved interfaces.** Your client must be found on the [Interface Whitelist](rules.php?p=interfaces). You must not use interfaces that have been modified in any way. Developers interested in testing unstable interfaces must first receive staff approval.
+**3.3 Do not use unapproved interfaces.** Your client must be found on the [Interface Whitelist](${interfaces_article}). You must not use interfaces that have been modified in any way. Developers interested in testing unstable interfaces must first receive staff approval.
 
 **3.4 Do not modify ${site_name} files.** Embedding non-${site_name} announce XML/URLs in ${site_name} releases are prohibited. Doing so causes false data to be reported and will be interpreted as cheating. This applies to standalone URLs, stringified XML (JSON, etc.), and API-based URLs that have been loaded into an interface.
 
@@ -50,12 +50,12 @@ These are Stellar's site-wide Golden Rules — the canonical behavioral standard
 
 **5.1 Do not browse ${site_name} using proxies (including any VPN) with dynamic or shared IP addresses.** You may browse the site through a private server/proxy only if it has a static IP address unique to you, or through your private or shared VPS. Note that this applies to every kind of proxy, including VPN services, Tor, and public proxies. When in doubt, send a ${staffpm} seeking approval of your proxy or VPN. See our ${vpns_article} and ${ips_article} articles for more information.
 
-**5.2 Do not abuse automated site access.** All automated site access must be done through the [API](https://github.com/orphic-inc/stellar-api/docs/JSON-API-Documentation). API use is limited to x requests within any xx-second window. Scripts and other automated processes must not scrape the site's HTML pages.
+**5.2 Do not abuse automated site access.** All automated site access must be done through the [API](https://github.com/orphic-inc/stellar-api). API use is limited to x requests within any xx-second window. Scripts and other automated processes must not scrape the site's HTML pages.
 
 **5.3 Do not autosnatch freepass releases.** The automatic snatching of freepass releases using any method involving little or no user-input (e.g., API-based scripts, log or site scraping, etc.) is prohibited. See ${site_name}'s ${autofp_article} article for more information.
 
 ---
 
-**6.1 Do not seek or exploit live bugs for any reason.** Seeking or exploiting bugs in the live site (as opposed to a local development environment) is prohibited. If you discover a critical bug or security vulnerability, immediately report it in accordance with ${site_name}'s ${bugs_article}. Non-critical bugs can be reported in the [Bugs Forum](/private/forums/[todo]).
+**6.1 Do not seek or exploit live bugs for any reason.** Seeking or exploiting bugs in the live site (as opposed to a local development environment) is prohibited. If you discover a critical bug or security vulnerability, immediately report it in accordance with ${site_name}'s ${bugs_article}. Non-critical bugs can be reported in the [Bugs Forum](${bugs_forum}).
 
 **6.2 Do not publish exploits.** The publication, organization, dissemination, sharing, technical discussion, or technical facilitation of exploits is prohibited at staff discretion. Exploits are defined as unanticipated or unaccepted uses of internal, external, non-profit, or for-profit services. See ${site_name}'s ${exploit_article} article for more information. Exploits are subject to reclassification at any time.

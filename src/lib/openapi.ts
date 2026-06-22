@@ -5518,13 +5518,18 @@ registry.registerPath({
   method: 'get',
   path: '/rules/tree',
   tags: ['Rules'],
-  description: 'The composable Rule/SubRule tree with CRS weights (PRD-05 #1)',
+  description:
+    'The composable Rule/SubRule tree with CRS weights (PRD-05 #1), plus the resolved ${...} variables map (PRD-09 / ADR-0020)',
   responses: {
     200: {
-      description: 'Rule tree, each rule with its nested sub-rules',
+      description:
+        'Rule tree (each rule with its nested sub-rules) and the variables map the UI substitutes into the verbatim bodies',
       content: {
         'application/json': {
-          schema: z.object({ rules: z.array(Rule) })
+          schema: z.object({
+            rules: z.array(Rule),
+            variables: z.record(z.string(), z.string())
+          })
         }
       }
     }

@@ -18,6 +18,7 @@ import {
   seedRankPromotionRules,
   seedForums
 } from '../../modules/bootstrap';
+import { seedGoldenRules } from '../../modules/goldenRules';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
 import { getDefaultStylesheetName } from '../../modules/stylesheet';
@@ -171,6 +172,7 @@ router.post(
     await seedRanks(prisma);
     await seedRankPromotionRules(prisma);
     await seedForums(prisma);
+    await seedGoldenRules(prisma);
 
     const sysopRank = await prisma.userRank.findFirst({
       where: { level: 1000 }

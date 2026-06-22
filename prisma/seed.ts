@@ -12,6 +12,7 @@ import {
   seedRankPromotionRules,
   seedForums
 } from '../src/modules/bootstrap';
+import { seedGoldenRules } from '../src/modules/goldenRules';
 
 const prisma = new PrismaClient();
 
@@ -19,6 +20,7 @@ async function main() {
   await seedRanks(prisma);
   await seedRankPromotionRules(prisma);
   await seedForums(prisma);
+  await seedGoldenRules(prisma);
   console.log('→ Complete setup at http://localhost:9000/install');
 }
 

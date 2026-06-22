@@ -2,28 +2,27 @@
 
 **Status:** Draft · **Owner:** @obrien-k · **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md)
 **Decisions:** [ADR-0001 granular permissions](../adr/0001-granular-permission-checks.md) (enforcement), [ADR-0002 community-health-pulse](../adr/0002-community-health-pulse.md) (standing trend), [ADR-0004 standing → CRS + warnings/bans](../adr/0004-standing-warnings-bans.md)
-**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance** · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art
+**Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance** · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art · PRD-09 Golden-Rules Surfacing
 
 > The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose. The canonical prose lives in two mirrors: the in-app `RulesPage` (rendered per-site with `${...}` placeholders) and the repo's [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) (the prose home). The 7-rule **model** stays here in the PRD.
 
-## The Golden Rules (7 — canonical, site-wide)
+## The Golden Rules (6 — canonical, site-wide, immutable)
 
-Seven canonical rules govern the whole site. They are deliberately kept whole — not consolidated — and are the backbone of CRS standing:
+Six canonical rules govern the whole site. They are **non-negotiable and baked into the software** — the seeded root of the rule tree; any per-Community rule may only ever be a **subset or extension** of these six. They are deliberately kept whole — not consolidated — and are the backbone of CRS standing. The canonical prose lives in [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) (mirrored into the `seedGoldenRules()` table by a CI drift-guard); the user-facing surfacing and `${...}` token resolution are **[PRD-09](09-golden-rules-surfacing.md)** / **[ADR-0020](../adr/0020-rules-tree-variable-resolution.md)**.
 
 1. **Accounts** — one account per person per lifetime; no sharing/trading/selling; keep it active.
 2. **Invites** — you are responsible for your invitees; no public trading/offering; do not request.
 3. **Contribution Integrity & Accounting** — no manipulating the contribute/consume ledger; Contributions must be honest, with **live links + accurate metadata**; protect your credentials (account / API key). _(Content-tracker cast: a self-hosted host counts as a seedbox-class source; RSS/IRC announcements + idle/activity tracking stand in for a torrent announce.)_
-4. **Conduct** — no blackmail/scams/impersonation; civil discourse; no backseat-moderation.
+4. **Conduct** — no blackmail/scams/impersonation; civil discourse; no backseat-moderation; **respect staff decisions** (staff are volunteers; their interpretation of the rules is final; raise disputes privately). _(Earlier drafts split "Respect Staff" into a 7th rule; it folds into Conduct, matching the prose's own grouping.)_
 5. **Access & Automation** — no free VPN/Tor; automated access via the **API only** (rate-limited); no automated abuse of download credits.
 6. **Bugs & Exploits** — don't seek or exploit live bugs (responsible disclosure); don't publish exploits.
-7. **Respect Staff** — staff are volunteers; their interpretation of the rules is final; raise disputes privately.
 
 ## Composable rule model (the architecture)
 
 Rules form a hierarchy, each node carrying a **CRS micro-impact**:
 
 ```
-GoldenRule (site-wide, 1..7)
+GoldenRule (site-wide, 1..6)
   └─ CommunityRules (per Community)
         ├─ may adopt 0, some, or all GoldenRules
         └─ may add its own rules, each with SubRules
@@ -44,7 +43,7 @@ GoldenRule (site-wide, 1..7)
 
 | Ruleset            | Status                                                                                                                                                                                             |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GoldenRules**    | the 7 above (canonical)                                                                                                                                                                            |
+| **GoldenRules**    | the 6 above (canonical, immutable — seeded from `CODE_OF_CONDUCT.md`, surfaced via PRD-09)                                                                                                         |
 | **CommunityRules** | composable per-Community tree (above) — leans on `Community`, `UserRank`, `RulesPage`                                                                                                              |
 | **StaffRules**     | staff conduct + the +50 CRS/week-served signal (cross-ref PRD-01) — `StaffGroup`, `UserRank` — [documented as built](../governance/forum-and-staff-rules.md#staffrules-built)                      |
 | **InterviewRules** | recruitment/interview conduct — net-new                                                                                                                                                            |
@@ -71,6 +70,7 @@ GoldenRule (site-wide, 1..7)
 1. ~~**Rule model** — a `Rule`/`SubRule` tree with a CRS-weight field + a pure `ruleImpact(...)` function (table-driven, mirroring the PRD-03 stylesheet slice).~~ **Shipped: [#123](https://github.com/orphic-inc/stellar-api/issues/123).** `Rule`/`SubRule` models (compliance/violation weights, `onDelete: Cascade`), the pure table-driven `ruleImpact()` (`src/modules/ruleImpact.ts` — standing-tier × per-node weights, magnitudes still TBD per the open questions below), and `GET /api/rules/tree`. The standing tier it consumes is computed by descent target #2 (ADR-0004).
 2. ~~**Warning/Ban model** + standing computation (ADR-0004).~~ **Standing computation shipped: [#124](https://github.com/orphic-inc/stellar-api/issues/124).** Pure `computeStanding()` (`src/modules/standing.ts`) rolls active `UserWarning` rows (accrual + expiry) and ban state into the 5-tier `Standing` that `ruleImpact()` (#1) consumes; surfaced on the profile read path (`PublicProfile.standing`). Thresholds are ADR-0004 placeholders (TBD). The fuller Warning/Ban _entity_ model (suspensions, escalation ladder, ban-evasion linkage) remains for ADR-0004 to finalize — this slice computes standing over the existing `UserWarning` + `banDate`.
 3. **Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new. **Documentation half shipped: [#126](https://github.com/orphic-inc/stellar-api/issues/126)** — ForumRules + StaffRules documented as built in [governance/forum-and-staff-rules.md](../governance/forum-and-staff-rules.md) (sub-rule list, the `ruleImpact()` weights as implemented, and an honest built-vs-stub map: `ForumSpecificRule` is a stub, the staff "+50 CRS/week-served" signal is not yet a CRS dimension). The IRCRules + InterviewRules specs remain net-new (HITL — content + weights need product decisions).
+4. ~~**Seed the GoldenRules + surface them**~~ — the 6-rule tree is seeded from `CODE_OF_CONDUCT.md` (`seedGoldenRules()`, drift-guarded), and `GET /api/rules/tree` ships the resolved `${...}` `variables` map for the UI. Spec: **[PRD-09](09-golden-rules-surfacing.md)** / **[ADR-0020](../adr/0020-rules-tree-variable-resolution.md)**.
 
 ## Open questions
 

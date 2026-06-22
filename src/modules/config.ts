@@ -27,6 +27,19 @@ export const http = {
   corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN || 'http://localhost:3000'
 };
 
+// Site identity + the canonical targets the Golden Rules `${...}` tokens resolve
+// to at read time (PRD-09 / ADR-0020). `GET /api/rules/tree` ships these as a
+// `variables` map the UI substitutes; the API single-sources the values here.
+// `publicKbBase` is the Stellar Public KB root — a public-facing wiki peer to IRC
+// that hosts the policy/guidance articles.
+export const site = {
+  name: process.env.STELLAR_SITE_NAME || 'Stellar',
+  ircUrl: process.env.STELLAR_IRC_URL || '/irc',
+  disabledChannel: process.env.STELLAR_DISABLED_CHANNEL || '#disabled',
+  staffPmPath: process.env.STELLAR_STAFFPM_PATH || '/inbox/staff',
+  publicKbBase: process.env.STELLAR_PUBLIC_KB_BASE || 'https://kb.stellargra.ph'
+};
+
 export const economy = {
   minimumBounty: parseInt(process.env.STELLAR_MINIMUM_BOUNTY || '104857600', 10)
 };
