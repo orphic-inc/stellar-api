@@ -42,14 +42,14 @@ GoldenRule (site-wide, 1..7)
 
 ## Sub-rulesets
 
-| Ruleset            | Status                                                                                                                |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| **GoldenRules**    | the 7 above (canonical)                                                                                               |
-| **CommunityRules** | composable per-Community tree (above) — leans on `Community`, `UserRank`, `RulesPage`                                 |
-| **StaffRules**     | staff conduct + the +50 CRS/week-served signal (cross-ref PRD-01) — `staff.ts`, `StaffGroup`                          |
-| **InterviewRules** | recruitment/interview conduct — net-new                                                                               |
-| **ForumRules**     | governance for the **already-built** forum (`forum.ts`, `ForumSpecificRule`, `RulesPage`) — documenting, not building |
-| **IRCRules**       | conduct on the IRC network — **rules here; the IRC feature itself is PRD-02**                                         |
+| Ruleset            | Status                                                                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **GoldenRules**    | the 7 above (canonical)                                                                                                                                                                            |
+| **CommunityRules** | composable per-Community tree (above) — leans on `Community`, `UserRank`, `RulesPage`                                                                                                              |
+| **StaffRules**     | staff conduct + the +50 CRS/week-served signal (cross-ref PRD-01) — `StaffGroup`, `UserRank` — [documented as built](../governance/forum-and-staff-rules.md#staffrules-built)                      |
+| **InterviewRules** | recruitment/interview conduct — net-new                                                                                                                                                            |
+| **ForumRules**     | governance for the **already-built** forum (class-gates + `RulesPage` + rule tree; `ForumSpecificRule` is a stub) — [documented as built](../governance/forum-and-staff-rules.md#forumrules-built) |
+| **IRCRules**       | conduct on the IRC network — **rules here; the IRC feature itself is PRD-02**                                                                                                                      |
 
 ## Bridges to existing decisions
 
@@ -70,7 +70,7 @@ GoldenRule (site-wide, 1..7)
 
 1. ~~**Rule model** — a `Rule`/`SubRule` tree with a CRS-weight field + a pure `ruleImpact(...)` function (table-driven, mirroring the PRD-03 stylesheet slice).~~ **Shipped: [#123](https://github.com/orphic-inc/stellar-api/issues/123).** `Rule`/`SubRule` models (compliance/violation weights, `onDelete: Cascade`), the pure table-driven `ruleImpact()` (`src/modules/ruleImpact.ts` — standing-tier × per-node weights, magnitudes still TBD per the open questions below), and `GET /api/rules/tree`. The standing tier it consumes is computed by descent target #2 (ADR-0004).
 2. ~~**Warning/Ban model** + standing computation (ADR-0004).~~ **Standing computation shipped: [#124](https://github.com/orphic-inc/stellar-api/issues/124).** Pure `computeStanding()` (`src/modules/standing.ts`) rolls active `UserWarning` rows (accrual + expiry) and ban state into the 5-tier `Standing` that `ruleImpact()` (#1) consumes; surfaced on the profile read path (`PublicProfile.standing`). Thresholds are ADR-0004 placeholders (TBD). The fuller Warning/Ban _entity_ model (suspensions, escalation ladder, ban-evasion linkage) remains for ADR-0004 to finalize — this slice computes standing over the existing `UserWarning` + `banDate`.
-3. **Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new.
+3. **Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new. **Documentation half shipped: [#126](https://github.com/orphic-inc/stellar-api/issues/126)** — ForumRules + StaffRules documented as built in [governance/forum-and-staff-rules.md](../governance/forum-and-staff-rules.md) (sub-rule list, the `ruleImpact()` weights as implemented, and an honest built-vs-stub map: `ForumSpecificRule` is a stub, the staff "+50 CRS/week-served" signal is not yet a CRS dimension). The IRCRules + InterviewRules specs remain net-new (HITL — content + weights need product decisions).
 
 ## Open questions
 
