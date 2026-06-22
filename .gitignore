@@ -9,3 +9,6 @@ src/**/*.js
 src/**/*.js.map
 .DS_Store
 .playwright-mcp/
+
+# Local recovery / scratch notes — never committed
+/update.md
