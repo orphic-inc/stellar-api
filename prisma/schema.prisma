@@ -2486,7 +2486,7 @@ model DevSeedRecord {
   runId      String
   run        DevSeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   entityType String // e.g. "User", "WikiAlias", "UserSecondaryRank"
-  pk         Json // { id: 7 } or { alias: "foo" } or { userId: 2, userRankId: 5 }
+  primaryKey Json // { id: 7 } or { alias: "foo" } or { userId: 2, userRankId: 5 }
   createdAt  DateTime   @default(now())
 
   @@index([runId])
@@ -2501,7 +2501,7 @@ model DevSeedMutation {
   runId      String
   run        DevSeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   entityType String
-  pk         Json
+  primaryKey Json // { id: 7 } or { alias: "foo" } or composite
   mutation   String // e.g. "counter_increment", "field_update", "relation_connect"
   before     Json?
   after      Json?

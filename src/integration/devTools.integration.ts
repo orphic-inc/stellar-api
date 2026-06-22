@@ -128,10 +128,10 @@ describe('runGeneration — minimal isolated', () => {
 
     const records = await testPrisma.devSeedRecord.findMany({
       where: { runId: result.runId, entityType: 'User' },
-      select: { pk: true }
+      select: { primaryKey: true }
     });
-    // pk is JSON: { id: <number> } for User records.
-    const ids = records.map((r) => (r.pk as { id: number }).id);
+    // primaryKey is JSON: { id: <number> } for User records.
+    const ids = records.map((r) => (r.primaryKey as { id: number }).id);
     const users = await testPrisma.user.findMany({
       where: { id: { in: ids } },
       select: { avatar: true }

@@ -92,9 +92,24 @@ const { email, password } = parsedBody<LoginInput>(res);
 - Avoid manual string manipulation or raw SQL unless absolutely necessary.
 - **Soft Deletes**: Always rely on Prisma soft-delete patterns or extensions rather than manually filtering `deletedAt: null` across all queries.
 
+## OpenAPI Synchronization
+
+Stellar relies on an OpenAPI specification to maintain type-safety between the API and the UI. When you make changes to Zod schemas or API routes, you must export the new OpenAPI spec:
+
+```bash
+npm run openapi:export
+```
+
+This generates an `openapi.json` file in the project root. The `stellar-ui` repository reads this file to generate its frontend TypeScript types, so a stale `openapi.json` will silently drift the UI's types away from the live API contract.
+
 ## Testing
 
-We utilize Jest and Supertest.
+We utilize Jest and Supertest. Supertest drives our route-level tests through the harness in `src/test/apiTestHarness.ts`, exercising the real Express app without binding a port.
+
+```bash
+npm run test              # unit/spec suite (mocked DB)
+npm run test:integration  # integration suite (requires a stellar_test database and a .env.test file)
+```
 
 - New endpoints must be accompanied by integration tests in `src/integration`.
 - Utilize the `apiTestHarness` and `dbHelpers` to cleanly stub out the database or test user context during integration tests.

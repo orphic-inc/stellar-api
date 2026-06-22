@@ -25,7 +25,7 @@ export async function trackCreate(
   pk: Record<string, unknown>
 ): Promise<void> {
   await tx.devSeedRecord.create({
-    data: { runId, entityType, pk: pk as Prisma.InputJsonValue }
+    data: { runId, entityType, primaryKey: pk as Prisma.InputJsonValue }
   });
 }
 
@@ -50,7 +50,7 @@ export async function trackMutation(
     data: {
       runId,
       entityType,
-      pk: pk as Prisma.InputJsonValue,
+      primaryKey: pk as Prisma.InputJsonValue,
       before:
         before == null ? Prisma.DbNull : (before as Prisma.InputJsonValue),
       after: after == null ? Prisma.DbNull : (after as Prisma.InputJsonValue),
@@ -100,7 +100,7 @@ export async function trackManyCreated(
 ): Promise<void> {
   if (ids.length === 0) return;
   await tx.devSeedRecord.createMany({
-    data: ids.map((id) => ({ runId, entityType, pk: { id } }))
+    data: ids.map((id) => ({ runId, entityType, primaryKey: { id } }))
   });
 }
 
@@ -115,7 +115,7 @@ export async function getTrackedRecords(
   const map = new Map<string, unknown[]>();
   for (const r of records) {
     const list = map.get(r.entityType) ?? [];
-    list.push(r.pk);
+    list.push(r.primaryKey);
     map.set(r.entityType, list);
   }
   return map;
@@ -130,7 +130,7 @@ export async function getTrackedMutations(
 ): Promise<
   Array<{
     entityType: string;
-    pk: unknown;
+    primaryKey: unknown;
     mutation: string;
     before: unknown;
     reversible: boolean;

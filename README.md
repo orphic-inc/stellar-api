@@ -87,27 +87,6 @@ Start the server in development mode (with hot-reloading):
 npm run dev
 ```
 
-## OpenAPI Synchronization
+## Contributing
 
-Stellar relies on an OpenAPI specification to maintain type-safety between the API and the UI.
-When you make changes to Zod schemas or API routes, you must export the new OpenAPI spec:
-
-```bash
-npm run openapi:export
-```
-
-This generates an `openapi.json` file in the project root. The `stellar-ui` repository will read this file to generate its frontend TypeScript types.
-
-## Testing
-
-Run the test suite:
-
-```bash
-npm run test
-```
-
-Run integration tests (requires a `stellar_test` database and `.env.test` file):
-
-```bash
-npm run test:integration
-```
+For the contributor workflow (OpenAPI sync, testing), see [CONTRIBUTING.md](CONTRIBUTING.md).
