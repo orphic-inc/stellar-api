@@ -36,16 +36,16 @@ export const createCommunitySchema = z
     registrationStatus: registrationStatusEnum,
     allowDuplicateFormats: z.boolean().optional(),
     staffIds: z.array(z.number().int().positive()).optional(),
-    ownerId: z.number().int().positive().optional()
+    leaderId: z.number().int().positive().optional()
   })
   .refine(
     (data) =>
       data.registrationStatus === RegistrationStatus.open ||
-      data.ownerId !== undefined,
+      data.leaderId !== undefined,
     {
       message:
-        'Owner user ID is required for invite-only and closed communities',
-      path: ['ownerId']
+        'Leader user ID is required for invite-only and closed communities',
+      path: ['leaderId']
     }
   );
 
@@ -55,7 +55,8 @@ export const updateCommunitySchema = z.object({
   image: z.string().url().optional(),
   registrationStatus: registrationStatusEnum.optional(),
   allowDuplicateFormats: z.boolean().optional(),
-  staffIds: z.array(z.number().int().positive()).optional()
+  staffIds: z.array(z.number().int().positive()).optional(),
+  leaderId: z.number().int().positive().optional()
 });
 
 export const createGroupSchema = z.object({

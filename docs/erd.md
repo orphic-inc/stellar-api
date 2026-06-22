@@ -1648,6 +1648,7 @@ Yearly Yearly
     "communities" |o--|| "RegistrationStatus" : "enum:registrationStatus"
     "communities" |o--|| "CommunityType" : "enum:type"
     "communities" o{--}o "consumers" : ""
+    "communities" }o--|o users : "leader"
     "consumers" |o--|| users : "user"
     "consumers" o{--}o "releases" : ""
     "consumers" o{--}o "contributions" : ""

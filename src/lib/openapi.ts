@@ -2613,6 +2613,7 @@ const Community = registry.register(
     registrationStatus: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
     allowDuplicateFormats: z.boolean(),
+    leaderId: z.number().nullable().optional(),
     staff: z.array(CommunityStaffMember).optional(),
     consumers: z.array(CommunityConsumer).optional(),
     _count: z

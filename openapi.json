@@ -2758,6 +2758,10 @@
           "allowDuplicateFormats": {
             "type": "boolean"
           },
+          "leaderId": {
+            "type": "number",
+            "nullable": true
+          },
           "staff": {
             "type": "array",
             "items": {

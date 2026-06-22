@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { RegistrationStatus, StatSnapshotPeriod } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { getCommunityHealthPulse } from '../../../modules/linkHealth';
 import { getCommunityHealthHistory } from '../../../modules/communityHealthHistory';
@@ -316,12 +317,13 @@ router.post(
       registrationStatus,
       allowDuplicateFormats,
       staffIds,
-      ownerId
+      leaderId
     } = parsedBody<CreateCommunityInput>(res);
 
-    if (ownerId !== undefined) {
-      const owner = await prisma.user.findUnique({ where: { id: ownerId } });
-      if (!owner) return res.status(404).json({ msg: 'Owner user not found' });
+    if (leaderId !== undefined) {
+      const leader = await prisma.user.findUnique({ where: { id: leaderId } });
+      if (!leader)
+        return res.status(404).json({ msg: 'Leader user not found' });
     }
 
     const defaultImages: Record<string, string> = {
@@ -334,9 +336,10 @@ router.post(
       Comics: '/images/defaults/comics.png'
     };
 
+    // Leader is a superset of staff (ADR-0021): always fold into the staff set.
     const allStaffIds = [
       ...(staffIds ?? []),
-      ...(ownerId !== undefined ? [ownerId] : [])
+      ...(leaderId !== undefined ? [leaderId] : [])
     ];
 
     const community = await prisma.community.create({
@@ -347,6 +350,7 @@ router.post(
         registrationStatus,
         image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
+        ...(leaderId !== undefined && { leaderId }),
         ...(allStaffIds.length && {
           staff: {
             connect: [...new Set(allStaffIds)].map((sid) => ({ id: sid }))
@@ -355,15 +359,23 @@ router.post(
       }
     });
 
-    if (ownerId !== undefined) {
+    if (leaderId !== undefined) {
       await prisma.consumer.upsert({
-        where: { userId: ownerId },
+        where: { userId: leaderId },
         create: {
-          userId: ownerId,
+          userId: leaderId,
           communities: { connect: { id: community.id } }
         },
         update: { communities: { connect: { id: community.id } } }
       });
+      await audit(
+        prisma,
+        req.user!.id,
+        'community.leader.set',
+        'community',
+        community.id,
+        { leaderId }
+      );
     }
 
     res.status(201).json(community);
@@ -387,8 +399,24 @@ router.put(
       image,
       registrationStatus,
       allowDuplicateFormats,
-      staffIds
+      staffIds,
+      leaderId
     } = parsedBody<UpdateCommunityInput>(res);
+
+    if (leaderId !== undefined) {
+      const leader = await prisma.user.findUnique({ where: { id: leaderId } });
+      if (!leader)
+        return res.status(404).json({ msg: 'Leader user not found' });
+    }
+
+    // `staffIds` (when given) replaces the whole staff set, so the new leader
+    // might not be in it — fold them back in to preserve the leader⊇staff
+    // invariant (ADR-0021).
+    const staffConnect =
+      leaderId !== undefined && staffIds !== undefined
+        ? [...new Set([...staffIds, leaderId])]
+        : staffIds;
+
     const community = await prisma.community.update({
       where: { id },
       data: {
@@ -397,11 +425,38 @@ router.put(
         ...(image !== undefined && { image }),
         ...(registrationStatus !== undefined && { registrationStatus }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
-        ...(staffIds !== undefined && {
-          staff: { set: staffIds.map((sid: number) => ({ id: sid })) }
-        })
+        ...(leaderId !== undefined && { leaderId }),
+        ...(staffConnect !== undefined && {
+          staff: { set: staffConnect.map((sid: number) => ({ id: sid })) }
+        }),
+        // Leader given but staff set untouched: connect (don't replace) so the
+        // invariant holds without disturbing existing staff.
+        ...(leaderId !== undefined &&
+          staffIds === undefined && {
+            staff: { connect: { id: leaderId } }
+          })
       }
     });
+
+    if (leaderId !== undefined) {
+      await prisma.consumer.upsert({
+        where: { userId: leaderId },
+        create: {
+          userId: leaderId,
+          communities: { connect: { id: community.id } }
+        },
+        update: { communities: { connect: { id: community.id } } }
+      });
+      await audit(
+        prisma,
+        req.user!.id,
+        'community.leader.set',
+        'community',
+        community.id,
+        { leaderId, previousLeaderId: existing.leaderId }
+      );
+    }
+
     res.json(community);
   })
 );

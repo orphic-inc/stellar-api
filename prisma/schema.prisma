@@ -427,6 +427,7 @@ model User {
   friendRequestsSent       FriendRelationship[]             @relation("FriendRequester")
   friendRequestsReceived   FriendRelationship[]             @relation("FriendRecipient")
   communityStaff           Community[]                      @relation("CommunityStaff")
+  communitiesLed           Community[]                      @relation("CommunityLeader")
   consumer                 Consumer?
   contributor              Contributor?
   contributions            Contribution[]
@@ -957,6 +958,12 @@ model Community {
   releases              Release[]
   comments              Comment[]
   staff                 User[]                    @relation("CommunityStaff")
+  // The founding/owning member. A superset of `staff`: setting it always
+  // connects the same user to `staff` + upserts a Consumer (ADR-0021).
+  // Nullable so a disabled/departed leader leaves a recoverable pointer
+  // rather than orphaning the community.
+  leaderId              Int?
+  leader                User?                     @relation("CommunityLeader", fields: [leaderId], references: [id])
   doNotContribute       DoNotContribute[]
   bookmarks             BookmarkCommunity[]
   createdAt             DateTime                  @default(now())
@@ -964,6 +971,7 @@ model Community {
   Request               Request[]
   healthSnapshots       CommunityHealthSnapshot[]
 
+  @@index([leaderId])
   @@map("communities")
 }
 

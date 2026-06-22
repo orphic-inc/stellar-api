@@ -393,7 +393,7 @@ describe('POST /api/communities', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 404 when ownerId does not exist', async () => {
+  it('returns 404 when leaderId does not exist', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -403,14 +403,14 @@ describe('POST /api/communities', () => {
       name: 'Jazz',
       type: 'Music',
       registrationStatus: 'open',
-      ownerId: 99
+      leaderId: 99
     });
 
     expect(res.status).toBe(404);
-    expect(res.body).toEqual({ msg: 'Owner user not found' });
+    expect(res.body).toEqual({ msg: 'Leader user not found' });
   });
 
-  it('creates a community with default image and owner membership', async () => {
+  it('creates a community, setting the leader as a superset of staff', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -429,7 +429,7 @@ describe('POST /api/communities', () => {
         name: 'Jazz',
         type: 'Music',
         registrationStatus: 'open',
-        ownerId: 9,
+        leaderId: 9,
         staffIds: [9, 11]
       });
 
@@ -440,6 +440,7 @@ describe('POST /api/communities', () => {
         type: 'Music',
         registrationStatus: 'open',
         image: '/images/defaults/music.png',
+        leaderId: 9,
         staff: {
           connect: [{ id: 9 }, { id: 11 }]
         }
@@ -449,6 +450,47 @@ describe('POST /api/communities', () => {
       where: { userId: 9 },
       create: { userId: 9, communities: { connect: { id: 4 } } },
       update: { communities: { connect: { id: 4 } } }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'community.leader.set',
+          targetType: 'community',
+          targetId: 4
+        })
+      })
+    );
+  });
+
+  it('folds the leader into staff even when omitted from staffIds', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 9 } as never);
+    prismaMock.community.create.mockResolvedValue(
+      makeCommunity({ id: 4, staff: [] }) as never
+    );
+    prismaMock.consumer.upsert.mockResolvedValue({
+      id: 10,
+      userId: 9
+    } as never);
+
+    const res = await request(app)
+      .post('/api/communities')
+      .send({
+        name: 'Jazz',
+        type: 'Music',
+        registrationStatus: 'open',
+        leaderId: 9,
+        staffIds: [11]
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.community.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        leaderId: 9,
+        staff: { connect: [{ id: 11 }, { id: 9 }] }
+      })
     });
   });
 });
@@ -491,6 +533,85 @@ describe('PUT /api/communities/:id', () => {
         name: 'Updated',
         registrationStatus: 'invite',
         staff: { set: [{ id: 8 }, { id: 9 }] }
+      }
+    });
+  });
+
+  it('returns 404 when the new leaderId does not exist', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ leaderId: 99 });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Leader user not found' });
+  });
+
+  it('reassigns the leader and connects them to staff (transfer)', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
+    prismaMock.community.update.mockResolvedValue(
+      makeCommunity({ id: 1, leaderId: 7 }) as never
+    );
+    prismaMock.consumer.upsert.mockResolvedValue({ id: 5, userId: 7 } as never);
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ leaderId: 7 });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: {
+        leaderId: 7,
+        staff: { connect: { id: 7 } }
+      }
+    });
+    expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
+      where: { userId: 7 },
+      create: { userId: 7, communities: { connect: { id: 1 } } },
+      update: { communities: { connect: { id: 1 } } }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'community.leader.set',
+          targetType: 'community',
+          targetId: 1
+        })
+      })
+    );
+  });
+
+  it('folds the new leader into a replaced staff set', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
+    prismaMock.community.update.mockResolvedValue(
+      makeCommunity({ id: 1, leaderId: 7 }) as never
+    );
+    prismaMock.consumer.upsert.mockResolvedValue({ id: 5, userId: 7 } as never);
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ leaderId: 7, staffIds: [8, 9] });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: {
+        leaderId: 7,
+        staff: { set: [{ id: 8 }, { id: 9 }, { id: 7 }] }
       }
     });
   });
