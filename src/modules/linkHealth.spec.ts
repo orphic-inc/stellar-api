@@ -30,7 +30,8 @@ import {
   sweepStaleWarnLinks,
   checkContributionLink,
   getCommunityHealthPulse,
-  computePulse
+  computePulse,
+  applyHealthAccrual
 } from './linkHealth';
 import { sendSystemMessage } from './pm';
 
@@ -127,38 +128,151 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     mockPrismaContribution.findUnique.mockResolvedValue({
       downloadUrl: 'http://example.test/x',
       linkStatus: 'WARN',
-      linkStatusChangedAt: new Date('2020-01-01')
+      linkStatusChangedAt: new Date('2020-01-01'),
+      healthyMs: 0n,
+      healthySince: null
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
     const { data } = mockPrismaContribution.update.mock.calls[0][0];
     expect(data.linkStatus).toBe('PASS');
     expect(data.linkStatusChangedAt).toBeInstanceOf(Date);
+    // Entering PASS opens the uptime segment (#95 / ADR-0019).
+    expect(data.healthySince).toBeInstanceOf(Date);
   });
 
   it('does not re-stamp when status is unchanged and already stamped', async () => {
     mockPrismaContribution.findUnique.mockResolvedValue({
       downloadUrl: 'http://example.test/x',
       linkStatus: 'PASS',
-      linkStatusChangedAt: new Date('2020-01-01')
+      linkStatusChangedAt: new Date('2020-01-01'),
+      healthyMs: 0n,
+      healthySince: new Date('2020-01-01')
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
     const { data } = mockPrismaContribution.update.mock.calls[0][0];
     expect(data.linkStatus).toBe('PASS');
     expect(data.linkStatusChangedAt).toBeUndefined();
+    // Still accruing: the open segment is left untouched (no re-open, no bank).
+    expect(data.healthySince).toEqual(new Date('2020-01-01'));
   });
 
   it('initializes the clock when it has never been stamped (backfill case)', async () => {
     mockPrismaContribution.findUnique.mockResolvedValue({
       downloadUrl: 'http://example.test/x',
       linkStatus: 'PASS',
-      linkStatusChangedAt: null
+      linkStatusChangedAt: null,
+      healthyMs: 0n,
+      healthySince: null
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
     const { data } = mockPrismaContribution.update.mock.calls[0][0];
     expect(data.linkStatusChangedAt).toBeInstanceOf(Date);
+    // Self-heal: a backfilled PASS that never opened a segment opens one now.
+    expect(data.healthySince).toBeInstanceOf(Date);
+  });
+
+  it('banks the open PASS segment when a link goes PASS → FAIL', async () => {
+    const since = new Date('2020-01-01T00:00:00Z');
+    mockPrismaContribution.findUnique.mockResolvedValue({
+      downloadUrl: 'http://example.test/x',
+      linkStatus: 'PASS',
+      linkStatusChangedAt: since,
+      healthyMs: 1000n,
+      healthySince: since
+    });
+    // 404 → FAIL.
+    fetchMock.mockResolvedValue({ ok: false, status: 404 });
+    await checkContributionLink(5);
+    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    expect(data.linkStatus).toBe('FAIL');
+    expect(data.healthySince).toBeNull();
+    // Banked = prior 1000ms + the elapsed open segment (> 0).
+    expect(data.healthyMs).toBeGreaterThan(1000n);
+  });
+});
+
+// ─── applyHealthAccrual (pure) ────────────────────────────────────────────────
+
+describe('applyHealthAccrual', () => {
+  const now = new Date('2026-06-21T00:00:00Z');
+  const earlier = new Date('2026-06-20T00:00:00Z'); // 24h before `now`
+  const DAY_MS = 86_400_000n;
+
+  it('opens a segment when entering PASS from a closed state', () => {
+    expect(
+      applyHealthAccrual(
+        LinkHealthStatus.PASS,
+        { healthyMs: 500n, healthySince: null },
+        now
+      )
+    ).toEqual({ healthyMs: 500n, healthySince: now });
+  });
+
+  it('self-heals: opens a segment for a PASS that never opened one', () => {
+    // Same path as "entering PASS" — healthySince is the only flag that matters.
+    expect(
+      applyHealthAccrual(
+        LinkHealthStatus.PASS,
+        { healthyMs: 0n, healthySince: null },
+        now
+      ).healthySince
+    ).toEqual(now);
+  });
+
+  it('is a no-op while already accruing (PASS with an open segment)', () => {
+    const current = { healthyMs: 10n, healthySince: earlier };
+    expect(applyHealthAccrual(LinkHealthStatus.PASS, current, now)).toEqual(
+      current
+    );
+  });
+
+  it('banks and closes the segment when leaving PASS', () => {
+    expect(
+      applyHealthAccrual(
+        LinkHealthStatus.FAIL,
+        { healthyMs: 100n, healthySince: earlier },
+        now
+      )
+    ).toEqual({ healthyMs: 100n + DAY_MS, healthySince: null });
+  });
+
+  it('does the same for WARN (only PASS accrues)', () => {
+    expect(
+      applyHealthAccrual(
+        LinkHealthStatus.WARN,
+        { healthyMs: 0n, healthySince: earlier },
+        now
+      )
+    ).toEqual({ healthyMs: DAY_MS, healthySince: null });
+  });
+
+  it('is a no-op for a non-PASS status with no open segment', () => {
+    const current = { healthyMs: 7n, healthySince: null };
+    expect(applyHealthAccrual(LinkHealthStatus.UNKNOWN, current, now)).toEqual(
+      current
+    );
+    expect(applyHealthAccrual(LinkHealthStatus.FAIL, current, now)).toEqual(
+      current
+    );
+  });
+
+  it('banks exactly the PASS interval across a PASS → WARN → PASS round-trip', () => {
+    const t0 = new Date('2026-06-01T00:00:00Z');
+    const t1 = new Date('2026-06-03T00:00:00Z'); // +2 days PASS → WARN: bank 2d
+    const t2 = new Date('2026-06-05T00:00:00Z'); // WARN → PASS: reopen (no accrual for WARN)
+    const opened = applyHealthAccrual(
+      LinkHealthStatus.PASS,
+      { healthyMs: 0n, healthySince: null },
+      t0
+    );
+    const banked = applyHealthAccrual(LinkHealthStatus.WARN, opened, t1);
+    expect(banked).toEqual({ healthyMs: 2n * DAY_MS, healthySince: null });
+    const reopened = applyHealthAccrual(LinkHealthStatus.PASS, banked, t2);
+    // The 2-day WARN window is NOT credited; only the new open segment carries on.
+    expect(reopened).toEqual({ healthyMs: 2n * DAY_MS, healthySince: t2 });
   });
 });
 

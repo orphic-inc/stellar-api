@@ -412,6 +412,53 @@ describe('computeCrs — Community dimension', () => {
   });
 });
 
+describe('computeCrs — LinkHealth dimension', () => {
+  const CAP = 8;
+  const linkHealthOf = (
+    linkHealthReliability: number,
+    linkHealthYears: number
+  ) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      linkHealthReliability,
+      linkHealthYears
+    }).dimensions.find((d) => d.name === 'linkHealth')!.subScore;
+
+  it('no contributions (R=0, H=0) → 0', () => {
+    expect(linkHealthOf(0, 0)).toBe(0);
+  });
+
+  it('reliability leads: rotted links (R=0) score 0 no matter how much banked H', () => {
+    expect(linkHealthOf(0, 100)).toBe(0);
+  });
+
+  it('volume gates: perfect reliability but ~no banked uptime (H≈0) ≈ 0', () => {
+    // A fresh account that dumped links all PASS today: R≈1, H≈0 → can't farm it.
+    expect(linkHealthOf(1, 0)).toBeCloseTo(0, 10);
+    expect(linkHealthOf(1, 0.001)).toBeLessThan(0.01);
+  });
+
+  it('perfect reliability at H_TAU=3yr → ~63% of cap', () => {
+    expect(linkHealthOf(1, 3)).toBeCloseTo(CAP * (1 - Math.exp(-1)), 6);
+  });
+
+  it('saturates toward cap 8 with sustained reliable uptime', () => {
+    expect(linkHealthOf(1, 30)).toBeGreaterThan(7.9);
+    expect(linkHealthOf(1, 30)).toBeLessThanOrEqual(CAP);
+  });
+
+  it('scales linearly with reliability (R halved → subScore halved)', () => {
+    expect(linkHealthOf(0.5, 6)).toBeCloseTo(linkHealthOf(1, 6) / 2, 10);
+  });
+
+  it('clamps out-of-range reliability to [0,1]', () => {
+    expect(linkHealthOf(2, 3)).toBeCloseTo(linkHealthOf(1, 3), 10);
+    expect(linkHealthOf(-1, 3)).toBe(0);
+  });
+});
+
 // ─── signed dimension floor (aggregator) ──────────────────────────────────────
 
 describe('computeCrs — signed dimension floor', () => {
@@ -541,11 +588,19 @@ describe('getReputation', () => {
     mockPrismaContribution.findMany.mockResolvedValue([
       {
         type: 'flac',
+        createdAt: NOW,
+        linkStatus: 'UNKNOWN',
+        healthyMs: 0n,
+        healthySince: null,
         release: { communityId: 10 },
         releaseFile: { bitrate: null, hasLog: true, hasCue: true }
       },
       {
         type: 'mp3',
+        createdAt: NOW,
+        linkStatus: 'UNKNOWN',
+        healthyMs: 0n,
+        healthySince: null,
         release: { communityId: 10 },
         releaseFile: { bitrate: null, hasLog: false, hasCue: false }
       }
@@ -584,6 +639,90 @@ describe('getReputation', () => {
     expect(
       result.dimensions.find((d) => d.name === 'donation')!.subScore
     ).toBeGreaterThan(0);
+  });
+
+  it('derives link-health R/H from banked contribution uptime (#95)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    // A 2-year-old contribution that banked the full 2 years of PASS (link now
+    // down, segment closed): R ≈ 1 over its 2y life, H ≈ 2 link-years. Dates are
+    // Date.now()-relative because the assembler reads the real clock (not NOW).
+    mockPrismaContribution.findMany.mockResolvedValue([
+      {
+        type: 'flac',
+        createdAt: new Date(Date.now() - 2 * YEAR_MS),
+        linkStatus: 'FAIL',
+        healthyMs: BigInt(Math.round(2 * YEAR_MS)),
+        healthySince: null,
+        release: { communityId: null },
+        releaseFile: null
+      }
+    ]);
+
+    const result = await getReputation(1);
+
+    // The fetch is widened to all of the user's contributions (no community filter).
+    expect(mockPrismaContribution.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 1 } })
+    );
+    const linkHealth = result.dimensions.find((d) => d.name === 'linkHealth')!;
+    expect(linkHealth.subScore).toBeCloseTo(8 * (1 - Math.exp(-2 / 3)), 1);
+  });
+
+  it('counts the live open PASS segment (healthySince) at read time (#95)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    // Nothing banked, but PASS continuously since creation 1y ago — the live
+    // segment alone must yield R ≈ 1, H ≈ 1, so the dimension is non-zero.
+    mockPrismaContribution.findMany.mockResolvedValue([
+      {
+        type: 'flac',
+        createdAt: new Date(NOW.getTime() - YEAR_MS),
+        linkStatus: 'PASS',
+        healthyMs: 0n,
+        healthySince: new Date(NOW.getTime() - YEAR_MS),
+        release: { communityId: null },
+        releaseFile: null
+      }
+    ]);
+
+    const result = await getReputation(1);
+    expect(
+      result.dimensions.find((d) => d.name === 'linkHealth')!.subScore
+    ).toBeGreaterThan(0);
+  });
+
+  it('a dead link with no banked uptime drags link-health reliability to 0 (#95)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue({
+      createdAt: NOW,
+      contributed: 0n,
+      consumed: 0n
+    });
+    mockPrismaFriend.count.mockResolvedValue(0);
+    mockPrismaContribution.findMany.mockResolvedValue([
+      {
+        type: 'flac',
+        createdAt: new Date(NOW.getTime() - 2 * YEAR_MS),
+        linkStatus: 'FAIL',
+        healthyMs: 0n,
+        healthySince: null,
+        release: { communityId: null },
+        releaseFile: null
+      }
+    ]);
+
+    const result = await getReputation(1);
+    expect(
+      result.dimensions.find((d) => d.name === 'linkHealth')!.subScore
+    ).toBe(0);
   });
 
   it('reads the adopter side of the ledger for the Friends controlled vector (#147)', async () => {

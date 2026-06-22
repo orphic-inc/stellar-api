@@ -60,7 +60,7 @@ src/
     asyncHandler.ts         # Wraps async routes; catches errors, 10s timeout
     installState.ts         # In-memory cache for isInstalled() check
     logging.ts              # Winston logger factory (JSON in prod, pretty in dev)
-    linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse
+    linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse; applyHealthAccrual (per-contribution PASS-uptime accumulator, #95/ADR-0019)
     linkHealthJob.ts        # Background job: recheck stale contribution links every 24h
     communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
     crsHistory.ts           # Capture/query CRS as a time-series snapshot (#94, ADR-0007 trend layer); active-users-only, Monthly+Yearly cadence (no hourly), self-read only — captured by statsJob
@@ -82,7 +82,7 @@ src/
     stats.ts                # Stats query helpers
     top10.ts                # Ranked list logic: binomial scoring, TTL caching, snapshots
     user.ts                 # User query helpers
-    reputation.ts           # CRS dimension registry (longevity/ratio/friends/irc); pure scorers + read-time assembler
+    reputation.ts           # CRS dimension registry (longevity/ratio/friends/invite/donation/community/linkHealth/irc/stylesheet); pure scorers + read-time assembler. linkHealth = lifetime confirmed-PASS uptime (#95/ADR-0019)
     irc.ts                  # korin.pink metrics poll client + pure IRCScore scorer (getIrcScore); ADR-0013
     ircJob.ts               # Background poll job — fetches korin.pink IRC metrics into the in-process cache (ADR-0013)
     announce.ts             # Release-Announce publisher — builds new-contribution RSS, pushes to korin POST /irc/announce (ADR-0013)

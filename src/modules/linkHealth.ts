@@ -40,12 +40,52 @@ export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   }
 };
 
+/**
+ * Accrue confirmed-PASS uptime for the lifetime link-health CRS dimension
+ * (ADR-0019, #95). Pure: a function of the NEW status and the current open-
+ * segment clock only. `healthySince` is itself the accrual-state flag, so the
+ * prior status is irrelevant and the result is idempotent / self-healing —
+ * dropping the same block into any status writer converges the columns to
+ * correct even if a transition was once missed. Returns the next
+ * `(healthyMs, healthySince)` to persist alongside the status write. Only PASS
+ * accrues; UNKNOWN/WARN/FAIL do not — stricter than ADR-0006 ratio relief
+ * (which counts everything but FAIL), because a positive reward must credit
+ * confirmed health only and can't be inflated by unconfirmed/suspect links.
+ */
+export const applyHealthAccrual = (
+  status: LinkHealthStatus,
+  current: { healthyMs: bigint; healthySince: Date | null },
+  now: Date
+): { healthyMs: bigint; healthySince: Date | null } => {
+  const isPass = status === LinkHealthStatus.PASS;
+  if (isPass && current.healthySince === null) {
+    // Open (or self-heal) the segment.
+    return { healthyMs: current.healthyMs, healthySince: now };
+  }
+  if (!isPass && current.healthySince !== null) {
+    // Bank the open segment and close it.
+    const elapsed = BigInt(now.getTime() - current.healthySince.getTime());
+    return {
+      healthyMs: current.healthyMs + (elapsed > 0n ? elapsed : 0n),
+      healthySince: null
+    };
+  }
+  // PASS while already accruing, or non-PASS while not accruing: no change.
+  return { healthyMs: current.healthyMs, healthySince: current.healthySince };
+};
+
 export const checkContributionLink = async (
   contributionId: number
 ): Promise<void> => {
   const contribution = await prisma.contribution.findUnique({
     where: { id: contributionId },
-    select: { downloadUrl: true, linkStatus: true, linkStatusChangedAt: true }
+    select: {
+      downloadUrl: true,
+      linkStatus: true,
+      linkStatusChangedAt: true,
+      healthyMs: true,
+      healthySince: true
+    }
   });
   if (!contribution) return;
 
@@ -56,11 +96,21 @@ export const checkContributionLink = async (
   const stampChange =
     status !== contribution.linkStatus ||
     contribution.linkStatusChangedAt === null;
+  const accrual = applyHealthAccrual(
+    status,
+    {
+      healthyMs: contribution.healthyMs,
+      healthySince: contribution.healthySince
+    },
+    now
+  );
   await prisma.contribution.update({
     where: { id: contributionId },
     data: {
       linkStatus: status,
       linkCheckedAt: now,
+      healthyMs: accrual.healthyMs,
+      healthySince: accrual.healthySince,
       ...(stampChange ? { linkStatusChangedAt: now } : {})
     }
   });
@@ -173,7 +223,7 @@ export const recordContributionReport = async (
   if (distinctReporters.length >= REPORT_WARN_THRESHOLD) {
     const current = await prisma.contribution.findUnique({
       where: { id: contributionId },
-      select: { linkStatus: true }
+      select: { linkStatus: true, healthyMs: true, healthySince: true }
     });
     // Only warn from a healthy/unknown state: don't reset the sweep clock on
     // an already-WARN link, and don't downgrade a confirmed FAIL back to WARN.
@@ -182,11 +232,22 @@ export const recordContributionReport = async (
       current.linkStatus !== LinkHealthStatus.WARN &&
       current.linkStatus !== LinkHealthStatus.FAIL
     ) {
+      const now = new Date();
+      // Bank any open PASS segment before flipping to WARN (same accrual block
+      // as checkContributionLink — ADR-0019). Don't rely on the async recheck
+      // below landing to close the segment.
+      const accrual = applyHealthAccrual(
+        LinkHealthStatus.WARN,
+        { healthyMs: current.healthyMs, healthySince: current.healthySince },
+        now
+      );
       await prisma.contribution.update({
         where: { id: contributionId },
         data: {
           linkStatus: LinkHealthStatus.WARN,
-          linkStatusChangedAt: new Date()
+          linkStatusChangedAt: now,
+          healthyMs: accrual.healthyMs,
+          healthySince: accrual.healthySince
         }
       });
       log.info('Contribution auto-warned by reports', {

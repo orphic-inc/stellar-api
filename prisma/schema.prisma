@@ -1044,6 +1044,14 @@ model Contribution {
   linkStatus              LinkHealthStatus      @default(UNKNOWN)
   linkCheckedAt           DateTime?
   linkStatusChangedAt     DateTime?
+  // Cumulative confirmed-PASS uptime, the substrate for the lifetime link-health
+  // CRS dimension (ADR-0019, #95). `healthyMs` is banked PASS milliseconds
+  // excluding the currently-open segment; `healthySince` is when the current open
+  // PASS segment began (null when not currently PASS). Live uptime =
+  // healthyMs + (healthySince ? now - healthySince : 0). The time analog of
+  // User.contributed — a substrate accumulator, not a score (ADR-0007).
+  healthyMs               BigInt                @default(0)
+  healthySince            DateTime?
   type                    FileType
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
