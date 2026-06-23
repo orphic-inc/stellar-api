@@ -8,34 +8,52 @@ All notable changes to stellar-api are documented here.
 
 ## [0.6.0] — 2026-06-23
 
-### Added
+One release consolidating the post-0.5.6 work, shown as dated milestones — no intermediate versions were tagged, so this is the genuine history rather than a fabricated 0.5.7–0.5.9 ladder. Entries already credited in 0.5.5/0.5.6 (tags cut ahead of merges) are not repeated.
 
-- **CRS dimensions — PRD-01's formula filled out.** Invite + Donation dimensions complete the v0.0.x set [#61, #62]; a signed, contribution-gated **CommunityScore**, quality-weighted so a lossless/logged/cued rip pulls more than a transcode [#75, #76, ADR-0017]; **CRS time-series snapshots** as the trend layer [#94, ADR-0007]; and a **lifetime link-health** dimension (`R × (1 − e^(−H/τ))`, PASS-only accrual) [#95, ADR-0019].
-- **Automated user-class progression — full rollout** atop the 0.5.6 evaluator: `RankPromotionRule` + `User.rankLocked` schema [#167], ladder + rule seed [#168], a background sweep job with promote/demote notifications [#169], and `RankPromotionRule` CRUD + per-user progression endpoint [#170, #171].
-- **Friends lifecycle** — request/accept, mutual-friend detection, and standardized response contracts [#60, PRD-01].
+### 2026-06-23
+
+- **PRD-01 CRS dimension roadmap** — the nine live dimensions plus the scoped additions (ContributionScore, Leadership, Contests, Concerts) and the governing decisions [#230].
+
+### 2026-06-22
+
 - **Golden Rules** — a 6-rule canonical tree seeded from `CODE_OF_CONDUCT.md` with read-time `${…}` variable resolution and `GET /api/rules/tree` [#215, PRD-09, ADR-0020].
 - **CommunityLeader role** — a scalar `Community.leaderId` (a superset of staff), transfer via `PUT /communities/:id`, seeded for the flagship community at install [#216, #217, #221, ADR-0021].
 - **Install state recorded as a fact**, not inferred from row counts [ADR-0022].
-- **Verified IRC nick link** — challenge/nonce proof-of-control for `User.ircNick`; only a verified link credits IRCScore or resolves the korin nick→account lookup. User-facing route now registered [#175, #198, #201, ADR-0015].
-- **Per-ReleaseType upload size caps** [#93].
-- **Paranoia-gated community-stats profile block** — friends count, invite summary, and reputation view on the profile (PRD-01 Profile Integration).
-- **Version-consistency guardrail** across the manifest, `/health`, and OpenAPI surfaces [#79].
-
-### Changed
-
 - **Trunk-only CI** — workflows off the retired staging/develop branches; widened the format gate to `prisma/**/*.ts` [#224].
+- ForumRules/StaffRules documented as built [#126].
+
+### 2026-06-21
+
+- **Lifetime link-health CRS dimension** — `R × (1 − e^(−H/τ))`, PASS-only accrual [#95, ADR-0019].
+- **CRS time-series snapshots** — the trend layer [#94, ADR-0007].
+- **Per-ReleaseType upload size caps** [#93].
+- **Version-consistency guardrail** across the manifest, `/health`, and OpenAPI surfaces [#79].
+- Verified IRC nick exposed on the self settings read [#201].
+- `CODE_OF_CONDUCT` + `SECURITY` added; OpenAPI/Testing folded into CONTRIBUTING.
+
+### 2026-06-20
+
+- **ADR-0018 development lifecycle + enforced API/UI contract gate** — the OpenAPI freshness gate de-inerted (now tracking `openapi.json`) [#204], plus issue/PR templates and a security-review gate.
+
+### 2026-06-19
+
+- **CRS dimensions — PRD-01's formula filled out.** Invite + Donation complete the v0.0.x set [#61, #62]; a signed, contribution-gated **CommunityScore**, quality-weighted so a lossless/logged/cued rip pulls more than a transcode [#75, #76, ADR-0017].
+- **Automated user-class progression** — a background sweep job with promote/demote notifications [#169] and `RankPromotionRule` CRUD + the per-user progression endpoint [#170, #171].
+- **Friends lifecycle** — request/accept, mutual-friend detection, and standardized response contracts [#60, PRD-01].
+- **Paranoia-gated community-stats profile block** — friends count, invite summary, and reputation view (PRD-01 Profile Integration).
 - **PM contributors** when a contribution link is swept WARN→FAIL [#125].
+- Fixed: raised the devTools integration hook timeout to stop a flake [#165].
 
-### Fixed
+### 2026-06-18
 
-- Install seed URL port corrected to `:9000` (the UI dev server).
-- Regenerated `docs/erd.md` to sync the irc-nick nonce fields.
-- Raised the devTools integration hook timeout to stop a flake [#165].
+- **Automated user-class progression — foundation** — `RankPromotionRule` + `User.rankLocked` schema [#167] and the ladder + rule seed [#168].
+- **ADR-0016** consumption-accounting & ratio-gate contract; Freepass/Neutralpass settled; a cross-repo CONTEXT-MAP + multi-context agent-skills config.
+- Fixed: install seed URL port corrected to `:9000` (the UI dev server); regenerated `docs/erd.md` to sync the irc-nick nonce fields.
 
-### Docs / Governance
+### 2026-06-17
 
-- **PRD-01 CRS dimension roadmap** — the nine live dimensions plus the scoped additions (ContributionScore, Leadership, Contests, Concerts) and the governing decisions [#230].
-- ForumRules/StaffRules documented as built [#126]; **ADR-0018** development lifecycle + the enforced API/UI contract gate, with the OpenAPI freshness gate de-inerted (now tracking `openapi.json`) [#204] and issue/PR templates + a security-review gate; **ADR-0016** consumption-accounting & ratio-gate contract; **PRD-02** reconciled to korin.pink [#163]; Freepass/Neutralpass settled; `CODE_OF_CONDUCT` + `SECURITY` added; a cross-repo CONTEXT-MAP + multi-context agent-skills config.
+- **Verified IRC nick link** — challenge/nonce proof-of-control for `User.ircNick`; only a verified link credits IRCScore or resolves the korin nick→account lookup; user-facing route registered [#175, #198, ADR-0015].
+- **PRD-02** reconciled to korin.pink [#163].
 
 ## [0.5.6] - 2026-06-17
 
