@@ -197,9 +197,25 @@ The registry + aggregator (computed-on-read, PR #96) ship the full v0.0.x dimens
 - ✅ FriendsScore — accepted friendships, deliberately low cap 4 (count can't dominate); also carries the Friends×Stylesheet controlled vector (PRD-03 #147).
 - ✅ InviteScore — direct invitees only, cap 5; active+contributing and long-lived invitees raise it, banned and warned/dormant invitees erode it, net floored at 0 (#61 substrate + #192 dimension).
 - ✅ DonationScore — supportConsistency + supportLongevity, cap 3 (the lowest), deliberately amount-agnostic so value can't dominate (#62 substrate + #192 dimension).
-- ✅ IRCScore (cap 6, brought forward from v0.1.x, ADR-0013) and StylesheetScore (cap 6, PRD-03) — registered ahead of the v0.0.x roadmap.
-- **The v0.0.x formula (Friends + Invite + Donation + Longevity) is therefore complete.** Subsequent dimensions (CommunityScore #75/#76, LinkHealthBonusPoints #95) slot into the same registry.
+- ✅ IRCScore (**cap 2** after the 2026-06-23 pinning pass — a deliberately thin signal until real IRC traffic exists, #141; ADR-0013) and StylesheetScore (cap 6, PRD-03, now with the #121 tier-escalation curve and the #122 signed −1 dead-link penalty) — registered ahead of the v0.0.x roadmap.
+- ✅ CommunityScore (signed, cap +4/floor −1, #75/ADR-0017) and LinkHealthScore (lifetime PASS-uptime, cap 8, #95/ADR-0019).
+- **The label "v0.0.x" is stale — nine dimensions ship today.** The formula is version-agnostic and self-registering; new dimensions slot into the same registry without touching the aggregator.
 - Surfaced two ways: GET /api/profile/me/reputation (own score + per-dimension breakdown), and — as of #193 — a paranoia-gated `community` block on every profile (GET /api/profile/me and /user/:id) carrying friends count, invite summary, and the reputation view. The block is hidden at the top paranoia tier, and its snatch-derived `ratio` dimension drops out when the viewer can't see consumed stats.
+
+Planned dimensions (scoped 2026-06-23, design — not built)
+
+The 9 live dimensions round out to ~12 with these. The cap budget is currently ≈52 at uniform weight 1.0; as these land, rebalance the per-dimension `weight`s rather than letting the sum drift.
+
+- **ContributionScore** — the keystone ("Contribution is king"). Bounded peer at **cap 10 / weight 1.0** (joint-largest with Longevity, but cannot dominate — the no-single-axis-dominates guardrail holds). Rewards quality-graded contribution volume via `gradeContribution` (#76), diminishing returns. Grading refinements pinned: per-file `logScore` granularity (Perfect = log 100% + cue > log 100% no cue > lower log% cascading); distinct **320 > V0 > V2** steps (today 320≡V0, 256≡V2); video source/resolution ladder (4K UHD BD → 1080p ≈ "320" → … → TS); eBooks **popularity-graded** off consumer + snatch count, not fidelity. **`isScene` is a significant detriment EXCEPT when it is the only available copy — then the penalty is suppressed and the grade is restored ("availability beats purity"); `isScene` is disallowed at upload on public communities, the penalty being the safety net.** Needs schema: a `logScore` field and video source/resolution enums.
+- **Leadership / User Class** (#218) — **signed**: holding CommunityLeader / Staff / Stellarific+ earns a bonus, but poor standing as a leader digs a _deeper_ hole than for a rank-and-file member (higher role = higher standard). **Subsumes** the legacy StaffRules "+50 CRS/week-served" flat accrual, which was unbounded (a 2-year staffer would dwarf the whole formula); the bounded signed dimension is its principled home.
+- **Contests** (cap ~7, below Ratio / above Stylesheet) — an **umbrella** for contributions to Stellar's own asset/data repository: **Vanity House ~90%** (the member's original _musical_ contributions — music-first site, so this dominates), Contests-proper (compilations of Vanity House artists; Signature/Avatar of the Week; Monthly zine), with **Stylesheet** (#121/#122) and **Cover Art / Collages** (PRD-08) as sub-signals. Stylesheet is **not folded yet** — it keeps its standalone dimension + shipped teeth; the fold (which resolves the double-count) is a later deliberate move. We are watching drift, not migrating code.
+- **Concerts** — **blocked**: needs the removed **Calendar** model rebuilt (the Concert model exists; Calendar was dropped as an early PoC stub). Belongs to the Staff Toolbox surface.
+- **Forum/Wiki engagement** — placement undecided (a high-scoring Community sub-signal, a forum-only Contribution piece, or a Contests sub-signal). Parked.
+
+Scoping decisions (2026-06-23)
+
+- **Negative CRS is a review flag + a drag on the number — never an automated execution.** A −1 does not auto-prune a member. Pruning/sweep is a link-health lifecycle action on dead _content_, not on a member's reputation score (consistent with #155 "suspect is not condemned" and the CRS-never-gates principle). Reputation consequences are HITL / privilege-layer.
+- **Calibration / "The Final Score" is NOT a CRS dimension.** It measures the _codebase/migration_ (typing coverage, Zod validation, Tailwind/stylesheet implementation, CI/CD reliability) — a project self-assessment, a different axis-space from per-member reputation. It gets its own ADR + dashboard and ties to the v0.7.0 CI/CD readiness goal; it must not be slotted into `computeCrs`.
 
 ⸻
 
