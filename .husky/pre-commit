@@ -3,6 +3,12 @@
 
 npx lint-staged
 
+# Type-check the whole project (and test files, which the base tsconfig excludes)
+# — catches type errors before push instead of waiting on CI. Whole-project, not
+# staged-only: a staged edit can break types in files it doesn't touch.
+npx tsc --noEmit
+npm run typecheck:test
+
 # Version-consistency guardrail (#79). Internal axes only — the git-tag axis is
 # enforced in CI on tag pushes so a release bump commit isn't blocked here.
 npm run version:check

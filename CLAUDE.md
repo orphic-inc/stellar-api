@@ -23,15 +23,15 @@ npm run db:studio        # prisma studio
 
 ## Commit workflow
 
-Run every step before committing. All must pass clean on new/changed files.
+The `.husky/pre-commit` hook runs on every commit and gates: lint-staged (`eslint --fix` + `prettier --write` on staged files), `npx tsc --noEmit`, `npm run typecheck:test`, and `npm run version:check`. So format/lint/type-check are enforced automatically — don't re-run them by hand as a separate pre-commit ritual.
 
-1. `npm run format` — format **all** of `src/` and `prisma/**/*.ts` (not just changed files — confirms nothing else drifted)
-2. `npm run lint` — must be clean on new/changed files; pre-existing errors in untouched files are acceptable
-3. `npx tsc --noEmit` — must be clean
-4. `npm run test --no-coverage` — full suite must pass
-5. Commit with descriptive message following existing log style
+What the hook does **not** cover, run yourself before committing:
 
-> Order matters: format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
+1. `npm run format` — only when you've changed files the hook didn't stage (it formats **all** of `src/` and `prisma/**/*.ts`, confirming nothing else drifted)
+2. `npm run test --no-coverage` — full suite (too slow for the hook; CI is the authority, but run it locally before pushing)
+3. Commit with a descriptive message following existing log style
+
+> If you do run the checks manually (e.g. before staging, or committing with `--no-verify`): order matters — format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
 
 ## Environment
 
@@ -195,13 +195,15 @@ Route handlers delegate to domain modules in `src/modules/`. Modules own DB quer
 
 ### Body validation
 
-Always run `validate(schema)` before the handler. Destructure using the Zod-inferred type:
+Always run `validate(schema)` before the handler. Read the parsed body with the `parsedBody<T>` helper, typed with the Zod-inferred type:
 
 ```ts
 validate(loginSchema),
 asyncHandler(async (req, res) => {
-  const { email, password } = req.body as LoginInput;
+  const { email, password } = parsedBody<LoginInput>(res);
 ```
+
+Use `parsedQuery<T>(res)` / `parsedParams<T>(res)` for `validateQuery` / `validateParams`.
 
 ### Param validation
 
