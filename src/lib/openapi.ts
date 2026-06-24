@@ -39,7 +39,8 @@ import {
 } from '../schemas/artist';
 import {
   stylesheetSchema,
-  stylesheetUpdateSchema
+  stylesheetUpdateSchema,
+  authorStylesheetSchema
 } from '../schemas/stylesheet';
 import {
   subscribeSchema,
@@ -1433,6 +1434,30 @@ const StylesheetStat = registry.register(
   })
 );
 
+// PRD-03 #118/#119/#120 — a user-authored stylesheet. `source` is the raw
+// CSS/SCSS (sanitized at store-time, ADR-0003), not a URL.
+const AuthorStylesheet = registry.register(
+  'AuthorStylesheet',
+  z.object({
+    id: z.number(),
+    authorId: z.number(),
+    name: z.string(),
+    source: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+// Result of adopting an author stylesheet into the Site Stylesheet slot (#119):
+// the adopted sheet plus whether this adoption recorded a new CRS event (#120).
+const AdoptionResult = registry.register(
+  'AdoptionResult',
+  z.object({
+    authorStylesheet: AuthorStylesheet,
+    scored: z.boolean()
+  })
+);
+
 registry.registerPath({
   method: 'get',
   path: '/announcements',
@@ -1642,6 +1667,74 @@ registry.registerPath({
     404: {
       description: 'User not found',
       content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/stylesheet/author',
+  tags: ['Stylesheets'],
+  request: {
+    body: {
+      content: { 'application/json': { schema: authorStylesheetSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Author stylesheet created',
+      content: { 'application/json': { schema: AuthorStylesheet } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/author/{userId}',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ userId: z.string() }) },
+  responses: {
+    200: {
+      description: "An author's stylesheets",
+      content: { 'application/json': { schema: z.array(AuthorStylesheet) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/author-stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Author stylesheet',
+      content: { 'application/json': { schema: AuthorStylesheet } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/stylesheet/author-stylesheet/{id}/adopt',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Stylesheet adopted into the Site Stylesheet slot',
+      content: { 'application/json': { schema: AdoptionResult } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

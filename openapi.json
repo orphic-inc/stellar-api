@@ -2095,6 +2095,52 @@
           "userCount"
         ]
       },
+      "AuthorStylesheet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "name",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdoptionResult": {
+        "type": "object",
+        "properties": {
+          "authorStylesheet": {
+            "$ref": "#/components/schemas/AuthorStylesheet"
+          },
+          "scored": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authorStylesheet",
+          "scored"
+        ]
+      },
       "GlobalNotice": {
         "type": "object",
         "properties": {
@@ -7671,6 +7717,170 @@
                   "required": [
                     "msg"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stylesheet/author": {
+      "post": {
+        "tags": [
+          "Stylesheets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100000
+                  }
+                },
+                "required": [
+                  "name",
+                  "source"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Author stylesheet created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorStylesheet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stylesheet/author/{userId}": {
+      "get": {
+        "tags": [
+          "Stylesheets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An author's stylesheets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthorStylesheet"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stylesheet/author-stylesheet/{id}": {
+      "get": {
+        "tags": [
+          "Stylesheets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Author stylesheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorStylesheet"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stylesheet/author-stylesheet/{id}/adopt": {
+      "post": {
+        "tags": [
+          "Stylesheets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stylesheet adopted into the Site Stylesheet slot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdoptionResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
