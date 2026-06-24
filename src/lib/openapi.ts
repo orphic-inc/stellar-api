@@ -1413,6 +1413,11 @@ const Subscription = registry.register(
   })
 );
 
+const VersionResponse = registry.register(
+  'VersionResponse',
+  z.object({ version: z.string() })
+);
+
 const Stylesheet = registry.register(
   'Stylesheet',
   z.object({
@@ -1457,6 +1462,18 @@ const AdoptionResult = registry.register(
     scored: z.boolean()
   })
 );
+
+registry.registerPath({
+  method: 'get',
+  path: '/version',
+  tags: ['Meta'],
+  responses: {
+    200: {
+      description: 'The running platform version',
+      content: { 'application/json': { schema: VersionResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',

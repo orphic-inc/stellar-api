@@ -2045,6 +2045,17 @@
           "topicId"
         ]
       },
+      "VersionResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "Stylesheet": {
         "type": "object",
         "properties": {
@@ -7267,6 +7278,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": [
+          "Meta"
+        ],
+        "responses": {
+          "200": {
+            "description": "The running platform version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
                 }
               }
             }
