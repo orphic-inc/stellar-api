@@ -7,9 +7,16 @@ generator client {
 // every `prisma generate` (and explicitly via `npm run db:erd`) so docs/erd.md
 // stays in lockstep with the schema. Set DISABLE_ERD=1 to skip (e.g. in CI).
 generator erd {
-  provider = "prisma-erd-generator"
-  output   = "../docs/erd.md"
-  disabled = env("DISABLE_ERD")
+  provider     = "prisma-erd-generator"
+  output       = "../docs/erd.md"
+  disabled     = env("DISABLE_ERD")
+  // The full per-column diagram (159 entities) exceeds GitHub's mermaid
+  // render budget ("Unable to render rich display"). Emit a high-level
+  // entity/relationship map instead — columns live in this schema. Emoji
+  // off per repo docs convention.
+  tableOnly    = true
+  ignoreEnums  = true
+  disableEmoji = true
 }
 
 datasource db {
