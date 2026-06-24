@@ -23,9 +23,11 @@ export const stylesheetUpdateSchema = z
 export type StylesheetInput = z.infer<typeof stylesheetSchema>;
 export type StylesheetUpdateInput = z.infer<typeof stylesheetUpdateSchema>;
 
-// PRD-03 #118 — a user-authored stylesheet (one per author) saved for others to
-// adopt. `source` is the raw CSS/SCSS; injection isolation is the UI injector's
-// job (ADR-0003), so it is stored verbatim, not sanitized here.
+// PRD-03 #118 — a user-authored stylesheet (many per author) saved for others to
+// adopt. `source` is raw CSS in transit; the ingestion path sanitizes it at
+// store-time via lib/cssSanitize.ts before persisting (ADR-0003 Arm 2), so the
+// stored artifact is already safe. The UI injector's protected-chrome layer
+// (ADR-0003 Arm 1) is the other half of the boundary.
 export const authorStylesheetSchema = z.object({
   name: z.string().min(1).max(100),
   source: z.string().min(1).max(100_000)
