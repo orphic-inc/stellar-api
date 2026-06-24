@@ -35,6 +35,7 @@ import { startRankProgressionJob } from './modules/rankProgressionJob';
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
 import { specRouter, uiRouter } from './routes/api/docs';
+import versionRouter from './routes/api/version';
 import toolsRouter from './routes/api/tools';
 import userRouter from './routes/api/user';
 import authRouter from './routes/api/auth';
@@ -118,6 +119,7 @@ export const createApp = () => {
   );
 
   app.use('/api/install', installRouter);
+  app.use('/api/version', versionRouter);
   app.use('/api/docs/json', specRouter);
   app.use('/api/docs', uiRouter);
 
