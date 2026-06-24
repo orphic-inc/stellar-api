@@ -209,7 +209,9 @@ const friendsScorer: DimensionScorer = {
 // Formula: activity × consistency × channelQuality (see irc.ts for definitions).
 // Returns 0 if the user has no linked nick or no data in the current window —
 // IRC presence is optional; absence is not penalised (ADR-0005).
-const IRC_CAP = 6;
+// Deliberately thin (cap 2) — a small signal until real IRC traffic exists to
+// justify more. Pinned with the other CRS magnitudes (PRD-02 #141).
+const IRC_CAP = 2;
 const IRC_WEIGHT = 1.0;
 
 const ircScorer: DimensionScorer = {
