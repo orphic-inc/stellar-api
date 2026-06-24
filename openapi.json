@@ -21114,6 +21114,113 @@
           }
         }
       }
+    },
+    "/log-check": {
+      "post": {
+        "tags": [
+          "Contribute"
+        ],
+        "summary": "Score a pasted EAC/XLD rip log (0–100; 100 = verified perfect)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "log": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000000
+                  }
+                },
+                "required": [
+                  "log"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scored log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ripper": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "EAC",
+                        "XLD",
+                        null
+                      ]
+                    },
+                    "version": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "score": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "isPerfect": {
+                      "type": "boolean"
+                    },
+                    "deductions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "points": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "message",
+                          "points"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ripper",
+                    "version",
+                    "score",
+                    "isPerfect",
+                    "deductions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

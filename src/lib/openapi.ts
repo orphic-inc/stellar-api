@@ -17,6 +17,10 @@ import {
   addContributionToReleaseSchema
 } from '../schemas/contribution';
 import {
+  logCheckRequestSchema,
+  logCheckResultSchema
+} from '../schemas/logCheck';
+import {
   createForumSchema,
   updateForumSchema,
   createTopicSchema,
@@ -7301,6 +7305,34 @@ registry.registerPath({
     204: { description: 'Deleted' },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Log checker ──────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: 'post',
+  path: '/log-check',
+  tags: ['Contribute'],
+  summary: 'Score a pasted EAC/XLD rip log (0–100; 100 = verified perfect)',
+  request: {
+    body: {
+      content: { 'application/json': { schema: logCheckRequestSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Scored log',
+      content: { 'application/json': { schema: logCheckResultSchema } }
+    },
+    400: {
+      description: 'Invalid request body',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }

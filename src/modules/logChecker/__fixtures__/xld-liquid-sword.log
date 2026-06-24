@@ -1,0 +1,332 @@
+X Lossless Decoder version 20161007 (149.3)
+
+XLD extraction logfile from 2016-12-15 03:45:11 -0500
+
+Various Artists / Legend Of The Liquid Sword
+
+Used drive : TSSTcorp CDDVDW SE-218CB (revision MF00)
+Media type : Pressed CD
+
+Ripper mode             : XLD Secure Ripper
+Disable audio cache     : OK for the drive with a cache less than 1375KiB
+Make use of C2 pointers : NO
+Read offset correction  : 6
+Max retry count         : 100
+Gap status              : Analyzed, Appended (except HTOA)
+
+TOC of the extracted CD
+     Track |   Start  |  Length  | Start sector | End sector 
+    ---------------------------------------------------------
+        1  | 00:00:00 | 00:42:19 |         0    |     3168   
+        2  | 00:42:19 | 03:54:58 |      3169    |    20776   
+        3  | 04:37:02 | 03:54:50 |     20777    |    38376   
+        4  | 08:31:52 | 02:41:30 |     38377    |    50481   
+        5  | 11:13:07 | 03:34:57 |     50482    |    66588   
+        6  | 14:47:64 | 04:02:24 |     66589    |    84762   
+        7  | 18:50:13 | 04:16:66 |     84763    |   104028   
+        8  | 23:07:04 | 04:10:39 |    104029    |   122817   
+        9  | 27:17:43 | 03:37:55 |    122818    |   139147   
+       10  | 30:55:23 | 03:45:27 |    139148    |   156049   
+       11  | 34:40:50 | 04:00:15 |    156050    |   174064   
+       12  | 38:40:65 | 02:59:19 |    174065    |   187508   
+       13  | 41:40:09 | 02:48:72 |    187509    |   200180   
+       14  | 44:29:06 | 03:05:07 |    200181    |   214062   
+       15  | 47:34:13 | 02:58:25 |    214063    |   227437   
+
+List of alternate offset correction values
+        #  | Absolute | Relative | Confidence 
+    ------------------------------------------
+        1  |     42   |     36   |     15     
+        2  |    -80   |    -86   |      2     
+        3  |   -277   |   -283   |      2     
+
+AccurateRip Summary (DiscID: 001b4e12-013bbc03-d70bd80f)
+    Track 01 : OK (v1+v2, confidence 28/46)
+    Track 02 : OK (v1+v2, confidence 28/46)
+    Track 03 : OK (v1+v2, confidence 28/46)
+    Track 04 : OK (v1+v2, confidence 29/46)
+    Track 05 : OK (v1+v2, confidence 27/44)
+    Track 06 : OK (v1+v2, confidence 27/45)
+    Track 07 : OK (v1+v2, confidence 28/46)
+    Track 08 : OK (v1+v2, confidence 28/46)
+    Track 09 : OK (v1+v2, confidence 28/46)
+    Track 10 : OK (v1+v2, confidence 28/46)
+    Track 11 : OK (v1+v2, confidence 27/46)
+    Track 12 : OK (v1+v2, confidence 27/46)
+    Track 13 : OK (v1+v2, confidence 28/47)
+    Track 14 : OK (v1+v2, confidence 24/43)
+    Track 15 : OK (v1+v2, confidence 28/47)
+        ->All tracks accurately ripped.
+
+All Tracks
+    Album gain               : -8.18 dB
+    Peak                     : 1.000000
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 01
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/01 Intro.flac
+    Pre-gap length : 00:02:00
+
+    Track gain               : 0.60 dB
+    Peak                     : 0.528900
+    CRC32 hash (test run)    : 17AE22BD
+    CRC32 hash               : 17AE22BD
+    CRC32 hash (skip zero)   : B297763F
+    AccurateRip v1 signature : 550E7A8C
+    AccurateRip v2 signature : 873E4D1B
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 02
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/02 Auto Bio.flac
+
+    Track gain               : -7.45 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 1D59D128
+    CRC32 hash               : 1D59D128
+    CRC32 hash (skip zero)   : 00BA8758
+    AccurateRip v1 signature : AEAD0386
+    AccurateRip v2 signature : A753E466
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 03
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/03 Did Ya Say That.flac
+
+    Track gain               : -7.51 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : F4F27435
+    CRC32 hash               : F4F27435
+    CRC32 hash (skip zero)   : D8DCF644
+    AccurateRip v1 signature : 48A5830E
+    AccurateRip v2 signature : A3195860
+        ->Accurately ripped (v1+v2, confidence 20+8/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 04
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/04 Silent.flac
+
+    Track gain               : -9.28 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 25DEAD0A
+    CRC32 hash               : 25DEAD0A
+    CRC32 hash (skip zero)   : 6965438E
+    AccurateRip v1 signature : 5F3CC4AD
+    AccurateRip v2 signature : 959F11FC
+        ->Accurately ripped (v1+v2, confidence 20+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 05
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/05 Knock, Knock.flac
+
+    Track gain               : -6.06 dB
+    Peak                     : 0.914886
+    CRC32 hash (test run)    : 67E4FA2E
+    CRC32 hash               : 67E4FA2E
+    CRC32 hash (skip zero)   : CB7796A6
+    AccurateRip v1 signature : 64CBE857
+    AccurateRip v2 signature : 8822C838
+        ->Accurately ripped (v1+v2, confidence 18+9/44)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 06
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/06 Stay In Line.flac
+
+    Track gain               : -8.97 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 6D0CD230
+    CRC32 hash               : 6D0CD230
+    CRC32 hash (skip zero)   : CF782B4B
+    AccurateRip v1 signature : 345D8C2A
+    AccurateRip v2 signature : CBCD20A9
+        ->Accurately ripped (v1+v2, confidence 19+8/45)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 07
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/07 Animal Planet.flac
+
+    Track gain               : -8.65 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 8022371E
+    CRC32 hash               : 8022371E
+    CRC32 hash (skip zero)   : 0DD411AC
+    AccurateRip v1 signature : D9C9421C
+    AccurateRip v2 signature : 388ECB02
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 08
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/08 Fam (Members Only).flac
+
+    Track gain               : -7.79 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 34B7A992
+    CRC32 hash               : 34B7A992
+    CRC32 hash (skip zero)   : 201A8FF0
+    AccurateRip v1 signature : 0166093C
+    AccurateRip v2 signature : 6E5DFB3A
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 09
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/09 Legend Of The Liquid Sword.flac
+
+    Track gain               : -8.32 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 586DB9C3
+    CRC32 hash               : 586DB9C3
+    CRC32 hash (skip zero)   : 98B0DA66
+    AccurateRip v1 signature : 59205A70
+    AccurateRip v2 signature : F7F51E48
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 10
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/10 Fame.flac
+
+    Track gain               : -9.31 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 1F61AF80
+    CRC32 hash               : 1F61AF80
+    CRC32 hash (skip zero)   : B286FDC2
+    AccurateRip v1 signature : 9CD55BE9
+    AccurateRip v2 signature : B9C2553A
+        ->Accurately ripped (v1+v2, confidence 19+9/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 11
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/11 Highway Robbery.flac
+
+    Track gain               : -8.05 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 14A016CB
+    CRC32 hash               : 14A016CB
+    CRC32 hash (skip zero)   : F6B7CCF4
+    AccurateRip v1 signature : B3934CCC
+    AccurateRip v2 signature : 50D21EAB
+        ->Accurately ripped (v1+v2, confidence 19+8/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 12
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/12 Luminal.flac
+
+    Track gain               : -7.95 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 11107D8B
+    CRC32 hash               : 11107D8B
+    CRC32 hash (skip zero)   : 227E30C8
+    AccurateRip v1 signature : F6524EE4
+    AccurateRip v2 signature : 9D61A9A4
+        ->Accurately ripped (v1+v2, confidence 19+8/46)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 13
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/13 Sparring Minds.flac
+
+    Track gain               : -7.47 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : 0FF4B9D3
+    CRC32 hash               : 0FF4B9D3
+    CRC32 hash (skip zero)   : 50D1E126
+    AccurateRip v1 signature : A23B8B7C
+    AccurateRip v2 signature : F699D312
+        ->Accurately ripped (v1+v2, confidence 19+9/47)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 14
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/14 Rough Cut.flac
+
+    Track gain               : -8.93 dB
+    Peak                     : 0.942871
+    CRC32 hash (test run)    : FB9B69EE
+    CRC32 hash               : FB9B69EE
+    CRC32 hash (skip zero)   : FDE6B9D7
+    AccurateRip v1 signature : 8B2F280C
+    AccurateRip v2 signature : 3FB624EA
+        ->Accurately ripped (v1+v2, confidence 17+7/43)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+Track 15
+    Filename : /Volumes/750 SSD/FLACs/Various Artists - Legend Of The Liquid Sword (2002) [FLAC]/15 Uncut Material.flac
+
+    Track gain               : -7.51 dB
+    Peak                     : 1.000000
+    CRC32 hash (test run)    : A1B201E9
+    CRC32 hash               : A1B201E9
+    CRC32 hash (skip zero)   : 442384A2
+    AccurateRip v1 signature : 8E26EEFC
+    AccurateRip v2 signature : 0C7FDC55
+        ->Accurately ripped (v1+v2, confidence 19+9/47)
+    Statistics
+        Read error                           : 0
+        Jitter error (maybe fixed)           : 0
+        Retry sector count                   : 0
+        Damaged sector count                 : 0
+
+No errors occurred
+
+End of status report
+
+-----BEGIN XLD SIGNATURE-----
+g8kzBkMjBtfSL2glSi6B32snr8IkyUTibM1uiUFcrscxxzNQR9VWDTO5kgSXJb.yhZukL033Yiuom_Cy3NQwcvfcuosoviR3O4_CDbO
+-----END XLD SIGNATURE-----
