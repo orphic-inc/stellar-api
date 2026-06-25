@@ -6,7 +6,6 @@
  */
 import {
   evaluateRankChange,
-  describeGapToNext,
   DEFAULT_RANKS,
   RankProgressionInput
 } from './rankProgression';
@@ -188,50 +187,5 @@ describe('evaluateRankChange — guards', () => {
       maxed({ currentRankId: rankId('Staff') })
     );
     expect(result.direction).toBe('none');
-  });
-});
-
-// ─── describeGapToNext ──────────────────────────────────────────────────────────
-
-describe('describeGapToNext', () => {
-  it('reports what a fresh User still needs for Member', () => {
-    const gap = describeGapToNext({
-      currentRankId: rankId('User'),
-      contributed: 4n * GiB,
-      consumed: 0n,
-      contributionCount: 0,
-      distinctReleaseCount: 0,
-      qualityContributionCount: 0,
-      accountAgeDays: 2,
-      hasActiveWarning: false,
-      rankLocked: false
-    });
-    expect(gap?.toRankName).toBe('Member');
-    expect(gap?.contributedShortBytes).toBe(6n * GiB); // 10 needed − 4 held
-    expect(gap?.ageShortDays).toBe(5); // 7 needed − 2 held
-    expect(gap?.ratioShort).toBe(0); // 1.0 already ≥ 0.70
-    expect(gap?.extraUnmet).toBeNull();
-  });
-
-  it('clamps satisfied criteria to zero shortfall', () => {
-    const gap = describeGapToNext(maxed());
-    expect(gap?.contributedShortBytes).toBe(0n);
-    expect(gap?.contributionsShort).toBe(0);
-    expect(gap?.ageShortDays).toBe(0);
-    expect(gap?.ratioShort).toBe(0);
-  });
-
-  it('surfaces the unmet Extra predicate on prestige rungs', () => {
-    const gap = describeGapToNext(
-      maxed({ currentRankId: rankId('Stellarific'), distinctReleaseCount: 10 })
-    );
-    expect(gap?.toRankName).toBe('Stellartastic');
-    expect(gap?.extraUnmet).toBe('DISTINCT_RELEASES_500');
-  });
-
-  it('returns null at the top of the auto ladder (Stellarige)', () => {
-    expect(
-      describeGapToNext(maxed({ currentRankId: rankId('Stellarige') }))
-    ).toBeNull();
   });
 });

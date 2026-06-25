@@ -960,51 +960,6 @@ registry.registerPath({
   }
 });
 
-const ProgressionGap = registry.register(
-  'ProgressionGap',
-  z.object({
-    toRankName: z.string().nullable(),
-    contributedShortBytes: z.string(),
-    ratioShort: z.number(),
-    contributionsShort: z.number(),
-    ageShortDays: z.number(),
-    extraUnmet: z
-      .enum(['DISTINCT_RELEASES_500', 'QUALITY_CONTRIB_500'])
-      .nullable()
-  })
-);
-
-const ProfileProgression = registry.register(
-  'ProfileProgression',
-  z.object({
-    currentRankId: z.number(),
-    currentRankName: z.string().nullable(),
-    rankLocked: z.boolean(),
-    // null at the top of the auto ladder
-    gap: ProgressionGap.nullable()
-  })
-);
-
-registry.registerPath({
-  method: 'get',
-  path: '/profile/me/progression',
-  tags: ['Profile'],
-  responses: {
-    200: {
-      description: 'Gap to the next auto-class rung',
-      content: { 'application/json': { schema: ProfileProgression } }
-    },
-    401: {
-      description: 'Not authenticated',
-      content: { 'application/json': { schema: MsgResponse } }
-    },
-    404: {
-      description: 'Profile not found',
-      content: { 'application/json': { schema: MsgResponse } }
-    }
-  }
-});
-
 // A captured CRS read in the trend series (#94). The score stays computed on
 // read; this is the snapshot read-model only. The korin service surface
 // (/users/{id}/reputation/history) is intentionally kept out of the public

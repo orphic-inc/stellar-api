@@ -800,6 +800,7 @@ router.get(
       where: { id },
       select: {
         userRankId: true,
+        rankLocked: true,
         secondaryRanks: {
           select: { userRankId: true },
           orderBy: { userRankId: 'asc' }
@@ -809,7 +810,10 @@ router.get(
     if (!user) return res.status(404).json({ msg: 'User not found' });
     res.json({
       userRankId: user.userRankId,
-      secondaryRankIds: user.secondaryRanks.map((entry) => entry.userRankId)
+      secondaryRankIds: user.secondaryRanks.map((entry) => entry.userRankId),
+      // Canonical staff read of the lock state — the admin rank panel
+      // initialises its toggle from here, alongside the rank it sets.
+      rankLocked: user.rankLocked
     });
   })
 );

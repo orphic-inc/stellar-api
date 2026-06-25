@@ -320,6 +320,33 @@ describe('PUT /api/users/:id/rank', () => {
   });
 });
 
+describe('GET /api/users/:id/rank', () => {
+  beforeEach(() => setStaff());
+
+  it('returns the rank assignment including the current rankLocked state', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      userRankId: 2,
+      rankLocked: true,
+      secondaryRanks: [{ userRankId: 5 }]
+    } as never);
+
+    const res = await request(app).get('/api/users/9/rank');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      userRankId: 2,
+      secondaryRankIds: [5],
+      rankLocked: true
+    });
+  });
+
+  it('returns 404 when the user does not exist', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    const res = await request(app).get('/api/users/9/rank');
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('PUT /api/users/:id/rank-lock', () => {
   beforeEach(() => setStaff());
 

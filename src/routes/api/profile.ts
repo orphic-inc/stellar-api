@@ -14,11 +14,6 @@ import {
   reputationHistoryPeriodQuerySchema,
   type ReputationHistoryPeriodQuery
 } from '../../schemas/statsHistory';
-import {
-  loadLadder,
-  buildProgressionInput
-} from '../../modules/rankProgressionJob';
-import { describeGapToNext } from '../../modules/rankProgression';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../lib/audit';
@@ -127,45 +122,6 @@ router.get(
   authHandler(async (req, res) => {
     const { period } = parsedQuery<ReputationHistoryPeriodQuery>(res);
     res.json(await getCrsHistory(req.user.id, period as CrsHistoryPeriod));
-  })
-);
-
-// GET /api/profile/me/progression — gap to the next auto-class rung (#171)
-router.get(
-  '/me/progression',
-  requireAuth,
-  authHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        userRankId: true,
-        consumed: true,
-        dateRegistered: true,
-        rankLocked: true,
-        userRank: { select: { name: true } }
-      }
-    });
-    if (!user) return res.status(404).json({ msg: 'Profile not found' });
-
-    // Reuse the DB-backed ladder + the same per-user input builder the sweep
-    // uses, so the widget never drifts from the actual promotion engine.
-    const { ranks, rules } = await loadLadder();
-    const input = await buildProgressionInput(user);
-    const gap = describeGapToNext(input, rules, ranks);
-
-    res.json({
-      currentRankId: user.userRankId,
-      currentRankName: user.userRank?.name ?? null,
-      rankLocked: user.rankLocked,
-      gap: gap
-        ? {
-            ...gap,
-            // bytes — string-encoded past MAX_SAFE_INTEGER
-            contributedShortBytes: gap.contributedShortBytes.toString()
-          }
-        : null
-    });
   })
 );
 
