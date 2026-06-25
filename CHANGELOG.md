@@ -6,6 +6,33 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-25
+
+A 0.6.x increment consolidating the post-0.6.0 work: a new rip-log scorer, the running-version endpoint, and the latest CRS dimension tuning.
+
+### Added
+
+- **EAC/XLD rip-log scoring module** — `POST /log-check` grades a submitted rip log.
+- **`GET /api/version`** — exposes the running platform version, derived from the manifest so it can't drift [PR #243].
+- **`db:seed-e2e`** — deterministic users + invite tree for E2E runs.
+
+### Changed
+
+- **Invite-tree Contagion** — graded, distance-decaying suspicion across the invite tree [#155, PR #249].
+- **Stylesheet CRS** — tiering escalation curve [#121, PR #248].
+- IRCScore cap pinned to 2; PRD + CONTEXT-MAP drift reconciled.
+- AuthorStylesheet author/adopt routes registered in the OpenAPI contract.
+- ADR-0003 — dropped Arm 1 chrome isolation; themes are visually unrestricted.
+- Husky — type-check folded into pre-commit; docs synced to current patterns.
+
+### Fixed
+
+- `docs/erd.md` — high-level map so GitHub renders the ERD.
+
+### Docs
+
+- Corrected the `AuthorStylesheet.source` sanitization note.
+
 ## [0.6.0] — 2026-06-23
 
 One release consolidating the post-0.5.6 work, shown as dated milestones — no intermediate versions were tagged, so this is the genuine history rather than a fabricated 0.5.7–0.5.9 ladder. Entries already credited in 0.5.5/0.5.6 (tags cut ahead of merges) are not repeated.
@@ -416,7 +443,11 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/orphic-inc/stellar-api/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/orphic-inc/stellar-api/compare/v0.5.6...v0.6.0
+[0.5.6]: https://github.com/orphic-inc/stellar-api/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/orphic-inc/stellar-api/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/orphic-inc/stellar-api/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/orphic-inc/stellar-api/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/orphic-inc/stellar-api/compare/v0.5.1...v0.5.2
