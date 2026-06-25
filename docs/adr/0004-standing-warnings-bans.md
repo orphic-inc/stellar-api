@@ -32,11 +32,17 @@ Tenure distinguishes only the top two rungs (`clean` vs `pristine`); a single wa
 
 The terminal-rung `banEvasion` input means **confirmed self ban-evasion** — binary, the worst standing. The broader signal — an inviter (trunk) that is infected makes their invitees (branches) _suspect_ — is **contagion**, and is deliberately **not** wired to the terminal tier. A clean user must not be auto-condemned because a distant inviter was banned long after the invite; **suspect is not condemned**. Contagion is therefore a _graded_ suspicion — a review flag plus a mild, distance-decaying CRS drag — owned by the InviteTree model ([#61](https://github.com/orphic-inc/stellar-api/issues/61)), not a Standing rung. This ADR names #61 as the source of the confirmed-evasion linkage and scopes contagion-suspicion out of the terminal tier.
 
+**Pinned magnitudes ([#155](https://github.com/orphic-inc/stellar-api/issues/155)).** Implemented as the signed `inviteContagion` CRS dimension (cap 0, negative floor), with the pure `contagion()` scorer (`src/modules/contagion.ts`) over a member's distances to each infected ancestor. "Infected" = `banned` (`User.banDate`) today; the confirmed-evasion trunk stays a dormant seam until that linkage model lands. `disabled`-without-ban does not infect, and there is no recency horizon — distance-decay is the only dampener. The read path walks _up_ the inviter chain (`getInfectedAncestorDistances`, capped at the reach) so the per-member CRS read stays bounded.
+
+- **Decay**: halves per level from the trunk — direct invitee ×1.0, then ×0.5 / ×0.25 / ×0.125 — out of **reach** past level 4.
+- **Drag**: base **−1.0** for a direct invitee; **cumulative** across multiple infected ancestors (a denser bad cluster is stronger evidence), clamped to a **−2.0 floor** so the worst case stays suspect, not condemned.
+- **Review flag**: `suspect` fires at cumulative drag **≤ −0.5** (direct invitee, grandchild, or a stacked genealogy). It is a _moderation_ signal: stripped from non-staff reputation views (including the member's own) so suspicion can't tip off a sockpuppet ring; the drag still counts in the true internal CRS.
+
 ## Deferred (tracked, not part of this decision)
 
 - **Magnitudes** — the ×10 reward, the hammer curve, warning thresholds, and per-rule/SubRule micro-impact weights (PRD-05 open questions).
 - **The fuller Warning/Ban entity model** — suspension/ban entities and an explicit escalation ladder beyond `UserWarning` + `User.banDate`.
-- **Invite-tree contagion** (the graded suspicion above) and the **positive Invite CRS dimension** (a productive sub-tree reflecting well on the inviter) — both owned by [#61](https://github.com/orphic-inc/stellar-api/issues/61); the latter registers as a future `reputation.ts` dimension.
+- **Invite-tree contagion** — _implemented_ as the signed `inviteContagion` dimension ([#155](https://github.com/orphic-inc/stellar-api/issues/155); magnitudes pinned in §3 above). The **positive Invite CRS dimension** (a productive sub-tree reflecting well on the inviter) remains the separate, already-shipped `invite` dimension.
 
 ## Consequences
 

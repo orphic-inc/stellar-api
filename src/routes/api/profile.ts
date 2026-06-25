@@ -8,7 +8,7 @@ import {
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
-import { getReputation } from '../../modules/reputation';
+import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
 import {
   reputationHistoryPeriodQuerySchema,
@@ -105,7 +105,15 @@ router.get(
   '/me/reputation',
   requireAuth,
   authHandler(async (req, res) => {
-    res.json(await getReputation(req.user.id));
+    // Self-view: the member sees their own snatch-derived dimensions but NOT the
+    // moderation-only Contagion drag / suspect flag (ADR-0004 §3).
+    const crs = await getReputation(req.user.id);
+    res.json(
+      filterReputationView(crs, {
+        includeSnatchDerived: true,
+        includeModeration: false
+      })
+    );
   })
 );
 

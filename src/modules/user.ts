@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors';
 import { getDefaultStylesheetName } from './stylesheet';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { computeRatio } from './ratio';
+import { CONTAGION_REACH } from './contagion';
 import {
   buildInviteSubtree,
   summarizeInviteTree,
@@ -308,6 +309,46 @@ export const getInviteSubtreeRows = async (
       consumed: u.consumed
     };
   });
+};
+
+/**
+ * Distances (1 = direct inviter) UP a member's invite chain to each *infected*
+ * ancestor, capped at `CONTAGION_REACH`. Feeds the `inviteContagion` CRS
+ * dimension (#155 / ADR-0004 §3): an infected ancestor drags a descendant's
+ * score, decaying by distance. "Infected" today = `banned` (User.banDate set);
+ * the confirmed-evasion trunk stays a dormant seam until that model lands.
+ */
+export const getInfectedAncestorDistances = async (
+  userId: number
+): Promise<number[]> => {
+  const ancestors = await prisma.$queryRaw<
+    { inviterId: number; depth: number }[]
+  >`
+    WITH RECURSIVE chain AS (
+      SELECT "inviterId", 1 AS depth
+      FROM "invite_trees"
+      WHERE "userId" = ${userId} AND "inviterId" IS NOT NULL
+      UNION ALL
+      SELECT it."inviterId", c.depth + 1
+      FROM "invite_trees" it
+      JOIN chain c ON it."userId" = c."inviterId"
+      WHERE c.depth < ${CONTAGION_REACH} AND it."inviterId" IS NOT NULL
+    )
+    SELECT "inviterId", depth FROM chain
+  `;
+  if (!ancestors.length) return [];
+
+  const banned = await prisma.user.findMany({
+    where: {
+      id: { in: ancestors.map((a) => a.inviterId) },
+      banDate: { not: null }
+    },
+    select: { id: true }
+  });
+  const bannedIds = new Set(banned.map((u) => u.id));
+  return ancestors
+    .filter((a) => bannedIds.has(a.inviterId))
+    .map((a) => Number(a.depth));
 };
 
 export interface InviteTreeViewNode {

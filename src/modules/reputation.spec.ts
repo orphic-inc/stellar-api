@@ -3,7 +3,8 @@
  * computeCrs is pure; getReputation uses a Prisma mock.
  */
 
-const mockPrismaUser = { findUnique: jest.fn() };
+const mockPrismaUser = { findUnique: jest.fn(), findMany: jest.fn() };
+const mockPrismaQueryRaw = jest.fn();
 const mockPrismaFriend = { count: jest.fn() };
 const mockPrismaEconomy = { count: jest.fn() };
 const mockPrismaInviteTree = { findMany: jest.fn() };
@@ -19,7 +20,8 @@ jest.mock('../lib/prisma', () => ({
     inviteTree: mockPrismaInviteTree,
     donation: mockPrismaDonation,
     communityHealthSnapshot: mockPrismaCommunitySnapshot,
-    contribution: mockPrismaContribution
+    contribution: mockPrismaContribution,
+    $queryRaw: mockPrismaQueryRaw
   }
 }));
 
@@ -310,6 +312,46 @@ describe('computeCrs — Invite dimension', () => {
   });
 });
 
+// ─── computeCrs / InviteContagion dimension (#155) ────────────────────────────
+
+describe('computeCrs — InviteContagion dimension', () => {
+  const crsOf = (infectedAncestorDistances: number[]) =>
+    computeCrs({
+      userId: 1,
+      createdAt: NOW,
+      now: NOW,
+      infectedAncestorDistances
+    });
+  const contagionOf = (distances: number[]) =>
+    crsOf(distances).dimensions.find((d) => d.name === 'inviteContagion')!
+      .subScore;
+
+  it('a clean genealogy has no drag and is not suspect', () => {
+    expect(contagionOf([])).toBe(0);
+    expect(crsOf([]).suspect).toBe(false);
+  });
+
+  it('drags negative, decaying with distance from the banned trunk', () => {
+    expect(contagionOf([1])).toBeCloseTo(-1.0, 10);
+    expect(contagionOf([2])).toBeCloseTo(-0.5, 10);
+    expect(contagionOf([1])).toBeLessThan(contagionOf([2]));
+  });
+
+  it('lowers the total CRS by the drag', () => {
+    expect(crsOf([1]).score).toBeLessThan(crsOf([]).score);
+  });
+
+  it('clamps to the dimension floor (−2.0)', () => {
+    expect(contagionOf([1, 1, 1, 1])).toBe(-2);
+  });
+
+  it('sets suspect at/below the review threshold (−0.5)', () => {
+    expect(crsOf([1]).suspect).toBe(true); // −1.0
+    expect(crsOf([2]).suspect).toBe(true); // −0.5 boundary
+    expect(crsOf([3]).suspect).toBe(false); // −0.25
+  });
+});
+
 // ─── computeCrs / Donation dimension ──────────────────────────────────────────
 
 describe('computeCrs — Donation dimension', () => {
@@ -494,6 +536,8 @@ describe('getReputation', () => {
     mockPrismaDonation.aggregate.mockResolvedValue(emptyDonationAgg);
     mockPrismaContribution.findMany.mockResolvedValue([]);
     mockPrismaCommunitySnapshot.findMany.mockResolvedValue([]);
+    mockPrismaQueryRaw.mockResolvedValue([]); // no infected ancestors (#155)
+    mockPrismaUser.findMany.mockResolvedValue([]);
   });
 
   it('computes CRS from the user createdAt + ratio + friends', async () => {
@@ -520,7 +564,7 @@ describe('getReputation', () => {
     mockPrismaUser.findUnique.mockResolvedValue(null);
     mockPrismaFriend.count.mockResolvedValue(0);
     const result = await getReputation(999);
-    expect(result).toEqual({ score: 0, dimensions: [] });
+    expect(result).toEqual({ score: 0, dimensions: [], suspect: false });
   });
 
   it('reflects stylesheet adoptions from the CRS_* ledger count', async () => {
@@ -763,37 +807,77 @@ describe('getReputation', () => {
 
 describe('filterReputationView', () => {
   const crs = {
-    score: 12,
+    score: 11,
     dimensions: [
       { name: 'longevity', subScore: 6, weighted: 6 },
       { name: 'ratio', subScore: 4, weighted: 4 },
-      { name: 'friends', subScore: 2, weighted: 2 }
-    ]
+      { name: 'friends', subScore: 2, weighted: 2 },
+      { name: 'inviteContagion', subScore: -1, weighted: -1 }
+    ],
+    suspect: true
   };
 
-  it('passes through unchanged when snatch-derived dimensions are included', () => {
-    expect(filterReputationView(crs, { includeSnatchDerived: true })).toBe(crs);
+  it('passes through unchanged when both gates are open', () => {
+    expect(
+      filterReputationView(crs, {
+        includeSnatchDerived: true,
+        includeModeration: true
+      })
+    ).toBe(crs);
   });
 
-  it('drops the ratio dimension and recomputes the score when excluded', () => {
-    const view = filterReputationView(crs, { includeSnatchDerived: false });
+  it('drops the ratio dimension and recomputes the score when snatch excluded', () => {
+    const view = filterReputationView(crs, {
+      includeSnatchDerived: false,
+      includeModeration: true
+    });
+    expect(view.dimensions.map((d) => d.name)).toEqual([
+      'longevity',
+      'friends',
+      'inviteContagion'
+    ]);
+    // recomputed from remaining weighted subscores: 6 + 2 − 1 = 7
+    expect(view.score).toBe(7);
+    expect(view.suspect).toBe(true); // moderation gate still open
+  });
+
+  it('hides the contagion drag + clears suspect when moderation excluded', () => {
+    const view = filterReputationView(crs, {
+      includeSnatchDerived: true,
+      includeModeration: false
+    });
+    expect(view.dimensions.map((d) => d.name)).not.toContain('inviteContagion');
+    // penalty stripped from the displayed total: 6 + 4 + 2 = 12
+    expect(view.score).toBe(12);
+    expect(view.suspect).toBe(false);
+  });
+
+  it('applies both gates together (member-facing, no ratio + no contagion)', () => {
+    const view = filterReputationView(crs, {
+      includeSnatchDerived: false,
+      includeModeration: false
+    });
     expect(view.dimensions.map((d) => d.name)).toEqual([
       'longevity',
       'friends'
     ]);
-    // score recomputed from the remaining weighted subscores: 6 + 2 = 8
-    expect(view.score).toBe(8);
+    expect(view.score).toBe(8); // 6 + 2
+    expect(view.suspect).toBe(false);
   });
 
-  it('is a no-op when there is no snatch-derived dimension present', () => {
-    const noRatio = {
+  it('is a no-op on score when neither hidden dimension is present', () => {
+    const plain = {
       score: 8,
       dimensions: [
         { name: 'longevity', subScore: 6, weighted: 6 },
         { name: 'friends', subScore: 2, weighted: 2 }
-      ]
+      ],
+      suspect: false
     };
-    const view = filterReputationView(noRatio, { includeSnatchDerived: false });
+    const view = filterReputationView(plain, {
+      includeSnatchDerived: false,
+      includeModeration: false
+    });
     expect(view.dimensions).toHaveLength(2);
     expect(view.score).toBe(8);
   });

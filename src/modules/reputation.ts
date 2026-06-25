@@ -19,6 +19,12 @@ import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
 import { getIrcScore } from './irc';
 import { scoreStylesheetTier } from './stylesheetScore';
+import {
+  contagion,
+  CONTAGION_FLOOR,
+  CONTAGION_REVIEW_THRESHOLD
+} from './contagion';
+import { getInfectedAncestorDistances } from './user';
 import { communityHealthFor } from './communityHealthHistory';
 import { gradeContribution } from './contributionQuality';
 
@@ -79,6 +85,10 @@ export interface DimensionInput {
    *  healthy-link-years (H) — the volume×duration term of the same dimension.
    *  Defaults to 0. */
   linkHealthYears?: number;
+  /** Hops UP this member's invite chain (1 = direct inviter) to each *infected*
+   *  (banned) ancestor, capped at the contagion reach. Feeds the signed
+   *  `inviteContagion` dimension (#155 / ADR-0004 §3). Defaults to []. */
+  infectedAncestorDistances?: number[];
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }
@@ -105,6 +115,11 @@ export interface DimensionResult {
 export interface CrsResult {
   score: number;
   dimensions: DimensionResult[];
+  /** ADR-0004 §3 invite-tree Contagion review flag — true when the member sits
+   *  close/dense enough to a banned trunk to warrant a moderator look. A
+   *  *moderation* signal: stripped from non-staff views (see
+   *  `filterReputationView`) so suspicion can't tip off a sockpuppet ring. */
+  suspect: boolean;
 }
 
 const clamp = (value: number, cap: number, floor = 0): number =>
@@ -292,6 +307,22 @@ const inviteScorer: DimensionScorer = {
   }
 };
 
+// ─── InviteContagion ──────────────────────────────────────────────────────────
+// The negative governance arm of the invite tree (ADR-0004 §3 / PRD-05, #155):
+// an infected trunk (a banned inviter) casts graded, distance-decaying suspicion
+// down over its descendants. A *signed* dimension (cap 0, no upside — a healthy
+// genealogy isn't a reward, just the absence of a drag) with a negative floor,
+// like CommunityScore. The magnitude + decay live in `contagion()`; this is the
+// read-time wiring over the per-member distances to banned ancestors.
+const inviteContagionScorer: DimensionScorer = {
+  name: 'inviteContagion',
+  weight: 1.0,
+  cap: 0,
+  floor: CONTAGION_FLOOR,
+  compute: ({ infectedAncestorDistances = [] }) =>
+    contagion(infectedAncestorDistances).score
+};
+
 // ─── DonationScore ──────────────────────────────────────────────────────────
 // Financial support (PRD-01 Donations): "recognition, not pay-to-win" —
 // donation *value must never dominate*. So this is AMOUNT-AGNOSTIC: it never
@@ -429,6 +460,7 @@ const REGISTRY: DimensionScorer[] = [
   ratioScorer,
   friendsScorer,
   inviteScorer,
+  inviteContagionScorer,
   donationScorer,
   communityScorer,
   linkHealthScorer,
@@ -443,7 +475,10 @@ export const computeCrs = (input: DimensionInput): CrsResult => {
     return { name: d.name, subScore, weighted: d.weight * subScore };
   });
   const score = dimensions.reduce((sum, d) => sum + d.weighted, 0);
-  return { score, dimensions };
+  // The contagion review flag is a function of the computed drag (ADR-0004 §3).
+  const contagionDim = dimensions.find((d) => d.name === 'inviteContagion');
+  const suspect = (contagionDim?.subScore ?? 0) <= CONTAGION_REVIEW_THRESHOLD;
+  return { score, dimensions, suspect };
 };
 
 /** Read-time CRS for a user. Assembles the dimension input, then computes. */
@@ -463,7 +498,8 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     stylesheetAdoptionsMade,
     invitees,
     donationAgg,
-    contributedContributions
+    contributedContributions,
+    infectedAncestorDistances
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -548,9 +584,11 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
           select: { bitrate: true, hasLog: true, hasCue: true }
         }
       }
-    })
+    }),
+    // Distances up the invite chain to each banned ancestor (#155 / ADR-0004 §3).
+    getInfectedAncestorDistances(userId)
   ]);
-  if (!user) return { score: 0, dimensions: [] };
+  if (!user) return { score: 0, dimensions: [], suspect: false };
 
   // Sum each contributed-to community's quality-graded weight (#76).
   const weightByCommunity = new Map<number, number>();
@@ -652,6 +690,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
     communityHealth,
     linkHealthReliability,
     linkHealthYears,
+    infectedAncestorDistances,
     now
   });
 };
@@ -662,20 +701,36 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
 // the only consumed-derived dimension (ratio = contributed / consumed).
 export const SNATCH_DERIVED_DIMENSIONS = ['ratio'];
 
+// Moderation-only dimensions: the invite-tree Contagion drag is a suspicion
+// signal (ADR-0004 §3). Hidden from non-staff views — including the member's own
+// — so the penalty + flag can't tip off a sockpuppet ring. The drag still counts
+// in the true internal CRS (`getReputation`); only the projected VIEW omits it.
+export const MODERATION_DIMENSIONS = ['inviteContagion'];
+
 /**
- * Project a computed CRS into a viewer-safe view. When `includeSnatchDerived`
- * is false, the snatch-derived dimensions are removed and the displayed score is
- * recomputed from the remaining weighted subscores — so a paranoia-gated viewer
- * neither sees the dimension nor can back it out of the total. Pure.
+ * Project a computed CRS into a viewer-safe view by dropping dimensions the
+ * viewer isn't entitled to and recomputing the displayed score from what
+ * remains — so a gated viewer neither sees a hidden dimension nor can back it
+ * out of the total. Two independent gates: `includeSnatchDerived` (paranoia —
+ * hides consumed-derived `ratio`) and `includeModeration` (staff-only — hides
+ * the invite-tree Contagion drag + clears the `suspect` flag). Pure.
  */
 export const filterReputationView = (
   crs: CrsResult,
-  opts: { includeSnatchDerived: boolean }
+  opts: { includeSnatchDerived: boolean; includeModeration: boolean }
 ): CrsResult => {
-  if (opts.includeSnatchDerived) return crs;
-  const dimensions = crs.dimensions.filter(
-    (d) => !SNATCH_DERIVED_DIMENSIONS.includes(d.name)
-  );
+  if (opts.includeSnatchDerived && opts.includeModeration) return crs;
+  const hidden = [
+    ...(opts.includeSnatchDerived ? [] : SNATCH_DERIVED_DIMENSIONS),
+    ...(opts.includeModeration ? [] : MODERATION_DIMENSIONS)
+  ];
+  const dimensions = crs.dimensions.filter((d) => !hidden.includes(d.name));
+  // Recompute from the visible dimensions so a gated viewer can't back a hidden
+  // dimension out of the total.
   const score = dimensions.reduce((sum, d) => sum + d.weighted, 0);
-  return { score, dimensions };
+  return {
+    score,
+    dimensions,
+    suspect: opts.includeModeration ? crs.suspect : false
+  };
 };

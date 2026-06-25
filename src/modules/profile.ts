@@ -754,7 +754,8 @@ export const buildCommunityStats = (
   friendCount: number | null,
   inviteView: InviteSummaryView | null,
   reputation: CrsResult | null,
-  includeSnatchDerived: boolean
+  includeSnatchDerived: boolean,
+  includeModeration: boolean
 ): {
   friends: number;
   invites: { direct: number; total: number; depth: number };
@@ -770,7 +771,10 @@ export const buildCommunityStats = (
       total: inviteView.summary.entries,
       depth: inviteView.summary.depth
     },
-    reputation: filterReputationView(reputation, { includeSnatchDerived })
+    reputation: filterReputationView(reputation, {
+      includeSnatchDerived,
+      includeModeration
+    })
   };
 };
 
@@ -839,7 +843,8 @@ const buildProfileView = async (
     friendCount,
     inviteView,
     reputation,
-    canSeeDownloaded
+    canSeeDownloaded,
+    viewer.isStaff // contagion drag + suspect flag are staff-only (ADR-0004 §3)
   );
   const percentiles = await getPercentileSummary(user, activitySummary);
   const donorPresentation = buildDonorPresentation(user);
