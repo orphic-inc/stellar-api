@@ -2982,6 +2982,215 @@
           "collaborators"
         ]
       },
+      "ReleaseFileQuality": {
+        "type": "object",
+        "properties": {
+          "bitrate": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "Lossless",
+              "Lossless24",
+              "Kbps320",
+              "Kbps256",
+              "KbpsV0",
+              "Kbps192",
+              "KbpsV2",
+              "Kbps128",
+              "Other",
+              null
+            ]
+          },
+          "hasLog": {
+            "type": "boolean"
+          },
+          "hasCue": {
+            "type": "boolean"
+          },
+          "isScene": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bitrate",
+          "hasLog",
+          "hasCue",
+          "isScene"
+        ]
+      },
+      "EditionIdentity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "media": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CD",
+              "WEB",
+              "Vinyl",
+              "SACD",
+              "DVD",
+              "Cassette",
+              "BluRay",
+              "DAT",
+              "Soundboard",
+              "Other",
+              null
+            ]
+          },
+          "year": {
+            "type": "number",
+            "nullable": true
+          },
+          "recordLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "catalogueNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRemaster": {
+            "type": "boolean"
+          },
+          "isUnknownEdition": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "media",
+          "year",
+          "recordLabel",
+          "catalogueNumber",
+          "title",
+          "isRemaster",
+          "isUnknownEdition"
+        ]
+      },
+      "ReleaseContributionDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "releaseId": {
+            "type": "number"
+          },
+          "contributorId": {
+            "type": "number"
+          },
+          "releaseDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "sizeInBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "linkStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "UNKNOWN",
+              "PASS",
+              "WARN",
+              "FAIL",
+              null
+            ]
+          },
+          "linkCheckedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "collaborators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "releaseFile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseFileQuality"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "edition": {
+            "$ref": "#/components/schemas/EditionIdentity"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "releaseId",
+          "contributorId",
+          "downloadUrl",
+          "sizeInBytes",
+          "linkStatus",
+          "linkCheckedAt",
+          "type",
+          "createdAt",
+          "updatedAt",
+          "user",
+          "collaborators",
+          "releaseFile",
+          "edition"
+        ]
+      },
       "ReleaseTagEnriched": {
         "type": "object",
         "properties": {
@@ -10417,6 +10626,64 @@
       }
     },
     "/communities/{communityId}/releases/{releaseId}/contributions": {
+      "get": {
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "communityId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "releaseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release contributions with rip-quality and edition identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReleaseContributionDetail"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a member of this community",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Communities"

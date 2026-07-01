@@ -2797,6 +2797,83 @@ const Contribution = registry.register(
   })
 );
 
+// The per-file rip-quality satellite (ReleaseFile), nested on a release-scoped
+// contribution read. `bitrate` is null until graded.
+const ReleaseFileQuality = registry.register(
+  'ReleaseFileQuality',
+  z.object({
+    bitrate: z
+      .enum([
+        'Lossless',
+        'Lossless24',
+        'Kbps320',
+        'Kbps256',
+        'KbpsV0',
+        'Kbps192',
+        'KbpsV2',
+        'Kbps128',
+        'Other'
+      ])
+      .nullable(),
+    hasLog: z.boolean(),
+    hasCue: z.boolean(),
+    isScene: z.boolean()
+  })
+);
+
+// The Edition identity (per-pressing) nested on a release-scoped contribution
+// read — media plus the fields that compose the edition string.
+const EditionIdentity = registry.register(
+  'EditionIdentity',
+  z.object({
+    id: z.number(),
+    media: z
+      .enum([
+        'CD',
+        'WEB',
+        'Vinyl',
+        'SACD',
+        'DVD',
+        'Cassette',
+        'BluRay',
+        'DAT',
+        'Soundboard',
+        'Other'
+      ])
+      .nullable(),
+    year: z.number().nullable(),
+    recordLabel: z.string().nullable(),
+    catalogueNumber: z.string().nullable(),
+    title: z.string().nullable(),
+    isRemaster: z.boolean(),
+    isUnknownEdition: z.boolean()
+  })
+);
+
+// A release-scoped contribution carrying the rip-quality satellite + edition
+// identity (issue #129) — the shape the release detail view omits.
+const ReleaseContributionDetail = registry.register(
+  'ReleaseContributionDetail',
+  z.object({
+    id: z.number(),
+    userId: z.number(),
+    releaseId: z.number(),
+    contributorId: z.number(),
+    releaseDescription: z.string().nullable().optional(),
+    downloadUrl: z.string(),
+    sizeInBytes: z.number().nullable(),
+    linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']).nullable(),
+    linkCheckedAt: z.string().nullable(),
+    type: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    user: z.object({ id: z.number(), username: z.string() }).nullable(),
+    collaborators: z.array(z.object({ id: z.number(), name: z.string() })),
+    releaseFile: ReleaseFileQuality.nullable(),
+    edition: EditionIdentity
+  })
+);
+
 const ReleaseTagEnriched = registry.register(
   'ReleaseTagEnriched',
   z.object({
@@ -3239,6 +3316,37 @@ registry.registerPath({
     },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{communityId}/releases/{releaseId}/contributions',
+  tags: ['Communities'],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description:
+        'Release contributions with rip-quality and edition identity',
+      content: {
+        'application/json': {
+          schema: z.array(ReleaseContributionDetail)
+        }
+      }
+    },
+    403: {
+      description: 'Not a member of this community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Release not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }

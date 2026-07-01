@@ -163,6 +163,111 @@ describe('GET /api/communities/:communityId/releases/:releaseId', () => {
   });
 });
 
+describe('GET /api/communities/:communityId/releases/:releaseId/contributions', () => {
+  const makeQualityContribution = (
+    overrides: Record<string, unknown> = {}
+  ) => ({
+    id: 15,
+    userId: 7,
+    releaseId: 3,
+    contributorId: 4,
+    releaseDescription: 'Lossless rip',
+    downloadUrl: 'https://example.com/kob.torrent',
+    // BigInt on the wire proves the number-normalization contract.
+    sizeInBytes: BigInt('5000000000'),
+    linkStatus: 'PASS',
+    linkCheckedAt: null,
+    type: FileType.flac,
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    updatedAt: new Date('2024-01-01T00:00:00Z'),
+    user: { id: 7, username: 'user' },
+    collaborators: [{ id: 2, name: 'Miles Davis' }],
+    releaseFile: {
+      bitrate: 'Lossless',
+      hasLog: true,
+      hasCue: true,
+      isScene: false
+    },
+    edition: {
+      id: 8,
+      media: 'CD',
+      year: 1997,
+      recordLabel: 'Columbia',
+      catalogueNumber: 'CL 1355',
+      title: 'Legacy Edition',
+      isRemaster: true,
+      isUnknownEdition: false
+    },
+    ...overrides
+  });
+
+  it('returns contributions with rip-quality and edition identity', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.contribution.findMany.mockResolvedValue([
+      makeQualityContribution()
+    ] as never);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/3/contributions'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    const entry = res.body[0];
+    expect(entry.type).toBe('flac');
+    // BigInt serialized to a JS number, not a string.
+    expect(entry.sizeInBytes).toBe(5000000000);
+    expect(entry.releaseFile).toEqual({
+      bitrate: 'Lossless',
+      hasLog: true,
+      hasCue: true,
+      isScene: false
+    });
+    expect(entry.edition.media).toBe('CD');
+    expect(entry.edition.recordLabel).toBe('Columbia');
+    expect(entry.edition.title).toBe('Legacy Edition');
+  });
+
+  it('returns an empty array when the release has no contributions', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.contribution.findMany.mockResolvedValue([] as never);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/3/contributions'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('returns 404 when the release is not in the community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/999/contributions'
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 for a non-member of a restricted community', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
+    );
+    prismaMock.consumer.findFirst.mockResolvedValue(null);
+    prismaMock.contributor.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get(
+      '/api/communities/1/releases/3/contributions'
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('POST /api/communities/:communityId/releases', () => {
   it('requires communities_manage permission', async () => {
     const res = await request(app)

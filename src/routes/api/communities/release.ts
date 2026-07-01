@@ -212,6 +212,27 @@ router.put(
   })
 );
 
+// GET /api/communities/:communityId/releases/:releaseId/contributions — release-scoped
+// read carrying rip-quality (ReleaseFile) + edition identity for the edition stack.
+router.get(
+  '/:releaseId/contributions',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const session = await releaseWorkbench.open({
+      actorId: req.user.id,
+      communityId,
+      releaseId,
+      permissions: req.user.permissions
+    });
+    res.json(await session.listContributions());
+  })
+);
+
 // POST /api/communities/:communityId/releases/:releaseId/contributions — any authenticated user
 router.post(
   '/:releaseId/contributions',

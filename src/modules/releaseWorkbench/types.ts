@@ -39,6 +39,42 @@ export type ReleaseContributionView = {
   collaborators: Array<{ id: number; name: string }>;
 };
 
+// A release-scoped contribution read that nests the rip-quality satellite
+// (ReleaseFile) and the full Edition identity alongside the spine — the shape
+// the release detail view deliberately omits (see listReleaseContributions).
+export type ReleaseContributionDetailView = {
+  id: number;
+  userId: number;
+  releaseId: number;
+  contributorId: number;
+  releaseDescription: string | null;
+  downloadUrl: string;
+  sizeInBytes: number | null;
+  linkStatus: string | null;
+  linkCheckedAt: Date | null;
+  type: string;
+  createdAt: Date;
+  updatedAt: Date;
+  user: { id: number; username: string } | null;
+  collaborators: Array<{ id: number; name: string }>;
+  releaseFile: {
+    bitrate: string | null;
+    hasLog: boolean;
+    hasCue: boolean;
+    isScene: boolean;
+  } | null;
+  edition: {
+    id: number;
+    media: string | null;
+    year: number | null;
+    recordLabel: string | null;
+    catalogueNumber: string | null;
+    title: string | null;
+    isRemaster: boolean;
+    isUnknownEdition: boolean;
+  };
+};
+
 export type ReleaseHistoryEntry = Prisma.ReleaseHistoryGetPayload<{
   include: { actor: { select: { id: true; username: true } } };
 }>;
@@ -120,6 +156,7 @@ export type ReleaseWorkbenchSession = {
   attachContribution(
     input: AddContributionToReleaseInput
   ): Promise<ReleaseContributionView>;
+  listContributions(): Promise<ReleaseContributionDetailView[]>;
   revertHistory(input: { historyId: number }): Promise<ReleaseWorkbenchView>;
 };
 

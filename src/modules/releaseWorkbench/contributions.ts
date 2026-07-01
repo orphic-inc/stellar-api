@@ -7,8 +7,76 @@ import { addContributionToRelease } from '../contribution';
 import { getSettings } from '../settings';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { snapshotRelease } from './snapshot';
-import type { ReleaseContributionView, ReleaseWorkbenchRef } from './types';
+import type {
+  ReleaseContributionDetailView,
+  ReleaseContributionView,
+  ReleaseWorkbenchRef
+} from './types';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
+
+// The rip-quality satellite + full edition identity for one release's
+// contributions. Kept off the release detail view (which is growing heavy) and
+// served from its own release-scoped GET so the UI can lazy-load an edition
+// stack (bitrate/media/flags) on demand. Gated identically to the detail read.
+export const listReleaseContributions = async (
+  ref: ReleaseWorkbenchRef
+): Promise<ReleaseContributionDetailView[]> => {
+  await loadReleaseWorkbenchAuthority(ref);
+
+  // 404 rather than an empty 200 when the named release isn't in this community —
+  // matches the sibling detail GET and the attach POST.
+  const release = await prisma.release.findFirst({
+    where: { id: ref.releaseId, communityId: ref.communityId },
+    select: { id: true }
+  });
+  if (!release) {
+    throw new AppError(404, 'Release not found');
+  }
+
+  const contributions = await prisma.contribution.findMany({
+    where: {
+      releaseId: ref.releaseId,
+      release: { communityId: ref.communityId }
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      userId: true,
+      releaseId: true,
+      contributorId: true,
+      releaseDescription: true,
+      downloadUrl: true,
+      sizeInBytes: true,
+      linkStatus: true,
+      linkCheckedAt: true,
+      type: true,
+      createdAt: true,
+      updatedAt: true,
+      user: { select: { id: true, username: true } },
+      collaborators: { select: { id: true, name: true } },
+      releaseFile: {
+        select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
+      },
+      edition: {
+        select: {
+          id: true,
+          media: true,
+          year: true,
+          recordLabel: true,
+          catalogueNumber: true,
+          title: true,
+          isRemaster: true,
+          isUnknownEdition: true
+        }
+      }
+    }
+  });
+
+  return contributions.map((contribution) => ({
+    ...contribution,
+    sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
+  }));
+};
 
 export const attachReleaseWorkbenchContribution = async (
   ref: ReleaseWorkbenchRef,

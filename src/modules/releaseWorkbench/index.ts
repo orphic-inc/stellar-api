@@ -18,7 +18,10 @@ import {
   removeReleaseWorkbenchTag,
   voteOnReleaseWorkbenchTag
 } from './tags';
-import { attachReleaseWorkbenchContribution } from './contributions';
+import {
+  attachReleaseWorkbenchContribution,
+  listReleaseContributions
+} from './contributions';
 import { revertReleaseWorkbenchHistory } from './history';
 
 const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
@@ -41,6 +44,7 @@ const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
     removeReleaseWorkbenchTag(ref, input),
   attachContribution: (input): Promise<ReleaseContributionView> =>
     attachReleaseWorkbenchContribution(ref, input),
+  listContributions: () => listReleaseContributions(ref),
   revertHistory: (input: {
     historyId: number;
   }): Promise<ReleaseWorkbenchView> => revertReleaseWorkbenchHistory(ref, input)
