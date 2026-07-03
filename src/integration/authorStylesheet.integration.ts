@@ -9,6 +9,14 @@ import { getReputation } from '../modules/reputation';
 import { updateProfile } from '../modules/profile';
 import { AppError } from '../lib/errors';
 
+// Route-level pagination defaults (lib/pagination.ts); the module takes the
+// already-derived PageParams, so integration calls build them directly.
+const page = (p = 1, limit = 25) => ({
+  page: p,
+  limit,
+  skip: (p - 1) * limit
+});
+
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
@@ -45,18 +53,70 @@ const activeSlotOf = async (userId: number): Promise<number | null> => {
   return user.userSettings.activeAuthorStylesheetId;
 };
 
-describe('AuthorStylesheet save → list (PRD-03 #118, many per author)', () => {
+describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', () => {
   it('an author can save several stylesheets and list them all', async () => {
     const author = await createUser();
-    await createAuthorStylesheet(author.id, { name: 'First', source: 'a {}' });
-    await createAuthorStylesheet(author.id, { name: 'Second', source: 'b {}' });
+    await createAuthorStylesheet(author.id, author.userRankId, {
+      name: 'First',
+      source: 'a {}'
+    });
+    await createAuthorStylesheet(author.id, author.userRankId, {
+      name: 'Second',
+      source: 'b {}'
+    });
 
-    const all = await listAuthorStylesheets(author.id);
+    const [all, total] = await listAuthorStylesheets(author.id, page());
     expect(all).toHaveLength(2);
+    expect(total).toBe(2);
     expect(all.map((s) => s.name)).toEqual(['First', 'Second']);
     // ADR-0024 §1 — a list payload carries metadata only; source stays behind
     // the per-id /css delivery route, never a JSON list.
     expect(all[0]).not.toHaveProperty('source');
+  });
+
+  it('pages through the list with a stable total (#146)', async () => {
+    const author = await createUser();
+    for (const name of ['One', 'Two', 'Three']) {
+      await createAuthorStylesheet(author.id, author.userRankId, {
+        name,
+        source: 'a {}'
+      });
+    }
+
+    const [firstPage, total1] = await listAuthorStylesheets(
+      author.id,
+      page(1, 2)
+    );
+    const [secondPage, total2] = await listAuthorStylesheets(
+      author.id,
+      page(2, 2)
+    );
+    expect(firstPage.map((s) => s.name)).toEqual(['One', 'Two']);
+    expect(secondPage.map((s) => s.name)).toEqual(['Three']);
+    expect(total1).toBe(3);
+    expect(total2).toBe(3);
+  });
+
+  it('rejects creation past the rank-configured registry-space limit (#146)', async () => {
+    const author = await createUser();
+    await testPrisma.userRank.update({
+      where: { id: author.userRankId },
+      data: { authorStylesheetLimit: 1 }
+    });
+
+    await createAuthorStylesheet(author.id, author.userRankId, {
+      name: 'Allowed',
+      source: 'a {}'
+    });
+    await expect(
+      createAuthorStylesheet(author.id, author.userRankId, {
+        name: 'One too many',
+        source: 'b {}'
+      })
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    const [, total] = await listAuthorStylesheets(author.id, page());
+    expect(total).toBe(1);
   });
 });
 
@@ -65,7 +125,7 @@ describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
     const author = await createUser();
     // Raw source with an exfiltration vector; store-time cssSanitize neutralizes
     // it, and the /css read hands back the already-safe stored artifact.
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Anorex',
       source: "@import url('http://evil.example/x.css'); body { color: #0f0; }"
     });
@@ -86,7 +146,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('selecting Registry (pointer) clears a previously-set Personal URL', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -109,7 +169,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('selecting Personal (URL) clears a previously-set Registry pointer', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -134,7 +194,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('rejects setting both sources in one write (400)', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -159,7 +219,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('adopt points the adopter Site slot at the sheet and credits the author', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Midnight',
       source: 'body { background: #000; }'
     });
@@ -194,11 +254,11 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('re-adopting the same author is idempotent — no second ledger row', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheetA = await createAuthorStylesheet(author.id, {
+    const sheetA = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'A',
       source: 'a {}'
     });
-    const sheetB = await createAuthorStylesheet(author.id, {
+    const sheetB = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'B',
       source: 'b {}'
     });
@@ -219,7 +279,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('concurrent double-adopt credits the author exactly once (F1: partial unique index)', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Race',
       source: 'r {}'
     });
@@ -243,7 +303,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
 
   it('self-adoption renders the sheet but credits nothing (anti-farm)', async () => {
     const author = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, {
+    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
       name: 'Mine',
       source: 'c {}'
     });

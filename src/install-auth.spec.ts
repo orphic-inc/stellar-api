@@ -212,7 +212,8 @@ describe('API auth/profile/user flows', () => {
         color: '',
         badge: '',
         permissions: {},
-        personalCollageLimit: 0
+        personalCollageLimit: 0,
+        authorStylesheetLimit: 0
       },
       secondaryRanks: []
     };

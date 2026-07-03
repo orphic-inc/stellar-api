@@ -51,6 +51,7 @@ export function makeUserRank(
     permittedForumIds: [],
     uploadRequired: 0,
     personalCollageLimit: 0,
+    authorStylesheetLimit: 0,
     displayStaff: false,
     staffGroupId: null
   };

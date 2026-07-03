@@ -2,15 +2,15 @@
  * AuthorStylesheet — user-authored stylesheets saved for others to adopt
  * (PRD-03, descent target #4).
  *
- * A member may author MANY stylesheets (cardinality fixed in #119; the
- * rank-gated count limit is deferred). Adoption is the keystone the shipped
- * `scoreStylesheetSelection` (#84) hooks onto:
+ * A member may author MANY stylesheets (cardinality fixed in #119). Adoption
+ * is the keystone the shipped `scoreStylesheetSelection` (#84) hooks onto:
  *   - #118 save:  create / list / read an author's sheets.
  *   - #119 adopt: a viewer points their Site Stylesheet slot
  *     (`UserSettings.activeAuthorStylesheetId`) at a chosen sheet, idempotently.
  *   - #120 score: a non-self adoption records the durable (adopter, author) pair
  *     once in the `CRS_*` event ledger (ADR-0007); the author's read-time
  *     stylesheet CRS dimension counts those pairs.
+ *   - #146 list pagination + rank-gated count limit (registry spaces, PRD-03).
  */
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -18,42 +18,72 @@ import { AppError } from '../lib/errors';
 import { sanitizeStylesheetSource } from '../lib/cssSanitize';
 import { scoreStylesheetSelection } from './stylesheetScore';
 import type { AuthorStylesheetInput } from '../schemas/stylesheet';
+import type { PageParams } from '../lib/pagination';
 
 /**
- * Create a new AuthorStylesheet for the calling author (many per author).
+ * Create a new AuthorStylesheet for the calling author (many per author),
+ * gated by the author's rank-configured registry-space count (#146,
+ * `UserRank.authorStylesheetLimit`, mirroring `personalCollageLimit`'s
+ * 0-means-unlimited shape). `userRankId` is the caller's primary rank —
+ * passed in rather than re-derived here, same scope as the collage-limit
+ * precedent (secondary ranks are not consulted).
  *
  * `source` is sanitized at store-time (ADR-0003): the injected artifact is kept
  * safe in the database, not just at render. See `lib/cssSanitize.ts`.
  */
-export const createAuthorStylesheet = (
+export const createAuthorStylesheet = async (
   authorId: number,
+  userRankId: number,
   input: AuthorStylesheetInput
-) =>
-  prisma.authorStylesheet.create({
+) => {
+  const rank = await prisma.userRank.findUnique({
+    where: { id: userRankId },
+    select: { authorStylesheetLimit: true }
+  });
+  if (rank && rank.authorStylesheetLimit > 0) {
+    const count = await prisma.authorStylesheet.count({
+      where: { authorId }
+    });
+    if (count >= rank.authorStylesheetLimit) {
+      throw new AppError(
+        400,
+        `Author stylesheet limit reached (${rank.authorStylesheetLimit})`
+      );
+    }
+  }
+
+  return prisma.authorStylesheet.create({
     data: {
       authorId,
       name: input.name,
       source: sanitizeStylesheetSource(input.source)
     }
   });
+};
 
 /**
- * List an author's stylesheets, oldest first — **metadata only** (ADR-0024 §1).
- * `source` never rides a list payload; it is delivered as `text/css` through the
- * per-id `/css` route so there is exactly one path a stored sheet leaves by.
+ * List an author's stylesheets, oldest first, paginated (#146) — **metadata
+ * only** (ADR-0024 §1). `source` never rides a list payload; it is delivered
+ * as `text/css` through the per-id `/css` route so there is exactly one path
+ * a stored sheet leaves by.
  */
-export const listAuthorStylesheets = (authorId: number) =>
-  prisma.authorStylesheet.findMany({
-    where: { authorId },
-    orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      authorId: true,
-      name: true,
-      createdAt: true,
-      updatedAt: true
-    }
-  });
+export const listAuthorStylesheets = (authorId: number, pg: PageParams) =>
+  Promise.all([
+    prisma.authorStylesheet.findMany({
+      where: { authorId },
+      orderBy: { createdAt: 'asc' },
+      skip: pg.skip,
+      take: pg.limit,
+      select: {
+        id: true,
+        authorId: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    }),
+    prisma.authorStylesheet.count({ where: { authorId } })
+  ]);
 
 /**
  * Read a single AuthorStylesheet by its id, or null if it does not exist.

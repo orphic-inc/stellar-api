@@ -240,6 +240,9 @@
               },
               "personalCollageLimit": {
                 "type": "integer"
+              },
+              "authorStylesheetLimit": {
+                "type": "integer"
               }
             },
             "required": [
@@ -2122,6 +2125,33 @@
           "updatedAt"
         ]
       },
+      "AuthorStylesheetListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "name",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "AdoptionResult": {
         "type": "object",
         "properties": {
@@ -3603,6 +3633,9 @@
             "type": "string"
           },
           "personalCollageLimit": {
+            "type": "integer"
+          },
+          "authorStylesheetLimit": {
             "type": "integer"
           },
           "displayStaff": {
@@ -7948,18 +7981,50 @@
             "required": true,
             "name": "userId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "An author's stylesheets",
+            "description": "An author's stylesheets, paginated (#146)",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AuthorStylesheet"
-                  }
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuthorStylesheetListItem"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
                 }
               }
             }
@@ -11302,6 +11367,10 @@
                     "type": "integer",
                     "minimum": 0
                   },
+                  "authorStylesheetLimit": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
                   "displayStaff": {
                     "type": "boolean"
                   },
@@ -11637,6 +11706,10 @@
                     "type": "string"
                   },
                   "personalCollageLimit": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "authorStylesheetLimit": {
                     "type": "integer",
                     "minimum": 0
                   },

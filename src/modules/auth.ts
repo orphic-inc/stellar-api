@@ -34,7 +34,8 @@ export const authUserSelect = {
       color: true,
       badge: true,
       permissions: true,
-      personalCollageLimit: true
+      personalCollageLimit: true,
+      authorStylesheetLimit: true
     }
   },
   secondaryRanks: {
@@ -46,7 +47,8 @@ export const authUserSelect = {
           level: true,
           permissions: true,
           permittedForumIds: true,
-          personalCollageLimit: true
+          personalCollageLimit: true,
+          authorStylesheetLimit: true
         }
       }
     }
@@ -86,6 +88,12 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
       raw.userRank.personalCollageLimit ?? 0,
       ...raw.secondaryRanks.map(
         (entry) => entry.userRank.personalCollageLimit ?? 0
+      )
+    ),
+    authorStylesheetLimit: Math.max(
+      raw.userRank.authorStylesheetLimit ?? 0,
+      ...raw.secondaryRanks.map(
+        (entry) => entry.userRank.authorStylesheetLimit ?? 0
       )
     )
   },

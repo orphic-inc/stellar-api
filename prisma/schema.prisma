@@ -303,23 +303,24 @@ model StaffGroup {
 }
 
 model UserRank {
-  id                   Int                 @id @default(autoincrement())
-  level                Int
-  name                 String
-  permissions          Json
-  secondary            Boolean             @default(false)
-  permittedForumIds    Int[]               @default([])
-  color                String              @default("")
-  badge                String              @default("")
-  uploadRequired       Int                 @default(0)
-  personalCollageLimit Int                 @default(0)
-  displayStaff         Boolean             @default(false)
-  staffGroupId         Int?
-  staffGroup           StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
-  users                User[]
-  secondaryUsers       UserSecondaryRank[]
-  promotionRulesFrom   RankPromotionRule[] @relation("RankPromotionFrom")
-  promotionRulesTo     RankPromotionRule[] @relation("RankPromotionTo")
+  id                    Int                 @id @default(autoincrement())
+  level                 Int
+  name                  String
+  permissions           Json
+  secondary             Boolean             @default(false)
+  permittedForumIds     Int[]               @default([])
+  color                 String              @default("")
+  badge                 String              @default("")
+  uploadRequired        Int                 @default(0)
+  personalCollageLimit  Int                 @default(0)
+  authorStylesheetLimit Int                 @default(0)
+  displayStaff          Boolean             @default(false)
+  staffGroupId          Int?
+  staffGroup            StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
+  users                 User[]
+  secondaryUsers        UserSecondaryRank[]
+  promotionRulesFrom    RankPromotionRule[] @relation("RankPromotionFrom")
+  promotionRulesTo      RankPromotionRule[] @relation("RankPromotionTo")
 
   @@unique([level])
   @@unique([name])

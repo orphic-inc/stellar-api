@@ -19,6 +19,7 @@ export const createRankSchema = z.object({
   color: z.string().optional(),
   badge: z.string().optional(),
   personalCollageLimit: z.number().int().min(0).optional(),
+  authorStylesheetLimit: z.number().int().min(0).optional(),
   displayStaff: z.boolean().optional(),
   staffGroupId: z.number().int().positive().nullable().optional()
 });
@@ -33,6 +34,7 @@ export const updateRankSchema = z
     color: z.string().optional(),
     badge: z.string().optional(),
     personalCollageLimit: z.number().int().min(0).optional(),
+    authorStylesheetLimit: z.number().int().min(0).optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().positive().nullable().optional()
   })

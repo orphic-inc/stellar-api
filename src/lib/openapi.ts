@@ -184,7 +184,8 @@ const AuthUser = registry.register(
       color: z.string(),
       badge: z.string().optional(),
       permissions: z.record(z.string(), z.boolean()).optional(),
-      personalCollageLimit: z.number().int().optional()
+      personalCollageLimit: z.number().int().optional(),
+      authorStylesheetLimit: z.number().int().optional()
     })
   })
 );
@@ -1475,6 +1476,19 @@ const AuthorStylesheet = registry.register(
   })
 );
 
+// The list projection (#146) never carries `source` (ADR-0024 §1) — the full
+// body is fetched only via the single-sheet read / `/css` delivery route.
+const AuthorStylesheetListItem = registry.register(
+  'AuthorStylesheetListItem',
+  z.object({
+    id: z.number(),
+    authorId: z.number(),
+    name: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
 // Result of adopting an author stylesheet into the Site Stylesheet slot (#119):
 // the adopted sheet plus whether this adoption recorded a new CRS event (#120).
 const AdoptionResult = registry.register(
@@ -1735,11 +1749,24 @@ registry.registerPath({
   method: 'get',
   path: '/stylesheet/author/{userId}',
   tags: ['Stylesheets'],
-  request: { params: z.object({ userId: z.string() }) },
+  request: {
+    params: z.object({ userId: z.string() }),
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
   responses: {
     200: {
-      description: "An author's stylesheets",
-      content: { 'application/json': { schema: z.array(AuthorStylesheet) } }
+      description: "An author's stylesheets, paginated (#146)",
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(AuthorStylesheetListItem),
+            meta: PaginationMeta
+          })
+        }
+      }
     }
   }
 });
@@ -3023,6 +3050,7 @@ const UserRank = registry.register(
     color: z.string().optional(),
     badge: z.string().optional(),
     personalCollageLimit: z.number().int().optional(),
+    authorStylesheetLimit: z.number().int().optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().nullable().optional(),
     userCount: z.number().optional()

@@ -6,9 +6,15 @@ import { requireStrictAdmin } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import {
   stylesheetSchema,
   stylesheetUpdateSchema,
@@ -39,29 +45,38 @@ const stylesheetIdParamsSchema = z.object({
 const authorIdParamsSchema = z.object({
   userId: z.coerce.number().int().positive()
 });
+const listAuthorStylesheetsQuerySchema = z.object({ ...paginationBase });
 
-// ─── AuthorStylesheet (PRD-03 #118/#119/#120) — registered before /:id ────────
+// ─── AuthorStylesheet (PRD-03 #118/#119/#120/#146) — registered before /:id ───
 
-// POST /api/stylesheet/author — author a new stylesheet (many per author).
+// POST /api/stylesheet/author — author a new stylesheet (many per author,
+// rank-gated by UserRank.authorStylesheetLimit — #146).
 router.post(
   '/author',
   requireAuth,
   validate(authorStylesheetSchema),
   authHandler(async (req, res) => {
     const data = parsedBody<AuthorStylesheetInput>(res);
-    const sheet = await createAuthorStylesheet(req.user.id, data);
+    const sheet = await createAuthorStylesheet(
+      req.user.id,
+      req.user.userRankId,
+      data
+    );
     res.status(201).json(sheet);
   })
 );
 
-// GET /api/stylesheet/author/:userId — list an author's stylesheets.
+// GET /api/stylesheet/author/:userId — list an author's stylesheets, paginated (#146).
 router.get(
   '/author/:userId',
   requireAuth,
   validateParams(authorIdParamsSchema),
+  validateQuery(listAuthorStylesheetsQuerySchema),
   authHandler(async (_req, res) => {
     const { userId } = parsedParams<{ userId: number }>(res);
-    res.json(await listAuthorStylesheets(userId));
+    const pg = parsedPage(res);
+    const [rows, total] = await listAuthorStylesheets(userId, pg);
+    paginatedResponse(res, rows, total, pg);
   })
 );
 

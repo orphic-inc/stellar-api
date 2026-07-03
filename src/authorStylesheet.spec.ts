@@ -3,13 +3,14 @@ import {
   request,
   app,
   resetApiTestState,
-  prismaMock
+  prismaMock,
+  makeUserRank
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
 
-// The default authed user is id 7 (see apiTestHarness). authorId 5 ≠ 7 → a
-// cross-user (non-self) adoption.
+// The default authed user is id 7 (see apiTestHarness), on userRankId 1.
+// authorId 5 ≠ 7 → a cross-user (non-self) adoption.
 const mockSheet = {
   id: 1,
   authorId: 5,
@@ -51,28 +52,77 @@ describe('POST /api/stylesheet/author', () => {
       .send({ name: 'Midnight' });
     expect(res.status).toBe(400);
   });
+
+  it('allows creation when authorStylesheetLimit is 0 (unlimited, default)', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank() as never); // authorStylesheetLimit: 0
+    prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Midnight', source: 'body { background: #000; }' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.authorStylesheet.count).not.toHaveBeenCalled();
+  });
+
+  it('rejects creation at the rank-configured limit (400) — registry spaces (#146)', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      authorStylesheetLimit: 1
+    } as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(1);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Second Sheet', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/Author stylesheet limit reached/);
+    expect(prismaMock.authorStylesheet.create).not.toHaveBeenCalled();
+  });
+
+  it('allows creation below the rank-configured limit', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      authorStylesheetLimit: 2
+    } as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(1);
+    prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Second Sheet', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(201);
+  });
 });
 
 // ─── GET /api/stylesheet/author/:userId ───────────────────────────────────────
 
 describe('GET /api/stylesheet/author/:userId', () => {
-  it("lists an author's stylesheets", async () => {
+  it("lists an author's stylesheets, paginated (#146)", async () => {
     prismaMock.authorStylesheet.findMany.mockResolvedValue([
       mockSheet
     ] as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(1);
 
     const res = await request(app).get('/api/stylesheet/author/5');
 
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(1);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.meta.total).toBe(1);
     expect(prismaMock.authorStylesheet.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { authorId: 5 } })
     );
+    expect(prismaMock.authorStylesheet.count).toHaveBeenCalledWith({
+      where: { authorId: 5 }
+    });
   });
 
   it('lists metadata only — source never rides a list payload (ADR-0024 §1)', async () => {
     prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(0);
     await request(app).get('/api/stylesheet/author/5');
     const call = prismaMock.authorStylesheet.findMany.mock.calls[0][0] as {
       select: Record<string, boolean>;
@@ -87,11 +137,33 @@ describe('GET /api/stylesheet/author/:userId', () => {
     expect(call.select.source).toBeUndefined();
   });
 
+  it('respects page/limit query params (skip/take passed to findMany)', async () => {
+    prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(45);
+
+    const res = await request(app).get(
+      '/api/stylesheet/author/5?page=2&limit=10'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.meta).toEqual({
+      total: 45,
+      page: 2,
+      limit: 10,
+      totalPages: 5
+    });
+    expect(prismaMock.authorStylesheet.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 })
+    );
+  });
+
   it('returns an empty list for an author with no stylesheets', async () => {
     prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+    prismaMock.authorStylesheet.count.mockResolvedValue(0);
     const res = await request(app).get('/api/stylesheet/author/999');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.meta.total).toBe(0);
   });
 
   it('rejects a non-numeric userId (400)', async () => {

@@ -87,6 +87,7 @@ const formatRank = (
   color: r.color,
   badge: r.badge,
   personalCollageLimit: r.personalCollageLimit,
+  authorStylesheetLimit: r.authorStylesheetLimit,
   displayStaff: r.displayStaff,
   staffGroupId: r.staffGroupId,
   primaryUserCount: r._count.users,
@@ -149,6 +150,7 @@ router.post(
       color,
       badge,
       personalCollageLimit,
+      authorStylesheetLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<CreateRankInput>(res);
@@ -185,6 +187,7 @@ router.post(
           color: color ?? '',
           badge: badge ?? '',
           personalCollageLimit: personalCollageLimit ?? 0,
+          authorStylesheetLimit: authorStylesheetLimit ?? 0,
           displayStaff: displayStaff ?? false,
           staffGroupId: effectiveStaffGroupId
         },
@@ -237,6 +240,7 @@ router.put(
       color,
       badge,
       personalCollageLimit,
+      authorStylesheetLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<UpdateRankInput>(res);
@@ -276,6 +280,9 @@ router.put(
           ...(color !== undefined && { color }),
           ...(badge !== undefined && { badge }),
           ...(personalCollageLimit !== undefined && { personalCollageLimit }),
+          ...(authorStylesheetLimit !== undefined && {
+            authorStylesheetLimit
+          }),
           ...(displayStaff !== undefined && { displayStaff }),
           ...(effectiveStaffGroupId !== undefined && {
             staffGroupId: effectiveStaffGroupId
