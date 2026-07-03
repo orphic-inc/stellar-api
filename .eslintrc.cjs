@@ -1,4 +1,9 @@
 module.exports = {
+  // Stop the config cascade here: a checkout nested inside another checkout
+  // (e.g. a git worktree under .claude/worktrees/) otherwise inherits the
+  // outer repo's .eslintrc.cjs too, and ESLint refuses to load the
+  // @typescript-eslint plugin from two node_modules at once.
+  root: true,
   env: {
     es2020: true,
     node: true
