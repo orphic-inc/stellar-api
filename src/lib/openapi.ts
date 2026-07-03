@@ -4835,15 +4835,13 @@ registry.registerPath({
 
 import {
   createResponseSchema,
-  updateResponseSchema
-} from '../schemas/staffInbox';
-import {
+  updateResponseSchema,
   createTicketSchema,
   replySchema as staffReplySchema,
   assignSchema,
   queueQuerySchema,
   bulkResolveSchema
-} from '../schemas/staffPm';
+} from '../schemas/staffInbox';
 
 const StaffInboxTicket = registry.register(
   'StaffInboxTicket',

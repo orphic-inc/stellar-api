@@ -76,8 +76,7 @@ src/
     downloads.ts            # Download grant logic
     forum.ts                # Forum business logic (post creation, topic management)
     pm.ts                   # Private message business logic
-    staffPm.ts              # Staff-to-staff private message logic (separate from support tickets)
-    staffInbox.ts           # Support ticket business logic
+    staffInbox.ts           # Member→staff conversations ("Staff PM"): tickets (subject/thread/assign/resolve) + canned responses
     profile.ts              # Profile update logic
     ratio.ts                # Ratio calculation helpers
     ratioPolicy.ts          # Ratio policy evaluation

@@ -26,6 +26,9 @@ const prismaMock = {
   },
   reportNote: {
     create: jest.fn()
+  },
+  auditLog: {
+    create: jest.fn()
   }
 };
 
@@ -224,6 +227,15 @@ describe('claimReport', () => {
       where: { id: 1 },
       data: { status: 'Claimed', claimedById: 7, claimedAt: expect.any(Date) }
     });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 7,
+          action: 'report.claim',
+          targetId: 1
+        })
+      })
+    );
   });
 });
 
@@ -265,6 +277,11 @@ describe('unclaimReport', () => {
       where: { id: 1 },
       data: { status: 'Open', claimedById: null, claimedAt: null }
     });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ actorId: 7, action: 'report.unclaim' })
+      })
+    );
   });
 });
 
@@ -277,6 +294,16 @@ describe('resolveReport', () => {
       {
         ok: true
       }
+    );
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 7,
+          action: 'report.resolve',
+          targetId: 1,
+          metadata: { resolutionAction: 'UserWarned' }
+        })
+      })
     );
 
     prismaMock.report.updateMany.mockResolvedValueOnce({ count: 0 });

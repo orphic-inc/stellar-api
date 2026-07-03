@@ -20,7 +20,7 @@ const { listInbox } = jest.requireActual<typeof PmModule>('./modules/pm');
 import type * as ForumModule from './modules/forum';
 const { deletePost, castVote, createPoll, closePoll, createTopicNote } =
   jest.requireActual<typeof ForumModule>('./modules/forum');
-import type * as StaffPmModule from './modules/staffPm';
+import type * as StaffInboxModule from './modules/staffInbox';
 const {
   listMyTickets,
   listQueue,
@@ -31,7 +31,7 @@ const {
   unresolveTicket,
   assignTicket,
   bulkResolve
-} = jest.requireActual<typeof StaffPmModule>('./modules/staffPm');
+} = jest.requireActual<typeof StaffInboxModule>('./modules/staffInbox');
 
 beforeEach(() => resetApiTestState());
 
@@ -694,9 +694,9 @@ describe('forum.castVote', () => {
   });
 });
 
-// ─── staffPm.listMyTickets ────────────────────────────────────────────────────
+// ─── staffInbox.listMyTickets ────────────────────────────────────────────────────
 
-describe('staffPm.listMyTickets', () => {
+describe('staffInbox.listMyTickets', () => {
   it('returns paginated ticket list for a user', async () => {
     prismaMock.staffInboxConversation.count.mockResolvedValue(1);
     prismaMock.staffInboxConversation.findMany.mockResolvedValue([
@@ -728,9 +728,9 @@ describe('staffPm.listMyTickets', () => {
   });
 });
 
-// ─── staffPm.listQueue ────────────────────────────────────────────────────────
+// ─── staffInbox.listQueue ────────────────────────────────────────────────────────
 
-describe('staffPm.listQueue', () => {
+describe('staffInbox.listQueue', () => {
   it('returns all tickets when status=all', async () => {
     prismaMock.staffInboxConversation.count.mockResolvedValue(3);
     prismaMock.staffInboxConversation.findMany.mockResolvedValue([]);
@@ -768,9 +768,9 @@ describe('staffPm.listQueue', () => {
   });
 });
 
-// ─── staffPm.getQueueCount ────────────────────────────────────────────────────
+// ─── staffInbox.getQueueCount ────────────────────────────────────────────────────
 
-describe('staffPm.getQueueCount', () => {
+describe('staffInbox.getQueueCount', () => {
   it('counts non-resolved tickets', async () => {
     prismaMock.staffInboxConversation.count.mockResolvedValue(5);
 
@@ -783,9 +783,9 @@ describe('staffPm.getQueueCount', () => {
   });
 });
 
-// ─── staffPm.replyToTicket (error paths) ─────────────────────────────────────
+// ─── staffInbox.replyToTicket (error paths) ──────────────────────────────────
 
-describe('staffPm.replyToTicket', () => {
+describe('staffInbox.replyToTicket', () => {
   it('returns not_found when the ticket does not exist', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue(null);
 
@@ -794,7 +794,7 @@ describe('staffPm.replyToTicket', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 
-  it("returns forbidden when non-staff user tries to reply to another user's ticket", async () => {
+  it("masks a non-staff user replying to another user's ticket as not_found", async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue({
       id: 1,
       userId: 99,
@@ -803,14 +803,14 @@ describe('staffPm.replyToTicket', () => {
 
     const result = await replyToTicket(1, 7, 'hello', false);
 
-    expect(result).toEqual({ ok: false, reason: 'forbidden' });
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 });
 
-// ─── staffPm.resolveTicket (error paths) ─────────────────────────────────────
+// ─── staffInbox.resolveTicket (error paths) ──────────────────────────────────
 
-describe('staffPm.resolveTicket', () => {
-  it("returns forbidden when non-staff tries to resolve another user's ticket", async () => {
+describe('staffInbox.resolveTicket', () => {
+  it("masks a non-staff user resolving another user's ticket as not_found", async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue({
       id: 1,
       userId: 99,
@@ -819,7 +819,7 @@ describe('staffPm.resolveTicket', () => {
 
     const result = await resolveTicket(1, 7, false);
 
-    expect(result).toEqual({ ok: false, reason: 'forbidden' });
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 
   it('returns already_resolved when the ticket is already resolved', async () => {
@@ -835,16 +835,16 @@ describe('staffPm.resolveTicket', () => {
   });
 });
 
-// ─── staffPm.unresolveTicket (error paths) ────────────────────────────────────
+// ─── staffInbox.unresolveTicket (error paths) ─────────────────────────────────
 
-describe('staffPm.unresolveTicket', () => {
+describe('staffInbox.unresolveTicket', () => {
   it('returns not_resolved when ticket is not in Resolved status', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValue({
       id: 1,
       status: 'Unanswered'
     } as never);
 
-    const result = await unresolveTicket(1);
+    const result = await unresolveTicket(1, 7);
 
     expect(result).toEqual({ ok: false, reason: 'not_resolved' });
   });
@@ -1105,9 +1105,9 @@ describe('requests.listRequests', () => {
   });
 });
 
-// ─── staffPm.viewTicket ───────────────────────────────────────────────────────
+// ─── staffInbox.viewTicket ───────────────────────────────────────────────────────
 
-describe('staffPm.viewTicket', () => {
+describe('staffInbox.viewTicket', () => {
   it('returns not_found when ticket does not exist', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce(null);
 
@@ -1157,28 +1157,57 @@ describe('staffPm.viewTicket', () => {
   });
 });
 
-// ─── staffPm.assignTicket ─────────────────────────────────────────────────────
+// ─── staffInbox.assignTicket ──────────────────────────────────────────────────
 
-describe('staffPm.assignTicket', () => {
+describe('staffInbox.assignTicket', () => {
   it('returns not_found when ticket does not exist', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce(null);
 
-    const result = await assignTicket(1, 5);
+    const result = await assignTicket(1, 5, 7);
 
     expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 
-  it('unassigns ticket when assignedUserId is null', async () => {
+  it('unassigns ticket without touching status', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
       id: 1
     } as never);
     prismaMock.staffInboxConversation.update.mockResolvedValueOnce({} as never);
 
-    const result = await assignTicket(1, null);
+    const result = await assignTicket(1, null, 7);
+
+    expect(result.ok).toBe(true);
+    // Assignment must not reset conversation status (ADR-0001-aligned reconcile).
+    expect(prismaMock.staffInboxConversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { assignedUserId: null } })
+    );
+  });
+
+  it('assigns to a staff-permitted user and writes an audit row', async () => {
+    prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
+      id: 1
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 5,
+      userRank: { permissions: { staff_inbox_manage: true } }
+    } as never);
+    prismaMock.staffInboxConversation.update.mockResolvedValueOnce({} as never);
+    prismaMock.auditLog.create.mockResolvedValueOnce({} as never);
+
+    const result = await assignTicket(1, 5, 7);
 
     expect(result.ok).toBe(true);
     expect(prismaMock.staffInboxConversation.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { assignedUserId: null } })
+      expect.objectContaining({ data: { assignedUserId: 5 } })
+    );
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 7,
+          action: 'staff_inbox.assign',
+          targetId: 1
+        })
+      })
     );
   });
 
@@ -1188,12 +1217,12 @@ describe('staffPm.assignTicket', () => {
     } as never);
     prismaMock.user.findUnique.mockResolvedValueOnce(null);
 
-    const result = await assignTicket(1, 5);
+    const result = await assignTicket(1, 5, 7);
 
     expect(result).toEqual({ ok: false, reason: 'assignee_not_found' });
   });
 
-  it('returns assignee_not_staff when assignee lacks staff/admin permission', async () => {
+  it('returns assignee_not_staff when assignee lacks the staff_inbox_manage permission', async () => {
     prismaMock.staffInboxConversation.findUnique.mockResolvedValueOnce({
       id: 1
     } as never);
@@ -1202,25 +1231,25 @@ describe('staffPm.assignTicket', () => {
       userRank: { permissions: { download: true } }
     } as never);
 
-    const result = await assignTicket(1, 5);
+    const result = await assignTicket(1, 5, 7);
 
     expect(result).toEqual({ ok: false, reason: 'assignee_not_staff' });
   });
 });
 
-// ─── staffPm.bulkResolve ──────────────────────────────────────────────────────
+// ─── staffInbox.bulkResolve ───────────────────────────────────────────────────
 
-describe('staffPm.bulkResolve', () => {
+describe('staffInbox.bulkResolve', () => {
   it('returns resolved: 0 when all tickets are already resolved', async () => {
     prismaMock.staffInboxConversation.findMany.mockResolvedValueOnce([]);
 
-    const result = await bulkResolve([1, 2, 3]);
+    const result = await bulkResolve([1, 2, 3], 7);
 
     expect(result).toEqual({ ok: true, resolved: 0 });
     expect(prismaMock.staffInboxConversation.updateMany).not.toHaveBeenCalled();
   });
 
-  it('resolves unresolved tickets and returns count', async () => {
+  it('resolves unresolved tickets, records the resolver, and audits', async () => {
     prismaMock.staffInboxConversation.findMany.mockResolvedValueOnce([
       { id: 1 },
       { id: 2 }
@@ -1228,10 +1257,25 @@ describe('staffPm.bulkResolve', () => {
     prismaMock.staffInboxConversation.updateMany.mockResolvedValueOnce({
       count: 2
     } as never);
+    prismaMock.auditLog.create.mockResolvedValueOnce({} as never);
 
-    const result = await bulkResolve([1, 2]);
+    const result = await bulkResolve([1, 2], 7);
 
     expect(result).toEqual({ ok: true, resolved: 2 });
+    // Reconcile: bulk resolve must attribute the resolver (scoreboard credit).
+    expect(prismaMock.staffInboxConversation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: 'Resolved', resolverId: 7 }
+      })
+    );
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 7,
+          action: 'staff_inbox.bulk_resolve'
+        })
+      })
+    );
   });
 });
 
