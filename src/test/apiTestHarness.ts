@@ -123,19 +123,7 @@ jest.mock('../modules/staffInbox', () => ({
   listResponses: jest.fn(),
   createResponse: jest.fn(),
   updateResponse: jest.fn(),
-  deleteResponse: jest.fn()
-}));
-
-jest.mock('../modules/staff', () => ({
-  getStaffList: jest.fn()
-}));
-
-jest.mock('../lib/mailer', () => ({
-  sendInviteEmail: jest.fn().mockResolvedValue(true),
-  sendRecoveryEmail: jest.fn().mockResolvedValue(true)
-}));
-
-jest.mock('../modules/staffPm', () => ({
+  deleteResponse: jest.fn(),
   createTicket: jest.fn(),
   listMyTickets: jest.fn(),
   listQueue: jest.fn(),
@@ -146,6 +134,15 @@ jest.mock('../modules/staffPm', () => ({
   unresolveTicket: jest.fn(),
   assignTicket: jest.fn(),
   bulkResolve: jest.fn()
+}));
+
+jest.mock('../modules/staff', () => ({
+  getStaffList: jest.fn()
+}));
+
+jest.mock('../lib/mailer', () => ({
+  sendInviteEmail: jest.fn().mockResolvedValue(true),
+  sendRecoveryEmail: jest.fn().mockResolvedValue(true)
 }));
 
 jest.mock('../modules/config', () => ({
@@ -308,7 +305,6 @@ const sanitize = jest.requireMock('../lib/sanitize') as {
 };
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
-import * as staffPmModule from '../modules/staffPm';
 import { makeUserRank } from './factories';
 export { makeUserRank } from './factories';
 
@@ -436,7 +432,6 @@ export const pmMock = pmModule as jest.Mocked<typeof pmModule>;
 export const staffInboxMock = staffInboxModule as jest.Mocked<
   typeof staffInboxModule
 >;
-export const staffPmMock = staffPmModule as jest.Mocked<typeof staffPmModule>;
 export const donorMock = donorModule as jest.Mocked<typeof donorModule>;
 
 export const setCurrentUserRankLevel = (level: number): void => {

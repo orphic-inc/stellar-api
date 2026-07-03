@@ -6,6 +6,7 @@ import {
   type ReportTargetType
 } from '@prisma/client';
 import type { ReportResolutionAction } from '../schemas/reports';
+import { audit } from '../lib/audit';
 
 const PAGE_SIZE = 25;
 
@@ -358,6 +359,7 @@ export async function claimReport(id: number, staffUserId: number) {
     where: { id },
     data: { status: 'Claimed', claimedById: staffUserId, claimedAt: new Date() }
   });
+  await audit(prisma, staffUserId, 'report.claim', 'Report', id);
   return { ok: true as const };
 }
 
@@ -376,6 +378,7 @@ export async function unclaimReport(id: number, staffUserId: number) {
     where: { id },
     data: { status: 'Open', claimedById: null, claimedAt: null }
   });
+  await audit(prisma, staffUserId, 'report.unclaim', 'Report', id);
   return { ok: true as const };
 }
 
@@ -410,6 +413,9 @@ export async function resolveReport(
       : { ok: false as const, reason: 'not_found' };
   }
 
+  await audit(prisma, staffUserId, 'report.resolve', 'Report', id, {
+    resolutionAction
+  });
   return { ok: true as const };
 }
 

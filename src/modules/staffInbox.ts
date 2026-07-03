@@ -4,67 +4,77 @@ import {
   type StaffInboxStatus,
   type StaffInboxResponse
 } from '@prisma/client';
+import {
+  authorRefSelect,
+  toAuthorRef,
+  toAuthorRefOrNull,
+  type AuthorRefRow
+} from './authorRef';
+import { hasPermission } from '../lib/rankPermissions';
+import { audit } from '../lib/audit';
 
 const PAGE_SIZE = 25;
 
-const userSelect = {
-  id: true,
-  username: true,
-  avatar: true
+const senderSelect = authorRefSelect;
+
+const ticketInclude = {
+  user: { select: senderSelect },
+  assignedUser: { select: senderSelect },
+  resolver: { select: senderSelect }
 } as const;
 
-export const staffTicketInclude = {
-  user: { select: userSelect },
-  assignedUser: { select: userSelect },
-  resolver: { select: userSelect },
-  messages: {
-    orderBy: { createdAt: 'desc' as const },
-    take: 1,
-    include: { sender: { select: userSelect } }
-  }
-} as const;
-
-export type StaffTicket = Prisma.StaffInboxConversationGetPayload<{
-  include: typeof staffTicketInclude;
-}>;
 export type StaffResponse = StaffInboxResponse;
 export type StaffMessage = Prisma.StaffInboxMessageGetPayload<{
-  include: { sender: { select: { id: true; username: true; avatar: true } } };
+  include: { sender: true };
 }>;
 
-export async function listStaffTickets(opts: {
-  page: number;
-  status: StaffInboxStatus | 'all';
-  assignedToMe: boolean;
-  staffUserId: number;
-}) {
-  const { page, status, assignedToMe, staffUserId } = opts;
+// Shapes a ticket's user/assignedUser/resolver/message-sender relations so the
+// donor sign + warning sign follow staff and members alike in the inbox
+// (#231), not just on their profile.
+const mapTicketMessage = <T extends { sender: AuthorRefRow }>(message: T) => ({
+  ...message,
+  sender: toAuthorRef(message.sender)
+});
 
-  const where: Prisma.StaffInboxConversationWhereInput = {};
-  if (status !== 'all') where.status = status;
-  if (assignedToMe) where.assignedUserId = staffUserId;
+const mapTicket = <
+  T extends {
+    user: AuthorRefRow;
+    assignedUser: AuthorRefRow | null;
+    resolver: AuthorRefRow | null;
+    messages?: Array<{ sender: AuthorRefRow } & Record<string, unknown>>;
+  }
+>(
+  ticket: T
+) => ({
+  ...ticket,
+  user: toAuthorRef(ticket.user),
+  assignedUser: toAuthorRefOrNull(ticket.assignedUser),
+  resolver: toAuthorRefOrNull(ticket.resolver),
+  ...(ticket.messages && { messages: ticket.messages.map(mapTicketMessage) })
+});
 
-  const [total, conversations] = await Promise.all([
-    prisma.staffInboxConversation.count({ where }),
-    prisma.staffInboxConversation.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: staffTicketInclude
-    })
-  ]);
-
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+export async function createTicket(
+  userId: number,
+  subject: string,
+  body: string
+) {
+  const ticket = await prisma.staffInboxConversation.create({
+    data: {
+      subject,
+      userId,
+      status: 'Unanswered',
+      messages: { create: { senderId: userId, body } }
+    },
+    include: {
+      ...ticketInclude,
+      messages: { include: { sender: { select: senderSelect } } }
+    }
+  });
+  return mapTicket(ticket);
 }
 
-export async function listMyTickets(
-  userId: number,
-  page: number,
-  isStaff: boolean
-) {
-  // Staff see tickets assigned to them; regular users see tickets they submitted.
-  const where = isStaff ? { assignedUserId: userId } : { userId };
+export async function listMyTickets(userId: number, page: number) {
+  const where = { userId };
   const [total, conversations] = await Promise.all([
     prisma.staffInboxConversation.count({ where }),
     prisma.staffInboxConversation.findMany({
@@ -73,76 +83,94 @@ export async function listMyTickets(
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        assignedUser: { select: userSelect },
+        ...ticketInclude,
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: { sender: { select: userSelect } }
+          include: { sender: { select: senderSelect } }
         }
       }
     })
   ]);
-
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapTicket)
+  };
 }
 
-export async function getStaffUnreadCount(): Promise<number> {
+export async function listQueue(opts: {
+  page: number;
+  status: StaffInboxStatus | 'all';
+  assignedToMe: boolean;
+  unassigned: boolean;
+  staffUserId: number;
+}) {
+  const { page, status, assignedToMe, unassigned, staffUserId } = opts;
+  const where = {
+    ...(status !== 'all' ? { status: status as StaffInboxStatus } : {}),
+    ...(assignedToMe ? { assignedUserId: staffUserId } : {}),
+    ...(unassigned ? { assignedUserId: null } : {})
+  };
+
+  const [total, conversations] = await Promise.all([
+    prisma.staffInboxConversation.count({ where }),
+    prisma.staffInboxConversation.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        ...ticketInclude,
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { sender: { select: senderSelect } }
+        }
+      }
+    })
+  ]);
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapTicket)
+  };
+}
+
+export async function getQueueCount(): Promise<number> {
   return prisma.staffInboxConversation.count({
     where: { status: { not: 'Resolved' } }
   });
 }
 
-export async function createTicket(
-  userId: number,
-  subject: string,
-  body: string
-) {
-  const conversation = await prisma.staffInboxConversation.create({
-    data: {
-      subject,
-      userId,
-      status: 'Unanswered',
-      messages: { create: { senderId: userId, body } }
-    },
-    include: {
-      user: { select: userSelect },
-      messages: { include: { sender: { select: userSelect } } }
-    }
-  });
-  return conversation;
-}
-
-export async function viewTicket(
-  id: number,
-  requesterId: number,
-  isStaff: boolean
-) {
-  const conversation = await prisma.staffInboxConversation.findUnique({
+export async function viewTicket(id: number, userId: number, isStaff: boolean) {
+  const ticket = await prisma.staffInboxConversation.findUnique({
     where: { id },
     include: {
-      user: { select: userSelect },
-      assignedUser: { select: userSelect },
-      resolver: { select: userSelect },
+      ...ticketInclude,
       messages: {
         orderBy: { createdAt: 'asc' },
-        include: { sender: { select: userSelect } }
+        include: { sender: { select: senderSelect } }
       }
     }
   });
-  if (!conversation) return { ok: false as const, reason: 'not_found' };
-  if (!isStaff && conversation.userId !== requesterId) {
-    return { ok: false as const, reason: 'forbidden' };
+  if (!ticket) return { ok: false as const, reason: 'not_found' };
+
+  // Non-owners who aren't staff must not learn the ticket exists.
+  if (!isStaff && ticket.userId !== userId) {
+    return { ok: false as const, reason: 'not_found' };
   }
 
-  // Mark read by user when they view their own ticket
-  if (!isStaff && !conversation.isReadByUser) {
+  if (!isStaff && !ticket.isReadByUser) {
     await prisma.staffInboxConversation.update({
       where: { id },
       data: { isReadByUser: true }
     });
   }
 
-  return { ok: true as const, conversation };
+  return { ok: true as const, ticket: mapTicket(ticket) };
 }
 
 export async function replyToTicket(
@@ -151,70 +179,37 @@ export async function replyToTicket(
   body: string,
   isStaff: boolean
 ) {
-  const conversation = await prisma.staffInboxConversation.findUnique({
+  const ticket = await prisma.staffInboxConversation.findUnique({
     where: { id },
     select: { userId: true, status: true }
   });
-  if (!conversation) return { ok: false as const, reason: 'not_found' };
-  if (!isStaff && conversation.userId !== senderId) {
-    return { ok: false as const, reason: 'forbidden' };
+  if (!ticket) return { ok: false as const, reason: 'not_found' };
+  // Mask non-owner access as not-found rather than forbidden (no existence leak).
+  if (!isStaff && ticket.userId !== senderId) {
+    return { ok: false as const, reason: 'not_found' };
   }
-  if (conversation.status === 'Resolved') {
+  if (ticket.status === 'Resolved') {
     return { ok: false as const, reason: 'resolved' };
   }
 
-  const newStatus: StaffInboxStatus = isStaff ? 'Open' : 'Unanswered';
-
-  const [message] = await prisma.$transaction([
-    prisma.staffInboxMessage.create({
+  const message = await prisma.$transaction(async (tx) => {
+    const msg = await tx.staffInboxMessage.create({
       data: { conversationId: id, senderId, body },
-      include: { sender: { select: userSelect } }
-    }),
-    prisma.staffInboxConversation.update({
+      include: { sender: { select: senderSelect } }
+    });
+    const newStatus: StaffInboxStatus = isStaff ? 'Open' : 'Unanswered';
+    await tx.staffInboxConversation.update({
       where: { id },
       data: {
         status: newStatus,
-        // When staff replies, user hasn't read it yet; when user replies, staff hasn't read it
+        // Staff reply → user hasn't read it yet; user reply → they have.
         isReadByUser: isStaff ? false : true
       }
-    })
-  ]);
-
-  return { ok: true as const, message };
-}
-
-export async function assignTicket(id: number, assignedUserId: number | null) {
-  const conversation = await prisma.staffInboxConversation.findUnique({
-    where: { id },
-    select: { id: true, status: true }
-  });
-  if (!conversation) return { ok: false as const, reason: 'not_found' };
-
-  // If assigning to a specific user, verify they exist and are staff
-  if (assignedUserId !== null) {
-    const assignee = await prisma.user.findUnique({
-      where: { id: assignedUserId },
-      select: { id: true, userRank: { select: { permissions: true } } }
     });
-    if (!assignee) return { ok: false as const, reason: 'assignee_not_found' };
-    const perms = (assignee.userRank.permissions ?? {}) as Record<
-      string,
-      boolean
-    >;
-    if (!perms['staff'] && !perms['admin']) {
-      return { ok: false as const, reason: 'assignee_not_staff' };
-    }
-  }
-
-  await prisma.staffInboxConversation.update({
-    where: { id },
-    data: {
-      assignedUserId,
-      status: 'Unanswered'
-    }
+    return msg;
   });
 
-  return { ok: true as const };
+  return { ok: true as const, message: mapTicketMessage(message) };
 }
 
 export async function resolveTicket(
@@ -222,15 +217,15 @@ export async function resolveTicket(
   resolverId: number,
   isStaff: boolean
 ) {
-  const conversation = await prisma.staffInboxConversation.findUnique({
+  const ticket = await prisma.staffInboxConversation.findUnique({
     where: { id },
     select: { userId: true, status: true }
   });
-  if (!conversation) return { ok: false as const, reason: 'not_found' };
-  if (!isStaff && conversation.userId !== resolverId) {
-    return { ok: false as const, reason: 'forbidden' };
+  if (!ticket) return { ok: false as const, reason: 'not_found' };
+  if (!isStaff && ticket.userId !== resolverId) {
+    return { ok: false as const, reason: 'not_found' };
   }
-  if (conversation.status === 'Resolved') {
+  if (ticket.status === 'Resolved') {
     return { ok: false as const, reason: 'already_resolved' };
   }
 
@@ -238,17 +233,23 @@ export async function resolveTicket(
     where: { id },
     data: { status: 'Resolved', resolverId }
   });
-
+  await audit(
+    prisma,
+    resolverId,
+    'staff_inbox.resolve',
+    'StaffInboxConversation',
+    id
+  );
   return { ok: true as const };
 }
 
-export async function unresolveTicket(id: number) {
-  const conversation = await prisma.staffInboxConversation.findUnique({
+export async function unresolveTicket(id: number, actorId: number) {
+  const ticket = await prisma.staffInboxConversation.findUnique({
     where: { id },
     select: { status: true }
   });
-  if (!conversation) return { ok: false as const, reason: 'not_found' };
-  if (conversation.status !== 'Resolved') {
+  if (!ticket) return { ok: false as const, reason: 'not_found' };
+  if (ticket.status !== 'Resolved') {
     return { ok: false as const, reason: 'not_resolved' };
   }
 
@@ -256,33 +257,88 @@ export async function unresolveTicket(id: number) {
     where: { id },
     data: { status: 'Unanswered', resolverId: null }
   });
-
+  await audit(
+    prisma,
+    actorId,
+    'staff_inbox.unresolve',
+    'StaffInboxConversation',
+    id
+  );
   return { ok: true as const };
 }
 
-export async function bulkResolveTickets(ids: number[], resolverId: number) {
-  const conversations = await prisma.staffInboxConversation.findMany({
+export async function assignTicket(
+  id: number,
+  assignedUserId: number | null,
+  actorId: number
+) {
+  const ticket = await prisma.staffInboxConversation.findUnique({
+    where: { id },
+    select: { id: true }
+  });
+  if (!ticket) return { ok: false as const, reason: 'not_found' };
+
+  if (assignedUserId !== null) {
+    const assignee = await prisma.user.findUnique({
+      where: { id: assignedUserId },
+      select: { id: true, userRank: { select: { permissions: true } } }
+    });
+    if (!assignee) return { ok: false as const, reason: 'assignee_not_found' };
+    // Gate on the granular permission (admin passes via hasPermission), never a
+    // named 'staff'/'admin' role — see ADR-0001.
+    const perms = (assignee.userRank?.permissions ?? {}) as Record<
+      string,
+      boolean
+    >;
+    if (!hasPermission(perms, 'staff_inbox_manage')) {
+      return { ok: false as const, reason: 'assignee_not_staff' };
+    }
+  }
+
+  // Assignment does not reset conversation status — a claimed ticket keeps its
+  // Open/Unanswered/Resolved state.
+  await prisma.staffInboxConversation.update({
+    where: { id },
+    data: { assignedUserId }
+  });
+  await audit(
+    prisma,
+    actorId,
+    'staff_inbox.assign',
+    'StaffInboxConversation',
+    id,
+    { assignedUserId }
+  );
+  return { ok: true as const };
+}
+
+export async function bulkResolve(ids: number[], resolverId: number) {
+  const tickets = await prisma.staffInboxConversation.findMany({
     where: { id: { in: ids }, status: { not: 'Resolved' } },
     select: { id: true }
   });
-
-  const resolveIds = conversations.map((c) => c.id);
+  const resolveIds = tickets.map((t) => t.id);
   if (resolveIds.length === 0) return { ok: true as const, resolved: 0 };
 
   await prisma.staffInboxConversation.updateMany({
     where: { id: { in: resolveIds } },
     data: { status: 'Resolved', resolverId }
   });
-
+  await audit(
+    prisma,
+    resolverId,
+    'staff_inbox.bulk_resolve',
+    'StaffInboxConversation',
+    undefined,
+    { ids: resolveIds }
+  );
   return { ok: true as const, resolved: resolveIds.length };
 }
 
-// Canned responses
+// ─── Canned responses ─────────────────────────────────────────────────────────
 
 export async function listResponses() {
-  return prisma.staffInboxResponse.findMany({
-    orderBy: { name: 'asc' }
-  });
+  return prisma.staffInboxResponse.findMany({ orderBy: { name: 'asc' } });
 }
 
 export async function createResponse(name: string, body: string) {

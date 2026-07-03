@@ -19,28 +19,24 @@ import {
 import {
   createResponseSchema,
   updateResponseSchema,
-  type CreateResponseInput,
-  type UpdateResponseInput
-} from '../../schemas/staffInbox';
-import {
   createTicketSchema,
   replySchema,
   assignSchema,
   queueQuerySchema,
   bulkResolveSchema,
+  type CreateResponseInput,
+  type UpdateResponseInput,
   type CreateTicketInput,
   type ReplyInput,
   type AssignInput,
   type QueueQueryInput,
   type BulkResolveInput
-} from '../../schemas/staffPm';
+} from '../../schemas/staffInbox';
 import {
   listResponses,
   createResponse,
   updateResponse,
-  deleteResponse
-} from '../../modules/staffInbox';
-import {
+  deleteResponse,
   createTicket,
   listMyTickets,
   listQueue,
@@ -51,7 +47,7 @@ import {
   unresolveTicket,
   assignTicket,
   bulkResolve
-} from '../../modules/staffPm';
+} from '../../modules/staffInbox';
 
 const router = express.Router();
 
@@ -187,9 +183,9 @@ router.post(
   '/bulk-resolve',
   ...requirePermission('staff_inbox_manage'),
   validate(bulkResolveSchema),
-  authHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { ids } = parsedBody<BulkResolveInput>(res);
-    const result = await bulkResolve(ids);
+    const result = await bulkResolve(ids, req.user.id);
     res.json(result);
   })
 );
@@ -226,9 +222,8 @@ router.post(
     );
     const result = await replyToTicket(id, req.user.id, body, isStaff);
     if (!result.ok) {
-      let status = 404;
-      if (result.reason === 'resolved') status = 422;
-      else if (result.reason === 'forbidden') status = 403;
+      // non-owner access is masked as not_found (404) upstream — no 'forbidden'.
+      const status = result.reason === 'resolved' ? 422 : 404;
       return res.status(status).json({ msg: result.reason });
     }
     res.status(201).json(result.message);
@@ -248,9 +243,8 @@ router.post(
     );
     const result = await resolveTicket(id, req.user.id, isStaff);
     if (!result.ok) {
-      let status = 404;
-      if (result.reason === 'already_resolved') status = 422;
-      else if (result.reason === 'forbidden') status = 403;
+      // non-owner access is masked as not_found (404) upstream — no 'forbidden'.
+      const status = result.reason === 'already_resolved' ? 422 : 404;
       return res.status(status).json({ msg: result.reason });
     }
     res.status(204).send();
@@ -262,9 +256,9 @@ router.post(
   '/tickets/:id/unresolve',
   ...requirePermission('staff_inbox_manage'),
   validateParams(ticketIdSchema),
-  authHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const result = await unresolveTicket(id);
+    const result = await unresolveTicket(id, req.user.id);
     if (!result.ok) {
       const status = result.reason === 'not_resolved' ? 422 : 404;
       return res.status(status).json({ msg: result.reason });
@@ -293,7 +287,7 @@ router.post(
       resolvedId = user.id;
     }
 
-    const result = await assignTicket(id, resolvedId);
+    const result = await assignTicket(id, resolvedId, req.user.id);
     if (!result.ok) {
       const status = result.reason === 'assignee_not_staff' ? 422 : 404;
       return res.status(status).json({ msg: result.reason });
