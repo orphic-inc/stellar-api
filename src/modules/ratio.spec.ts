@@ -20,6 +20,7 @@ import {
   getEligibleContributionBytes,
   getRatioStats
 } from './ratio';
+import { AppError } from '../lib/errors';
 
 const GiB = BigInt(1024 ** 3);
 
@@ -204,5 +205,15 @@ describe('getRatioStats', () => {
     expect(typeof stats.contributed).toBe('string');
     expect(typeof stats.consumed).toBe('string');
     expect(typeof stats.eligibleContributionBytes).toBe('string');
+  });
+
+  it('throws AppError(404) when the user is missing (#233)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue(null);
+
+    await expect(getRatioStats(1)).rejects.toThrow(AppError);
+    await expect(getRatioStats(1)).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'User not found'
+    });
   });
 });

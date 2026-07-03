@@ -1,5 +1,6 @@
 import { LinkHealthStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
 
 const GiB = BigInt(1024 ** 3);
 
@@ -100,7 +101,7 @@ export const getRatioStats = async (userId: number): Promise<RatioStats> => {
     where: { id: userId },
     select: { contributed: true, consumed: true }
   });
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError(404, 'User not found');
 
   const { contributed, consumed } = user;
   const eligibleBytes = await getEligibleContributionBytes(userId);
