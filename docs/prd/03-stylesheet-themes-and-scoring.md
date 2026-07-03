@@ -12,13 +12,13 @@ Stellar is an invite-only `/private/` community site. Users want to theme their 
 
 ## Stylesheet types
 
-| Type                                       | Meaning                                                                                                                                                                                                                                                       |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Built-in / site stylesheets**            | Seeded themes: `kuro`, `layer-cake`, `postmod`, `proton`, `sublime`. **Sublime = default/base + selectable + contest reference** (net-new authoring; reset target).                                                                                           |
-| **ExternalStylesheet**                     | A URL on the user's profile (`profile.externalStylesheet`).                                                                                                                                                                                                   |
-| **AuthorStylesheet / AuthorStylesheetUrl** | A user-authored `.scss`/`.css` saved for others to adopt. **Many per author** (cardinality decided 2026-06-13; rank-gated _count limit_ deferred). The author is a **StylesheetAuthor** — shorthand for any member who has authored one, not a distinct role. |
-| **CommunityStylesheet**                    | Community-scoped theme, set by that Community's Staff; rendered to any viewer on that community's pages. Slot deferred (TBD — tied to Contests / Community Toolbox).                                                                                          |
-| **Global SCSS/CSS reset flag**             | Per-injection boundary so a user sheet can't leak into app chrome (see ADR-0003).                                                                                                                                                                             |
+| Type                            | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Built-in / site stylesheets** | Seeded themes: `kuro`, `layer-cake`, `postmod`, `proton`, `sublime`. **Sublime = default/base + selectable + contest reference** (net-new authoring; reset target).                                                                                                                                                                                                                                                                                                                                             |
+| **ExternalStylesheet**          | An `https:` URL on the user's profile (`profile.externalStylesheet`) — the **Personal** source. Serves CSS the browser consumes directly; never fetched, compiled, or transformed by us (ADR-0024).                                                                                                                                                                                                                                                                                                             |
+| **AuthorStylesheet**            | A user-authored **`.css`** saved for others to adopt — the **Registry** source. **Many per author** (cardinality decided 2026-06-13; rank-gated _count limit_ = **registry spaces**, deferred #146). Stored as sanitized `source`, delivered as `text/css` via the API `/css` route (ADR-0024). The author is a **StylesheetAuthor** — shorthand for any member who has authored one, not a distinct role. (`AuthorStylesheetUrl` as a distinct URL-typed entry is **dropped** — Personal covers the URL case.) |
+| **CommunityStylesheet**         | Community-scoped theme, set by that Community's Staff; rendered to any viewer on that community's pages. Slot deferred (TBD — tied to Contests / Community Toolbox).                                                                                                                                                                                                                                                                                                                                            |
+| **Injection boundary**          | Store-time `cssSanitize` (API) + inject-time CSP (UI) — the code-injection guard on user sheets (ADR-0003). The old global CSS-reset / chrome-lock flag (Arm 1) was **dropped** in the 2026-06-23 amendment: CSS cannot lock the cascade against `!important`, so themes may restyle chrome freely.                                                                                                                                                                                                             |
 
 ### Slots & cascade (decided 2026-06-13)
 
@@ -48,7 +48,7 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 - Base for setting an AuthorStylesheet to a site default/alternative: **0.1**
 - **×2** when non-default
-- **×3** when a custom ExternalStylesheet / non-self AuthorStylesheet(Url)
+- **×3** when a custom ExternalStylesheet / non-self AuthorStylesheet
 - **×5** when it's the user's **own** authored stylesheet
 - A user on a modified stylesheet: a **+1** engagement bonus → to Site (or admin), and to the **Author** if a custom InjectedStylesheet.
 
@@ -64,7 +64,7 @@ Stylesheet activity accrues into the **CRS** along three recipients:
 
 Lives in `scoreStylesheetTier` (`stylesheetScore.ts`), wired into the `stylesheet` dimension in `reputation.ts`.
 
-**External disposition (decided, #84).** A `profile.externalStylesheet` that resolves to an author is scored as an **AuthorStylesheet** (credit the author). An **authorless** external `.css/.scss` earns the _user_ the customization reward but **nothing to the site** — it's a **prune/investigate** candidate, or, if multiple users share it, a hidden **Community stylesheet**, both handled at the **permission / link-health layer**, not scored here.
+**External disposition (decided, #84).** A `profile.externalStylesheet` that resolves to an author is scored as an **AuthorStylesheet** (credit the author). An **authorless** external `.css` earns the _user_ the customization reward but **nothing to the site** — it's a **prune/investigate** candidate, or, if multiple users share it, a hidden **Community stylesheet**, both handled at the **permission / link-health layer**, not scored here.
 
 **Author** (incentive to design good themes): accrues when others adopt their AuthorStylesheet (exact split TBD with Contests / CommunityStylesheets). **Self-use is not an adoption** — using your own sheet pays the user reward (×5) only, no author bonus (anti-farm, #84).
 
@@ -141,12 +141,13 @@ First testable slices (much of the substrate already exists):
 
    **Shipped since:** the **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1 into the Friends dimension) is now wired — see the §"Friends × Stylesheet" decision above ([#147](https://github.com/orphic-inc/stellar-api/issues/147) / PR #162).
 
-5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui asserting the global reset boundary.
+5. **Injection isolation** (ADR-0003) — StylesheetInjector spec in stellar-ui. The boundary is **code-injection only** (store-time `cssSanitize` + prod CSP); the ADR-0003 Arm 1 protected-chrome/global-reset layer was **dropped** (2026-06-23 amendment — CSS cannot lock the cascade against `!important`).
 
 ## Open questions
 
-- AuthorStylesheetUrl storage shape (URL vs stored file) — pending ExternalStylesheet + global-reset findings.
 - **Dead-external penalty magnitude** — value TBD (#122).
 - IRC scoring belongs to PRD-02 — confirm it's not duplicated here.
 
-**Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed for the stylesheet-dimension author bonus (the `/private` invite+report model covers it) · **accrual model = computed-on-read, with adoption events logged to a `CRS_*` ledger** ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1, once-per-pair + per-user cap) · **tiering curve** (#121: back-loaded marginal table over distinct adoptions, cap 6 — table above).
+**Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed for the stylesheet-dimension author bonus (the `/private` invite+report model covers it) · **accrual model = computed-on-read, with adoption events logged to a `CRS_*` ledger** ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1, once-per-pair + per-user cap) · **tiering curve** (#121: back-loaded marginal table over distinct adoptions, cap 6 — table above) · **AuthorStylesheet storage shape** ([ADR-0024](../adr/0024-stylesheet-delivery-contract.md): stored sanitized `source`, delivered as `text/css` via `GET /api/stylesheet/author-stylesheet/:id/css`; a distinct URL-typed `AuthorStylesheetUrl` entry is dropped — Personal covers the URL case) · **user contract = `.css` only** (SCSS rejected as user input; ADR-0024) · **Personal/Registry radio** (the Site Stylesheet slot is one explicit source; selecting one clears the other, enforced server-side — retires the "URL overrides" implicit precedence).
+
+**Radio UAT flow (ADR-0024).** Settings shows the Site Stylesheet slot as a two-way radio: **Personal** (`externalStylesheet` https URL) or **Registry** (an authored/adopted `activeAuthorStylesheetId`). Selecting Personal and saving nulls the pointer; selecting Registry and saving nulls the URL. Injector precedence: explicit slot value → `siteAppearance` built-in → Sublime default (no stacking).

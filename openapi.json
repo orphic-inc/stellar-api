@@ -343,6 +343,10 @@
             "type": "string",
             "nullable": true
           },
+          "activeAuthorStylesheetId": {
+            "type": "number",
+            "nullable": true
+          },
           "styledTooltips": {
             "type": "boolean"
           },
@@ -6902,6 +6906,12 @@
                         ]
                       }
                     ]
+                  },
+                  "activeAuthorStylesheetId": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "exclusiveMinimum": true
                   },
                   "styledTooltips": {
                     "type": "boolean"

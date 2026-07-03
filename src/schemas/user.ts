@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { externalStylesheetUrl } from './stylesheet';
 
 export const adminCreateUserSchema = z.object({
   username: z.string().min(1, 'Username is required').max(32),
@@ -9,7 +10,7 @@ export const adminCreateUserSchema = z.object({
 
 export const userSettingsSchema = z.object({
   siteAppearance: z.string().optional(),
-  externalStylesheet: z.string().url().optional().or(z.literal('')),
+  externalStylesheet: externalStylesheetUrl,
   styledTooltips: z.boolean().optional(),
   paranoia: z.coerce.number().int().min(0).max(3).optional(),
   avatar: z.string().optional(),

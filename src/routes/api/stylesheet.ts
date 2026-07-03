@@ -27,6 +27,7 @@ import {
   createAuthorStylesheet,
   listAuthorStylesheets,
   getAuthorStylesheetById,
+  getAuthorStylesheetCss,
   adoptAuthorStylesheet
 } from '../../modules/authorStylesheet';
 import { prisma } from '../../lib/prisma';
@@ -77,6 +78,32 @@ router.get(
       return;
     }
     res.json(sheet);
+  })
+);
+
+// GET /api/stylesheet/author-stylesheet/:id/css — deliver the stored (already
+// store-time-sanitized, ADR-0003 Arm 2) source as CSS the browser links. This is
+// the *only* route a registry sheet leaves by as a stylesheet payload (ADR-0024
+// §1); the injector links it exactly as Personal links an external URL, so the
+// ADR-0003 "href, never CSS text" boundary stays one-shaped.
+router.get(
+  '/author-stylesheet/:id/css',
+  requireAuth,
+  validateParams(stylesheetIdParamsSchema),
+  authHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const sheet = await getAuthorStylesheetCss(id);
+    if (!sheet) {
+      res.status(404).json({ msg: 'Author stylesheet not found' });
+      return;
+    }
+    // Sheets are mutable (authors edit in place) — revalidate rather than cache.
+    // nosniff: this origin serves user-authored bytes; pin the type so a browser
+    // can't be talked into interpreting them as anything but CSS (no helmet here).
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(sheet.source);
   })
 );
 

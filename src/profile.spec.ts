@@ -140,6 +140,44 @@ describe('PUT /api/profile/me', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('accepts an https external stylesheet URL', async () => {
+    const res = await request(app)
+      .put('/api/profile/me')
+      .send({ externalStylesheet: 'https://cdn.example.com/theme.css' });
+
+    expect(res.status).toBe(200);
+    expect(updateProfileMock).toHaveBeenCalledWith(7, {
+      externalStylesheet: 'https://cdn.example.com/theme.css'
+    });
+  });
+
+  it.each([
+    ['http', 'http://cdn.example.com/theme.css'],
+    ['ftp', 'ftp://cdn.example.com/theme.css'],
+    ['javascript', 'javascript:alert(1)']
+  ])(
+    'rejects a non-https (%s) external stylesheet URL (400)',
+    async (_s, url) => {
+      const res = await request(app)
+        .put('/api/profile/me')
+        .send({ externalStylesheet: url });
+
+      expect(res.status).toBe(400);
+      expect(updateProfileMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('accepts an empty string to clear the external stylesheet', async () => {
+    const res = await request(app)
+      .put('/api/profile/me')
+      .send({ externalStylesheet: '' });
+
+    expect(res.status).toBe(200);
+    expect(updateProfileMock).toHaveBeenCalledWith(7, {
+      externalStylesheet: ''
+    });
+  });
 });
 
 describe('DELETE /api/profile', () => {

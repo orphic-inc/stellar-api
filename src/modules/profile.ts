@@ -5,6 +5,7 @@ import type {
   StaffInboxStatus
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { parseBBCode } from '../lib/bbcode';
@@ -38,6 +39,7 @@ type UserSettingsView = {
   id: number;
   siteAppearance: string;
   externalStylesheet: string | null;
+  activeAuthorStylesheetId: number | null;
   styledTooltips: boolean;
   paranoia: number;
   notificationMethod: NotificationMethod;
@@ -217,6 +219,9 @@ const PROFILE_BASE_SELECT = {
       id: true,
       siteAppearance: true,
       externalStylesheet: true,
+      // The Registry source pointer (ADR-0024 §4): the two sources are the two
+      // arms of one radio, so the pointer travels the contract next to the URL.
+      activeAuthorStylesheetId: true,
       styledTooltips: true,
       paranoia: true,
       notificationMethod: true,
@@ -906,6 +911,7 @@ const buildProfileView = async (
           id: settings.id,
           siteAppearance: settings.siteAppearance,
           externalStylesheet: settings.externalStylesheet,
+          activeAuthorStylesheetId: settings.activeAuthorStylesheetId,
           styledTooltips: settings.styledTooltips,
           paranoia: settings.paranoia,
           notificationMethod: settings.notificationMethod,
@@ -999,6 +1005,7 @@ export const updateProfile = async (
     profileInfo?: string;
     siteAppearance?: string;
     externalStylesheet?: string;
+    activeAuthorStylesheetId?: number | null;
     styledTooltips?: boolean;
     paranoia?: number;
     notificationMethod?: NotificationMethod;
@@ -1014,6 +1021,42 @@ export const updateProfile = async (
     select: { profileId: true, userSettingsId: true }
   });
   if (!user) return null;
+
+  // Site Stylesheet radio (ADR-0024 §4): Personal (external URL) and Registry
+  // (author-sheet pointer) are two arms of one slot. Selecting one clears the
+  // other, and both-at-once is a contract violation a radio UI can't produce but
+  // a raw API client could — so reject it rather than pick a silent winner.
+  const settingExternal =
+    data.externalStylesheet !== undefined && data.externalStylesheet !== '';
+  const settingPointer =
+    data.activeAuthorStylesheetId !== undefined &&
+    data.activeAuthorStylesheetId !== null;
+  if (settingExternal && settingPointer) {
+    throw new AppError(
+      400,
+      'Choose one Site Stylesheet source — an external URL or a registry stylesheet, not both.'
+    );
+  }
+  if (settingPointer) {
+    // FK would reject a bad id as a raw P2003 → 500; surface it as a clean 400.
+    const exists = await prisma.authorStylesheet.findUnique({
+      where: { id: data.activeAuthorStylesheetId! },
+      select: { id: true }
+    });
+    if (!exists) throw new AppError(400, 'Author stylesheet not found');
+  }
+  const stylesheetSlot: {
+    externalStylesheet?: string | null;
+    activeAuthorStylesheetId?: number | null;
+  } = {};
+  if (data.externalStylesheet !== undefined) {
+    stylesheetSlot.externalStylesheet = data.externalStylesheet || null;
+    if (settingExternal) stylesheetSlot.activeAuthorStylesheetId = null;
+  }
+  if (data.activeAuthorStylesheetId !== undefined) {
+    stylesheetSlot.activeAuthorStylesheetId = data.activeAuthorStylesheetId;
+    if (settingPointer) stylesheetSlot.externalStylesheet = null;
+  }
 
   await prisma.$transaction([
     prisma.profile.update({
@@ -1045,9 +1088,7 @@ export const updateProfile = async (
         ...(data.siteAppearance !== undefined && {
           siteAppearance: data.siteAppearance
         }),
-        ...(data.externalStylesheet !== undefined && {
-          externalStylesheet: data.externalStylesheet || null
-        }),
+        ...stylesheetSlot,
         ...(data.styledTooltips !== undefined && {
           styledTooltips: data.styledTooltips
         }),

@@ -345,6 +345,10 @@ const UserSettings = registry.register(
     id: z.number(),
     siteAppearance: z.string(),
     externalStylesheet: z.string().nullable().optional(),
+    // Registry source pointer — the other arm of the Site Stylesheet radio
+    // (ADR-0024 §4). Non-null ⇒ an adopted/authored sheet is active; mutually
+    // exclusive with externalStylesheet.
+    activeAuthorStylesheetId: z.number().nullable().optional(),
     styledTooltips: z.boolean(),
     paranoia: z.number(),
     notificationMethod: z.enum([

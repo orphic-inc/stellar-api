@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { externalStylesheetUrl } from './stylesheet';
 
 export const profileUpdateSchema = z.object({
   avatar: z.string().url().optional().or(z.literal('')),
@@ -6,7 +7,12 @@ export const profileUpdateSchema = z.object({
   profileTitle: z.string().max(128).optional(),
   profileInfo: z.string().max(10000).optional(),
   siteAppearance: z.string().optional(),
-  externalStylesheet: z.string().url().optional().or(z.literal('')),
+  externalStylesheet: externalStylesheetUrl,
+  // The Registry arm of the Site Stylesheet radio (ADR-0024 §4). Nullable so the
+  // UI can explicitly clear it (selecting Personal); a positive id points at an
+  // authored/adopted sheet. Mutual exclusion with externalStylesheet is enforced
+  // server-side in updateProfile, not here — it spans two fields' runtime values.
+  activeAuthorStylesheetId: z.number().int().positive().nullable().optional(),
   styledTooltips: z.boolean().optional(),
   paranoia: z.coerce.number().int().min(0).max(3).optional(),
   notificationMethod: z
