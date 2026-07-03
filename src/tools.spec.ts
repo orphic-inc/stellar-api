@@ -378,6 +378,25 @@ const dupPairError = () =>
     clientVersion: 'test'
   });
 
+// Rank #1 → #2 with levels 100 → 150, nothing on the ladder between them —
+// the "valid adjacent pair" fixture most tests build on.
+const mockAdjacentRankPair = (
+  fromLevel = 100,
+  toLevel = 150,
+  betweenLevels: number[] = []
+) => {
+  prismaMock.userRank.findUnique.mockImplementation(((args: {
+    where: { id?: number };
+  }) => {
+    if (args.where.id === 1) return Promise.resolve({ level: fromLevel });
+    if (args.where.id === 2) return Promise.resolve({ level: toLevel });
+    return Promise.resolve(null);
+  }) as never);
+  prismaMock.userRank.findMany.mockResolvedValue(
+    betweenLevels.map((level) => ({ level })) as never
+  );
+};
+
 describe('GET /api/tools/promotion-rules', () => {
   beforeEach(() => {
     setRankPermissionsManager();
@@ -438,7 +457,7 @@ describe('POST /api/tools/promotion-rules', () => {
   });
 
   it('creates a rule and returns 201 with string minContributed', async () => {
-    prismaMock.userRank.count.mockResolvedValue(2);
+    mockAdjacentRankPair();
     prismaMock.rankPromotionRule.create.mockResolvedValue(
       makePromotionRule() as never
     );
@@ -453,7 +472,7 @@ describe('POST /api/tools/promotion-rules', () => {
   });
 
   it('returns 422 when a referenced rank does not exist', async () => {
-    prismaMock.userRank.count.mockResolvedValue(1);
+    prismaMock.userRank.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
       .post('/api/tools/promotion-rules')
@@ -470,8 +489,30 @@ describe('POST /api/tools/promotion-rules', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 422 when toRank is not a higher level than fromRank', async () => {
+    mockAdjacentRankPair(150, 100); // toRank (100) below fromRank (150)
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 2 });
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toMatch(/adjacent/);
+  });
+
+  it('returns 422 when a rank sits between fromRank and toRank on the ladder', async () => {
+    mockAdjacentRankPair(100, 200, [150]); // skips the 150 rung
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 2 });
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toMatch(/adjacent/);
+  });
+
   it('returns 409 on a duplicate rank pair', async () => {
-    prismaMock.userRank.count.mockResolvedValue(2);
+    mockAdjacentRankPair();
     prismaMock.rankPromotionRule.create.mockRejectedValue(dupPairError());
 
     const res = await request(app)
@@ -512,6 +553,37 @@ describe('PUT /api/tools/promotion-rules/:id', () => {
       .send({ enabled: false });
 
     expect(res.status).toBe(404);
+  });
+
+  it('re-validates adjacency when toRankId changes', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(
+      makePromotionRule() as never
+    );
+    mockAdjacentRankPair(100, 200, [150]); // skips the 150 rung
+
+    const res = await request(app)
+      .put('/api/tools/promotion-rules/1')
+      .send({ toRankId: 2 });
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toMatch(/adjacent/);
+  });
+
+  it('skips the adjacency check when fromRankId/toRankId are untouched', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue(
+      makePromotionRule() as never
+    );
+    prismaMock.rankPromotionRule.update.mockResolvedValue(
+      makePromotionRule({ enabled: false }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .put('/api/tools/promotion-rules/1')
+      .send({ enabled: false });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.userRank.findUnique).not.toHaveBeenCalled();
   });
 });
 

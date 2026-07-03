@@ -200,3 +200,18 @@ export const evaluateRankChange = (
 
   return stay(outgoing ? 'criteria not yet met' : 'top of the auto ladder');
 };
+
+/**
+ * Guards RankPromotionRule admin CRUD (tools.ts, #170): a rule must step to the
+ * very next rung by level, with nothing else on the ladder in between. Without
+ * this, two rules could both claim the same fromRankId — evaluateRankChange's
+ * `rules.find` takes whichever one Prisma returns first, an unordered query
+ * result — silently dropping coverage instead of erroring.
+ */
+export const isAdjacentPromotionStep = (
+  fromLevel: number,
+  toLevel: number,
+  otherLadderLevels: number[]
+): boolean =>
+  toLevel > fromLevel &&
+  !otherLadderLevels.some((level) => level > fromLevel && level < toLevel);

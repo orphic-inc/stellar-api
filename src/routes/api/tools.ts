@@ -31,6 +31,7 @@ import {
   type CreateStaffGroupInput,
   type UpdateStaffGroupInput
 } from '../../schemas/staff';
+import { isAdjacentPromotionStep } from '../../modules/rankProgression';
 
 const router = express.Router();
 
@@ -353,6 +354,48 @@ const promotionRuleInclude = {
   toRank: { select: { name: true } }
 } as const;
 
+/**
+ * Existence + adjacency guard shared by create/update. Returns an error
+ * message to surface as a 422, or null when the pair is valid. Adjacency is
+ * scoped to the primary ladder (secondary ranks like Donor/VIP overlay tags
+ * don't participate in auto-progression — see rankProgressionJob.loadLadder).
+ */
+async function validatePromotionRulePair(
+  fromRankId: number,
+  toRankId: number
+): Promise<string | null> {
+  const [fromRank, toRank] = await Promise.all([
+    prisma.userRank.findUnique({
+      where: { id: fromRankId },
+      select: { level: true }
+    }),
+    prisma.userRank.findUnique({
+      where: { id: toRankId },
+      select: { level: true }
+    })
+  ]);
+  if (!fromRank || !toRank) return 'fromRank or toRank does not exist';
+
+  const ladderLevels = await prisma.userRank.findMany({
+    where: {
+      secondary: false,
+      id: { notIn: [fromRankId, toRankId] }
+    },
+    select: { level: true }
+  });
+
+  if (
+    !isAdjacentPromotionStep(
+      fromRank.level,
+      toRank.level,
+      ladderLevels.map((r) => r.level)
+    )
+  ) {
+    return 'fromRank and toRank must be adjacent rungs on the ladder (toRank the very next level up, nothing in between)';
+  }
+  return null;
+}
+
 // GET /api/tools/promotion-rules — list all promotion rules
 router.get(
   '/promotion-rules',
@@ -390,12 +433,11 @@ router.post(
   authHandler(async (req, res) => {
     const data = parsedBody<CreatePromotionRuleInput>(res);
 
-    const rankCount = await prisma.userRank.count({
-      where: { id: { in: [data.fromRankId, data.toRankId] } }
-    });
-    if (rankCount !== 2) {
-      return res.status(422).json({ msg: 'fromRank or toRank does not exist' });
-    }
+    const pairError = await validatePromotionRulePair(
+      data.fromRankId,
+      data.toRankId
+    );
+    if (pairError) return res.status(422).json({ msg: pairError });
 
     try {
       const rule = await prisma.rankPromotionRule.create({
@@ -453,18 +495,12 @@ router.put(
 
     const body = parsedBody<UpdatePromotionRuleInput>(res);
 
-    const rankIds = [body.fromRankId, body.toRankId].filter(
-      (v): v is number => v !== undefined
-    );
-    if (rankIds.length > 0) {
-      const rankCount = await prisma.userRank.count({
-        where: { id: { in: rankIds } }
-      });
-      if (rankCount !== rankIds.length) {
-        return res
-          .status(422)
-          .json({ msg: 'fromRank or toRank does not exist' });
-      }
+    if (body.fromRankId !== undefined || body.toRankId !== undefined) {
+      const pairError = await validatePromotionRulePair(
+        body.fromRankId ?? existing.fromRankId,
+        body.toRankId ?? existing.toRankId
+      );
+      if (pairError) return res.status(422).json({ msg: pairError });
     }
 
     try {

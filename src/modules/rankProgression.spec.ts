@@ -6,6 +6,7 @@
  */
 import {
   evaluateRankChange,
+  isAdjacentPromotionStep,
   DEFAULT_RANKS,
   RankProgressionInput
 } from './rankProgression';
@@ -187,5 +188,26 @@ describe('evaluateRankChange — guards', () => {
       maxed({ currentRankId: rankId('Staff') })
     );
     expect(result.direction).toBe('none');
+  });
+});
+
+// ─── isAdjacentPromotionStep (#170 admin CRUD guard) ────────────────────────────
+
+describe('isAdjacentPromotionStep', () => {
+  it('accepts a toRank one rung above fromRank with nothing between', () => {
+    expect(isAdjacentPromotionStep(100, 150, [200, 300])).toBe(true);
+  });
+
+  it('rejects a toRank at or below fromRank', () => {
+    expect(isAdjacentPromotionStep(150, 150, [])).toBe(false);
+    expect(isAdjacentPromotionStep(150, 100, [])).toBe(false);
+  });
+
+  it('rejects a step that skips a rung on the ladder', () => {
+    expect(isAdjacentPromotionStep(100, 200, [150])).toBe(false);
+  });
+
+  it('ignores rungs outside the (fromLevel, toLevel) window', () => {
+    expect(isAdjacentPromotionStep(150, 200, [100, 300])).toBe(true);
   });
 });
