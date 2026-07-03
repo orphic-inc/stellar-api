@@ -37,16 +37,42 @@ export const createAuthorStylesheet = (
     }
   });
 
-/** List an author's stylesheets, oldest first. */
+/**
+ * List an author's stylesheets, oldest first — **metadata only** (ADR-0024 §1).
+ * `source` never rides a list payload; it is delivered as `text/css` through the
+ * per-id `/css` route so there is exactly one path a stored sheet leaves by.
+ */
 export const listAuthorStylesheets = (authorId: number) =>
   prisma.authorStylesheet.findMany({
     where: { authorId },
-    orderBy: { createdAt: 'asc' }
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      authorId: true,
+      name: true,
+      createdAt: true,
+      updatedAt: true
+    }
   });
 
-/** Read a single AuthorStylesheet by its id, or null if it does not exist. */
+/**
+ * Read a single AuthorStylesheet by its id, or null if it does not exist.
+ * Returns `source` — this is the edit-path read (author + staff, ADR-0024 §1),
+ * not the browser delivery path.
+ */
 export const getAuthorStylesheetById = (id: number) =>
   prisma.authorStylesheet.findUnique({ where: { id } });
+
+/**
+ * Read just the sanitized `source` for CSS delivery (ADR-0024 §1). Kept lean —
+ * the `/css` route serves the body verbatim as `text/css`, so nothing else is
+ * selected. Null if the sheet does not exist.
+ */
+export const getAuthorStylesheetCss = (id: number) =>
+  prisma.authorStylesheet.findUnique({
+    where: { id },
+    select: { source: true }
+  });
 
 export interface AdoptionResult {
   /** The adopted stylesheet (now in the adopter's Site Stylesheet slot). */

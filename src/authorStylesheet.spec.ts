@@ -71,6 +71,22 @@ describe('GET /api/stylesheet/author/:userId', () => {
     );
   });
 
+  it('lists metadata only — source never rides a list payload (ADR-0024 §1)', async () => {
+    prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+    await request(app).get('/api/stylesheet/author/5');
+    const call = prismaMock.authorStylesheet.findMany.mock.calls[0][0] as {
+      select: Record<string, boolean>;
+    };
+    expect(call.select).toEqual({
+      id: true,
+      authorId: true,
+      name: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    expect(call.select.source).toBeUndefined();
+  });
+
   it('returns an empty list for an author with no stylesheets', async () => {
     prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
     const res = await request(app).get('/api/stylesheet/author/999');
@@ -109,6 +125,44 @@ describe('GET /api/stylesheet/author-stylesheet/:id', () => {
     await request(app).get('/api/stylesheet/author-stylesheet/1');
     // The site-stylesheet /:id handler must not have run.
     expect(prismaMock.stylesheet.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+// ─── GET /api/stylesheet/author-stylesheet/:id/css ────────────────────────────
+
+describe('GET /api/stylesheet/author-stylesheet/:id/css', () => {
+  it('delivers the stored source as text/css with revalidate + nosniff', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue({
+      source: 'body { background: #000; }'
+    } as never);
+
+    const res = await request(app).get(
+      '/api/stylesheet/author-stylesheet/1/css'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/css/);
+    expect(res.headers['cache-control']).toBe('no-cache');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.text).toBe('body { background: #000; }');
+  });
+
+  it('selects only source — the delivery read never over-fetches', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue({
+      source: 'a{}'
+    } as never);
+    await request(app).get('/api/stylesheet/author-stylesheet/1/css');
+    expect(prismaMock.authorStylesheet.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ select: { source: true } })
+    );
+  });
+
+  it('404s when the stylesheet does not exist', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+    const res = await request(app).get(
+      '/api/stylesheet/author-stylesheet/999/css'
+    );
+    expect(res.status).toBe(404);
   });
 });
 
