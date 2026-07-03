@@ -6,6 +6,18 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Registry stylesheet CSS delivery** — `GET /api/stylesheet/author-stylesheet/:id/css` serves an adopted author sheet's stored, sanitized source as `text/css` (no-cache, nosniff), so the UI injector can link it like an external URL [ADR-0024, PR #256]. OpenAPI path registered [PR #257].
+
+### Changed
+
+- **Site Stylesheet slot is one explicit source** — Personal (external URL) and Registry (`activeAuthorStylesheetId`) are mutually exclusive; selecting one clears the other, enforced server-side on the profile write. The pointer joins the profile contract; `externalStylesheet` is tightened to `https:`-only [ADR-0024, PR #256].
+
+### Docs
+
+- **ADR-0024** — stylesheet delivery contract (URL vs stored-source registry serving); PRD-03 amended (`.css`-only, storage shape closed, "registry spaces" naming); superseded ADR-0003 Arm-1 comments corrected [PR #256].
+
 ## [0.6.1] — 2026-06-25
 
 A 0.6.x increment consolidating the post-0.6.0 work: a new rip-log scorer, the running-version endpoint, and the latest CRS dimension tuning.
