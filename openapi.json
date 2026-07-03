@@ -8105,6 +8105,45 @@
         }
       }
     },
+    "/stylesheet/author-stylesheet/{id}/css": {
+      "get": {
+        "tags": [
+          "Stylesheets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored, sanitized stylesheet source as CSS",
+            "content": {
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/stylesheet": {
       "get": {
         "tags": [

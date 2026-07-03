@@ -1754,6 +1754,25 @@ registry.registerPath({
   }
 });
 
+// The registry sheet's CSS delivery route (ADR-0024 §1) — the injector links
+// this exactly as Personal links an external URL. Body is text/css, not JSON.
+registry.registerPath({
+  method: 'get',
+  path: '/stylesheet/author-stylesheet/{id}/css',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'The stored, sanitized stylesheet source as CSS',
+      content: { 'text/css': { schema: z.string() } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/stylesheet',
