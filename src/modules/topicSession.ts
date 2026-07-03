@@ -8,6 +8,7 @@ import {
   trashTopic as forumTrashTopic,
   castVote
 } from './forum';
+import { authorRefSelect, toAuthorRefOrNull } from './authorRef';
 import type { PageParams } from '../lib/pagination';
 
 // ─── Actor ───────────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ type TopicSessionReadState = {
 // ─── Post serialization (mirrors forumPost.ts) ─────────────────────────────
 
 const publicPostInclude = {
-  author: { select: { id: true, username: true, avatar: true } },
+  author: { select: authorRefSelect },
   edits: {
     orderBy: { editedAt: 'desc' as const },
     take: 1,
@@ -58,6 +59,7 @@ type RawPost = Awaited<
 
 const serializePost = (post: RawPost) => ({
   ...post,
+  author: toAuthorRefOrNull(post.author),
   ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
   edits: undefined
 });
@@ -97,13 +99,14 @@ export const getTopicSession = async (
   const topic = await prisma.forumTopic.findFirst({
     where: { id: topicId, forumId, deletedAt: null },
     include: {
-      author: { select: { id: true, username: true, avatar: true } },
+      author: { select: authorRefSelect },
       notes: {
         include: { author: { select: { id: true, username: true } } }
       }
     }
   });
   if (!topic) throw new AppError(404, 'Topic not found');
+  const topicWithAuthor = { ...topic, author: toAuthorRefOrNull(topic.author) };
 
   // Posts, poll, and subscription — all parallel
   const [posts, total, poll, subscription] = await Promise.all([
@@ -162,7 +165,7 @@ export const getTopicSession = async (
       forumCategoryId: forum.forumCategoryId,
       forumCategory: forum.forumCategory
     },
-    topic,
+    topic: topicWithAuthor,
     posts: {
       data: serializedPosts,
       meta: {

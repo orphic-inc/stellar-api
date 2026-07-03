@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
+import { makeAuthorRefRow } from './test/factories';
 
 const makePost = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -14,7 +15,7 @@ const makePost = (overrides: Record<string, unknown> = {}) => ({
   tags: ['jazz', 'history'],
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
-  user: { id: 7, username: 'testuser', avatar: null },
+  user: makeAuthorRefRow(),
   comments: [],
   ...overrides
 });
@@ -25,7 +26,7 @@ const makePostComment = (overrides: Record<string, unknown> = {}) => ({
   userId: 7,
   text: 'Great post!',
   createdAt: new Date('2026-01-01'),
-  user: { id: 7, username: 'testuser', avatar: null },
+  user: makeAuthorRefRow(),
   ...overrides
 });
 
@@ -49,6 +50,49 @@ describe('GET /api/posts', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
+  });
+
+  // #231 — post and comment authors carry the donor sign + warning sign.
+  it('returns post and comment authors as AuthorRef with the signs', async () => {
+    prismaMock.post.findMany.mockResolvedValue([
+      makePost({
+        user: makeAuthorRefRow({
+          isDonor: true,
+          donorRank: {
+            expiresAt: null,
+            donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }
+          }
+        }),
+        comments: [
+          makePostComment({
+            user: makeAuthorRefRow({
+              id: 9,
+              username: 'warneduser',
+              warned: new Date('2026-06-01T00:00:00.000Z')
+            })
+          })
+        ]
+      })
+    ] as never);
+
+    const res = await request(app).get('/api/posts');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].user).toEqual(
+      expect.objectContaining({
+        isDonor: true,
+        donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' },
+        warned: null
+      })
+    );
+    expect(res.body[0].comments[0].user).toEqual(
+      expect.objectContaining({
+        id: 9,
+        isDonor: false,
+        donorRank: null,
+        warned: '2026-06-01T00:00:00.000Z'
+      })
+    );
   });
 });
 

@@ -700,7 +700,22 @@ describe('staffPm.listMyTickets', () => {
   it('returns paginated ticket list for a user', async () => {
     prismaMock.staffInboxConversation.count.mockResolvedValue(1);
     prismaMock.staffInboxConversation.findMany.mockResolvedValue([
-      { id: 1, userId: 7, status: 'Unanswered' }
+      {
+        id: 1,
+        userId: 7,
+        status: 'Unanswered',
+        user: {
+          id: 7,
+          username: 'testuser',
+          avatar: null,
+          isDonor: false,
+          warned: null,
+          donorRank: null
+        },
+        assignedUser: null,
+        resolver: null,
+        messages: []
+      }
     ] as never);
 
     const result = await listMyTickets(7, 1);
@@ -1119,6 +1134,16 @@ describe('staffPm.viewTicket', () => {
       id: 1,
       userId: 7,
       isReadByUser: false,
+      user: {
+        id: 7,
+        username: 'testuser',
+        avatar: null,
+        isDonor: false,
+        warned: null,
+        donorRank: null
+      },
+      assignedUser: null,
+      resolver: null,
       messages: []
     } as never);
     prismaMock.staffInboxConversation.update.mockResolvedValueOnce({} as never);

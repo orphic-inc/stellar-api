@@ -32,6 +32,7 @@ import {
   paginationBase
 } from '../../../lib/pagination';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
+import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
@@ -47,7 +48,7 @@ const forumPostParamsSchema = z.object({
 const forumPostsQuerySchema = z.object({ ...paginationBase });
 
 const publicPostInclude = {
-  author: { select: { id: true, username: true, avatar: true } },
+  author: { select: authorRefSelect },
   edits: {
     orderBy: { editedAt: 'desc' as const },
     take: 1,
@@ -59,7 +60,13 @@ const publicPostInclude = {
       editor: { select: { id: true, username: true } }
     }
   }
-};
+} as const;
+
+type RawPost = Awaited<
+  ReturnType<
+    typeof prisma.forumPost.findMany<{ include: typeof publicPostInclude }>
+  >
+>[number];
 
 const editHistoryInclude = {
   edits: {
@@ -68,20 +75,9 @@ const editHistoryInclude = {
   }
 };
 
-const serializeForumPost = <
-  T extends {
-    edits?: Array<{
-      id: number;
-      forumPostId: number;
-      editorId: number;
-      editedAt: Date;
-      editor?: { id: number; username: string } | null;
-    }>;
-  }
->(
-  post: T
-) => ({
+const serializeForumPost = (post: RawPost) => ({
   ...post,
+  author: toAuthorRefOrNull(post.author),
   ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
   edits: undefined
 });

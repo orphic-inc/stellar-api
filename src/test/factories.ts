@@ -109,6 +109,34 @@ export function asUserMock<T extends Record<string, unknown>>(value: T): User {
   return value as unknown as User;
 }
 
+// ─── AuthorRef row (what authorRefSelect returns from Prisma, #231) ──────────
+
+export type AuthorRefRowFactory = {
+  id: number;
+  username: string;
+  avatar: string | null;
+  isDonor: boolean;
+  warned: Date | null;
+  donorRank: {
+    expiresAt: Date | null;
+    donorRank: { name: string; badge: string; color: string };
+  } | null;
+};
+
+export function makeAuthorRefRow(
+  overrides: Partial<AuthorRefRowFactory> = {}
+): AuthorRefRowFactory {
+  return {
+    id: TEST_USER_ID,
+    username: 'testuser',
+    avatar: null,
+    isDonor: false,
+    warned: null,
+    donorRank: null,
+    ...overrides
+  };
+}
+
 // ─── Forum ────────────────────────────────────────────────────────────────────
 
 export function makeForum(overrides: Partial<Forum> = {}): Forum {
@@ -211,7 +239,7 @@ export function makePost(overrides: Partial<Post> = {}): Post {
 }
 
 type PostWithIncludes = Post & {
-  user: { id: number; username: string; avatar: string | null };
+  user: AuthorRefRowFactory;
   comments: Array<PostCommentWithUser>;
 };
 
@@ -220,7 +248,7 @@ export function makePostWithIncludes(
 ): PostWithIncludes {
   return {
     ...makePost(),
-    user: { id: TEST_USER_ID, username: 'testuser', avatar: null },
+    user: makeAuthorRefRow(),
     comments: [],
     ...overrides
   } as PostWithIncludes;
@@ -242,7 +270,7 @@ export function makePostComment(
 }
 
 type PostCommentWithUser = PostComment & {
-  user: { id: number; username: string; avatar: string | null };
+  user: AuthorRefRowFactory;
 };
 
 export function makePostCommentWithUser(
@@ -250,7 +278,7 @@ export function makePostCommentWithUser(
 ): PostCommentWithUser {
   return {
     ...makePostComment(),
-    user: { id: TEST_USER_ID, username: 'testuser', avatar: null },
+    user: makeAuthorRefRow(),
     ...overrides
   } as PostCommentWithUser;
 }
@@ -278,7 +306,7 @@ export function makeComment(overrides: Partial<Comment> = {}): Comment {
 }
 
 type CommentWithAuthor = Comment & {
-  author: { id: number; username: string; avatar: string | null };
+  author: AuthorRefRowFactory;
 };
 
 export function makeCommentWithAuthor(
@@ -286,7 +314,7 @@ export function makeCommentWithAuthor(
 ): CommentWithAuthor {
   return {
     ...makeComment(),
-    author: { id: TEST_USER_ID, username: 'testuser', avatar: null },
+    author: makeAuthorRefRow(),
     ...overrides
   } as CommentWithAuthor;
 }

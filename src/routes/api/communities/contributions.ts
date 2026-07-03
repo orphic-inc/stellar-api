@@ -25,6 +25,7 @@ import {
   type CreateContributionInput
 } from '../../../schemas/contribution';
 import { getSettings } from '../../../modules/settings';
+import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 
 const router = express.Router();
 const contributionIdParamsSchema = z.object({
@@ -120,7 +121,7 @@ router.get(
         collaborators: true,
         comments: {
           include: {
-            author: { select: { id: true, username: true, avatar: true } }
+            author: { select: authorRefSelect }
           }
         }
       }
@@ -129,7 +130,11 @@ router.get(
       return res.status(404).json({ msg: 'Contribution not found' });
     res.json({
       ...contribution,
-      sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
+      sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes),
+      comments: contribution.comments.map((comment) => ({
+        ...comment,
+        author: toAuthorRefOrNull(comment.author)
+      }))
     });
   })
 );

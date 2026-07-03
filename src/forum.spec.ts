@@ -15,6 +15,7 @@ import {
   resetApiTestState
 } from './test/apiTestHarness';
 import {
+  makeAuthorRefRow,
   makeForum,
   makeForumTopic,
   makeForumPost,
@@ -553,6 +554,52 @@ describe('GET /api/forums/:forumId/topics', () => {
     expect(res.body.meta.total).toBe(1);
   });
 
+  // #231 — topic and last-post authors carry the donor sign + warning sign.
+  it('returns topic and lastPost authors as AuthorRef with the signs', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
+    prismaMock.forumTopic.findMany.mockResolvedValue([
+      {
+        ...makeForumTopic({ id: 44, title: 'Topic A' }),
+        author: makeAuthorRefRow({
+          isDonor: true,
+          donorRank: {
+            expiresAt: null,
+            donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }
+          }
+        }),
+        lastPost: {
+          id: 21,
+          createdAt: new Date(),
+          author: makeAuthorRefRow({
+            id: 9,
+            username: 'warneduser',
+            warned: new Date('2026-04-01T00:00:00.000Z')
+          })
+        }
+      } as never
+    ]);
+    prismaMock.forumTopic.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/forums/9/topics');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].author).toEqual(
+      expect.objectContaining({
+        isDonor: true,
+        donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' },
+        warned: null
+      })
+    );
+    expect(res.body.data[0].lastPost.author).toEqual(
+      expect.objectContaining({
+        id: 9,
+        isDonor: false,
+        donorRank: null,
+        warned: '2026-04-01T00:00:00.000Z'
+      })
+    );
+  });
+
   it('returns 404 when forum does not exist', async () => {
     prismaMock.forum.findUnique.mockResolvedValue(null);
 
@@ -749,6 +796,38 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
       editor: { id: 11, username: 'mod' }
     });
     expect(res.body.meta.total).toBe(1);
+  });
+
+  // #231 — post authors carry the donor sign + warning sign in the list read.
+  it('returns post authors as AuthorRef with the signs', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
+    prismaMock.forumPost.findMany.mockResolvedValue([
+      {
+        ...makeForumPost({ id: 21, body: 'Post body' }),
+        author: makeAuthorRefRow({
+          isDonor: true,
+          warned: new Date('2026-05-01T00:00:00.000Z'),
+          donorRank: {
+            expiresAt: null,
+            donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }
+          }
+        }),
+        edits: []
+      } as never
+    ]);
+    prismaMock.forumPost.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/forums/9/topics/44/posts');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].author).toEqual({
+      id: 7,
+      username: 'testuser',
+      avatar: null,
+      isDonor: true,
+      donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' },
+      warned: '2026-05-01T00:00:00.000Z'
+    });
   });
 
   it('returns 404 when forum does not exist', async () => {

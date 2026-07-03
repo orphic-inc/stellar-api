@@ -5,7 +5,11 @@ import {
   prismaMock,
   makeUserRank
 } from './test/apiTestHarness';
-import { makeComment, makeCommentWithAuthor } from './test/factories';
+import {
+  makeAuthorRefRow,
+  makeComment,
+  makeCommentWithAuthor
+} from './test/factories';
 
 jest.mock('./modules/comment', () => ({
   deleteComment: jest.fn()
@@ -31,6 +35,37 @@ describe('GET /api/comments', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.meta.total).toBe(1);
+  });
+
+  // #231 — comment authors must carry the donor sign + warning sign so the
+  // PostBox renders them anywhere comments appear, not just on the profile.
+  it('returns authors as AuthorRef with donor and warning signs', async () => {
+    prismaMock.comment.findMany.mockResolvedValue([
+      makeCommentWithAuthor({
+        id: 12,
+        author: makeAuthorRefRow({
+          isDonor: true,
+          warned: new Date('2026-03-01T00:00:00.000Z'),
+          donorRank: {
+            expiresAt: null,
+            donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }
+          }
+        })
+      })
+    ] as never);
+    prismaMock.comment.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/comments');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].author).toEqual({
+      id: 7,
+      username: 'testuser',
+      avatar: null,
+      isDonor: true,
+      donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' },
+      warned: '2026-03-01T00:00:00.000Z'
+    });
   });
 
   it('filters by communities page and pageId', async () => {

@@ -74,6 +74,17 @@ const makeConversation = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
+// AuthorRef-shaped sender row as returned by authorRefSelect (#231).
+const makeSenderRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 7,
+  username: 'testuser',
+  avatar: null,
+  isDonor: false,
+  warned: null,
+  donorRank: null,
+  ...overrides
+});
+
 beforeEach(() => {
   mockTransaction.mockImplementation(
     (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
@@ -181,7 +192,7 @@ describe('sendMessage', () => {
         { userId: 9, inInbox: true, inSentbox: false, isRead: false },
         { userId: 7, inInbox: false, inSentbox: true, isRead: true }
       ],
-      messages: [{ id: 10, body: 'Body' }]
+      messages: [{ id: 10, body: 'Body', sender: makeSenderRow() }]
     });
     prismaMock.user.findUnique.mockResolvedValue({
       id: 9,
@@ -192,7 +203,26 @@ describe('sendMessage', () => {
 
     const result = await sendMessage(7, 9, 'Subject', 'Body');
 
-    expect(result).toEqual({ ok: true, conversation: created });
+    expect(result).toEqual({
+      ok: true,
+      conversation: expect.objectContaining({
+        participants: created.participants,
+        messages: [
+          {
+            id: 10,
+            body: 'Body',
+            sender: {
+              id: 7,
+              username: 'testuser',
+              avatar: null,
+              isDonor: false,
+              donorRank: null,
+              warned: null
+            }
+          }
+        ]
+      })
+    });
     expect(mockTx.privateConversation.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -330,6 +360,67 @@ describe('viewConversation', () => {
     await expect(viewConversation(1, 7)).resolves.toEqual({
       ok: false,
       reason: 'not_found'
+    });
+  });
+
+  // #231 — every sender/participant in a conversation read must carry the
+  // donor sign + warning sign so PMs render them like the profile does.
+  it('carries donor and warning signs on message senders and participants', async () => {
+    const warnedAt = new Date('2026-02-01T00:00:00.000Z');
+    prismaMock.privateConversation.findUnique.mockResolvedValue(
+      makeConversation({
+        participants: [
+          {
+            userId: 7,
+            inInbox: true,
+            inSentbox: false,
+            isRead: true,
+            user: makeSenderRow()
+          },
+          {
+            userId: 9,
+            inInbox: false,
+            inSentbox: true,
+            isRead: true,
+            user: makeSenderRow({
+              id: 9,
+              username: 'donorwarned',
+              isDonor: true,
+              warned: warnedAt,
+              donorRank: {
+                expiresAt: null,
+                donorRank: { name: 'Patron', badge: 'p.png', color: '#fff' }
+              }
+            })
+          }
+        ],
+        messages: [
+          {
+            id: 11,
+            body: 'Hi',
+            sender: makeSenderRow({
+              id: 9,
+              username: 'donorwarned',
+              isDonor: true
+            })
+          }
+        ]
+      })
+    );
+
+    const result = await viewConversation(1, 7);
+
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.conversation.messages[0].sender).toEqual(
+      expect.objectContaining({ isDonor: true, warned: null, donorRank: null })
+    );
+    expect(result.conversation.participants[1].user).toEqual({
+      id: 9,
+      username: 'donorwarned',
+      avatar: null,
+      isDonor: true,
+      donorRank: { name: 'Patron', badge: 'p.png', color: '#fff' },
+      warned: '2026-02-01T00:00:00.000Z'
     });
   });
 

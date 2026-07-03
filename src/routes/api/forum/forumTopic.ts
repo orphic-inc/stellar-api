@@ -36,6 +36,7 @@ import {
 import { prisma } from '../../../lib/prisma';
 import { sanitizePlain } from '../../../lib/sanitize';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
+import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 import forumPostRouter from './forumPost';
 
 const router = express.Router({ mergeParams: true });
@@ -97,15 +98,25 @@ router.get(
         skip: pg.skip,
         take: pg.limit,
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: authorRefSelect },
           lastPost: {
-            include: { author: { select: { id: true, username: true } } }
+            include: { author: { select: authorRefSelect } }
           }
         }
       }),
       prisma.forumTopic.count({ where: { forumId, deletedAt: null } })
     ]);
-    paginatedResponse(res, topics, total, pg);
+    const mapped = topics.map((topic) => ({
+      ...topic,
+      author: toAuthorRefOrNull(topic.author),
+      lastPost: topic.lastPost
+        ? {
+            ...topic.lastPost,
+            author: toAuthorRefOrNull(topic.lastPost.author)
+          }
+        : null
+    }));
+    paginatedResponse(res, mapped, total, pg);
   })
 );
 
@@ -150,7 +161,7 @@ router.get(
       prisma.forumTopic.findFirst({
         where: { id, forumId, deletedAt: null },
         include: {
-          author: { select: { id: true, username: true, avatar: true } },
+          author: { select: authorRefSelect },
           notes: {
             include: { author: { select: { id: true, username: true } } }
           }
@@ -164,7 +175,7 @@ router.get(
         .json({ msg: 'Insufficient class to read this forum' });
     }
     if (!topic) return res.status(404).json({ msg: 'Topic not found' });
-    res.json(topic);
+    res.json({ ...topic, author: toAuthorRefOrNull(topic.author) });
   })
 );
 

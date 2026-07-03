@@ -29,6 +29,7 @@ import {
   type UpdateCommentInput
 } from '../../schemas/comment';
 import { deleteComment } from '../../modules/comment';
+import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
 const router = express.Router();
 const commentIdParamsSchema = z.object({
@@ -60,13 +61,17 @@ router.get(
         skip: pg.skip,
         take: pg.limit,
         include: {
-          author: { select: { id: true, username: true, avatar: true } },
+          author: { select: authorRefSelect },
           editedUser: { select: { id: true, username: true } }
         }
       }),
       prisma.comment.count({ where: { ...where, deletedAt: null } })
     ]);
-    paginatedResponse(res, comments, total, pg);
+    const mapped = comments.map((comment) => ({
+      ...comment,
+      author: toAuthorRefOrNull(comment.author)
+    }));
+    paginatedResponse(res, mapped, total, pg);
   })
 );
 
@@ -79,11 +84,11 @@ router.get(
     const comment = await prisma.comment.findUnique({
       where: { id },
       include: {
-        author: { select: { id: true, username: true, avatar: true } }
+        author: { select: authorRefSelect }
       }
     });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
-    res.json(comment);
+    res.json({ ...comment, author: toAuthorRefOrNull(comment.author) });
   })
 );
 
@@ -134,7 +139,7 @@ router.post(
           ...(collageId && { collageId })
         },
         include: {
-          author: { select: { id: true, username: true, avatar: true } }
+          author: { select: authorRefSelect }
         }
       });
 
@@ -178,7 +183,9 @@ router.post(
       return created;
     });
 
-    res.status(201).json(comment);
+    res
+      .status(201)
+      .json({ ...comment, author: toAuthorRefOrNull(comment.author) });
   })
 );
 

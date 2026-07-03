@@ -8,7 +8,9 @@ import {
   recordContributionReportMock,
   resetApiTestState
 } from './test/apiTestHarness';
+import { authorRefSelect } from './modules/authorRef';
 import {
+  makeAuthorRefRow,
   makePost,
   makePostWithIncludes,
   makePostComment,
@@ -43,7 +45,7 @@ describe('API content and shared flows', () => {
         text: 'Some text',
         category: 'news',
         tags: ['launch'],
-        user: { id: 7, username: 'kai', avatar: null }
+        user: makeAuthorRefRow({ username: 'kai' })
       }) as unknown as ReturnType<typeof makePost>
     );
 
@@ -66,11 +68,11 @@ describe('API content and shared flows', () => {
         tags: ['launch']
       },
       include: {
-        user: { select: { id: true, username: true, avatar: true } },
+        user: { select: authorRefSelect },
         comments: {
           orderBy: { createdAt: 'asc' },
           include: {
-            user: { select: { id: true, username: true, avatar: true } }
+            user: { select: authorRefSelect }
           }
         }
       }
@@ -88,7 +90,7 @@ describe('API content and shared flows', () => {
         postId: 14,
         userId: 7,
         text: 'Nice post',
-        user: { id: 7, username: 'kai', avatar: null }
+        user: makeAuthorRefRow({ username: 'kai' })
       }) as unknown as ReturnType<typeof makePostComment>
     );
 
@@ -99,7 +101,7 @@ describe('API content and shared flows', () => {
     expect(res.status).toBe(201);
     expect(prismaMock.postComment.create).toHaveBeenCalledWith({
       data: { postId: 14, userId: 7, text: 'Nice post' },
-      include: { user: { select: { id: true, username: true, avatar: true } } }
+      include: { user: { select: authorRefSelect } }
     });
     expect(res.body.text).toBe('Nice post');
   });
@@ -428,7 +430,7 @@ describe('API content and shared flows', () => {
         body: 'hello',
         communityId: 3,
         authorId: 7,
-        author: { id: 7, username: 'kai', avatar: null }
+        author: makeAuthorRefRow({ username: 'kai' })
       }) as unknown as ReturnType<typeof makeComment>
     );
 
@@ -447,7 +449,7 @@ describe('API content and shared flows', () => {
         communityId: 3
       },
       include: {
-        author: { select: { id: true, username: true, avatar: true } }
+        author: { select: authorRefSelect }
       }
     });
     expect(res.body.communityId).toBe(3);

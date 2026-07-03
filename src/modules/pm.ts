@@ -1,12 +1,42 @@
 import { prisma } from '../lib/prisma';
+import {
+  authorRefSelect,
+  toAuthorRefOrNull,
+  type AuthorRefRow
+} from './authorRef';
 
 const PAGE_SIZE = 25;
 
-const senderSelect = {
-  id: true,
-  username: true,
-  avatar: true
-} as const;
+const senderSelect = authorRefSelect;
+
+// Shapes the sender/participant relations a PM conversation carries so the
+// donor sign + warning sign follow the sender everywhere a message renders
+// (#231), not just on their profile.
+const mapMessage = <T extends { sender: AuthorRefRow | null }>(message: T) => ({
+  ...message,
+  sender: toAuthorRefOrNull(message.sender)
+});
+
+type ParticipantRow = { user?: AuthorRefRow } & Record<string, unknown>;
+
+const mapConversation = <
+  T extends {
+    messages?: Array<{ sender: AuthorRefRow | null } & Record<string, unknown>>;
+    participants?: Array<ParticipantRow>;
+  }
+>(
+  conversation: T
+) => ({
+  ...conversation,
+  ...(conversation.messages && {
+    messages: conversation.messages.map(mapMessage)
+  }),
+  ...(conversation.participants && {
+    participants: conversation.participants.map((p) =>
+      'user' in p ? { ...p, user: toAuthorRefOrNull(p.user) } : p
+    )
+  })
+});
 
 export async function listInbox(userId: number, page: number, search?: string) {
   const where = {
@@ -44,7 +74,12 @@ export async function listInbox(userId: number, page: number, search?: string) {
     })
   ]);
 
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapConversation)
+  };
 }
 
 export async function listSentbox(userId: number, page: number) {
@@ -73,7 +108,12 @@ export async function listSentbox(userId: number, page: number) {
     })
   ]);
 
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapConversation)
+  };
 }
 
 export async function getUnreadCount(userId: number): Promise<number> {
@@ -136,7 +176,7 @@ export async function sendMessage(
     return conv;
   });
 
-  return { ok: true as const, conversation };
+  return { ok: true as const, conversation: mapConversation(conversation) };
 }
 
 /**
@@ -181,7 +221,7 @@ export async function sendSystemMessage(
     }
   });
 
-  return { ok: true as const, conversation };
+  return { ok: true as const, conversation: mapConversation(conversation) };
 }
 
 export async function replyToConversation(
@@ -229,7 +269,7 @@ export async function replyToConversation(
     return msg;
   });
 
-  return { ok: true as const, message };
+  return { ok: true as const, message: mapMessage(message) };
 }
 
 export async function viewConversation(conversationId: number, userId: number) {
@@ -259,7 +299,7 @@ export async function viewConversation(conversationId: number, userId: number) {
     });
   }
 
-  return { ok: true as const, conversation };
+  return { ok: true as const, conversation: mapConversation(conversation) };
 }
 
 export async function updateConversationFlags(

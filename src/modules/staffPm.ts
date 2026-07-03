@@ -1,13 +1,15 @@
 import { prisma } from '../lib/prisma';
 import type { StaffInboxStatus } from '@prisma/client';
+import {
+  authorRefSelect,
+  toAuthorRef,
+  toAuthorRefOrNull,
+  type AuthorRefRow
+} from './authorRef';
 
 const PAGE_SIZE = 25;
 
-const senderSelect = {
-  id: true,
-  username: true,
-  avatar: true
-} as const;
+const senderSelect = authorRefSelect;
 
 const ticketInclude = {
   user: { select: senderSelect },
@@ -15,12 +17,37 @@ const ticketInclude = {
   resolver: { select: senderSelect }
 } as const;
 
+// Shapes a ticket's user/assignedUser/resolver/message-sender relations so the
+// donor sign + warning sign follow staff and members alike in the inbox
+// (#231), not just on their profile.
+const mapTicketMessage = <T extends { sender: AuthorRefRow }>(message: T) => ({
+  ...message,
+  sender: toAuthorRef(message.sender)
+});
+
+const mapTicket = <
+  T extends {
+    user: AuthorRefRow;
+    assignedUser: AuthorRefRow | null;
+    resolver: AuthorRefRow | null;
+    messages?: Array<{ sender: AuthorRefRow } & Record<string, unknown>>;
+  }
+>(
+  ticket: T
+) => ({
+  ...ticket,
+  user: toAuthorRef(ticket.user),
+  assignedUser: toAuthorRefOrNull(ticket.assignedUser),
+  resolver: toAuthorRefOrNull(ticket.resolver),
+  ...(ticket.messages && { messages: ticket.messages.map(mapTicketMessage) })
+});
+
 export async function createTicket(
   userId: number,
   subject: string,
   body: string
 ) {
-  return prisma.staffInboxConversation.create({
+  const ticket = await prisma.staffInboxConversation.create({
     data: {
       subject,
       userId,
@@ -32,6 +59,7 @@ export async function createTicket(
       messages: { include: { sender: { select: senderSelect } } }
     }
   });
+  return mapTicket(ticket);
 }
 
 export async function listMyTickets(userId: number, page: number) {
@@ -53,7 +81,12 @@ export async function listMyTickets(userId: number, page: number) {
       }
     })
   ]);
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapTicket)
+  };
 }
 
 export async function listQueue(opts: {
@@ -87,7 +120,12 @@ export async function listQueue(opts: {
       }
     })
   ]);
-  return { total, page, pageSize: PAGE_SIZE, conversations };
+  return {
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    conversations: conversations.map(mapTicket)
+  };
 }
 
 export async function getQueueCount(): Promise<number> {
@@ -120,7 +158,7 @@ export async function viewTicket(id: number, userId: number, isStaff: boolean) {
     });
   }
 
-  return { ok: true as const, ticket };
+  return { ok: true as const, ticket: mapTicket(ticket) };
 }
 
 export async function replyToTicket(
@@ -157,7 +195,7 @@ export async function replyToTicket(
     return msg;
   });
 
-  return { ok: true as const, message };
+  return { ok: true as const, message: mapTicketMessage(message) };
 }
 
 export async function resolveTicket(

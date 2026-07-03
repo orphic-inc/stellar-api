@@ -118,6 +118,30 @@ const PaginationMeta = registry.register(
 
 const StaffUserRef = z.object({ id: z.number(), username: z.string() });
 
+// #231 — the shared author identity for every PostBox-rendering surface (forum
+// posts/topics, comments, blog-post comments, PMs, staff inbox). Carries the
+// donor sign + warning sign so they follow the user site-wide, mirroring the
+// fields the profile shapes already expose. `donorRank` is null when no active
+// (unexpired) grant exists; `warned` is the ISO timestamp of the active warning
+// or null. Backed by src/modules/authorRef.ts.
+const AuthorRef = registry.register(
+  'AuthorRef',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    avatar: z.string().nullable(),
+    isDonor: z.boolean(),
+    donorRank: z
+      .object({
+        name: z.string(),
+        badge: z.string(),
+        color: z.string()
+      })
+      .nullable(),
+    warned: z.string().nullable()
+  })
+);
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 const LoginBody = registry.register(
@@ -2002,24 +2026,14 @@ const ForumTopic = registry.register(
     isLocked: z.boolean(),
     isSticky: z.boolean(),
     numPosts: z.number(),
-    author: z
-      .object({
-        id: z.number(),
-        username: z.string(),
-        avatar: z.string().nullable().optional()
-      })
-      .optional(),
+    author: AuthorRef.optional(),
     lastPost: z
       .object({
         id: z.number(),
         createdAt: z.string(),
-        author: z
-          .object({
-            id: z.number(),
-            username: z.string()
-          })
-          .optional()
+        author: AuthorRef.optional()
       })
+      .nullable()
       .optional(),
     createdAt: z.string(),
     updatedAt: z.string()
@@ -2057,13 +2071,7 @@ const ForumPost = registry.register(
     authorId: z.number(),
     body: z.string(),
     lastEdit: ForumPostLastEdit.optional(),
-    author: z
-      .object({
-        id: z.number(),
-        username: z.string(),
-        avatar: z.string().nullable().optional()
-      })
-      .optional(),
+    author: AuthorRef.optional(),
     createdAt: z.string(),
     updatedAt: z.string()
   })
@@ -3567,13 +3575,7 @@ const Comment = registry.register(
     body: z.string(),
     authorId: z.number(),
     createdAt: z.string(),
-    author: z
-      .object({
-        id: z.number(),
-        username: z.string(),
-        avatar: z.string().nullable().optional()
-      })
-      .optional()
+    author: AuthorRef.optional()
   })
 );
 
@@ -4315,13 +4317,7 @@ const PostComment = registry.register(
     userId: z.number(),
     text: z.string(),
     createdAt: z.string(),
-    user: z
-      .object({
-        id: z.number(),
-        username: z.string(),
-        avatar: z.string().nullable().optional()
-      })
-      .optional()
+    user: AuthorRef.optional()
   })
 );
 
@@ -4336,13 +4332,7 @@ const Post = registry.register(
     tags: z.array(z.string()),
     comments: z.array(PostComment),
     createdAt: z.string(),
-    user: z
-      .object({
-        id: z.number(),
-        username: z.string(),
-        avatar: z.string().nullable().optional()
-      })
-      .optional()
+    user: AuthorRef.optional()
   })
 );
 
@@ -4606,14 +4596,9 @@ registry.registerPath({
 
 // ─── Private Messages ────────────────────────────────────────────────────────
 
-const MessageUser = registry.register(
-  'MessageUser',
-  z.object({
-    id: z.number(),
-    username: z.string(),
-    avatar: z.string().nullable().optional()
-  })
-);
+// PM senders/participants carry the full AuthorRef (#231) so donor/warning
+// signs render in conversations; the old thin MessageUser shape is retired.
+const MessageUser = AuthorRef;
 
 const PrivateMessage = registry.register(
   'PrivateMessage',

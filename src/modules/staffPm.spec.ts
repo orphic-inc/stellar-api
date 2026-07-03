@@ -55,6 +55,19 @@ const prismaMock = prisma as unknown as {
   user: { findUnique: jest.Mock };
 };
 
+// Minimal AuthorRef-shaped row (#231): a plain donor/warning-free user unless
+// a test overrides it, so mapTicket's transform is a no-op on the fields it
+// doesn't touch.
+const makeAuthorRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 7,
+  username: 'testuser',
+  avatar: null,
+  isDonor: false,
+  warned: null,
+  donorRank: null,
+  ...overrides
+});
+
 const makeTicket = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   userId: 7,
@@ -63,6 +76,9 @@ const makeTicket = (overrides: Record<string, unknown> = {}) => ({
   isReadByUser: false,
   assignedUserId: null,
   resolverId: null,
+  user: makeAuthorRow(),
+  assignedUser: null,
+  resolver: null,
   messages: [],
   ...overrides
 });
@@ -76,7 +92,7 @@ beforeEach(() => {
 describe('createTicket', () => {
   it('creates an unanswered ticket with the initial message', async () => {
     const created = makeTicket({
-      messages: [{ id: 10, body: 'Please help', sender: { id: 7 } }]
+      messages: [{ id: 10, body: 'Please help', sender: makeAuthorRow() }]
     });
     prismaMock.staffInboxConversation.create.mockResolvedValue(created);
 
@@ -92,7 +108,45 @@ describe('createTicket', () => {
         })
       })
     );
-    expect(result).toBe(created);
+    expect(result).toEqual(created);
+  });
+
+  // #231 — the ticket owner and each message sender must carry isDonor/warned/
+  // donorRank so the donor sign + warning sign render in the staff inbox, not
+  // just on the profile page.
+  it('carries the donor sign and warning sign on the ticket owner and sender', async () => {
+    const created = makeTicket({
+      user: makeAuthorRow({
+        isDonor: true,
+        warned: new Date('2026-01-01T00:00:00.000Z'),
+        donorRank: {
+          expiresAt: null,
+          donorRank: { name: 'Patron', badge: 'patron.png', color: '#fff' }
+        }
+      }),
+      messages: [
+        {
+          id: 10,
+          body: 'Please help',
+          sender: makeAuthorRow({ isDonor: true })
+        }
+      ]
+    });
+    prismaMock.staffInboxConversation.create.mockResolvedValue(created);
+
+    const result = await createTicket(7, 'Need help', 'Please help');
+
+    expect(result.user).toEqual({
+      id: 7,
+      username: 'testuser',
+      avatar: null,
+      isDonor: true,
+      donorRank: { name: 'Patron', badge: 'patron.png', color: '#fff' },
+      warned: '2026-01-01T00:00:00.000Z'
+    });
+    expect(result.messages[0].sender).toEqual(
+      expect.objectContaining({ isDonor: true })
+    );
   });
 });
 

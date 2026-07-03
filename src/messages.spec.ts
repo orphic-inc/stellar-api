@@ -24,7 +24,15 @@ const makeMessage = () => ({
   senderId: 7,
   body: 'Hey there',
   createdAt: new Date(),
-  sender: { id: 7, username: 'testuser', avatar: null }
+  // AuthorRef sender (#231) — donor/warning signs travel with PM senders.
+  sender: {
+    id: 7,
+    username: 'testuser',
+    avatar: null,
+    isDonor: false,
+    warned: null,
+    donorRank: null
+  }
 });
 
 describe('GET /api/messages', () => {

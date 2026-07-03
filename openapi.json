@@ -79,6 +79,56 @@
           "totalPages"
         ]
       },
+      "AuthorRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDonor": {
+            "type": "boolean"
+          },
+          "donorRank": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "badge": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "badge",
+              "color"
+            ]
+          },
+          "warned": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "avatar",
+          "isDonor",
+          "donorRank",
+          "warned"
+        ]
+      },
       "LoginBody": {
         "type": "object",
         "properties": {
@@ -2252,26 +2302,11 @@
             "type": "number"
           },
           "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              },
-              "avatar": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+            "$ref": "#/components/schemas/AuthorRef"
           },
           "lastPost": {
             "type": "object",
+            "nullable": true,
             "properties": {
               "id": {
                 "type": "number"
@@ -2280,19 +2315,7 @@
                 "type": "string"
               },
               "author": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "number"
-                  },
-                  "username": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "username"
-                ]
+                "$ref": "#/components/schemas/AuthorRef"
               }
             },
             "required": [
@@ -2418,23 +2441,7 @@
             "$ref": "#/components/schemas/ForumPostLastEdit"
           },
           "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              },
-              "avatar": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+            "$ref": "#/components/schemas/AuthorRef"
           },
           "createdAt": {
             "type": "string"
@@ -3716,23 +3723,7 @@
             "type": "string"
           },
           "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              },
-              "avatar": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+            "$ref": "#/components/schemas/AuthorRef"
           }
         },
         "required": [
@@ -4071,23 +4062,7 @@
             "type": "string"
           },
           "user": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              },
-              "avatar": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+            "$ref": "#/components/schemas/AuthorRef"
           }
         },
         "required": [
@@ -4132,23 +4107,7 @@
             "type": "string"
           },
           "user": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              },
-              "avatar": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+            "$ref": "#/components/schemas/AuthorRef"
           }
         },
         "required": [
@@ -4208,25 +4167,6 @@
           "updatedAt"
         ]
       },
-      "MessageUser": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "username": {
-            "type": "string"
-          },
-          "avatar": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "username"
-        ]
-      },
       "PrivateMessage": {
         "type": "object",
         "properties": {
@@ -4245,7 +4185,7 @@
           "sender": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/MessageUser"
+                "$ref": "#/components/schemas/AuthorRef"
               },
               {
                 "nullable": true
@@ -4290,7 +4230,7 @@
             "nullable": true
           },
           "user": {
-            "$ref": "#/components/schemas/MessageUser"
+            "$ref": "#/components/schemas/AuthorRef"
           }
         },
         "required": [
@@ -4390,12 +4330,12 @@
             "type": "string"
           },
           "user": {
-            "$ref": "#/components/schemas/MessageUser"
+            "$ref": "#/components/schemas/AuthorRef"
           },
           "assignedUser": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/MessageUser"
+                "$ref": "#/components/schemas/AuthorRef"
               },
               {
                 "nullable": true
@@ -4405,7 +4345,7 @@
           "resolver": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/MessageUser"
+                "$ref": "#/components/schemas/AuthorRef"
               },
               {
                 "nullable": true
@@ -4429,7 +4369,7 @@
                 "sender": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/MessageUser"
+                      "$ref": "#/components/schemas/AuthorRef"
                     },
                     {
                       "nullable": true

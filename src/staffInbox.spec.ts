@@ -288,7 +288,14 @@ describe('POST /api/staff-inbox/tickets/:id/reply', () => {
         senderId: 7,
         body: 'Reply',
         createdAt: new Date(),
-        sender: { id: 7, username: 'regular', avatar: null }
+        sender: {
+          id: 7,
+          username: 'regular',
+          avatar: null,
+          isDonor: false,
+          warned: null,
+          donorRank: null
+        }
       }
     });
 
@@ -341,7 +348,14 @@ describe('POST /api/staff-inbox/tickets/:id/reply', () => {
         senderId: 7,
         body: 'Staff reply',
         createdAt: new Date(),
-        sender: { id: 7, username: 'mod', avatar: null }
+        sender: {
+          id: 7,
+          username: 'mod',
+          avatar: null,
+          isDonor: false,
+          warned: null,
+          donorRank: null
+        }
       }
     });
 
