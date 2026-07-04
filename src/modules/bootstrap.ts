@@ -180,6 +180,7 @@ export const DEFAULT_RANKS = [
       users_disable: true,
       users_view_ips: true,
       users_view_email: true,
+      messages_mass_pm: true,
       staff: true
     }
   },

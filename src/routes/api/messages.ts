@@ -218,7 +218,7 @@ router.delete(
 // POST /api/messages/mass — send mass PM
 router.post(
   '/mass',
-  ...requirePermission('staff'),
+  ...requirePermission('messages_mass_pm'),
   validate(massPmSchema),
   authHandler(async (req, res) => {
     const { subject, body, targetRankId } = parsedBody<MassPmInput>(res);

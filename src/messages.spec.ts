@@ -533,7 +533,7 @@ describe('POST /api/messages/mass', () => {
   beforeEach(() => {
     resetApiTestState();
     prismaMock.userRank.findUnique.mockResolvedValue(
-      makeUserRank({ staff: true })
+      makeUserRank({ messages_mass_pm: true })
     );
   });
 
@@ -589,8 +589,21 @@ describe('POST /api/messages/mass', () => {
     );
   });
 
-  it('returns 403 without staff permission', async () => {
+  it('returns 403 without messages_mass_pm permission', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+
+    const res = await request(app)
+      .post('/api/messages/mass')
+      .send({ subject: 'S', body: 'B' });
+
+    expect(res.status).toBe(403);
+  });
+
+  // Granular gate (#281) — the coarse 'staff' flag alone must not satisfy it.
+  it('returns 403 for staff without messages_mass_pm permission', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ staff: true })
+    );
 
     const res = await request(app)
       .post('/api/messages/mass')
