@@ -6,18 +6,35 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-07-03
+
+A 0.6.x increment landing the stylesheet delivery contract (registry CSS serving + a single-source slot), site-wide author-sign propagation, the staff-inbox consolidation, and a self-migrating runtime image.
+
 ### Added
 
 - **Registry stylesheet CSS delivery** — `GET /api/stylesheet/author-stylesheet/:id/css` serves an adopted author sheet's stored, sanitized source as `text/css` (no-cache, nosniff), so the UI injector can link it like an external URL [ADR-0024, PR #256]. OpenAPI path registered [PR #257].
 - **`anorex` built-in theme** — registered in the `stylesheets` registry so the wood-toned theme shipped by stellar-ui is reachable through the theme picker [#255].
+- **Release-scoped contributions read** — `getReleaseWorkbenchView` now embeds the `ReleaseFile` satellite and `Edition`, so rip-quality and edition are readable from a release-scoped GET (was POST/search-only), unblocking the UI edition-disclosure feature [#129].
+- **`PUT /api/users/:id/rank-lock`** — staff can freeze/unfreeze a user from auto class-progression; `rankLocked` also exposed on the staff rank-assignment read [#203].
+- **Self-migrating container** — the runtime image runs `prisma migrate deploy` on boot (fail-fast) before exec'ing the app, so a merged-but-unapplied migration can no longer serve a schema-behind DB; a CI `smoke` job boots the real image against a fresh Postgres and gates publish [#276].
 
 ### Changed
 
 - **Site Stylesheet slot is one explicit source** — Personal (external URL) and Registry (`activeAuthorStylesheetId`) are mutually exclusive; selecting one clears the other, enforced server-side on the profile write. The pointer joins the profile contract; `externalStylesheet` is tightened to `https:`-only [ADR-0024, PR #256].
+- **Author-stylesheet list paginated** — `GET /api/stylesheet/author/:userId` returns the standard `{ data, meta }` envelope, plus a rank-gated cap on stored sheets [#146].
+- **RankPromotionRule CRUD guarded to adjacent ladder steps** — promotion-rule admin writes are constrained to neighbouring class levels [#170].
+- **Staff-inbox ticket engine consolidated** — the duplicated engine (copied into `staffPm.ts`, then drifted) is unified onto `staffInbox.ts`; the duplicate module + schema are deleted [#272].
+- ESLint config marked `root: true` so a checkout nested inside another (a git worktree) lints cleanly instead of cascading into the outer repo's config.
+
+### Fixed
+
+- **Author signs follow the author site-wide** — donor sign and warning sign now ship on every PostBox author payload (forum/comment/PM/staff-inbox) via a shared `AuthorRef` seam, not just the profile page [#231].
+- **`getRatioStats` 404s on a missing user** — throws `AppError(404)` per the codebase convention instead of a raw `Error` the global handler mapped to a generic 500 [#233].
 
 ### Docs
 
 - **ADR-0024** — stylesheet delivery contract (URL vs stored-source registry serving); PRD-03 amended (`.css`-only, storage shape closed, "registry spaces" naming); superseded ADR-0003 Arm-1 comments corrected [PR #256].
+- **ADR-0023 (proposed)** — `ReleaseGroup` cross-community identity node + the Contribution package seam.
 
 ## [0.6.1] — 2026-06-25
 
@@ -456,7 +473,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orphic-inc/stellar-api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/orphic-inc/stellar-api/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/orphic-inc/stellar-api/compare/v0.5.5...v0.5.6
