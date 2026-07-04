@@ -35,6 +35,7 @@ A 0.6.x increment landing the stylesheet delivery contract (registry CSS serving
 
 - **ADR-0024** — stylesheet delivery contract (URL vs stored-source registry serving); PRD-03 amended (`.css`-only, storage shape closed, "registry spaces" naming); superseded ADR-0003 Arm-1 comments corrected [PR #256].
 - **ADR-0023 (proposed)** — `ReleaseGroup` cross-community identity node + the Contribution package seam.
+- **ADR-0025** — moderation & messaging surface model: Reports (content-anchored), Personal Messages (user↔user), and Staff Inbox (generic member→staff) are three separate systems; Staff Inbox is one role-dispatched entry (no separate "Staff Queue"). Reconciles a stellar-ui surface drift ([stellar-ui #164](https://github.com/orphic-inc/stellar-ui/pull/164)); staff-class tiering deferred.
 
 ## [0.6.1] — 2026-06-25
 
