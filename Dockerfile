@@ -23,8 +23,11 @@ RUN npm ci --omit=dev
 
 COPY --from=build /usr/src/stellar-api/dist ./dist
 COPY --from=build /usr/src/stellar-api/prisma ./prisma
+COPY --chmod=0755 docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Client only — devDependencies (incl. prisma-erd-generator) are omitted here.
+# The `prisma` CLI itself is a runtime dependency (not devDep) so the entrypoint
+# can run `migrate deploy` offline against the target DB.
 RUN npx prisma generate --generator client
 
 USER node
@@ -34,4 +37,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 
-CMD ["node", "dist/index.js"]
+# Self-migrating: apply pending migrations, then start. See docker-entrypoint.sh.
+CMD ["./docker-entrypoint.sh"]

@@ -67,8 +67,58 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
-  publish:
+  # Build the real image and prove it self-migrates a fresh DB and boots — the
+  # class of break where a merged-but-unapplied migration leaves the runtime
+  # schema behind (see docker-entrypoint.sh). Gates publish.
+  smoke:
     needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build image
+        run: docker build -t stellar-api:smoke .
+      - name: Boot-and-migrate against a fresh database
+        run: |
+          set -euo pipefail
+          docker network create stellar-smoke
+          docker run -d --name pg --network stellar-smoke \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=stellar \
+            postgres:16-alpine
+          echo "Waiting for Postgres..."
+          for _ in $(seq 1 30); do
+            docker exec pg pg_isready -U postgres -q && break
+            sleep 1
+          done
+          docker run -d --name api --network stellar-smoke -p 8080:8080 \
+            -e STELLAR_PSQL_URI=postgresql://postgres:postgres@pg:5432/stellar \
+            -e STELLAR_AUTH_JWT_SECRET=smoke_ci_jwt_secret_at_least_32_chars_long \
+            stellar-api:smoke
+          echo "Waiting for /health..."
+          healthy=0
+          for _ in $(seq 1 30); do
+            if wget -qO- http://localhost:8080/health >/dev/null 2>&1; then healthy=1; break; fi
+            sleep 2
+          done
+          if [ "$healthy" != "1" ]; then
+            echo "::error::API never became healthy"; docker logs api; exit 1
+          fi
+          # Definitive check: the entrypoint actually applied migrations.
+          applied=$(docker exec pg psql -U postgres -d stellar -tAc \
+            "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
+          echo "Applied migrations: $applied"
+          if [ "$applied" -lt 1 ]; then
+            echo "::error::No migrations applied — container did not self-migrate"
+            docker logs api; exit 1
+          fi
+      - name: Teardown
+        if: always()
+        run: |
+          docker rm -f api pg >/dev/null 2>&1 || true
+          docker network rm stellar-smoke >/dev/null 2>&1 || true
+
+  publish:
+    needs: [test, smoke]
     runs-on: ubuntu-latest
     permissions:
       contents: read
