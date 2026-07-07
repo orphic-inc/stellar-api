@@ -27,6 +27,18 @@ function mockPreseededBootstrap() {
 }
 
 function mockSysopTransaction() {
+  // seedSystemUser + seedStylesheetFixtures run just before the SysOp transaction:
+  // the reserved System user is absent (findUnique → null), its UserSettings/Profile/
+  // User rows create as base mocks (the tx's once-mocks below still win for the SysOp),
+  // and the two built-in fixtures create + repoint their registry rows.
+  prismaMock.user.findUnique.mockResolvedValue(null);
+  prismaMock.userSettings.create.mockResolvedValue({ id: 4 } as never);
+  prismaMock.profile.create.mockResolvedValue({ id: 5 } as never);
+  prismaMock.user.create.mockResolvedValue({ id: 2 } as never);
+  prismaMock.authorStylesheet.findFirst.mockResolvedValue(null);
+  prismaMock.authorStylesheet.create.mockResolvedValue({ id: 100 } as never);
+  prismaMock.stylesheet.upsert.mockResolvedValue({ id: 1 } as never);
+
   // The flagship-community seed runs right after the user transaction commits.
   prismaMock.community.findFirst.mockResolvedValue(null);
   prismaMock.community.create.mockResolvedValue({ id: 1 } as never);

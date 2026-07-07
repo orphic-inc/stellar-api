@@ -1,0 +1,51 @@
+/*
+ * Dark Ambient — deep atmospheric theme with muted blue.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Components read the tokens through their `data-st`
+ * hooks, so repainting the tokens repaints every migrated surface for free. Built
+ * on the Layer Cake template; the derived tokens in common/global.css
+ * (--st-lossy, --st-weight, --st-weight-track) and the geometry/type tokens follow
+ * automatically.
+ *
+ * Palette is dark-ambient's own — near-black greys under a cold #007dc6 blue that
+ * lifts to #22b9ff on hover. The original skinned via tiled background *images*
+ * (wrapper/header/footer/button textures); those assets are deliberately NOT
+ * carried over (data-scrub gate) — the atmosphere lives in flat surface tokens
+ * instead. No url(), no bundled images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — near-black, faintly stepped */
+  --st-backdrop: #1a1a1a; /* page backdrop            */
+  --st-base: #202020; /* header / column-head bar */
+  --st-panel: #262626; /* cards, boxes             */
+  --st-raised: #2e2e2e; /* rows, inputs, chips      */
+
+  /* Text — muted grey on dark, cold-white for strong */
+  --st-text-strong: #d5efff; /* the cold blue-white accent text */
+  --st-text: #909090;
+  --st-text-muted: #757575;
+  --st-text-faint: #5c5c5c;
+
+  /* Accent / link — the muted blue signature */
+  --st-accent: #007dc6;
+  --st-accent-hover: #22b9ff;
+  --st-accent-ring: #22b9ff;
+  --st-link: #007dc6;
+  --st-link-hover: #22b9ff;
+
+  /* Borders */
+  --st-border: #303030;
+  --st-border-subtle: #242424;
+  --st-border-strong: #3f3f3f;
+
+  /* Status — red alert, muted-blue info, atmospheric greens/gold */
+  --st-danger: #cf3b3b;
+  --st-success: #5a9e5a;
+  --st-warning: #c99a3a;
+  --st-info: #557d9c;
+  --st-lossless: #7ec97e; /* quality cue */
+}

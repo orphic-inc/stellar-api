@@ -7,6 +7,8 @@ import {
   CommunityType,
   RegistrationStatus
 } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { ALL_PERMISSIONS } from '../lib/rankPermissions';
 import {
   DEFAULT_RANKS as EVALUATOR_RANKS,
@@ -489,6 +491,56 @@ export async function seedForums(client: PrismaClient): Promise<void> {
       });
     }
   }
+}
+
+/** Reserved username for the non-interactive System account. */
+export const SYSTEM_USERNAME = 'system';
+
+/**
+ * Seed the reserved, non-interactive System user that owns built-in content
+ * fixtures (the built-in stylesheet `AuthorStylesheet` rows). It can never log in
+ * — `disabled` + `rankLocked`, with an unguessable random password nobody holds —
+ * and uses an RFC-reserved `.invalid` email so it can't collide with a real
+ * signup. Idempotent on the unique username. Requires `seedRanks` to have run (it
+ * takes the base User rank). Returns the id so dependent seeders can author under
+ * it.
+ */
+export async function seedSystemUser(client: PrismaClient): Promise<number> {
+  const existing = await client.user.findUnique({
+    where: { username: SYSTEM_USERNAME },
+    select: { id: true }
+  });
+  if (existing) return existing.id;
+
+  const baseRank = await client.userRank.findFirst({ where: { level: 100 } });
+  if (!baseRank)
+    throw new Error(
+      'base User rank missing — run seedRanks before seedSystemUser'
+    );
+
+  // Unusable password: a random 32-byte secret hashed and discarded. No plaintext
+  // exists, so the account cannot authenticate even setting aside the disabled flag.
+  const unusablePassword = await bcrypt.hash(
+    randomBytes(32).toString('hex'),
+    await bcrypt.genSalt(10)
+  );
+
+  const userSettings = await client.userSettings.create({ data: {} });
+  const profile = await client.profile.create({ data: {} });
+  const user = await client.user.create({
+    data: {
+      username: SYSTEM_USERNAME,
+      email: 'system@stellar.invalid',
+      password: unusablePassword,
+      userRankId: baseRank.id,
+      userSettingsId: userSettings.id,
+      profileId: profile.id,
+      disabled: true,
+      rankLocked: true
+    },
+    select: { id: true }
+  });
+  return user.id;
 }
 
 /**

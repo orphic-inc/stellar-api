@@ -1,0 +1,50 @@
+/*
+ * Anorex — brown / wood theme (the classic tracker default), ported to Stellar.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Components read the tokens through their `data-st`
+ * hooks, so repainting the tokens repaints every migrated surface for free. Built
+ * on the Layer Cake template (src/stylesheets/layer-cake/style.css); the derived
+ * tokens in common/global.css (--st-lossy, --st-weight, --st-weight-track) and the
+ * geometry/type tokens (--st-radius, --st-gap, --st-mono) follow automatically.
+ *
+ * Palette is anorex's own — wood browns, cream boxes, oxblood/gold status. The
+ * original skinned via a wood-texture background *image*; that asset is
+ * deliberately NOT carried over (data-scrub gate) — the wood tone lives in
+ * --st-backdrop as a flat colour instead. No url(), no bundled images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — wood chrome, cream panels */
+  --st-backdrop: #6b4f2a; /* page backdrop (was the woodbg texture) */
+  --st-base: #b78234; /* header / column-head (the wood nav)     */
+  --st-panel: #dcb881; /* cards, boxes (.box cream)               */
+  --st-raised: #cda369; /* rows, inputs, chips (tr.rowa)           */
+
+  /* Text — dark brown ink */
+  --st-text-strong: #331c01;
+  --st-text: #492802;
+  --st-text-muted: #6b481e;
+  --st-text-faint: #7a5a2e;
+
+  /* Accent / link — anorex browns */
+  --st-accent: #6b481e;
+  --st-accent-hover: #a56a22;
+  --st-accent-ring: #a56a22;
+  --st-link: #6b481e;
+  --st-link-hover: #a56a22;
+
+  /* Borders */
+  --st-border: #65430f;
+  --st-border-subtle: #8a6a3a;
+  --st-border-strong: #65430f;
+
+  /* Status — oxblood alert, gold save, tracker greens */
+  --st-danger: #af2525;
+  --st-success: #418b00;
+  --st-warning: #b8860b;
+  --st-info: #557d9c;
+  --st-lossless: #418b00; /* quality cue = the tracker green */
+}

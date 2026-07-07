@@ -17,9 +17,11 @@ import {
   seedRanks,
   seedRankPromotionRules,
   seedForums,
+  seedSystemUser,
   seedDefaultCommunity
 } from '../../modules/bootstrap';
 import { seedGoldenRules } from '../../modules/goldenRules';
+import { seedStylesheetFixtures } from '../../modules/stylesheetFixtures';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
 import { getDefaultStylesheetName } from '../../modules/stylesheet';
@@ -174,6 +176,10 @@ router.post(
     await seedRankPromotionRules(prisma);
     await seedForums(prisma);
     await seedGoldenRules(prisma);
+    // System user + built-in stylesheet fixtures it owns (repoints the registry
+    // rows at the /css delivery route). Needs ranks; independent of the SysOp.
+    const systemUserId = await seedSystemUser(prisma);
+    await seedStylesheetFixtures(prisma, systemUserId);
 
     const sysopRank = await prisma.userRank.findFirst({
       where: { level: 1000 }

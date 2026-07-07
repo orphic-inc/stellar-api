@@ -10,9 +10,11 @@ import { PrismaClient } from '@prisma/client';
 import {
   seedRanks,
   seedRankPromotionRules,
-  seedForums
+  seedForums,
+  seedSystemUser
 } from '../src/modules/bootstrap';
 import { seedGoldenRules } from '../src/modules/goldenRules';
+import { seedStylesheetFixtures } from '../src/modules/stylesheetFixtures';
 
 const prisma = new PrismaClient();
 
@@ -21,6 +23,9 @@ async function main() {
   await seedRankPromotionRules(prisma);
   await seedForums(prisma);
   await seedGoldenRules(prisma);
+  // System user must precede the stylesheet fixtures it owns (needs ranks first).
+  const systemUserId = await seedSystemUser(prisma);
+  await seedStylesheetFixtures(prisma, systemUserId);
   console.log('→ Complete setup at http://localhost:9000/install');
 }
 
