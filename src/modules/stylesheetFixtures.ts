@@ -27,6 +27,46 @@ export const BUILTIN_STYLESHEET_FIXTURES = [
     name: 'dark-ambient',
     description: 'Deep atmospheric theme with muted blue',
     file: 'dark-ambient.css'
+  },
+  {
+    name: 'kuro',
+    description: 'Dark slate theme — muted blue accent',
+    file: 'kuro.css'
+  },
+  {
+    name: 'layer-cake',
+    description: 'Classic light-grey theme (token reference)',
+    file: 'layer-cake.css'
+  },
+  {
+    name: 'shiro',
+    description: 'Light neutral grey theme',
+    file: 'shiro.css'
+  },
+  {
+    name: 'mono',
+    description: 'Clean light theme with a single blue accent',
+    file: 'mono.css'
+  },
+  {
+    name: 'minimal',
+    description: 'Dark neutral theme with a bright cyan accent',
+    file: 'minimal.css'
+  },
+  {
+    name: 'hydro',
+    description: 'Soft slate-blue light theme',
+    file: 'hydro.css'
+  },
+  {
+    name: 'bubblegum',
+    description: 'Pastel-cyan theme with a hot-pink accent',
+    file: 'bubblegum.css'
+  },
+  {
+    name: 'white',
+    description: 'Clean white theme with a sky-blue accent',
+    file: 'white.css'
   }
 ] as const;
 
@@ -62,7 +102,9 @@ export const REQUIRED_ST_PRIMITIVES = [
   '--st-danger',
   '--st-success',
   '--st-warning',
-  '--st-info'
+  '--st-info',
+  // Quality
+  '--st-lossless'
 ] as const;
 
 const SEED_ASSET_DIR = resolve(

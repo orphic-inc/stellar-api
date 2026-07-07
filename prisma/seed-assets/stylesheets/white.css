@@ -1,0 +1,47 @@
+/*
+ * White — clean white theme with a sky-blue accent.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Original header
+ * textures and icon sprites are dropped (data-scrub gate) — the airy look lives in
+ * flat surface tokens. No url(), no bundled images.
+ *
+ * Bright sky (--st-accent) carries chrome/fills; link text uses a deeper blue so
+ * it stays legible on white.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — white cards, faint grey chrome */
+  --st-backdrop: #ffffff; /* page backdrop          */
+  --st-base: #e8e8e8; /* header / column-head   */
+  --st-panel: #fafafa; /* cards, boxes           */
+  --st-raised: #f0f0f0; /* rows, inputs, chips    */
+
+  /* Text */
+  --st-text-strong: #333333;
+  --st-text: #555555;
+  --st-text-muted: #777777;
+  --st-text-faint: #999999;
+
+  /* Accent / link — sky blue chrome, deeper blue link text */
+  --st-accent: #3a9fd6;
+  --st-accent-hover: #2e93cf;
+  --st-accent-ring: #3a9fd6;
+  --st-link: #1a7ab8;
+  --st-link-hover: #0f5687;
+
+  /* Borders */
+  --st-border: #dcdcdc;
+  --st-border-subtle: #ececec;
+  --st-border-strong: #c4c4c4;
+
+  /* Status */
+  --st-danger: #cc3311;
+  --st-success: #1a9955;
+  --st-warning: #b0791f;
+  --st-info: #2e93cf;
+  --st-lossless: #1a9955; /* quality cue = the theme's green */
+}

@@ -26,15 +26,18 @@
 
   /* Text — muted grey on dark, cold-white for strong */
   --st-text-strong: #d5efff; /* the cold blue-white accent text */
-  --st-text: #909090;
+  --st-text: #999999; /* clears AA 4.5 on the raised-row surface */
   --st-text-muted: #757575;
   --st-text-faint: #5c5c5c;
 
-  /* Accent / link — the muted blue signature */
+  /* Accent / link — muted blue signature on chrome; link text lifted for AA.
+   * --st-accent stays the deep #007dc6 brand fill (accents/rings pass the 3:1
+   * UI-component rule); --st-link is raised so link *text* clears AA 4.5 on the
+   * dark panels, then brightens to #22b9ff on hover. */
   --st-accent: #007dc6;
   --st-accent-hover: #22b9ff;
   --st-accent-ring: #22b9ff;
-  --st-link: #007dc6;
+  --st-link: #2b95e0;
   --st-link-hover: #22b9ff;
 
   /* Borders */

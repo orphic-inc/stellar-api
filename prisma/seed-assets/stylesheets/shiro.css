@@ -1,0 +1,44 @@
+/*
+ * Shiro — light neutral grey theme (the pale counterpart to Kuro).
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Any original
+ * chrome textures are dropped (data-scrub gate) — the tone lives in flat surface
+ * tokens. No url(), no bundled images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — plain light greys */
+  --st-backdrop: #dddddd; /* page backdrop          */
+  --st-base: #cccccc; /* header / column-head   */
+  --st-panel: #eaeaea; /* cards, boxes           */
+  --st-raised: #d4d4d4; /* rows, inputs, chips    */
+
+  /* Text — neutral grey ink */
+  --st-text-strong: #2a2a2a;
+  --st-text: #444444;
+  --st-text-muted: #666666;
+  --st-text-faint: #888888;
+
+  /* Accent / link — quiet grey, darkening on hover */
+  --st-accent: #555555;
+  --st-accent-hover: #333333;
+  --st-accent-ring: #555555;
+  --st-link: #555555;
+  --st-link-hover: #333333;
+
+  /* Borders */
+  --st-border: #bbbbbb;
+  --st-border-subtle: #cfcfcf;
+  --st-border-strong: #999999;
+
+  /* Status */
+  --st-danger: #a33333;
+  --st-success: #4f7a2f;
+  --st-warning: #9c7d28;
+  --st-info: #557d9c;
+  --st-lossless: #4f7a2f; /* quality cue = the theme's green */
+}

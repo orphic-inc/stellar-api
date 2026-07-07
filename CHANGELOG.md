@@ -6,6 +6,26 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.6.4] — 2026-07-07
+
+The built-in theme catalog becomes api-canonical and single-sourced, and the api version aligns with stellar-ui.
+
+### Added
+
+- **Eight more built-in themes are api-canonical** — `kuro` and `layer-cake` (previously bundled in stellar-ui) plus six token-only conversions (`shiro`, `mono`, `minimal`, `hydro`, `bubblegum`, `white`) now ship as System-owned `AuthorStylesheet` fixtures delivered via `GET /api/stylesheet/author-stylesheet/:id/css` — single-sourced like `anorex`/`dark-ambient` before them, so the theme catalog has one home (the api registry) rather than a split across two repos [ADR-0024, ADR-0026]. Asset-bearing themes stay out until the asset store lands.
+
+### Changed
+
+- **dark-ambient link/text contrast** — the resting link colour is lifted (`--st-link` → `#2b95e0`) so link text clears WCAG AA on the dark panels, while `--st-accent` keeps its deep muted-blue signature on chrome; body `--st-text` nudged to `#999999` to clear AA on the raised-row surface.
+
+### Fixed
+
+- **Theme contract drift closed** — `--st-lossless` added to the api's required `--st-*` primitive set (20 → 21), matching the stellar-ui token contract; the fixture drift-guard now pins every built-in theme to the full primitive set.
+
+### Docs
+
+- **ADR-0026 accepted** — static-asset storage for theme imagery and content assets moves from Proposed to Accepted; implementation is tracked separately [#290] (it unblocks the asset-bearing themes that the `/css` route can't carry).
+
 ## [0.6.3] — 2026-07-07
 
 Stylesheet registry integrity: the built-in themes become api-canonical and single-source, and delivery is guarded so a dead theme-picker entry can't ship.
@@ -494,7 +514,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orphic-inc/stellar-api/compare/v0.6.0...v0.6.1

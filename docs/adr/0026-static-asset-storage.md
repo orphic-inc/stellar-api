@@ -1,6 +1,6 @@
 # ADR-0026: Static asset storage for themes and content imagery
 
-**Status:** Proposed (2026-07-07)
+**Status:** Accepted (2026-07-07)
 **Relates:** [ADR-0024](0024-stylesheet-delivery-contract.md) (stylesheet delivery contract — the `/css` route this ADR complements), stellar-ui ADR-0005 / `docs/theming.md` (the token contract that makes recolor themes asset-free), and the built-in stylesheet fixtures shipped in 0.6.3 (#285, #286).
 
 ## Context
@@ -15,11 +15,11 @@ But two forces make a real asset story unavoidable:
 
 This ADR fixes the **decision** to build a general static-asset store; the implementation is deferred to a tracked follow-up (it does not block the 0.6.3 cut, whose themes are asset-free).
 
-## Decision (shape — to be ratified before implementation)
+## Decision
 
-Introduce an api-owned asset store as the single home for binary assets a stored row references, so an asset — like a stylesheet's canonical source — is verifiable from the api that serves it.
+Introduce an api-owned asset store as the single home for binary assets a stored row references, so an asset — like a stylesheet's canonical source — is verifiable from the api that serves it. The shape below is accepted; the implementation is tracked as a separate `feat` issue that settles the remaining concrete choices (marked).
 
-The design space to settle in the implementation ADR/PR:
+The parameters the implementation fixes:
 
 - **Storage backend.** An object store (S3-compatible / MinIO) is the scalable default for "plentiful"; a mounted volume or a DB-blob table are simpler but bounded. Pick one, with the connection surfaced through `config.ts` and degrade-closed when unset (mirroring the korin integration pattern).
 - **Model + serve route.** An `Asset` row (id, content hash, mime, size, owner, kind) plus a content-addressed serve route (`GET /api/asset/:id` or by hash) with correct `Content-Type` and long-lived caching (assets are immutable once stored, unlike the mutable `/css` sheet).
@@ -36,4 +36,4 @@ The design space to settle in the implementation ADR/PR:
 
 ## Follow-up
 
-Implementation is tracked separately (a `feat` issue on this repo); this ADR is the design gate, not the build.
+Implementation is tracked separately (#290); this ADR is the design gate, not the build.

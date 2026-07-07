@@ -1,0 +1,50 @@
+/*
+ * Layer Cake — classic light-grey theme (the token-only reference).
+ * ============================================================================
+ *
+ * The reference token-only theme (stellar-ui ADR-0005 / docs/theming.md, WS3). It
+ * proves the recolor contract: a whole-app re-skin is *just* a redefinition of the
+ * `--st-*` Role Tokens — NO selectors, NO utility overrides, NO `!important`. The
+ * components read the tokens through their `data-st` hooks, so repainting the
+ * tokens repaints every hooked surface for free.
+ *
+ * Only the PRIMITIVE tokens are restated. The derived tokens in common/global.css
+ * reference others via var() and resolve lazily, so they follow automatically:
+ *   --st-lossy        → var(--st-text-faint)
+ *   --st-weight       → var(--st-accent-ring)
+ *   --st-weight-track → color-mix(… var(--st-raised) …)
+ * Geometry/type (--st-radius, --st-gap, --st-mono) inherit the defaults.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — classic light grays */
+  --st-backdrop: #e2e2e2; /* page backdrop          */
+  --st-base: #d7d7d7; /* header / column-head   */
+  --st-panel: #eaeaea; /* cards, boxes           */
+  --st-raised: #d7d7d7; /* rows, inputs, chips    */
+
+  /* Text */
+  --st-text-strong: #333333;
+  --st-text: #444444;
+  --st-text-muted: #555555;
+  --st-text-faint: #666666;
+
+  /* Accent / link */
+  --st-accent: #666666;
+  --st-accent-hover: #565656;
+  --st-accent-ring: #666666;
+  --st-link: #555555;
+  --st-link-hover: #444444;
+
+  /* Borders */
+  --st-border: #888888;
+  --st-border-subtle: #b8b8b8;
+  --st-border-strong: #666666;
+
+  /* Status */
+  --st-danger: #aa5555;
+  --st-success: #557d39;
+  --st-warning: #9c7d28;
+  --st-info: #557d9c; /* Layer Cake had no explicit info; a muted blue */
+  --st-lossless: #557d39; /* quality cue = the theme's green */
+}

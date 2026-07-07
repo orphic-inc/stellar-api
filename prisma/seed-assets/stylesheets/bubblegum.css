@@ -1,0 +1,47 @@
+/*
+ * Bubblegum — pastel-cyan theme with a hot-pink accent.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Original
+ * background/icon chrome is dropped (data-scrub gate). No url(), no bundled
+ * images.
+ *
+ * Two blues + a pink: vivid pink (--st-accent) carries fills and chrome; link
+ * text uses a deeper magenta so it clears legibility contrast on the pale panels.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — pastel cyan, near-white cards */
+  --st-backdrop: #c7edfc; /* page backdrop          */
+  --st-base: #b8e8fb; /* header / column-head   */
+  --st-panel: #f3fbfe; /* cards, boxes           */
+  --st-raised: #dff4fd; /* rows, inputs, chips    */
+
+  /* Text */
+  --st-text-strong: #1f2933;
+  --st-text: #333333;
+  --st-text-muted: #5a6570;
+  --st-text-faint: #8090a0;
+
+  /* Accent / link — vivid pink fill, deeper magenta for link text */
+  --st-accent: #fe448b;
+  --st-accent-hover: #ff6ba3;
+  --st-accent-ring: #fe448b;
+  --st-link: #cc1a72;
+  --st-link-hover: #99145a;
+
+  /* Borders */
+  --st-border: #9dd9f2;
+  --st-border-subtle: #cdeefb;
+  --st-border-strong: #7bc0e6;
+
+  /* Status */
+  --st-danger: #d13a3a;
+  --st-success: #4f9e2f;
+  --st-warning: #d19a2a;
+  --st-info: #3b9ad0;
+  --st-lossless: #4f9e2f; /* quality cue = the theme's green */
+}

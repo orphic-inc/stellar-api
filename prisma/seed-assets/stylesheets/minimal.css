@@ -1,0 +1,44 @@
+/*
+ * Minimal — dark neutral theme with a bright cyan accent.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Original
+ * background patterns and sprite chrome are dropped (data-scrub gate) — the
+ * atmosphere lives in flat surface tokens. No url(), no bundled images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — stepped dark greys */
+  --st-backdrop: #212121; /* page backdrop          */
+  --st-base: #2e2e2e; /* header / column-head   */
+  --st-panel: #373737; /* cards, boxes           */
+  --st-raised: #313131; /* rows, inputs, chips    */
+
+  /* Text — light grey on dark */
+  --st-text-strong: #ffffff;
+  --st-text: #e6e6e6;
+  --st-text-muted: #a8a8a8;
+  --st-text-faint: #7c7c7c;
+
+  /* Accent / link — bright cyan */
+  --st-accent: #3f9ae0;
+  --st-accent-hover: #55aaff;
+  --st-accent-ring: #55aaff;
+  --st-link: #55aaff;
+  --st-link-hover: #7cc0ff;
+
+  /* Borders */
+  --st-border: #4d4d4d;
+  --st-border-subtle: #3a3a3a;
+  --st-border-strong: #6a6a6a;
+
+  /* Status */
+  --st-danger: #cf5b5b;
+  --st-success: #6aab6a;
+  --st-warning: #c9a24a;
+  --st-info: #557d9c;
+  --st-lossless: #7ec97e; /* quality cue */
+}

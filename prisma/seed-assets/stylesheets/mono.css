@@ -1,0 +1,43 @@
+/*
+ * Mono — clean light theme with a single blue accent.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Original icon
+ * chrome is dropped (data-scrub gate). No url(), no bundled images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — white cards on soft grey */
+  --st-backdrop: #eeeeee; /* page backdrop          */
+  --st-base: #dcdcdc; /* header / column-head   */
+  --st-panel: #ffffff; /* cards, boxes           */
+  --st-raised: #f4f4f4; /* rows, inputs, chips    */
+
+  /* Text */
+  --st-text-strong: #333333;
+  --st-text: #565656;
+  --st-text-muted: #767676;
+  --st-text-faint: #969696;
+
+  /* Accent / link — the one blue */
+  --st-accent: #3b7ab0;
+  --st-accent-hover: #2c5f8a;
+  --st-accent-ring: #3b7ab0;
+  --st-link: #2f6ea3;
+  --st-link-hover: #21506f;
+
+  /* Borders */
+  --st-border: #aeaeae;
+  --st-border-subtle: #d0d0d0;
+  --st-border-strong: #8a8a8a;
+
+  /* Status */
+  --st-danger: #b23a3a;
+  --st-success: #4f7a2f;
+  --st-warning: #9c7d28;
+  --st-info: #3b7ab0;
+  --st-lossless: #4f7a2f; /* quality cue = the theme's green */
+}

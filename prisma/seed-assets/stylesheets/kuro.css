@@ -1,0 +1,69 @@
+/*
+ * Kuro — dark slate theme.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Components read the tokens through their `data-st`
+ * hooks, so repainting the tokens repaints every migrated surface for free. The
+ * derived tokens in common/global.css (--st-lossy, --st-weight, --st-weight-track)
+ * and the geometry/type tokens (--st-radius, --st-gap, --st-mono) follow
+ * automatically.
+ *
+ * Kuro keeps its own named `--kuro-*` palette and aliases it onto the `--st-*`
+ * primitives — the palette resolves within this sheet, so the fixture is
+ * self-contained. (The legacy `.bg-gray-*` !important surface-overrides kuro
+ * carried before the component sweep are dropped here — this is the token layer
+ * only.)
+ * ============================================================================ */
+
+:root {
+  /* Palette */
+  --kuro-bg-page: #1f1f1f;
+  --kuro-bg-panel: #2a2a2a;
+  --kuro-bg-panel-alt: #333;
+  --kuro-bg-input: #2e2e2e;
+  --kuro-border: #4a4a4a;
+  --kuro-border-muted: #3a3a3a;
+  --kuro-text: #c8c8c8;
+  --kuro-text-muted: #999;
+  --kuro-text-faint: #666;
+  --kuro-link: #b8c0d0;
+  --kuro-link-hover: #dde3ec;
+  --kuro-accent: #5b7fa6;
+  --kuro-accent-hover: #4a6e94;
+  --kuro-danger: #a05050;
+  --kuro-success: #4f7a4f;
+  --kuro-warning: #8a7340;
+
+  /* Surfaces */
+  --st-backdrop: var(--kuro-bg-page);
+  --st-base: var(--kuro-bg-panel-alt);
+  --st-panel: var(--kuro-bg-panel);
+  --st-raised: var(--kuro-bg-input);
+
+  /* Text */
+  --st-text-strong: #e2e2e2;
+  --st-text: var(--kuro-text);
+  --st-text-muted: var(--kuro-text-muted);
+  --st-text-faint: var(--kuro-text-faint);
+
+  /* Accent / link */
+  --st-accent: var(--kuro-accent);
+  --st-accent-hover: var(--kuro-accent-hover);
+  --st-accent-ring: var(--kuro-accent);
+  --st-link: var(--kuro-link);
+  --st-link-hover: var(--kuro-link-hover);
+
+  /* Borders */
+  --st-border: var(--kuro-border);
+  --st-border-subtle: var(--kuro-border-muted);
+  --st-border-strong: var(--kuro-border);
+
+  /* Status */
+  --st-danger: var(--kuro-danger);
+  --st-success: var(--kuro-success);
+  --st-warning: var(--kuro-warning);
+  --st-info: var(--kuro-accent);
+  --st-lossless: var(--kuro-success);
+}

@@ -1,0 +1,44 @@
+/*
+ * Hydro — soft slate-blue light theme.
+ * ============================================================================
+ *
+ * A token-only theme (stellar-ui ADR-0005 / docs/theming.md): a whole-app re-skin
+ * is *just* a redefinition of the `--st-*` Role Tokens — NO selectors, NO utility
+ * overrides, NO `!important`. Built on the Layer Cake template; the derived and
+ * geometry/type tokens in common/global.css follow automatically. Original
+ * gradient/texture chrome is dropped (data-scrub gate). No url(), no bundled
+ * images.
+ * ============================================================================ */
+
+:root {
+  /* Surfaces — pale blue-greys */
+  --st-backdrop: #ecf0f6; /* page backdrop          */
+  --st-base: #d7e2ef; /* header / column-head   */
+  --st-panel: #f4f6fb; /* cards, boxes           */
+  --st-raised: #e1e9f2; /* rows, inputs, chips    */
+
+  /* Text — near-black slate */
+  --st-text-strong: #16202b;
+  --st-text: #29323d;
+  --st-text-muted: #52606f;
+  --st-text-faint: #7a8794;
+
+  /* Accent / link — muted slate blue */
+  --st-accent: #32475f;
+  --st-accent-hover: #4a6a94;
+  --st-accent-ring: #4a6a94;
+  --st-link: #32475f;
+  --st-link-hover: #4a6a94;
+
+  /* Borders */
+  --st-border: #98aab1;
+  --st-border-subtle: #c3d0dd;
+  --st-border-strong: #7c8b97;
+
+  /* Status */
+  --st-danger: #c0504a;
+  --st-success: #5f9e3a;
+  --st-warning: #c99a3a;
+  --st-info: #4a6a94;
+  --st-lossless: #5f9e3a; /* quality cue = the theme's green */
+}
