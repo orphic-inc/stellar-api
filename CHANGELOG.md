@@ -6,6 +6,26 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-07-07
+
+Stylesheet registry integrity: the built-in themes become api-canonical and single-source, and delivery is guarded so a dead theme-picker entry can't ship.
+
+### Added
+
+- **Built-in stylesheet fixtures are api-canonical** — `anorex` and `dark-ambient` are stored as `AuthorStylesheet` rows owned by a reserved System user and delivered via `GET /api/stylesheet/author-stylesheet/:id/css`; each registry row's `cssUrl` points at that route, so the stored source is the single canonical artifact, no silent static-file duplicate [#285, #286, ADR-0024]. `dark-ambient` — previously a registered row with no stylesheet anywhere (a dead theme-picker entry) — now ships as a token-only theme (stellar-ui ADR-0005) [#286].
+- **Reserved System user** — a non-interactive, disabled account (`seedSystemUser`) owning built-in content fixtures; seeded before them in both the dev seed and the install flow.
+- **Registry ↔ delivery consistency guard** — an integration test asserts every `/css`-backed registry row resolves to a real, non-empty `AuthorStylesheet`, and a pure spec pins each built-in theme to the full `--st-*` primitive set, so a dead or half-painted theme fails CI instead of shipping [#286].
+- **ADR-0026** — static-asset storage plan (design) for theme imagery and content assets the `/css` route can't carry [ADR-0026].
+
+### Fixed
+
+- **Mass PM gated by a granular permission** — mass private messaging now requires `messages_mass_pm` rather than a broad role check [#281].
+
+### Docs
+
+- **ADR-0014** — per-user contribution feed (derive the token, don't mint a secret); cross-linked to the live PRD-02 and ADR-0015.
+- **ADR-0025** — moderation & messaging surface model (Reports vs Personal Messages vs Staff Inbox).
+
 ## [0.6.2] — 2026-07-03
 
 A 0.6.x increment landing the stylesheet delivery contract (registry CSS serving + a single-source slot), site-wide author-sign propagation, the staff-inbox consolidation, and a self-migrating runtime image.
@@ -474,7 +494,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orphic-inc/stellar-api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/orphic-inc/stellar-api/compare/v0.5.6...v0.6.0
