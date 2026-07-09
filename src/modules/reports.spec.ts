@@ -36,6 +36,14 @@ jest.mock('../lib/prisma', () => ({
   prisma: prismaMock
 }));
 
+jest.mock('./logging', () => ({
+  getLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() })
+}));
+
+jest.mock('./pm', () => ({
+  sendSystemMessage: jest.fn().mockResolvedValue({ ok: true })
+}));
+
 import {
   addNote,
   claimReport,
@@ -48,6 +56,9 @@ import {
   resolveReport,
   unclaimReport
 } from './reports';
+import { sendSystemMessage } from './pm';
+
+const mockSendSystemMessage = sendSystemMessage as jest.Mock;
 
 const makeReport = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -323,6 +334,32 @@ describe('resolveReport', () => {
         reason: 'not_found'
       }
     );
+  });
+
+  it('sends a null-sender System PM to the reporter on resolve', async () => {
+    prismaMock.report.updateMany.mockResolvedValueOnce({ count: 1 });
+    prismaMock.report.findUnique.mockResolvedValueOnce({ reporterId: 42 });
+
+    await expect(
+      resolveReport(9, 7, 'Removed the offending post', 'ContentRemoved')
+    ).resolves.toEqual({ ok: true });
+
+    expect(mockSendSystemMessage).toHaveBeenCalledTimes(1);
+    const [toId, , body] = mockSendSystemMessage.mock.calls[0];
+    expect(toId).toBe(42);
+    expect(body).toContain('Removed the offending post');
+    expect(body).toContain('ContentRemoved');
+    expect(body).toContain('/private/reports/9');
+  });
+
+  it('does not fail the resolve when the System PM send throws', async () => {
+    prismaMock.report.updateMany.mockResolvedValueOnce({ count: 1 });
+    prismaMock.report.findUnique.mockResolvedValueOnce({ reporterId: 42 });
+    mockSendSystemMessage.mockRejectedValueOnce(new Error('pm boom'));
+
+    await expect(resolveReport(9, 7, 'Handled', 'Dismissed')).resolves.toEqual({
+      ok: true
+    });
   });
 });
 
