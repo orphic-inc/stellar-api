@@ -1089,11 +1089,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/DonorPresentation"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "collageShelves": {
             "$ref": "#/components/schemas/ProfileCollageShelves"
@@ -1102,11 +1100,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ProfileStaffPmOverview"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "recentContributions": {
             "type": "array",
@@ -1130,11 +1126,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/CommunityStats"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -1255,11 +1249,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/DonorPresentation"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "collageShelves": {
             "$ref": "#/components/schemas/ProfileCollageShelves"
@@ -1268,11 +1260,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ProfileStaffPmOverview"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "recentContributions": {
             "type": "array",
@@ -1296,11 +1286,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/CommunityStats"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "userSettings": {
             "$ref": "#/components/schemas/UserSettings"
@@ -1944,7 +1932,11 @@
               "request_filled",
               "collage_updated",
               "comment_sub",
-              "artist_release"
+              "artist_release",
+              "site_news",
+              "global_notice",
+              "rank_promoted",
+              "rank_demoted"
             ]
           },
           "actorId": {

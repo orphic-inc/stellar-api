@@ -4,6 +4,7 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { NotificationType } from '@prisma/client';
 import { appVersion } from './version';
 import {
   profileUpdateSchema,
@@ -1394,14 +1395,7 @@ const Notification = registry.register(
   'Notification',
   z.object({
     id: z.number(),
-    type: z.enum([
-      'forum_quote',
-      'forum_sub',
-      'request_filled',
-      'collage_updated',
-      'comment_sub',
-      'artist_release'
-    ]),
+    type: z.nativeEnum(NotificationType),
     actorId: z.number().nullable().optional(),
     actor: z
       .object({
@@ -7472,9 +7466,59 @@ registry.registerPath({
 
 // ─── Document builder ─────────────────────────────────────────────────────────
 
+type JsonRecord = Record<string, unknown>;
+
+// zod-to-openapi's OpenAPI 3.0 codegen for `X.nullable()` on a *registered*
+// schema renders `{ allOf: [ref, { nullable: true }] }` — the nullable flag
+// as its own array member rather than a sibling of `allOf`. That's not the
+// standard OpenAPI 3.0 nullable-ref idiom (`{ allOf: [ref], nullable: true }`,
+// flag as a sibling of the array); openapi-typescript reads the malformed
+// shape as an untyped extra branch and silently drops `null` from the
+// generated type (#295). Reshape post-generation instead of hand-duplicating
+// every affected schema at its use site.
+function isNullableRefWorkaround(
+  value: unknown
+): value is { allOf: [unknown, JsonRecord] } {
+  if (!value || typeof value !== 'object') return false;
+  const { allOf } = value as JsonRecord;
+  if (!Array.isArray(allOf) || allOf.length !== 2) return false;
+  const second = allOf[1];
+  return (
+    !!second &&
+    typeof second === 'object' &&
+    Object.keys(second as JsonRecord).length === 1 &&
+    (second as JsonRecord).nullable === true
+  );
+}
+
+function fixNullableRef(value: unknown): unknown {
+  if (isNullableRefWorkaround(value)) {
+    return { allOf: [value.allOf[0]], nullable: true };
+  }
+  return value;
+}
+
+function normalizeNullableRefsDeep(node: unknown): unknown {
+  if (Array.isArray(node)) {
+    return node.map(normalizeNullableRefsDeep);
+  }
+  if (node && typeof node === 'object') {
+    const fixed = fixNullableRef(node);
+    if (fixed !== node) {
+      return fixed;
+    }
+    const result: JsonRecord = {};
+    for (const [key, val] of Object.entries(node as JsonRecord)) {
+      result[key] = normalizeNullableRefsDeep(val);
+    }
+    return result;
+  }
+  return node;
+}
+
 export function buildOpenApiDocument() {
   const generator = new OpenApiGeneratorV3(registry.definitions);
-  return generator.generateDocument({
+  const doc = generator.generateDocument({
     openapi: '3.0.0',
     info: {
       title: 'Stellar API',
@@ -7485,4 +7529,19 @@ export function buildOpenApiDocument() {
     },
     servers: [{ url: '/api', description: 'API server' }]
   });
+
+  // Only PublicProfile and MyProfile (which spreads PublicProfile.shape) hit
+  // the nullable-ref registered-schema path (#295) — scope the reshape to
+  // those instead of walking the whole document.
+  const schemas = doc.components?.schemas;
+  if (schemas) {
+    for (const name of ['PublicProfile', 'MyProfile'] as const) {
+      const schema = schemas[name];
+      if (schema) {
+        schemas[name] = normalizeNullableRefsDeep(schema) as typeof schema;
+      }
+    }
+  }
+
+  return doc;
 }
