@@ -16,15 +16,15 @@ git clone git@github.com:<you>/stellar-api.git && cd stellar-api
 git remote add upstream git@github.com:orphic-inc/stellar-api.git   # or: git wire-upstream
 ```
 
-**Aliases** (install via the `~/.config/git/stellar-aliases.gitconfig` include):
+**Optional aliases.** These convenience aliases wrap the fork-workflow commands. Add them to a git include (e.g. a `~/.config/git/stellar-aliases.gitconfig` referenced from your `~/.gitconfig`), or just use the raw commands in the right-hand column:
 
-| alias                | does                                                            |
-| -------------------- | --------------------------------------------------------------- |
-| `git sync`           | fetch upstream, ff `main` to `upstream/main`, push to your fork |
-| `git feature <name>` | `sync` then branch off a fresh `main`                           |
-| `git publish`        | push the current branch to your fork                            |
-| `git opr`            | open a PR from the current branch into `upstream/main`          |
-| `git remotes`        | show which remote is fork vs upstream                           |
+| alias                | does                                                            | raw equivalent                                                                                         |
+| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `git sync`           | fetch upstream, ff `main` to `upstream/main`, push to your fork | `git fetch upstream && git checkout main && git merge --ff-only upstream/main && git push origin main` |
+| `git feature <name>` | `sync` then branch off a fresh `main`                           | `git sync && git checkout -b <name>`                                                                   |
+| `git publish`        | push the current branch to your fork                            | `git push -u origin HEAD`                                                                              |
+| `git opr`            | open a PR from the current branch into `upstream/main`          | `gh pr create --repo orphic-inc/stellar-api --base main`                                               |
+| `git remotes`        | show which remote is fork vs upstream                           | `git remote -v`                                                                                        |
 
 **Branches:** `main` is the only long-lived branch and the sole PR target — there is no `develop` or `staging`. **Cut feature branches from `main`** on your fork and PR into `upstream/main`; linear history (rebase-merge). `release/*` branches may live on `upstream` when a release needs coordination — the one sanctioned exception. See [ADR-0010](docs/adr/0010-trunk-based-single-branch-workflow.md).
 
@@ -32,16 +32,20 @@ git remote add upstream git@github.com:orphic-inc/stellar-api.git   # or: git wi
 
 ## Local pre-commit gate
 
-Each repo runs a **husky** pre-commit hook that invokes **lint-staged** over your staged files, so formatting/lint never lands in a commit:
+The **husky** `pre-commit` hook does more than format staged files — it runs, in order:
 
-- staged `*.ts`/`*.tsx` → `eslint --fix` then `prettier --write`
-- staged `*.{json,md,scss,css}` → `prettier --write` (ui also runs `stylelint` on `*.scss`)
+1. **`lint-staged`** over staged files — `*.ts`/`*.tsx` → `eslint --fix` then `prettier --write`; `*.{json,md,scss,css}` → `prettier --write` (ui also runs `stylelint` on `*.scss`).
+2. **`tsc --noEmit`** — type-checks the **whole project** (a staged edit can break types in files it doesn't touch).
+3. **`npm run typecheck:test`** — type-checks the test files (the base tsconfig excludes them).
+4. **`npm run version:check`** — the version-consistency guardrail across `package.json`/lockfile/CHANGELOG (internal axes; the git-tag axis is enforced in CI on tag pushes so a release-bump commit isn't blocked).
 
-The hook installs automatically — `npm install` runs the `prepare` script (`husky install || true`; the `|| true` keeps dependency-free production/Docker builds from failing). Nothing to wire up by hand.
+So format, lint, and type-checking are enforced at commit time — you don't need to run them by hand as a separate ritual. The hook installs automatically: `npm install` runs `prepare` (`husky install || true`; the `|| true` keeps dependency-free production/Docker builds from failing).
+
+The whole chain can take several minutes on a cold cache. If you must commit around it (e.g. a docs-only change while iterating), run the gates yourself and commit with `--no-verify`, noting it in the message — but the pushed branch must still pass CI.
 
 > **One config, no shadow.** lint-staged config lives **only** in `package.json`. Do not add a `.lintstagedrc` — lint-staged prefers the rc file and silently ignores the `package.json` block, which disables the real rules.
 
-lint-staged is the fast staged-file pass, not the full check. **Before pushing**, run the complete gate (it must be clean on new/changed files):
+The hook does **not** run the full Jest suite (too slow) — that is CI's job. **Before pushing**, run it yourself:
 
 ```bash
 npm run format   # prettier --write (whole tree — confirms nothing else drifted)

@@ -1,5 +1,7 @@
 ## Agent Documentation
 
+> Human contributors: start at [docs/README.md](README.md) (architecture, environment reference, "add a module" guide) and the root [README.md](../README.md) / [CONTRIBUTING.md](../CONTRIBUTING.md). This page is the map for AI coding agents.
+
 ## Documentation Map
 
 | Document                     | Purpose                                            |

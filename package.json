@@ -6,6 +6,9 @@
   "author": "ayan4m1 <andrew@bulletlogic.com>, Kyle O'Brien <obrienk@webbhost.net>",
   "license": "MIT",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",

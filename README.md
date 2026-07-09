@@ -16,7 +16,7 @@ Stellar is an invite-only (`/private/`) platform built around **Communities** wi
 
 ## Documentation
 
-The README is the lamp-post; specs and decisions live in [`docs/`](docs/):
+The README is the lamp-post; the developer guide is **[`docs/README.md`](docs/README.md)** (architecture, environment reference, "add a module" walkthrough), and specs and decisions live in [`docs/`](docs/):
 
 | Doc                                                                                          | Covers                                       |
 | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
@@ -31,7 +31,7 @@ The README is the lamp-post; specs and decisions live in [`docs/`](docs/):
 
 ## Tech Stack
 
-- **Runtime**: Node.js (LTS)
+- **Runtime**: Node.js 22
 - **Framework**: Express.js
 - **Database**: PostgreSQL with Prisma ORM
 - **Validation**: Zod (with OpenAPI generation)
@@ -47,8 +47,8 @@ If you prefer to run the API directly on your local machine for development:
 
 ### 1. Prerequisites
 
-- Node.js (LTS version)
-- A running PostgreSQL instance
+- **Node.js 22** (see `.nvmrc` / the `engines` field in `package.json`) — `nvm use` picks it up.
+- **PostgreSQL 16** running and reachable.
 
 ### 2. Installation
 
@@ -60,24 +60,34 @@ npm install
 
 ### 3. Environment Variables
 
-Copy `.env.example` to `.env` (or create one) and configure the following variables:
+Copy `.env.default` to `.env` and set at least the database URI and JWT secret:
 
-| Variable                   | Description                                    | Default                 |
-| -------------------------- | ---------------------------------------------- | ----------------------- |
-| `DATABASE_URL`             | Prisma connection string to your Postgres DB   | `postgresql://...`      |
-| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs (must be securely set) | _undefined_             |
-| `STELLAR_LOG_LEVEL`        | Winston log level (e.g., debug, info, error)   | `info`                  |
-| `STELLAR_HTTP_PORT`        | API listening port                             | `8080`                  |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)       | `http://localhost:3000` |
+```bash
+cp .env.default .env
+```
+
+`.env.default` is self-documenting (grouped, commented) and is the authoritative list. The variables you must set for a local run:
+
+| Variable                   | Description                                            | Example / default                          |
+| -------------------------- | ------------------------------------------------------ | ------------------------------------------ |
+| `STELLAR_PSQL_URI`         | **Prisma connection string** to your Postgres DB       | `postgresql://user:pass@localhost:5432/db` |
+| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs (32+ chars; set to a real one) | `changeme`                                 |
+| `STELLAR_HTTP_PORT`        | API listening port                                     | `8080`                                     |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)               | `https://stellargra.ph`                    |
+| `STELLAR_LOG_LEVEL`        | Winston log level (`debug`/`info`/`error`)             | `info`                                     |
+
+Optional integrations (Sentry, SMTP invites, site identity/Golden-Rules tokens, and the korin.pink IRC sidecar) are all documented inline in `.env.default` and are **inert until their keys are set** — the app runs fine without them. The full variable reference lives in [`docs/README.md`](docs/README.md#environment-reference).
 
 ### 4. Database Setup
 
-Before running the app, ensure your database schema is initialized and the Prisma Client is generated:
+Apply migrations and generate the Prisma client. `prisma migrate dev` also **auto-runs the seed** (`prisma/seed.ts`), which plants default user ranks, rank-promotion rules, forums, the Golden Rules, the System user, and the built-in stylesheet fixtures — but **no users**:
 
 ```bash
-npx prisma migrate dev
-npx prisma generate
+npx prisma migrate dev     # applies migrations + seeds defaults
+npx prisma generate        # regenerate the client (only needed after schema pulls)
 ```
+
+After a database reset you can re-run just the seed with `npm run db:seed`.
 
 ### 5. Running the API
 
@@ -87,6 +97,21 @@ Start the server in development mode (with hot-reloading):
 npm run dev
 ```
 
+### 6. Complete the one-time install (required)
+
+A fresh instance has **no admin and is 503-walled** on `/api/*` until you complete the one-time install, which mints the first SysOp ([ADR-0022](docs/adr/0022-install-state-recorded-fact.md)). Do this once:
+
+- **Via the UI** (recommended for a full-stack setup): open `http://localhost:9000/install` with [stellar-ui](https://github.com/orphic-inc/stellar-ui) running, and fill in the first-admin form.
+- **Directly against the API**:
+
+  ```bash
+  curl -X POST http://localhost:8080/api/install \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","email":"admin@example.com","password":"<a-strong-password>"}'
+  ```
+
+The response includes `configWarnings` and a `setupChecklist` flagging launch-readiness gaps (CORS default, SMTP unset, open registration, etc.). Until install completes, every other route returns `503`.
+
 ## Contributing
 
-For the contributor workflow (OpenAPI sync, testing), see [CONTRIBUTING.md](CONTRIBUTING.md).
+New contributors start with **[CONTRIBUTING.md](CONTRIBUTING.md)** (fork workflow, pre-commit gate, OpenAPI sync, testing). For the architecture overview, the full environment reference, and a worked "add a module" guide, see **[`docs/README.md`](docs/README.md)**.
