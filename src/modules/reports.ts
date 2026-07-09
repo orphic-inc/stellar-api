@@ -7,6 +7,10 @@ import {
 } from '@prisma/client';
 import type { ReportResolutionAction } from '../schemas/reports';
 import { audit } from '../lib/audit';
+import { getLogger } from './logging';
+import { sendSystemMessage } from './pm';
+
+const log = getLogger('reports');
 
 const PAGE_SIZE = 25;
 
@@ -416,6 +420,29 @@ export async function resolveReport(
   await audit(prisma, staffUserId, 'report.resolve', 'Report', id, {
     resolutionAction
   });
+
+  // Fire-and-forget: let the reporter know their report was resolved. Runs
+  // after the CAS commits, in its own try/catch — a PM failure must never
+  // roll back or fail the resolve (#273).
+  try {
+    const report = await prisma.report.findUnique({
+      where: { id },
+      select: { reporterId: true }
+    });
+    if (report) {
+      await sendSystemMessage(
+        report.reporterId,
+        'Your report has been resolved',
+        `Your report has been resolved.\n\n` +
+          `Action taken: ${resolutionAction}\n` +
+          `Resolution: ${resolution}\n\n` +
+          `View your report: /private/reports/${id}`
+      );
+    }
+  } catch (err) {
+    log.warn('System report-resolved PM failed', { reportId: id, err });
+  }
+
   return { ok: true as const };
 }
 
