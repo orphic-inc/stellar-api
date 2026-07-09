@@ -107,9 +107,9 @@ _Avoid_: nonce, token, **key**, passcode
 The handshake that turns a **Nick Claim** into a **Verified IRC Link** by proving control of the claimed nick. Its security rests on the `(fromNick, code)` binding plus Ergo's `force-nick-equals-account` — only the nick's true owner can present the code as that nick. Distinct from the superseded delegated-SASL design (ADR-0011).
 _Avoid_: SASL auth, delegated auth, login
 
-**Chrome Layer**:
-The high-priority CSS `@layer` / `all: revert` boundary that renders critical app chrome (navigation, staff/admin and moderation controls) so an injected user stylesheet cannot override or hide it. The isolation half of the stylesheet trust boundary; user themes cascade everywhere else, and a store-time sanitizer + inject-time CSP cover the exfiltration half (ADR-0003).
-_Avoid_: sandbox, shadow root, reset wrapper
+**Chrome Layer** _(retired)_:
+The dropped protected-chrome CSS boundary (ADR-0003 Arm 1, superseded by the 2026-06-23 amendment). Themes are **visually unrestricted** — the CSS cascade cannot contain an `!important` theme (for important declarations, layer order reverses and unlayered-important is weakest), so no layer/revert lock is sound. The stylesheet trust boundary is **code-injection only**: the store-time sanitizer (`cssSanitize`) plus the inject-time CSP (stellar-ui, prod). Do not rebuild a chrome lock.
+_Avoid_: chrome lock, protected chrome, sandbox, shadow root, reset wrapper
 
 **Standing**:
 A member's five-rung governance tier — `pristine | clean | neutral | poor | hammer` — computed on read from active **Warnings**, ban state, and account tenure (never a stored column). It _scales_ rule impact on the CRS (pristine amplifies compliance rewards, hammer amplifies violation penalties); it is not a **Dimension Scorer** and never gates access (ADR-0004).
