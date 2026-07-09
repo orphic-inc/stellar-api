@@ -6,6 +6,25 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.6.9] — 2026-07-09
+
+A consolidation cut on the road to 0.7.0: reporters get notified when their reports resolve, two OpenAPI contract-drift bugs are closed at the source, and the last undocumented subsystems and pipeline boundaries get their governing docs.
+
+### Added
+
+- **Reporters are notified when their report is resolved** — on report resolution a null-sender System PM is sent to the reporter with the resolution text, the resolution action, and a link back to the report. It is fire-and-forget: a failure to send never rolls back or blocks the resolve [#273].
+
+### Fixed
+
+- **`Notification.type` now advertises all ten notification kinds** — the OpenAPI contract derives the enum from the Prisma `NotificationType` instead of a hand-maintained list of six, so `site_news`, `global_notice`, `rank_promoted`, and `rank_demoted` are type-narrowable by clients and the enum can no longer drift from the source [#302].
+- **Nullable profile references no longer drop their `null`** — `PublicProfile`/`MyProfile` `community`, `donorPresentation`, and `staffPmOverview` generate as `T | null` instead of `T & unknown`, matching what the routes actually return; the codegen shape that swallowed the null is normalized during export [#295].
+
+### Docs
+
+- **ADR-0027 — the publish/deploy boundary** — the stellar-api pipeline's responsibility ends at the versioned GHCR publish; deployment and environment promotion live in stellar-compose, with a pinned semver image tag as the handoff artifact [#293].
+- **ADR-0028 and PRD-10 — the user-classes ladder and automated progression** — the shipped class-progression system (rank ladder, promotion rules, sweep job, `rankLocked`) finally has a governing doc, recording the classes-versus-CRS firewall, link-health-eligible byte accounting, the prestige predicate, and the demotion guards [#303].
+- **CONTEXT retires the Chrome Layer entry** — the retired stylesheet-injection term is marked do-not-rebuild and the stellar-ui cross-links are resolved [#305].
+
 ## [0.6.4] — 2026-07-07
 
 The built-in theme catalog becomes api-canonical and single-sourced, and the api version aligns with stellar-ui.
@@ -514,7 +533,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...v0.6.9
 [0.6.4]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orphic-inc/stellar-api/compare/v0.6.1...v0.6.2
