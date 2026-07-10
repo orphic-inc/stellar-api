@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard", "schedule:weekly"],
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "description": "Dev tooling: safe to automerge patch/minor",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Group non-major npm deps to keep PR volume low",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm non-major"
+    },
+    {
+      "description": "Pin GitHub Action digests fresh; safe to automerge",
+      "matchManagers": ["github-actions"],
+      "automerge": true,
+      "groupName": "github-actions"
+    },
+    {
+      "description": "Base images: review every bump (ADR-0001 / api#99 class)",
+      "matchDatasources": ["docker"],
+      "automerge": false,
+      "groupName": null
+    },
+    {
+      "description": "Prisma is engine-sensitive + a live 6->7 migration: review, grouped, never automerge",
+      "matchPackageNames": ["prisma", "@prisma/client"],
+      "automerge": false,
+      "groupName": "prisma"
+    },
+    {
+      "description": "Major bumps always reviewed",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "lockFileMaintenance": { "enabled": true, "automerge": true }
+}
