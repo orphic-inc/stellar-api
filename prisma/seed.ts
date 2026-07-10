@@ -6,29 +6,17 @@
  * http://localhost:9000/install when stellar-ui is running) or directly against
  * the API: POST http://localhost:${STELLAR_HTTP_PORT:-8080}/api/install.
  *
- * Runs automatically after `prisma migrate dev` resets the database.
- * Can also be run manually: npm run db:seed (npx prisma db seed).
+ * Runs automatically after `prisma migrate dev` resets the database, and can be
+ * run manually with `npm run db:seed`. The container runs the same sequence on
+ * boot via src/scripts/seed.ts — both call seedAll(), the single source of truth.
  */
 import { PrismaClient } from '@prisma/client';
-import {
-  seedRanks,
-  seedRankPromotionRules,
-  seedForums,
-  seedSystemUser
-} from '../src/modules/bootstrap';
-import { seedGoldenRules } from '../src/modules/goldenRules';
-import { seedStylesheetFixtures } from '../src/modules/stylesheetFixtures';
+import { seedAll } from '../src/modules/seedAll';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  await seedRanks(prisma);
-  await seedRankPromotionRules(prisma);
-  await seedForums(prisma);
-  await seedGoldenRules(prisma);
-  // System user must precede the stylesheet fixtures it owns (needs ranks first).
-  const systemUserId = await seedSystemUser(prisma);
-  await seedStylesheetFixtures(prisma, systemUserId);
+  await seedAll(prisma);
   const port = process.env.STELLAR_HTTP_PORT || '8080';
   console.log(
     `→ Seed complete. Create the first SysOp via the UI install page ` +

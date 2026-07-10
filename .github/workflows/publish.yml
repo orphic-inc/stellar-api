@@ -111,6 +111,15 @@ jobs:
             echo "::error::No migrations applied — container did not self-migrate"
             docker logs api; exit 1
           fi
+          # Definitive check: the entrypoint also seeded the baseline, so a fresh
+          # deploy is ready for /install rather than an empty DB (api#313).
+          ranks=$(docker exec pg psql -U postgres -d stellar -tAc \
+            "SELECT count(*) FROM user_ranks")
+          echo "Seeded ranks: $ranks"
+          if [ "$ranks" -lt 1 ]; then
+            echo "::error::No ranks seeded — container did not self-seed on boot"
+            docker logs api; exit 1
+          fi
       - name: Teardown
         if: always()
         run: |
