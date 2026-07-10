@@ -7,7 +7,8 @@
       "description": "Dev tooling: safe to automerge patch/minor",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["patch", "minor"],
-      "automerge": true
+      "automerge": true,
+      "labels": ["automerge"]
     },
     {
       "description": "Group non-major npm deps to keep PR volume low",
@@ -19,7 +20,8 @@
       "description": "Pin GitHub Action digests fresh; safe to automerge",
       "matchManagers": ["github-actions"],
       "automerge": true,
-      "groupName": "github-actions"
+      "groupName": "github-actions",
+      "labels": ["automerge"]
     },
     {
       "description": "Base images: review every bump (ADR-0001 / api#99 class)",
@@ -39,5 +41,5 @@
       "automerge": false
     }
   ],
-  "lockFileMaintenance": { "enabled": true, "automerge": true }
+  "lockFileMaintenance": { "enabled": true, "automerge": true, "labels": ["automerge"] }
 }
