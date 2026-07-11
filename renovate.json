@@ -1,7 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "platformAutomerge is off deliberately: GitHub native auto-merge ignores the branch-protection app-bypass, so Renovate merges its own automerge PRs directly as the app (the bypass on `main` covers the Renovate app). Required human review stays for everything else; the `test` required check still gates every merge.",
   "extends": ["config:recommended", ":dependencyDashboard", "schedule:weekly"],
   "prConcurrentLimit": 5,
+  "platformAutomerge": false,
   "packageRules": [
     {
       "description": "Dev tooling: safe to automerge patch/minor",
