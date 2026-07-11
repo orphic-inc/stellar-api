@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Stellar API",
-    "version": "0.6.9",
+    "version": "0.7.0",
     "description": "REST API for the Stellar community tracker. All routes under `/api/*`. Authentication uses JWT cookies (`token` cookie set on login)."
   },
   "servers": [
