@@ -6,10 +6,24 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-11
+
+The 0.6.x consolidation wave closes (#287): a fresh container now boots batteries-included (migrate + seed, ready for /install), dependency and image freshness runs on autopilot, and the commit-to-merge pipeline drops from tens of minutes to minutes at both ends.
+
+### Added
+
+- **Containers seed the idempotent baseline on boot** — the self-migrating entrypoint (#276) left a fresh `docker compose up` with a migrated-but-empty database; the seed sequence is now extracted into `seedAll()` (one source of truth for the dev `prisma/seed.ts` and a new compiled `dist/scripts/seed.js`) and runs after `migrate deploy` on every boot. Every seeder is idempotent, so it is a no-op on an existing DB; seeding deliberately does not stamp `installedAt`, so /install stays available to mint the SysOp. The publish smoke job now asserts ranks were seeded alongside the migration assertion [#313].
+- **Renovate manages dependency and image bumps** — pinned tags are kept fresh rather than unpinned to floating; dev-tooling patch/minor, github-actions digests, and lockfile maintenance are pre-approved classes that merge via the app's branch-protection bypass, while Prisma, Docker base images, and all majors remain individually human-reviewed; weekly schedule with grouped non-major bumps to limit PR volume.
+
 ### Changed
 
-- **Pre-commit and CI typecheck cost cut at the measured sources** — trace attribution showed the tax was cold whole-graph re-checks plus two Prisma type pathologies, not zod inference: both tsconfigs now persist incremental build info (warm `tsc --noEmit` re-checks only the changed subgraph), `testPrisma` is annotated as canonical `PrismaClient` (one unannotated export cost a 29s structural compare), `version:check` runs ts-node transpile-only (was ~40s of boot-time type-checking), and `jest.integration.cjs` gets the same `isolatedModules` treatment as the unit config so the CI integration step stops re-type-checking every suite's import graph [#306].
-- **Integration tests run as their own parallel CI job** — measurement on the PR showed the step is DB-bound (~4.5 min) and still the long pole of the required `test` check, so it moves out of that job's critical path; branch protection must require both `test` and `integration` once this lands [#306].
+- **Pre-commit and CI typecheck cost cut at the measured sources** — trace attribution showed the tax was cold whole-graph re-checks plus two Prisma type pathologies, not zod inference: both tsconfigs now persist incremental build info (warm `tsc --noEmit` re-checks only the changed subgraph), `testPrisma` is annotated as canonical `PrismaClient` (one unannotated export cost a 29s structural compare), `version:check` runs ts-node transpile-only (was ~40s of boot-time type-checking), and `jest.integration.cjs` gets the same `isolatedModules` treatment as the unit config so the CI integration step stops re-type-checking every suite's import graph. The full pre-commit chain drops from ~8.5 minutes to ~1 minute warm [#306].
+- **Integration tests run as their own parallel CI job** — measurement showed the step is DB-bound (~4.5 min) and the long pole of the required check, so it moves out of the `test` job's critical path (6m48s → 2m37s); branch protection on `main` now requires both `test` and `integration` [#306].
+
+### Docs
+
+- **Human-facing developer docs** — a real getting-started path for humans (not just agents), plus fixes for README errors that broke a fresh install when followed literally.
+- **stellar-compose joins the constellation map** — CONTEXT cross-links the deployment repo, closing the publish/deploy boundary loop recorded in ADR-0027.
 
 ## [0.6.9] — 2026-07-09
 
@@ -538,7 +552,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...v0.7.0
 [0.6.9]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...v0.6.9
 [0.6.4]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orphic-inc/stellar-api/compare/v0.6.2...v0.6.3
