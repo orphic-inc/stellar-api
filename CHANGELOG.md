@@ -9,6 +9,7 @@ All notable changes to stellar-api are documented here.
 ### Changed
 
 - **Pre-commit and CI typecheck cost cut at the measured sources** — trace attribution showed the tax was cold whole-graph re-checks plus two Prisma type pathologies, not zod inference: both tsconfigs now persist incremental build info (warm `tsc --noEmit` re-checks only the changed subgraph), `testPrisma` is annotated as canonical `PrismaClient` (one unannotated export cost a 29s structural compare), `version:check` runs ts-node transpile-only (was ~40s of boot-time type-checking), and `jest.integration.cjs` gets the same `isolatedModules` treatment as the unit config so the CI integration step stops re-type-checking every suite's import graph [#306].
+- **Integration tests run as their own parallel CI job** — measurement on the PR showed the step is DB-bound (~4.5 min) and still the long pole of the required `test` check, so it moves out of that job's critical path; branch protection must require both `test` and `integration` once this lands [#306].
 
 ## [0.6.9] — 2026-07-09
 
