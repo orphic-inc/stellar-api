@@ -2,7 +2,11 @@ import { PrismaClient } from '@prisma/client';
 
 const testUrl = process.env.STELLAR_PSQL_URI_TEST!;
 
-export const testPrisma = new PrismaClient({
+// Annotated as canonical `PrismaClient`: without it the inferred type is the
+// non-canonical `PrismaClient<{datasources, log}>` instantiation, and every
+// call site taking a `PrismaClient` parameter pays a full structural compare
+// of the entire client (~29s in one integration test alone, #306 trace).
+export const testPrisma: PrismaClient = new PrismaClient({
   datasources: { db: { url: testUrl } },
   log: []
 });

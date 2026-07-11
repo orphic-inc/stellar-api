@@ -19,7 +19,13 @@
 
     /* Type Checking */
     "strict": true /* Enable all strict type-checking options. */,
-    "skipLibCheck": true /* Skip type checking all .d.ts files. */
+    "skipLibCheck": true /* Skip type checking all .d.ts files. */,
+
+    /* Performance (#306) — persist the program graph so a warm `tsc --noEmit`
+       re-checks only the changed subgraph instead of a full cold pass. The test
+       tsconfig overrides tsBuildInfoFile: each project needs its own cache. */
+    "incremental": true,
+    "tsBuildInfoFile": ".cache/tsbuildinfo.src"
   },
   "ts-node": {
     "files": true

@@ -11,7 +11,9 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
-    "noEmit": true
+    "noEmit": true,
+    // Own cache — sharing the base project's tsbuildinfo would thrash it (#306).
+    "tsBuildInfoFile": ".cache/tsbuildinfo.test"
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]

@@ -10,5 +10,8 @@ src/**/*.js.map
 .DS_Store
 .playwright-mcp/
 
+# Incremental typecheck caches (#306)
+.cache/
+
 # Local recovery / scratch notes — never committed
 /update.md

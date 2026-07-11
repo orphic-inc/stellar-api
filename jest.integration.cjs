@@ -17,6 +17,12 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: {
+          // Transpile-only, same rationale as jest.config.cjs (#306): without
+          // this, ts-jest full-type-checks each suite's import graph — the
+          // dominant term of the CI integration step. Type safety for these
+          // files is enforced by `npm run typecheck:test` (its exclude is only
+          // `dist`, so *.integration.ts is covered).
+          isolatedModules: true,
           module: 'commonjs',
           moduleResolution: 'node',
           esModuleInterop: true,
