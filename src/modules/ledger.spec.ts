@@ -180,7 +180,9 @@ describe('checkCanConsume', () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => verdict });
     expect(await checkCanConsume(7, 5)).toEqual(verdict);
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toContain('/ledger/can-consume?userId=7&contributionId=5');
+    expect(String(url)).toContain(
+      '/ledger/can-consume?userId=7&contributionId=5'
+    );
   });
 
   it('returns null (fail-open) on a non-2xx response', async () => {

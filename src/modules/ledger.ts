@@ -168,7 +168,12 @@ export const checkCanConsume = async (
   if (!apiUrl || !pullKey) return null;
 
   try {
-    const url = `${apiUrl}/ledger/can-consume?userId=${userId}&contributionId=${contributionId}`;
+    // Build via URL/searchParams: the host is fixed trusted config and only the
+    // numeric ids vary, routed through the encoding sink (no string concat of
+    // request data into the target — closes the SSRF-taint path).
+    const url = new URL(`${apiUrl}/ledger/can-consume`);
+    url.searchParams.set('userId', String(userId));
+    url.searchParams.set('contributionId', String(contributionId));
     const res = await fetch(url, {
       headers: { 'x-pull-key': pullKey },
       signal: AbortSignal.timeout(CAN_CONSUME_TIMEOUT_MS)

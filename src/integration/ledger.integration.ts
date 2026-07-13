@@ -11,6 +11,16 @@ import { grantDownloadAccess } from '../modules/downloads';
 import { getLedgerSnapshot, getNewConsumptionEvents } from '../modules/ledger';
 import { korin } from '../modules/config';
 
+// grantDownloadAccess kicks off evaluateRatioPolicy as a post-commit fire-and-forget
+// (deliberately un-awaited in production). This suite tests the ledger/gate path, not
+// the policy state machine, so stub it — otherwise its queries land after the suite
+// tears down ("Cannot log after tests are done" → non-zero exit). Mirrors the unit
+// specs, which mock ./ratioPolicy for the same reason.
+jest.mock('../modules/ratioPolicy', () => ({
+  ...jest.requireActual('../modules/ratioPolicy'),
+  evaluateRatioPolicy: jest.fn(() => Promise.resolve())
+}));
+
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
