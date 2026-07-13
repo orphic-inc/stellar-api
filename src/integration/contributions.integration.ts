@@ -2,12 +2,14 @@ import {
   ReleaseType,
   FileType,
   CommunityType,
-  RegistrationStatus
+  RegistrationStatus,
+  RatioExempt
 } from '@prisma/client';
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import {
   createContributionSubmission,
-  addContributionToRelease
+  addContributionToRelease,
+  setContributionRatioExempt
 } from '../modules/contribution';
 import type { CreateContributionInput } from '../schemas/contribution';
 
@@ -412,5 +414,63 @@ describe('addContributionToRelease', () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+describe('setContributionRatioExempt', () => {
+  it('sets the flag and writes an audit row', async () => {
+    const staff = await createUser('rx-staff');
+    const owner = await createUser('rx-owner');
+    const community = await createCommunity();
+    const contribution = await createContributionSubmission({
+      userId: owner.id,
+      input: baseInput(community.id)
+    });
+
+    const updated = await setContributionRatioExempt(
+      staff.id,
+      contribution!.id,
+      RatioExempt.FREEPASS
+    );
+    expect(updated.ratioExempt).toBe(RatioExempt.FREEPASS);
+
+    const row = await testPrisma.contribution.findUniqueOrThrow({
+      where: { id: contribution!.id }
+    });
+    expect(row.ratioExempt).toBe(RatioExempt.FREEPASS);
+
+    const auditRow = await testPrisma.auditLog.findFirst({
+      where: {
+        action: 'contribution.ratio_exempt.set',
+        targetId: contribution!.id
+      }
+    });
+    expect(auditRow).not.toBeNull();
+    expect(auditRow!.actorId).toBe(staff.id);
+  });
+
+  it('is a no-op that writes no audit row when the flag is unchanged', async () => {
+    const staff = await createUser('rx-noop-staff');
+    const owner = await createUser('rx-noop-owner');
+    const community = await createCommunity();
+    const contribution = await createContributionSubmission({
+      userId: owner.id,
+      input: baseInput(community.id)
+    });
+
+    // Default is NONE; setting NONE again should not audit.
+    await setContributionRatioExempt(
+      staff.id,
+      contribution!.id,
+      RatioExempt.NONE
+    );
+
+    const auditRows = await testPrisma.auditLog.findMany({
+      where: {
+        action: 'contribution.ratio_exempt.set',
+        targetId: contribution!.id
+      }
+    });
+    expect(auditRows).toHaveLength(0);
   });
 });

@@ -2,10 +2,13 @@ import {
   ArtistRole,
   FileType,
   Prisma,
+  RatioExempt,
   ReleaseCategory,
   ReleaseType
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
+import { audit } from '../lib/audit';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
 import { checkContributionLink } from './linkHealth';
@@ -366,4 +369,39 @@ export const addContributionToRelease = async ({
         sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
       };
     });
+};
+
+// Staff lever (PRD-06 #4): set/clear a Contribution's ratio exemption. Applies to
+// future consumption only — already-completed grants snapshotted their exemption,
+// so this never retroactively rewrites past accounting. Audited as an economy lever.
+export const setContributionRatioExempt = async (
+  actorId: number,
+  contributionId: number,
+  ratioExempt: RatioExempt
+): Promise<{ id: number; ratioExempt: RatioExempt }> => {
+  const contribution = await prisma.contribution.findUnique({
+    where: { id: contributionId },
+    select: { id: true, ratioExempt: true }
+  });
+  if (!contribution) throw new AppError(404, 'Contribution not found');
+
+  if (contribution.ratioExempt === ratioExempt)
+    return { id: contribution.id, ratioExempt };
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.contribution.update({
+      where: { id: contributionId },
+      data: { ratioExempt },
+      select: { id: true, ratioExempt: true }
+    });
+    await audit(
+      tx,
+      actorId,
+      'contribution.ratio_exempt.set',
+      'contribution',
+      contributionId,
+      { from: contribution.ratioExempt, to: ratioExempt }
+    );
+    return updated;
+  });
 };

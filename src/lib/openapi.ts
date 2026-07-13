@@ -2838,6 +2838,7 @@ const Contribution = registry.register(
     sizeInBytes: z.number().nullable().optional(),
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']),
     linkCheckedAt: z.string().nullable().optional(),
+    ratioExempt: z.enum(['NONE', 'FREEPASS', 'NEUTRALPASS']),
     collaborators: z.array(
       z.object({
         id: z.number(),
@@ -2916,6 +2917,7 @@ const ReleaseContributionDetail = registry.register(
     sizeInBytes: z.number().nullable(),
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']).nullable(),
     linkCheckedAt: z.string().nullable(),
+    ratioExempt: z.enum(['NONE', 'FREEPASS', 'NEUTRALPASS']),
     type: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),

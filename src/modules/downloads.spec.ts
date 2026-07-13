@@ -3,7 +3,11 @@
  */
 
 import { AppError } from '../lib/errors';
-import { DownloadGrantStatus, EconomyTransactionReason } from '@prisma/client';
+import {
+  DownloadGrantStatus,
+  EconomyTransactionReason,
+  RatioExempt
+} from '@prisma/client';
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -46,6 +50,7 @@ const makeContribution = (overrides = {}) => ({
   downloadUrl: 'https://example.com/file.zip',
   sizeInBytes: 209715200,
   approvedAccountingBytes: null,
+  ratioExempt: RatioExempt.NONE,
   ...overrides
 });
 
@@ -62,6 +67,7 @@ const makeGrant = (overrides = {}) => ({
   contributorId: 99,
   contributionId: 5,
   amountBytes: BigInt('209715200'),
+  ratioExempt: RatioExempt.NONE,
   status: DownloadGrantStatus.COMPLETED,
   idempotencyKey: null,
   reversedAt: null,

@@ -2,10 +2,15 @@ import {
   FileType,
   ReleaseType,
   CommunityType,
-  RegistrationStatus
+  RegistrationStatus,
+  RatioExempt,
+  EconomyTransactionReason
 } from '@prisma/client';
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
-import { grantDownloadAccess } from '../modules/downloads';
+import {
+  grantDownloadAccess,
+  reverseDownloadAccess
+} from '../modules/downloads';
 
 beforeEach(async () => {
   await truncateAll();
@@ -44,7 +49,11 @@ const createUser = async (
 };
 
 /** sizeInBytes is stored as Int in the schema; approvedAccountingBytes is BigInt. */
-const createContribution = async (userId: number, sizeBytes = 1_000_000) => {
+const createContribution = async (
+  userId: number,
+  sizeBytes = 1_000_000,
+  ratioExempt: RatioExempt = RatioExempt.NONE
+) => {
   const community = await testPrisma.community.create({
     data: {
       name: `DL-Community-${Date.now()}`,
@@ -84,7 +93,8 @@ const createContribution = async (userId: number, sizeBytes = 1_000_000) => {
       downloadUrl: 'https://example.com/file.torrent',
       sizeInBytes: sizeBytes,
       approvedAccountingBytes: BigInt(sizeBytes),
-      releaseDescription: 'test'
+      releaseDescription: 'test',
+      ratioExempt
     }
   });
 };
@@ -172,5 +182,149 @@ describe('grantDownloadAccess', () => {
     await expect(
       grantDownloadAccess(consumer.id, contribution.id)
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+});
+
+describe('grantDownloadAccess — ratio-exempt (PRD-06 #4)', () => {
+  it('FREEPASS: consumer consumed NOT accrued; contributor contributed still accrued', async () => {
+    const COST = 1_000_000;
+    const contributor = await createUser('fp-contrib', { contributed: 0n });
+    const consumer = await createUser('fp-consumer', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.FREEPASS
+    );
+
+    const result = await grantDownloadAccess(consumer.id, contribution.id);
+    expect(result.status).toBe('COMPLETED');
+
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    expect(c.consumed).toBe(0n); // suppressed
+
+    const k = await testPrisma.user.findUniqueOrThrow({
+      where: { id: contributor.id }
+    });
+    expect(k.contributed).toBe(BigInt(COST)); // still earns availability credit
+
+    const grant = await testPrisma.downloadAccessGrant.findUniqueOrThrow({
+      where: { id: result.grantId }
+    });
+    expect(grant.ratioExempt).toBe(RatioExempt.FREEPASS);
+
+    // Ledger: consumer gets a zero-amount marker, contributor a real credit.
+    const rows = await testPrisma.economyTransaction.findMany({
+      where: { contextId: result.grantId, contextType: 'download' }
+    });
+    const consumerRow = rows.find((r) => r.userId === consumer.id);
+    const contribRow = rows.find((r) => r.userId === contributor.id);
+    expect(consumerRow?.reason).toBe(EconomyTransactionReason.FREEPASS_GRANT);
+    expect(consumerRow?.amount).toBe(0n);
+    expect(contribRow?.reason).toBe(EconomyTransactionReason.DOWNLOAD_CREDIT);
+    expect(contribRow?.amount).toBe(BigInt(COST));
+  });
+
+  it('NEUTRALPASS: neither side accrues', async () => {
+    const COST = 1_000_000;
+    const contributor = await createUser('np-contrib', { contributed: 0n });
+    const consumer = await createUser('np-consumer', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.NEUTRALPASS
+    );
+
+    const result = await grantDownloadAccess(consumer.id, contribution.id);
+    expect(result.status).toBe('COMPLETED');
+
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    const k = await testPrisma.user.findUniqueOrThrow({
+      where: { id: contributor.id }
+    });
+    expect(c.consumed).toBe(0n);
+    expect(k.contributed).toBe(0n);
+  });
+
+  it('FREEPASS bypasses the balance gate for a below-ratio consumer', async () => {
+    const COST = 1_000_000;
+    const contributor = await createUser('fp-gate-contrib');
+    const consumer = await createUser('fp-gate-consumer', {
+      contributed: 100n // far below cost — would 400 without a Freepass
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.FREEPASS
+    );
+
+    const result = await grantDownloadAccess(consumer.id, contribution.id);
+    expect(result.status).toBe('COMPLETED');
+
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    expect(c.consumed).toBe(0n);
+  });
+
+  it('reversing a FREEPASS grant is symmetric — no negative balance manufactured', async () => {
+    const COST = 1_000_000;
+    const staff = await createUser('fp-staff');
+    const contributor = await createUser('fp-rev-contrib', { contributed: 0n });
+    const consumer = await createUser('fp-rev-consumer', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.FREEPASS
+    );
+
+    const grant = await grantDownloadAccess(consumer.id, contribution.id);
+    await reverseDownloadAccess(staff.id, grant.grantId);
+
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    const k = await testPrisma.user.findUniqueOrThrow({
+      where: { id: contributor.id }
+    });
+    // Consumer never accrued, so reversal must not drive it negative.
+    expect(c.consumed).toBe(0n);
+    // Contributor's Freepass credit is clawed back.
+    expect(k.contributed).toBe(0n);
+  });
+
+  it('reversing a NEUTRALPASS grant leaves both balances untouched', async () => {
+    const COST = 1_000_000;
+    const staff = await createUser('np-staff');
+    const contributor = await createUser('np-rev-contrib', { contributed: 0n });
+    const consumer = await createUser('np-rev-consumer', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.NEUTRALPASS
+    );
+
+    const grant = await grantDownloadAccess(consumer.id, contribution.id);
+    await reverseDownloadAccess(staff.id, grant.grantId);
+
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    const k = await testPrisma.user.findUniqueOrThrow({
+      where: { id: contributor.id }
+    });
+    expect(c.consumed).toBe(0n);
+    expect(k.contributed).toBe(0n);
   });
 });

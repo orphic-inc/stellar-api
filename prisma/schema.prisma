@@ -190,6 +190,11 @@ enum EconomyTransactionReason {
   DOWNLOAD_CREDIT
   STAFF_REVERSAL
   CRS_STYLESHEET_ADOPTION
+  // Ratio-exempt grants (PRD-06 #4): a zero-amount marker row so the grant
+  // event still exists in the ledger for the ADR-0016 korin handoff (#261),
+  // even though no balance moved.
+  FREEPASS_GRANT
+  NEUTRALPASS_GRANT
 }
 
 enum DownloadGrantStatus {
@@ -201,6 +206,17 @@ enum RatioPolicyStatus {
   OK
   WATCH
   LEECH_DISABLED
+}
+
+// Ratio-exempt Contribution flags (PRD-06 #4). Read at consumption time by the
+// accounting path (downloads.ts). Mutually exclusive by construction — a single
+// enum encodes that a Contribution can't be both Freepass and Neutralpass.
+//   FREEPASS    — consumer's `consumed` not accrued; contributor still earns `contributed`.
+//   NEUTRALPASS — neither side accrues; fully ratio-invisible.
+enum RatioExempt {
+  NONE
+  FREEPASS
+  NEUTRALPASS
 }
 
 enum LinkHealthStatus {
@@ -1068,6 +1084,9 @@ model Contribution {
   // User.contributed — a substrate accumulator, not a score (ADR-0007).
   healthyMs               BigInt                @default(0)
   healthySince            DateTime?
+  // Ratio-exempt flag (PRD-06 #4). Read at consumption time in downloads.ts to
+  // suppress accrual; staff-settable and audited. See RatioExempt.
+  ratioExempt             RatioExempt           @default(NONE)
   type                    FileType
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
@@ -1524,6 +1543,10 @@ model DownloadAccessGrant {
   contributionId Int
   contribution   Contribution        @relation(fields: [contributionId], references: [id])
   amountBytes    BigInt
+  // Snapshot of the Contribution's exemption at grant time. Reversal reads this
+  // to claw back exactly what accrued — never assume `amountBytes` moved, or an
+  // exempt grant's reversal would manufacture negative balance (PRD-06 #4).
+  ratioExempt    RatioExempt         @default(NONE)
   status         DownloadGrantStatus @default(COMPLETED)
   idempotencyKey String?
   reversedAt     DateTime?

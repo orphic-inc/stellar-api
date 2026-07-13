@@ -1,13 +1,18 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
+import { RatioExempt } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { sizeBytesToNumber } from '../../../lib/serialize';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
-import { createContributionSubmission } from '../../../modules/contribution';
+import {
+  createContributionSubmission,
+  setContributionRatioExempt
+} from '../../../modules/contribution';
 import { fileReport } from '../../../modules/reports';
 import { recordContributionReport } from '../../../modules/linkHealth';
 import { emitNotifications } from '../../../lib/notifications';
 import { requireAuth } from '../../../middleware/auth';
+import { requirePermission } from '../../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -35,6 +40,9 @@ const contributionIdParamsSchema = z.object({
 const reportSchema = z.object({
   reason: z.string().min(1).max(1000)
 });
+const ratioExemptSchema = z.object({
+  ratioExempt: z.nativeEnum(RatioExempt)
+});
 const contributionsQuerySchema = z.object({ ...paginationBase });
 
 // GET /api/contributions
@@ -61,6 +69,7 @@ router.get(
           approvedAccountingBytes: true,
           linkStatus: true,
           linkCheckedAt: true,
+          ratioExempt: true,
           type: true,
           releaseFile: {
             select: {
@@ -110,6 +119,7 @@ router.get(
         approvedAccountingBytes: true,
         linkStatus: true,
         linkCheckedAt: true,
+        ratioExempt: true,
         type: true,
         releaseFile: {
           select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
@@ -217,6 +227,24 @@ router.post(
     });
     await recordContributionReport(id, req.user.id, reason);
     res.status(201).json({ msg: 'Report submitted' });
+  })
+);
+
+// PUT /api/contributions/:id/ratio-exempt — staff: set/clear Freepass/Neutralpass
+router.put(
+  '/:id/ratio-exempt',
+  ...requirePermission('contributions_manage'),
+  validateParams(contributionIdParamsSchema),
+  validate(ratioExemptSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const { ratioExempt } = parsedBody<{ ratioExempt: RatioExempt }>(res);
+    const updated = await setContributionRatioExempt(
+      req.user.id,
+      id,
+      ratioExempt
+    );
+    res.json(updated);
   })
 );
 

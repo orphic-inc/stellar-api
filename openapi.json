@@ -2979,6 +2979,14 @@
             "type": "string",
             "nullable": true
           },
+          "ratioExempt": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "FREEPASS",
+              "NEUTRALPASS"
+            ]
+          },
           "collaborators": {
             "type": "array",
             "items": {
@@ -3012,6 +3020,7 @@
           "type",
           "downloadUrl",
           "linkStatus",
+          "ratioExempt",
           "collaborators"
         ]
       },
@@ -3149,6 +3158,14 @@
             "type": "string",
             "nullable": true
           },
+          "ratioExempt": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "FREEPASS",
+              "NEUTRALPASS"
+            ]
+          },
           "type": {
             "type": "string"
           },
@@ -3215,6 +3232,7 @@
           "sizeInBytes",
           "linkStatus",
           "linkCheckedAt",
+          "ratioExempt",
           "type",
           "createdAt",
           "updatedAt",

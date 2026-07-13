@@ -1,4 +1,8 @@
-import { DownloadGrantStatus, EconomyTransactionReason } from '@prisma/client';
+import {
+  DownloadGrantStatus,
+  EconomyTransactionReason,
+  RatioExempt
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { getLogger } from './logging';
@@ -8,6 +12,12 @@ import { evaluateRatioPolicy } from './ratioPolicy';
 const log = getLogger('downloads');
 
 const IDEMPOTENCY_WINDOW_MS = 120_000; // 2 minutes
+
+// The zero-amount ledger reason for a suppressed accrual side (PRD-06 #4).
+const exemptLedgerReason = (exempt: RatioExempt): EconomyTransactionReason =>
+  exempt === RatioExempt.NEUTRALPASS
+    ? EconomyTransactionReason.NEUTRALPASS_GRANT
+    : EconomyTransactionReason.FREEPASS_GRANT;
 
 export interface GrantResult {
   grantId: number;
@@ -30,7 +40,8 @@ export const grantDownloadAccess = async (
         userId: true,
         downloadUrl: true,
         sizeInBytes: true,
-        approvedAccountingBytes: true
+        approvedAccountingBytes: true,
+        ratioExempt: true
       }
     });
     if (!contribution) throw new AppError(404, 'Contribution not found');
@@ -81,38 +92,53 @@ export const grantDownloadAccess = async (
       };
     }
 
-    if (consumer.contributed - consumer.consumed < cost)
-      throw new AppError(400, 'Insufficient contributed balance');
+    // Ratio-exempt handling (PRD-06 #4). FREEPASS suppresses the consumer's
+    // `consumed`; NEUTRALPASS suppresses both sides. The balance gate is skipped
+    // when consumer accrual is suppressed — the point of a Freepass is to let a
+    // below-ratio member consume freely to rebuild, so there is nothing to guard.
+    const exempt = contribution.ratioExempt;
+    const suppressConsumer = exempt !== RatioExempt.NONE;
+    const suppressContributor = exempt === RatioExempt.NEUTRALPASS;
 
-    // CAS: atomically increment consumed, guarding against concurrent balance drain
-    const newConsumed = consumer.consumed + cost;
-    const newRatio = computeRatio(consumer.contributed, newConsumed);
-    const debited = await tx.user.updateMany({
-      where: { id: consumerId, consumed: { lte: consumer.contributed - cost } },
-      data: {
-        consumed: { increment: cost },
-        ratio: newRatio
-      }
-    });
-    if (debited.count === 0)
-      throw new AppError(409, 'Balance changed concurrently, please retry');
+    if (!suppressConsumer) {
+      if (consumer.contributed - consumer.consumed < cost)
+        throw new AppError(400, 'Insufficient contributed balance');
 
-    // Credit contributor balance and recompute ratio
-    const contributor = await tx.user.findUniqueOrThrow({
-      where: { id: contribution.userId },
-      select: { consumed: true, contributed: true }
-    });
-    const newContributorRatio = computeRatio(
-      contributor.contributed + cost,
-      contributor.consumed
-    );
-    await tx.user.update({
-      where: { id: contribution.userId },
-      data: {
-        contributed: { increment: cost },
-        ratio: newContributorRatio
-      }
-    });
+      // CAS: atomically increment consumed, guarding against concurrent balance drain
+      const newConsumed = consumer.consumed + cost;
+      const newRatio = computeRatio(consumer.contributed, newConsumed);
+      const debited = await tx.user.updateMany({
+        where: {
+          id: consumerId,
+          consumed: { lte: consumer.contributed - cost }
+        },
+        data: {
+          consumed: { increment: cost },
+          ratio: newRatio
+        }
+      });
+      if (debited.count === 0)
+        throw new AppError(409, 'Balance changed concurrently, please retry');
+    }
+
+    // Credit contributor balance and recompute ratio (skipped for NEUTRALPASS).
+    if (!suppressContributor) {
+      const contributor = await tx.user.findUniqueOrThrow({
+        where: { id: contribution.userId },
+        select: { consumed: true, contributed: true }
+      });
+      const newContributorRatio = computeRatio(
+        contributor.contributed + cost,
+        contributor.consumed
+      );
+      await tx.user.update({
+        where: { id: contribution.userId },
+        data: {
+          contributed: { increment: cost },
+          ratio: newContributorRatio
+        }
+      });
+    }
 
     const grant = await tx.downloadAccessGrant.create({
       data: {
@@ -120,28 +146,35 @@ export const grantDownloadAccess = async (
         contributorId: contribution.userId,
         contributionId,
         amountBytes: cost,
+        // Snapshot the exemption so reversal claws back exactly what accrued.
+        ratioExempt: exempt,
         status: DownloadGrantStatus.COMPLETED,
         idempotencyKey: idempotencyKey ?? null
       }
     });
 
-    // Immutable ledger: debit consumer
+    // Immutable ledger. A suppressed side writes a zero-amount marker row (rather
+    // than a real DEBIT/CREDIT) so the grant event still exists in the ledger for
+    // the ADR-0016 korin handoff (#261), even though no balance moved.
     await tx.economyTransaction.create({
       data: {
         userId: consumerId,
-        amount: -cost,
-        reason: EconomyTransactionReason.DOWNLOAD_DEBIT,
+        amount: suppressConsumer ? 0n : -cost,
+        reason: suppressConsumer
+          ? exemptLedgerReason(exempt)
+          : EconomyTransactionReason.DOWNLOAD_DEBIT,
         contextId: grant.id,
         contextType: 'download'
       }
     });
 
-    // Immutable ledger: credit contributor
     await tx.economyTransaction.create({
       data: {
         userId: contribution.userId,
-        amount: cost,
-        reason: EconomyTransactionReason.DOWNLOAD_CREDIT,
+        amount: suppressContributor ? 0n : cost,
+        reason: suppressContributor
+          ? exemptLedgerReason(exempt)
+          : EconomyTransactionReason.DOWNLOAD_CREDIT,
         contextId: grant.id,
         contextType: 'download'
       }
@@ -202,43 +235,53 @@ export const reverseDownloadAccess = async (
       })
     ]);
 
-    const consumerNewConsumed = consumer.consumed - grant.amountBytes;
-    const consumerNewRatio = computeRatio(
-      consumer.contributed,
-      consumerNewConsumed < 0n ? 0n : consumerNewConsumed
-    );
-    const contribNewContributed =
-      contributor.contributed >= grant.amountBytes
-        ? contributor.contributed - grant.amountBytes
-        : 0n;
-    const contribNewRatio = computeRatio(
-      contribNewContributed,
-      contributor.consumed
-    );
+    // Mirror the grant's exemption (snapshotted at grant time): only reverse a
+    // side that actually accrued. Clawing back `amountBytes` on a suppressed side
+    // would manufacture negative balance out of nothing (PRD-06 #4).
+    const suppressConsumer = grant.ratioExempt !== RatioExempt.NONE;
+    const suppressContributor = grant.ratioExempt === RatioExempt.NEUTRALPASS;
 
-    // Claw back from contributor balance
-    await tx.user.update({
-      where: { id: grant.contributorId },
-      data: {
-        contributed: { decrement: grant.amountBytes },
-        ratio: contribNewRatio
-      }
-    });
+    // Refund consumer (consumed decrements; contributed unchanged).
+    if (!suppressConsumer) {
+      const consumerNewConsumed = consumer.consumed - grant.amountBytes;
+      const consumerNewRatio = computeRatio(
+        consumer.contributed,
+        consumerNewConsumed < 0n ? 0n : consumerNewConsumed
+      );
+      await tx.user.update({
+        where: { id: grant.consumerId },
+        data: {
+          consumed: { decrement: grant.amountBytes },
+          ratio: consumerNewRatio
+        }
+      });
+    }
 
-    // Refund consumer (consumed decrements; contributed unchanged)
-    await tx.user.update({
-      where: { id: grant.consumerId },
-      data: {
-        consumed: { decrement: grant.amountBytes },
-        ratio: consumerNewRatio
-      }
-    });
+    // Claw back from contributor balance.
+    if (!suppressContributor) {
+      const contribNewContributed =
+        contributor.contributed >= grant.amountBytes
+          ? contributor.contributed - grant.amountBytes
+          : 0n;
+      const contribNewRatio = computeRatio(
+        contribNewContributed,
+        contributor.consumed
+      );
+      await tx.user.update({
+        where: { id: grant.contributorId },
+        data: {
+          contributed: { decrement: grant.amountBytes },
+          ratio: contribNewRatio
+        }
+      });
+    }
 
-    // Reversal ledger entries
+    // Reversal ledger entries — zero on a side whose grant accrual was suppressed,
+    // mirroring the marker rows the grant wrote (every grant stays paired).
     await tx.economyTransaction.create({
       data: {
         userId: grant.consumerId,
-        amount: grant.amountBytes,
+        amount: suppressConsumer ? 0n : grant.amountBytes,
         reason: EconomyTransactionReason.STAFF_REVERSAL,
         contextId: grant.id,
         contextType: 'download',
@@ -248,7 +291,7 @@ export const reverseDownloadAccess = async (
     await tx.economyTransaction.create({
       data: {
         userId: grant.contributorId,
-        amount: -grant.amountBytes,
+        amount: suppressContributor ? 0n : -grant.amountBytes,
         reason: EconomyTransactionReason.STAFF_REVERSAL,
         contextId: grant.id,
         contextType: 'download',
