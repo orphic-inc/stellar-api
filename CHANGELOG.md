@@ -6,6 +6,11 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Freepass/Neutralpass ratio-exempt Contribution flags** (PRD-06 #4) — a Contribution can be flagged Freepass (consumption accrues no `consumed` for the consumer; the contributor still earns `contributed`) or Neutralpass (neither side accrues, fully ratio-neutral) [#260].
+- **Consumption-event ingest + grant-time `canConsume` gate** (ADR-0016 Phase 2) — stellar now emits a server-authoritative consumption event per grant for korin's ledger to sum (`ledger.ts`, `ledgerJob.ts`), and `downloads.ts` enforces the Ratio Mechanism verdict at grant time via the ledger's hot state (`checkCanConsume`) instead of read-time-only evaluation; the check fails open (`null`) on unset keys, non-2xx, timeout, or error, so an unreachable ledger never blocks a grant. Freepass/Neutralpass contributions skip the gate entirely. Remaining ADR-0016 surface (`/ledger/sync` mutations, `/ledger/stats` reads) tracked in #324 [#261].
+
 ## [0.7.0] — 2026-07-11
 
 The 0.6.x consolidation wave closes (#287): a fresh container now boots batteries-included (migrate + seed, ready for /install), dependency and image freshness runs on autopilot, and the commit-to-merge pipeline drops from tens of minutes to minutes at both ends.
