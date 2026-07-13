@@ -30,6 +30,7 @@ import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
 import { startIrcJob } from './modules/ircJob';
 import { startAnnounceJob } from './modules/announceJob';
+import { startLedgerJob } from './modules/ledgerJob';
 import { startRankProgressionJob } from './modules/rankProgressionJob';
 
 import installRouter from './routes/api/install';
@@ -53,6 +54,7 @@ import forumPollRouter from './routes/api/forum/forumPoll';
 import requestsRouter from './routes/api/requests';
 import downloadsRouter from './routes/api/downloads';
 import ratioPolicyRouter from './routes/api/ratioPolicy';
+import ledgerRouter from './routes/api/ledger';
 import forumPollVoteRouter from './routes/api/forum/forumPollVote';
 import forumLastReadRouter from './routes/api/forum/forumLastReadTopic';
 import forumTopicNoteRouter from './routes/api/forum/forumTopicNote';
@@ -160,6 +162,7 @@ export const createApp = () => {
   app.use('/api/requests', requestsRouter);
   app.use('/api', downloadsRouter);
   app.use('/api/ratio-policy', ratioPolicyRouter);
+  app.use('/api/ledger', ledgerRouter);
   app.use('/api/communities', communitiesRouter);
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/log-check', logCheckRouter);
@@ -227,6 +230,7 @@ export const createApp = () => {
     startDonorExpiryJob();
     startIrcJob();
     startAnnounceJob();
+    startLedgerJob();
     startRankProgressionJob();
   }
 
