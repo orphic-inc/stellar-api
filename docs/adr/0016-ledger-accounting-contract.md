@@ -1,6 +1,6 @@
 # ADR-0016: Consumption accounting & ratio-gate contract (korin.pink `ledger` ↔ stellar-api)
 
-**Status:** Proposed
+**Status:** Accepted (2026-07-13) — consumption event, can-consume gate, and snapshot seed shipped (#322/#323); `/ledger/sync` and `/ledger/stats` remain open, tracked in #324
 **Date:** 2026-06-18
 **Repos:** orphic-inc/stellar-api (system of record), obrien-k/korin-pink (`ledger` accounting authority)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (the bidirectional boundary this builds on)
