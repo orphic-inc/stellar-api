@@ -12,13 +12,26 @@ const STARTUP_DELAY_MS = 30_000; // align with the metrics job; let boot settle
 // re-announces history; only contributions created after boot are pushed.
 let cursor = 0;
 
-const tick = async (): Promise<void> => {
-  const items = await getNewAnnounceItems(cursor);
+/**
+ * Push every contribution newer than `from` to korin, in id order, and return
+ * the cursor to resume from. Stops at the first push failure so that item (and
+ * everything after it) is retried on the next cycle — at-least-once, in-order,
+ * never skipping. Successfully-pushed items advance the returned cursor even
+ * when a later item in the same batch fails.
+ */
+export const runAnnounceCycle = async (from: number): Promise<number> => {
+  let resume = from;
+  const items = await getNewAnnounceItems(resume);
   for (const item of items) {
     const ok = await publishAnnounceItem(item);
-    if (!ok) return; // leave cursor; retry from here next tick
-    cursor = item.id;
+    if (!ok) return resume; // hold here; retry from this item next cycle
+    resume = item.id;
   }
+  return resume;
+};
+
+const tick = async (): Promise<void> => {
+  cursor = await runAnnounceCycle(cursor);
 };
 
 export const startAnnounceJob = (): void => {

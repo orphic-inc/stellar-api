@@ -13,6 +13,42 @@ const requireEnv = (key: string, minLength = 0): string => {
   return value;
 };
 
+// Parse the optional IRCScore channel-weight map (#141). Malformed input is
+// non-fatal — a bad tuning value must not crash boot — so it fails soft to an
+// empty map.
+const parseChannelWeights = (raw?: string): Record<string, number> => {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
+      console.warn('KORIN_CHANNEL_WEIGHTS is not a JSON object — ignoring');
+      return {};
+    }
+    const out: Record<string, number> = {};
+    for (const [channel, weight] of Object.entries(parsed)) {
+      if (
+        typeof weight === 'number' &&
+        Number.isFinite(weight) &&
+        weight >= 0
+      ) {
+        out[channel] = weight;
+      } else {
+        console.warn(
+          `KORIN_CHANNEL_WEIGHTS["${channel}"] is not a non-negative number — ignoring`
+        );
+      }
+    }
+    return out;
+  } catch {
+    console.warn('KORIN_CHANNEL_WEIGHTS is not valid JSON — ignoring');
+    return {};
+  }
+};
+
 export const auth = {
   jwtSecret: requireEnv('STELLAR_AUTH_JWT_SECRET', 32)
 };
@@ -66,7 +102,12 @@ export const korin = {
   // Bearer key korin presents on its INBOUND service calls to stellar
   // (by-irc-nick lookup, link-nick, reputation-by-id). Fails closed when unset
   // — the korin-facing endpoints reject all requests (ADR-0013 contract).
-  serviceKey: process.env.STELLAR_SERVICE_KEY ?? ''
+  serviceKey: process.env.STELLAR_SERVICE_KEY ?? '',
+  // Per-channel weights for the IRCScore channelQuality factor (#141). Values
+  // stay DEFERRED until real multi-channel traffic exists (PRD-02); the default
+  // empty map is behaviour-identical to unweighted channel counting. Format:
+  // JSON object of `{ "#channel": weight }`, e.g. `{"#announce":0.2,"#help":1.5}`.
+  channelWeights: parseChannelWeights(process.env.KORIN_CHANNEL_WEIGHTS)
 };
 
 export const email = {

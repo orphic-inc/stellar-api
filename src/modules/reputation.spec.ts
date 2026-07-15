@@ -25,6 +25,11 @@ jest.mock('../lib/prisma', () => ({
   }
 }));
 
+// The IRC dimension reads getIrcScore over the in-process metrics cache; mock
+// it so computeCrs is deterministic without seeding the cache.
+const mockGetIrcScore = jest.fn();
+jest.mock('./irc', () => ({ getIrcScore: mockGetIrcScore }));
+
 // A donation aggregate with no rows.
 const emptyDonationAgg = {
   _count: { _all: 0 },
@@ -523,6 +528,42 @@ describe('computeCrs — signed dimension floor', () => {
     // Without the floor the clamp would force this to 0; with floor −1 it survives.
     expect(community.subScore).toBe(-1);
     expect(community.weighted).toBe(-1);
+  });
+});
+
+// ─── computeCrs / IRC dimension (#141) ────────────────────────────────────────
+
+describe('computeCrs — IRC dimension', () => {
+  const ircOf = (input: Parameters<typeof computeCrs>[0]) =>
+    computeCrs(input).dimensions.find((d) => d.name === 'irc')!;
+
+  beforeEach(() => mockGetIrcScore.mockReset());
+
+  it('scores 0 and never consults the scorer when the user has no linked nick', () => {
+    expect(ircOf({ userId: 1, createdAt: NOW, now: NOW }).subScore).toBe(0);
+    expect(mockGetIrcScore).not.toHaveBeenCalled();
+  });
+
+  it('scores 0 when the nick has no data in the current window (null)', () => {
+    mockGetIrcScore.mockReturnValue(null);
+    expect(
+      ircOf({ userId: 1, createdAt: NOW, now: NOW, ircNick: 'ghost' }).subScore
+    ).toBe(0);
+    expect(mockGetIrcScore).toHaveBeenCalledWith('ghost');
+  });
+
+  it('scales the [0,1] raw score up to the dimension cap of 2', () => {
+    mockGetIrcScore.mockReturnValue(1);
+    const dim = ircOf({ userId: 1, createdAt: NOW, now: NOW, ircNick: 'nova' });
+    expect(dim.subScore).toBe(2); // raw 1 × IRC_CAP 2
+    expect(dim.weighted).toBe(2); // IRC_WEIGHT 1.0
+  });
+
+  it('scales a partial raw score proportionally within the cap', () => {
+    mockGetIrcScore.mockReturnValue(0.5);
+    expect(
+      ircOf({ userId: 1, createdAt: NOW, now: NOW, ircNick: 'nova' }).subScore
+    ).toBe(1); // 0.5 × 2
   });
 });
 

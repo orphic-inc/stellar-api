@@ -84,6 +84,23 @@ export const pollKorinMetrics = async (): Promise<void> => {
 const ACTIVITY_REF = 50;
 /** Reference channel count where channelQuality reaches ~63% of max. */
 const CHANNEL_REF = 5;
+/** Weight applied to a channel absent from the configured weight map (#141). */
+const DEFAULT_CHANNEL_WEIGHT = 1;
+
+/**
+ * Effective channel count feeding channelQuality (#141). Empty weight map (the
+ * default) returns the raw `channelCount` — weights are deferred until real
+ * multi-channel traffic exists to calibrate them (PRD-02). A configured map
+ * instead sums per-channel weights over the user's joined `channels`.
+ */
+const effectiveChannelCount = (user: IrcUserMetrics): number => {
+  const weights = korinConfig.channelWeights;
+  if (Object.keys(weights).length === 0) return user.channelCount;
+  return user.channels.reduce(
+    (sum, channel) => sum + (weights[channel] ?? DEFAULT_CHANNEL_WEIGHT),
+    0
+  );
+};
 
 /**
  * Compute IRCScore factors for a nick from a single flush window.
@@ -101,7 +118,7 @@ export const getIrcScore = (nick: string): number | null => {
   const activity = Math.log1p(user.messageCount) / Math.log1p(ACTIVITY_REF);
   const consistency = Math.min(user.presenceSeconds / windowDurationSeconds, 1);
   const channelQuality =
-    Math.log1p(user.channelCount) / Math.log1p(CHANNEL_REF);
+    Math.log1p(effectiveChannelCount(user)) / Math.log1p(CHANNEL_REF);
 
   return activity * consistency * channelQuality;
 };

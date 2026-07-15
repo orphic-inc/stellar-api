@@ -8,8 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **IRCScore channel-weight mechanism** (#141) — `channelQuality` now reads an `effectiveChannels` count that an optional `KORIN_CHANNEL_WEIGHTS` map (JSON `{"#channel": weight}`) can re-weight per channel, so a firehose everyone idles in can count for less than a niche channel. The map is empty by default and behaviour-identical to the previous raw channel count; actual weight values stay deferred until real multi-channel traffic exists to calibrate them (PRD-02). Ships with the first test coverage for `getIrcScore` and the CRS IRC dimension.
+- **Announce push-path verification** (#299) — the previously-untested cursor/retry loop (`runAnnounceCycle`, extracted for testability) and the korin `POST /irc/announce` wire contract (`InboundFeedSchema` shape, plain notify-and-link) are now covered by tests, plus a live end-to-end runbook (`docs/runbooks/announce-e2e.md`).
 - **Freepass/Neutralpass ratio-exempt Contribution flags** (PRD-06 #4) — a Contribution can be flagged Freepass (consumption accrues no `consumed` for the consumer; the contributor still earns `contributed`) or Neutralpass (neither side accrues, fully ratio-neutral) [#260].
 - **Consumption-event ingest + grant-time `canConsume` gate** (ADR-0016 Phase 2) — stellar now emits a server-authoritative consumption event per grant for korin's ledger to sum (`ledger.ts`, `ledgerJob.ts`), and `downloads.ts` enforces the Ratio Mechanism verdict at grant time via the ledger's hot state (`checkCanConsume`) instead of read-time-only evaluation; the check fails open (`null`) on unset keys, non-2xx, timeout, or error, so an unreachable ledger never blocks a grant. Freepass/Neutralpass contributions skip the gate entirely. Remaining ADR-0016 surface (`/ledger/sync` mutations, `/ledger/stats` reads) tracked in #324 [#261].
+
+### Docs
+
+- **ADR-0029 — integrity-monitoring / abuse-detection contract** (#300) — the follow-on ADR ADR-0016 deferred: defines the abuse-signal taxonomy, a cursor-pulled `GET /ledger/integrity` wire shape reusing the existing keys, and the stellar action model (evidence into staff review or a bounded CRS drag — never an automated gate). Reconciles ADR-0016 to Accepted (Phase 2 shipped via #261).
+- **ADR-0030 — access-gated announce delivery for private communities** (#177, design-only) — models the access-control feature ADR-0015 deferred: a dedicated `Community.visibility`, membership single-sourced from existing role relations ∩ verified nicks, an optional `target` on the announce push, and the crux decision that stellar projects membership while korin enforces the channel ACL.
+- **IRCScore magnitude reconcile** (#141) — corrected the stale `IRC_CAP = 6` in ADR-0013 to the pinned `2` and documented the channel-weight mechanism in ADR-0013 and PRD-02.
 
 ## [0.7.0] — 2026-07-11
 

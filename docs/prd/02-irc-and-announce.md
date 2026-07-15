@@ -63,7 +63,7 @@ consistency    = min(presenceSeconds / windowDuration, 1)     → [0, 1]
 channelQuality = log1p(channelCount)  / log1p(CHANNEL_REF)    → [0, 1]
 ```
 
-Anti-farming is structural: log-scaling on message count gives hard diminishing returns, `consistency` rewards sustained presence over one-session marathons, and `channelQuality` (also log-scaled) defeats single-channel spamming. The reputation registry applies the per-dimension cap (`IRC_CAP` = **2**, pinned 2026-06-23 — deliberately thin until real IRC traffic exists) so IRC can never dominate the CRS. `ACTIVITY_REF` = 50 and `CHANNEL_REF` = 5 are likewise pinned; the only **HITL/TBD** magnitude that remains is the channel-weight map ([#141](https://github.com/orphic-inc/stellar-api/issues/141)), deferred until there is real multi-channel traffic to weight.
+Anti-farming is structural: log-scaling on message count gives hard diminishing returns, `consistency` rewards sustained presence over one-session marathons, and `channelQuality` (also log-scaled) defeats single-channel spamming. The reputation registry applies the per-dimension cap (`IRC_CAP` = **2**, pinned 2026-06-23 — deliberately thin until real IRC traffic exists) so IRC can never dominate the CRS. `ACTIVITY_REF` = 50 and `CHANNEL_REF` = 5 are likewise pinned. The channel-weight **mechanism** ([#141](https://github.com/orphic-inc/stellar-api/issues/141)) now ships: `channelQuality` reads an `effectiveChannels` count that a `KORIN_CHANNEL_WEIGHTS` map (JSON `{"#channel": weight}`) can re-weight per channel. The map is **empty by default — behaviour-identical to raw channel counting** — and pinning actual weights remains the one **HITL/TBD** magnitude, deferred until there is real multi-channel traffic to calibrate against.
 
 ## Concept → code (descent map)
 
@@ -83,11 +83,11 @@ Anti-farming is structural: log-scaling on message count gives hard diminishing 
 
 - ✅ **korin.pink integration** — metrics pull + in-process cache, IRCScore read-time scorer registered into the CRS, announce push, and the Bearer-gated `by-irc-nick` / `reputation` inbound calls (ADR-0013; in-repo build #134–140 shipped-then-superseded, removed via #148/#150).
 - ✅ **Verified nick link** — challenge/nonce claim → `!verify` → `POST /irc-nick/verify` → promotion; only verified links credit IRCScore or resolve (ADR-0015; #175).
-- ✅ **IRCScore magnitudes** — cap pinned at **2** and `ACTIVITY_REF` = 50 / `CHANNEL_REF` = 5 confirmed (2026-06-23). ⏳ Only the channel-weight map remains, deferred until real multi-channel traffic exists ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL).
+- ✅ **IRCScore magnitudes** — cap pinned at **2** and `ACTIVITY_REF` = 50 / `CHANNEL_REF` = 5 confirmed (2026-06-23); the channel-weight **mechanism** (config-driven `KORIN_CHANNEL_WEIGHTS`, neutral empty default) shipped with test coverage. ⏳ Only the actual weight **values** remain, deferred until real multi-channel traffic exists ([#141](https://github.com/orphic-inc/stellar-api/issues/141), HITL).
 
 ## Open questions
 
-- **Channel-weight map** — the one IRCScore magnitude still TBD (cap and the refs were pinned 2026-06-23); deferred until real multi-channel traffic exists to weight (#141).
+- **Channel-weight map values** — the mechanism ships (config-driven `KORIN_CHANNEL_WEIGHTS`, neutral empty default); pinning the actual per-channel weights is the one IRCScore magnitude still TBD (cap and refs pinned 2026-06-23), deferred until real multi-channel traffic exists to weight (#141). korin exposes no canonical channel-list endpoint today — the de-facto channels are the bridge join set (`#announce,#stellar,#korin`).
 - **IRCScore teeth (positive reinforcement) — noted 2026-06-13, not scoped.** Today IRCScore only feeds CRS as substrate. The intended downstream: high scorers _earn capability_ — rights to create official channels, moderation in specific community channels — administered via the **Staff Toolbox** / **Community Toolbox** (see [PRD-01 → Future direction: making CRS bite](01-Community-Score.md)). Privilege-granting, never a download gate.
 - **Periodic re-verification.** Verified links don't expire in v1 (ADR-0015); a member abandoning a nick later re-registered by someone else is an accepted narrow window. Re-verification cadence is a future option.
 

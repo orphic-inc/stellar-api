@@ -45,14 +45,14 @@ This ADR records that supersession and the integration design that replaces it. 
 ## IRCScore formula
 
 ```
-IRCScore = activity × consistency × channelQuality   (scaled to IRC_CAP = 6)
+IRCScore = activity × consistency × channelQuality   (scaled to IRC_CAP = 2)
 
-activity       = log1p(messageCount)   / log1p(ACTIVITY_REF=50)   → [0, 1]
-consistency    = presenceSeconds / windowDurationSeconds           → [0, 1]
-channelQuality = log1p(channelCount)   / log1p(CHANNEL_REF=5)     → [0, 1]
+activity       = log1p(messageCount)     / log1p(ACTIVITY_REF=50)   → [0, 1]
+consistency    = presenceSeconds / windowDurationSeconds             → [0, 1]
+channelQuality = log1p(effectiveChannels) / log1p(CHANNEL_REF=5)    → [0, 1]
 ```
 
-Log-scaling on message and channel counts prevents volume abuse; the product of three `[0,1]` factors bounds the dimension before the registry cap. Absence of an IRC nick earns 0 — IRC presence is optional, absence is not penalised.
+`IRC_CAP` was pinned at **2** (2026-06-23, PRD-02 — deliberately thin until real IRC traffic exists); the earlier `6` here was superseded and is corrected. `effectiveChannels` is `channelCount` by default; a configured `KORIN_CHANNEL_WEIGHTS` map (#141) instead sums per-channel weights over the joined channel list — the map is empty (behaviour-identical to the raw count) until real multi-channel traffic exists to calibrate it. Log-scaling on message and channel counts prevents volume abuse; the product of three `[0,1]` factors bounds the dimension before the registry cap. Absence of an IRC nick earns 0 — IRC presence is optional, absence is not penalised.
 
 ---
 
@@ -95,7 +95,7 @@ The reconcile lands as part of the `feat/korin-pink` integration onto `main`. Ne
 | File                             | Resolution                                                                                                                                                                                                          |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/modules/config.ts`          | Take korin — drop the `irc` `{ botToken, saslSecret }` block, keep `korin` `{ apiUrl, pullKey, pollIntervalMs }`.                                                                                                   |
-| `src/modules/reputation.ts`      | Take korin (4 hunks) — `ircScorer` reads `getIrcScore(ircNick)` from `irc.ts`, `ircNick` in `DimensionInput`, drop the `prisma.ircActivity` query. Self-consistent: imports `./irc`, defines `IRC_CAP = 6` locally. |
+| `src/modules/reputation.ts`      | Take korin (4 hunks) — `ircScorer` reads `getIrcScore(ircNick)` from `irc.ts`, `ircNick` in `DimensionInput`, drop the `prisma.ircActivity` query. Self-consistent: imports `./irc`, defines `IRC_CAP = 2` locally. |
 | `src/modules/reputation.spec.ts` | Take korin — its tests cover the external IRCScore; main's cover the deleted in-repo scorer (~166 lines, effectively two different files).                                                                          |
 | `prisma/schema.prisma`           | **Hand-merge** — main's `User` model (no `communityPass` per #134, no `ircKey`/`announceKey`) **+** korin's `ircNick String? @unique`. korin's branch still carries `communityPass`; a blind take reintroduces it.  |
 | `package.json`                   | **Hand-merge** — main's `version` + `prepare: husky install` **+** korin's `db:seed-wiki` script.                                                                                                                   |

@@ -62,7 +62,7 @@ Auth, key names, and fail-closed semantics are inherited verbatim from ADR-0013 
 - korin gains a `Contribution`-aware working set (not just IRC metrics) and three endpoints (`/ledger/consumption`, `/ledger/can-consume`, `/ledger/stats`); stellar gains a `/api/ledger/snapshot` read and emits events + sync mutations from `downloads.ts` / the contribution + ratio-policy paths.
 - **Phasing.** korin ADR-004 Phase 1 (port IRC metrics) needs **no** new contract. This ADR is the **Phase 2** dependency; it can land incrementally — gate-only first (read path), then event ingest, then live stats, then abuse signals.
 - **Freepass / Neutralpass** (PRD-06 red-green target #4) are realized as the `pass` field on the consumption event + a `Contribution` flag synced via `/ledger/sync`. **Bonus-funded pass** rides the same `pass: "bonus"` value, debited in stellar's (deferred) bonus economy.
-- **Integrity / abuse detection** is enabled but **out of scope for this contract** — korin's hot-state + IRC vantage is the home for it; the signal shape (impossible-consumption, sybil/multi-account) is a follow-on ADR.
+- **Integrity / abuse detection** is enabled but **out of scope for this contract** — korin's hot-state + IRC vantage is the home for it; the signal shape (impossible-consumption, sybil/multi-account) is defined in the follow-on [ADR-0029 — integrity-monitoring contract](0029-integrity-monitoring-contract.md).
 - If korin is never deployed, stellar's existing read-time accounting continues unchanged — this contract is purely additive.
 
 ---
