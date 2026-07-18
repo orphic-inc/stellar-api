@@ -8,11 +8,6 @@ import { AppError } from '../lib/errors';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
-import {
-  checkCanConsume,
-  buildConsumptionEvent,
-  pushConsumptionEvent
-} from './ledger';
 
 const log = getLogger('downloads');
 
@@ -37,25 +32,6 @@ export const grantDownloadAccess = async (
   contributionId: number,
   idempotencyKey?: string
 ): Promise<GrantResult> => {
-  // Grant-time ratio gate (ADR-0016). Consult korin's hot state BEFORE opening the
-  // grant transaction — a ~2s network call must never be held inside a DB tx. Exempt
-  // contributions skip the gate entirely: a pass exists precisely to bypass ratio, so
-  // stellar enforces the skip locally rather than trusting korin to know the flag
-  // (mirrors the balance-gate skip below). korin unreachable ⇒ null ⇒ fail open to the
-  // local checks inside the transaction; a korin outage must never hard-block.
-  const gateContribution = await prisma.contribution.findUnique({
-    where: { id: contributionId },
-    select: { ratioExempt: true }
-  });
-  if (gateContribution && gateContribution.ratioExempt === RatioExempt.NONE) {
-    const verdict = await checkCanConsume(consumerId, contributionId);
-    if (verdict && verdict.allow === false)
-      throw new AppError(
-        403,
-        verdict.reason ?? 'Ratio gate: consumption not permitted'
-      );
-  }
-
   const result = await prisma.$transaction(async (tx) => {
     const contribution = await tx.contribution.findUnique({
       where: { id: contributionId },
@@ -240,7 +216,7 @@ export const reverseDownloadAccess = async (
   grantId: number,
   reason?: string
 ): Promise<{ grantId: number; status: DownloadGrantStatus }> => {
-  const { result, eventSource } = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const grant = await tx.downloadAccessGrant.findUnique({
       where: { id: grantId }
     });
@@ -333,25 +309,6 @@ export const reverseDownloadAccess = async (
       }
     });
 
-    return {
-      result: { grantId: updated.id, status: updated.status },
-      // Fields for the reversal event, snapshotting the grant's exemption so the
-      // negated deltas match exactly what accrued.
-      eventSource: {
-        id: grant.id,
-        consumerId: grant.consumerId,
-        contributorId: grant.contributorId,
-        contributionId: grant.contributionId,
-        amountBytes: grant.amountBytes,
-        ratioExempt: grant.ratioExempt,
-        at: updated.reversedAt ?? new Date()
-      }
-    };
+    return { grantId: updated.id, status: updated.status };
   });
-
-  // Best-effort reversal event (post-commit; ADR-0016). A miss self-heals on korin's
-  // next snapshot reload — the durable REVERSED state is authoritative regardless.
-  void pushConsumptionEvent(buildConsumptionEvent(eventSource, 'reversal'));
-
-  return result;
 };
