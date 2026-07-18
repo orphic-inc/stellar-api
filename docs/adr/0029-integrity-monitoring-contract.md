@@ -1,6 +1,6 @@
 # ADR-0029: Integrity-monitoring & abuse-detection contract (korin.pink `ledger` ↔ stellar-api)
 
-**Status:** Proposed
+**Status:** Proposed — **blocked: no substrate.** The korin `ledger` this contract reads over is being withdrawn (see ADR-0016, Superseded); `GET /ledger/integrity` therefore has nothing to attach to. The signal taxonomy and action model below stand on their own and are worth keeping, but any implementation must **first specify and justify its own substrate** rather than inherit one. Do not build against the endpoint shape in this document until that is done.
 **Date:** 2026-07-15
 **Repos:** orphic-inc/stellar-api (decides & acts), obrien-k/korin-pink (`ledger` — detects)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (boundary + key model) · [ADR-0016 — consumption accounting & ratio-gate contract](0016-ledger-accounting-contract.md) (the hot consumption state this reads over)
