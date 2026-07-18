@@ -93,7 +93,7 @@ Lives in `scoreStylesheetTier` (`stylesheetScore.ts`), wired into the `styleshee
 
 Rewards alone let bad actors coast; CRS must be able to go **down**.
 
-- **Dead externalUrl** — an `externalStylesheet` whose link is dead/unreachable is **suspicious → negative CRS** for the user hosting it (link-health driven). This is the stylesheet sibling of contribution link-health: a dead link isn't neutral, it's a penalty.
+- ~~**Dead externalUrl** — an `externalStylesheet` whose link is dead/unreachable is **suspicious → negative CRS** for the user hosting it.~~ **Withdrawn 2026-07-18 (#122 closed wontfix).** The premise does not hold: `UserSettings.externalStylesheet` is owner-only (`profile.ts` returns it solely when `viewer.isOwner`) and themes the holder's own view, so a dead link degrades nobody's experience but the holder's. It is therefore _not_ the stylesheet sibling of contribution link-health — a dead contribution link denies content to other members, which is what makes that penalty a reputational event. A CRS penalty requires community harm. See PRD-01, "Scoping decisions (2026-07-18)". Note that no publicly-consumed stylesheet URL exists at all: `AuthorStylesheet.source` is inline CSS, not a link.
 - **Broader negative CRS lives in PRD-01 (lifetime CRS) + the LinkHealth lifecycle**, referenced here so the stylesheet penalty stays consistent with them:
   - flapping / unresolved-in-72h links → penalty then sweep
   - **upheld** reports on contributions → penalty (a heavily-reported user is always suspect)
@@ -145,7 +145,7 @@ First testable slices (much of the substrate already exists):
 
 ## Open questions
 
-- **Dead-external penalty magnitude** — value TBD (#122).
+- ~~**Dead-external penalty magnitude** — value TBD (#122).~~ **Resolved 2026-07-18: no penalty ships.** #122 closed wontfix (see Negative scoring above). CRS descent is unaffected — `community` (floor −1) and the contagion vector already provide it.
 - IRC scoring belongs to PRD-02 — confirm it's not duplicated here.
 
 **Resolved:** external disposition (authorless → permission/link-health, not site) · self-use pays no author bonus · per-author cap not needed for the stylesheet-dimension author bonus (the `/private` invite+report model covers it) · **accrual model = computed-on-read, with adoption events logged to a `CRS_*` ledger** ([ADR-0007](../adr/0007-crs-read-time-and-event-ledger.md)) · **Friends×Stylesheet controlled vector** (adopter +0.2 / author +0.1, once-per-pair + per-user cap) · **tiering curve** (#121: back-loaded marginal table over distinct adoptions, cap 6 — table above) · **AuthorStylesheet storage shape** ([ADR-0024](../adr/0024-stylesheet-delivery-contract.md): stored sanitized `source`, delivered as `text/css` via `GET /api/stylesheet/author-stylesheet/:id/css`; a distinct URL-typed `AuthorStylesheetUrl` entry is dropped — Personal covers the URL case) · **user contract = `.css` only** (SCSS rejected as user input; ADR-0024) · **Personal/Registry radio** (the Site Stylesheet slot is one explicit source; selecting one clears the other, enforced server-side — retires the "URL overrides" implicit precedence).
