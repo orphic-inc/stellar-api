@@ -84,11 +84,11 @@ function getSetupChecklist(
   const dismissed = new Set(settings.dismissedLaunchChecklist ?? []);
   const checklist: LaunchChecklistItem[] = [];
 
-  if (settings.registrationStatus === 'open') {
+  if (settings.registrationStatus === 'closed') {
     checklist.push({
-      id: 'registration-open',
+      id: 'registration-closed',
       message:
-        'registrationStatus is still "open". Switch it to "closed" or "invite" until you are ready for public launch.'
+        'registrationStatus is "closed". Switch it to "open" or "invite" when you are ready to accept registrations.'
     });
   }
 

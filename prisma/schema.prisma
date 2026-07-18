@@ -2048,7 +2048,7 @@ model ReportNote {
 model SiteSettings {
   id                       Int                @id
   approvedDomains          String[]
-  registrationStatus       RegistrationStatus @default(open)
+  registrationStatus       RegistrationStatus @default(closed)
   maxUsers                 Int                @default(7000)
   dismissedLaunchChecklist String[]
   // The one recorded fact for "is this instance installed?" — stamped once by

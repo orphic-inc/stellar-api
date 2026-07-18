@@ -135,11 +135,34 @@ describe('GET /api/install', () => {
       res.body.setupChecklist.map((item: { message: string }) => item.message)
     ).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('registrationStatus is still "open"'),
+        expect.stringContaining('registrationStatus is "closed"'),
         expect.stringContaining('maxUsers is still the default value'),
         expect.stringContaining('approvedDomains is empty')
       ])
     );
+  });
+
+  it('omits the registration checklist item once registration is opened', async () => {
+    prismaMock.userRank.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: null,
+      updatedAt: new Date()
+    } as never);
+
+    const res = await request(app).get('/api/install');
+
+    expect(res.status).toBe(200);
+    expect(
+      res.body.setupChecklist.find(
+        (item: { id: string }) => item.id === 'registration-closed'
+      )
+    ).toBeUndefined();
   });
 
   it('omits dismissed launch checklist items', async () => {

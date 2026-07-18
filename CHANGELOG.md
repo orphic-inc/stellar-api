@@ -12,6 +12,10 @@ All notable changes to stellar-api are documented here.
 - **Announce push-path verification** (#299) — the previously-untested cursor/retry loop (`runAnnounceCycle`, extracted for testability) and the korin `POST /irc/announce` wire contract (`InboundFeedSchema` shape, plain notify-and-link) are now covered by tests, plus a live end-to-end runbook (`docs/runbooks/announce-e2e.md`).
 - **Freepass/Neutralpass ratio-exempt Contribution flags** (PRD-06 #4) — a Contribution can be flagged Freepass (consumption accrues no `consumed` for the consumer; the contributor still earns `contributed`) or Neutralpass (neither side accrues, fully ratio-neutral) [#260].
 
+### Changed
+
+- **Fresh installs default registration to `closed`** — a newly installed instance no longer accepts self-registrations until the admin deliberately opens it: the `SiteSettings.registrationStatus` default flips from `open` to `closed` (app-level `DEFAULTS` and DB `@default`, with a migration; existing rows keep their value), and the install launch-checklist item inverts from the old `registration-open` warning to a `registration-closed` advisory telling the admin to switch to `open` or `invite` when ready to accept registrations [#332].
+
 ### Removed
 
 - **The korin `ledger` client is withdrawn** — the consumption-event ingest and grant-time `canConsume` gate merged earlier in this unreleased window (#261) are removed along with `GET /api/ledger/snapshot`. Exercising the announce runbook against a live korin stack showed the gate to be redundant: its verdict rides `canDownload`, the same flag `downloads.ts` already reads authoritatively from Postgres in the same request, while stellar's stricter balance gate had no korin equivalent. No user-facing behaviour changes — the removed gate could only deny what stellar already denied, and it failed open. Stellar's own accounting (`contributed`/`consumed`, `economyTransaction`, the ADR-0006 ratio-relief substrate) is untouched. Reasoning recorded in ADR-0016, now Superseded.

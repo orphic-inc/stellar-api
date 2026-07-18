@@ -7,7 +7,9 @@ type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 const DEFAULTS = {
   id: 1,
   approvedDomains: [] as string[],
-  registrationStatus: 'open' as const,
+  // 'closed' until the admin deliberately opens registration (#332); the
+  // install checklist reminds them to flip it at launch.
+  registrationStatus: 'closed' as const,
   maxUsers: 7000,
   dismissedLaunchChecklist: [] as string[]
 };

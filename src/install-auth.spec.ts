@@ -38,6 +38,17 @@ describe('API auth/profile/user flows', () => {
   });
 
   it('returns a msg response when registration hits an existing user', async () => {
+    // Registration must be open to reach the duplicate-user check — the
+    // harness default mirrors prod ('closed'), which rejects earlier.
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: null,
+      updatedAt: new Date()
+    });
     prismaMock.user.findFirst.mockResolvedValue(makeUser({ id: 1 }));
 
     const res = await request(app).post('/api/auth/register').send({

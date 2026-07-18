@@ -494,7 +494,9 @@ export const resetApiTestState = (): void => {
   prismaMock.siteSettings.upsert.mockResolvedValue({
     id: 1,
     approvedDomains: [],
-    registrationStatus: 'open',
+    // Mirrors the prod default (modules/settings.ts DEFAULTS): fresh
+    // instances start closed. Tests exercising registration mock 'open'.
+    registrationStatus: 'closed',
     maxUsers: 7000,
     dismissedLaunchChecklist: [],
     installedAt: null,

@@ -4,7 +4,11 @@
 
 This is the Node.js API backend for **Stellar**, a modern, next-generation community content tracker and forum software.
 
-Stellar is an invite-only (`/private/`) platform built around **Communities** with granular permissions, member contributions, and a **Community Reputation Score (CRS)** that rewards long-term, healthy participation.
+Stellar is an invite-only platform built around **Communities** with granular permissions, member contributions, and a **Community Reputation Score (CRS)** that rewards long-term, healthy participation.
+
+## Status: alpha
+
+Stellar is pre-1.0 software (currently 0.7.x). Running a public instance means running an alpha: interfaces and the database schema still change between releases, migrations may be destructive (pre-1.0 carries no backfill guarantees), and no data-durability promises are made yet. Trunk is kept deployable — every merge passes the full CI chain (format, lint, type-checks, unit and integration suites, and a boot-and-migrate container smoke test) — but treat any public deployment as disposable for now. A fresh install starts with registration `closed`; open it deliberately from site settings when you are ready to accept members.
 
 ## What's here
 
@@ -110,7 +114,7 @@ A fresh instance has **no admin and is 503-walled** on `/api/*` until you comple
     -d '{"username":"admin","email":"admin@example.com","password":"<a-strong-password>"}'
   ```
 
-The response includes `configWarnings` and a `setupChecklist` flagging launch-readiness gaps (CORS default, SMTP unset, open registration, etc.). Until install completes, every other route returns `503`.
+The response includes `configWarnings` and a `setupChecklist` flagging launch-readiness gaps (CORS default, SMTP unset, registration still closed, etc.). Registration defaults to `closed` on a fresh instance — switch it to `open` or `invite` via site settings when you are ready to accept members. Until install completes, every other route returns `503`.
 
 ## Contributing
 
