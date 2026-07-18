@@ -1,6 +1,6 @@
 # ADR-0016: Consumption accounting & ratio-gate contract (korin.pink `ledger` ↔ stellar-api)
 
-**Status:** Accepted (2026-07-13) — consumption event, can-consume gate, and snapshot seed shipped (#322/#323); `/ledger/sync` and `/ledger/stats` remain open, tracked in #324
+**Status:** **Superseded (2026-07-18) — the contract is withdrawn and the implementation removed.** Briefly Accepted (2026-07-13) when Phase 2 shipped (#322/#323); driving the announce end-to-end runbook against a live korin stack then showed the ledger to be redundant with stellar's own accounting. See [Supersession](#supersession-2026-07-18) below. The Context section is retained because its analysis is the durable artifact.
 **Date:** 2026-06-18
 **Repos:** orphic-inc/stellar-api (system of record), obrien-k/korin-pink (`ledger` accounting authority)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (the bidirectional boundary this builds on)
@@ -67,7 +67,26 @@ Auth, key names, and fail-closed semantics are inherited verbatim from ADR-0013 
 
 ---
 
+## Supersession (2026-07-18)
+
+Everything above is retained as written. This section records why it was withdrawn.
+
+The contract shipped (#322/#323) and was marked Accepted. Exercising the announce end-to-end runbook (#299) against a live korin stack then surfaced that the ledger does not earn its place:
+
+1. **The gate is redundant.** korin's `can-consume` verdict is `Allow: u.canDownload` and nothing else. `downloads.ts` reads that same flag from Postgres, authoritatively, ~20 lines later in the same request, and throws 403 on it. The remote call can only ever deny the set stellar already denies — from a derived copy that can be stale, cold, or absent, and that fails open on every error path. Stellar's balance gate (`contributed - consumed < cost`) is strictly stronger and korin never implemented it.
+2. **The stated rationale is not realized.** "Without per-request Postgres aggregation" (Rationale, above) does not hold: the grant transaction reads the consumer row regardless, for the CAS. No query is saved.
+3. **The load premise was imported, not measured.** "Hot, high-churn counters" describes a swarm tracker — every peer re-announcing every ~30 minutes from untrusted clients. Stellar's profile is one event per deliberate human download. The Context section above already establishes why: _"Stellar has no swarm: stellar issues every consumption grant itself."_ That analysis correctly identifies the sidecar's reason for existing as absent here, and the Decision then specifies one anyway.
+4. **The justification was circular.** This ADR exists because korin ADR-004 gated Phase 2 on it; ADR-004 exists because _"the capability korin lacks is a hot-path accounting authority."_ Neither states a problem observed in the system of record.
+
+**Removed:** `ledger.ts`, `ledgerJob.ts`, their specs, the integration suite, `GET /api/ledger/snapshot`, the `app.ts` mount and job start, and the `downloads.ts` gate and reversal-event emission. korin's counterpart PR (obrien-k/korin-pink#65) was closed unmerged and its Phase 1 scaffold removed.
+
+**Deliberately untouched:** stellar's own accounting — the `contributed`/`consumed` CAS, `DownloadAccessGrant`, the `economyTransaction` ledger, and the ADR-0006 ratio-relief substrate (`ratio.ts`, `ratioPolicy.ts`, `linkHealth.ts`). None of it imported the korin client. "Ledger" naming the korin client _and_ stellar's local accounting is what made this ambiguous; if the pipe is ever rebuilt, name it for korin explicitly.
+
+**If this is revisited,** the bar is a problem observed in stellar — a measured slow path, real contention, or a question stellar genuinely cannot answer locally — not a capability gap in the sidecar. [ADR-0029](0029-integrity-monitoring-contract.md) (integrity monitoring) is the strongest surviving candidate, since correlating IRC presence with consumption is something neither system can do alone; it is held Proposed-but-blocked and must specify its own substrate.
+
+---
+
 ## Cross-references
 
-- **stellar-api:** ADR-0013 (boundary, extended here) · ADR-0006 (ratio relief) · PRD-06 (ratio, Freepass/Neutralpass).
-- **korin.pink:** ADR-004 (the `ledger` service this contract unblocks) · ADR-003 (bounded-loss hot-state model).
+- **stellar-api:** ADR-0013 (boundary, extended here) · ADR-0006 (ratio relief) · PRD-06 (ratio, Freepass/Neutralpass) · ADR-0029 (integrity monitoring — blocked, see above).
+- **korin.pink:** ADR-004 (the `ledger` service this contract unblocked — also superseded) · ADR-003 (bounded-loss hot-state model).

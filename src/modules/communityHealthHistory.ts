@@ -122,8 +122,8 @@ export type CommunityPulse = {
  * series (#161) — O(1) per community, ≤1 day stale, cheap on the reputation read
  * path. Per ADR-0007 the snapshot is a trend layer, not the source of truth; the
  * dimension accepts that for a bounded tier-0 signal. The scorer only consumes
- * the returned shape, so this source can later be swapped for a top10-style /
- * korin-ledger-backed read model without touching `reputation.ts`.
+ * the returned shape, so this source can later be swapped for a top10-style
+ * read model without touching `reputation.ts`.
  */
 export async function communityHealthFor(
   communityIds: number[]

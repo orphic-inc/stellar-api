@@ -31,28 +31,14 @@ const mockTx = {
 
 const mockEvaluateRatioPolicy = jest.fn();
 const mockTransaction = jest.fn();
-// The grant-time ratio gate pre-reads the contribution's exemption OUTSIDE the
-// transaction (never hold a tx across a network call), so the top-level prisma mock
-// needs `contribution.findUnique` in addition to `$transaction`.
-const mockGateContributionFindUnique = jest.fn();
-
-const mockCheckCanConsume = jest.fn();
-const mockPushConsumptionEvent = jest.fn();
 
 jest.mock('./ratioPolicy', () => ({
   evaluateRatioPolicy: mockEvaluateRatioPolicy
 }));
 
-jest.mock('./ledger', () => ({
-  checkCanConsume: mockCheckCanConsume,
-  buildConsumptionEvent: jest.fn(() => ({})),
-  pushConsumptionEvent: mockPushConsumptionEvent
-}));
-
 jest.mock('../lib/prisma', () => ({
   prisma: {
-    $transaction: mockTransaction,
-    contribution: { findUnique: mockGateContributionFindUnique }
+    $transaction: mockTransaction
   }
 }));
 
@@ -98,13 +84,6 @@ beforeEach(() => {
     (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
   );
   mockEvaluateRatioPolicy.mockResolvedValue(undefined);
-  // Gate defaults: non-exempt contribution + korin unreachable (null ⇒ fail open),
-  // so the gate is transparent for the existing grant/reverse cases.
-  mockGateContributionFindUnique.mockResolvedValue({
-    ratioExempt: RatioExempt.NONE
-  });
-  mockCheckCanConsume.mockReset().mockResolvedValue(null);
-  mockPushConsumptionEvent.mockReset().mockResolvedValue(true);
 });
 
 // ─── grantDownloadAccess ───────────────────────────────────────────────────────
@@ -268,71 +247,6 @@ describe('grantDownloadAccess', () => {
     });
     expect(result.downloadUrl).toBe('https://example.com/file.zip');
     expect(result.amountBytes).toBe(cost.toString());
-  });
-});
-
-// ─── grant-time canConsume gate (ADR-0016) ──────────────────────────────────────
-
-describe('grantDownloadAccess — ratio gate', () => {
-  it('blocks with 403 before opening the transaction when korin says allow:false', async () => {
-    mockCheckCanConsume.mockResolvedValue({
-      allow: false,
-      reason: 'LEECH_DISABLED'
-    });
-
-    await expect(grantDownloadAccess(7, 5)).rejects.toMatchObject({
-      statusCode: 403
-    });
-    // Gate short-circuits: the grant transaction never runs.
-    expect(mockTransaction).not.toHaveBeenCalled();
-  });
-
-  it('fails open (proceeds) when korin is unreachable (null verdict)', async () => {
-    mockCheckCanConsume.mockResolvedValue(null);
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.user.findUnique.mockResolvedValue(makeUser());
-    mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
-    mockTx.user.updateMany.mockResolvedValue({ count: 1 });
-    mockTx.user.update.mockResolvedValue(undefined);
-    mockTx.user.findUniqueOrThrow.mockResolvedValue({
-      consumed: BigInt(0),
-      contributed: BigInt('2000000000')
-    });
-    mockTx.downloadAccessGrant.create.mockResolvedValue(makeGrant());
-    mockTx.economyTransaction.create.mockResolvedValue(undefined);
-    mockTx.consumer.upsert.mockResolvedValue({ id: 1 });
-    mockTx.consumer.update.mockResolvedValue(undefined);
-
-    await expect(grantDownloadAccess(7, 5)).resolves.toMatchObject({
-      status: DownloadGrantStatus.COMPLETED
-    });
-  });
-
-  it('skips the gate entirely for an exempt contribution', async () => {
-    // Even a hostile allow:false must not touch an exempt grant.
-    mockGateContributionFindUnique.mockResolvedValue({
-      ratioExempt: RatioExempt.FREEPASS
-    });
-    mockCheckCanConsume.mockResolvedValue({ allow: false });
-    mockTx.contribution.findUnique.mockResolvedValue(
-      makeContribution({ ratioExempt: RatioExempt.FREEPASS })
-    );
-    mockTx.user.findUnique.mockResolvedValue(makeUser());
-    mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
-    mockTx.user.findUniqueOrThrow.mockResolvedValue({
-      consumed: BigInt(0),
-      contributed: BigInt('2000000000')
-    });
-    mockTx.downloadAccessGrant.create.mockResolvedValue(
-      makeGrant({ ratioExempt: RatioExempt.FREEPASS })
-    );
-    mockTx.economyTransaction.create.mockResolvedValue(undefined);
-    mockTx.consumer.upsert.mockResolvedValue({ id: 1 });
-    mockTx.consumer.update.mockResolvedValue(undefined);
-
-    await grantDownloadAccess(7, 5);
-
-    expect(mockCheckCanConsume).not.toHaveBeenCalled();
   });
 });
 
