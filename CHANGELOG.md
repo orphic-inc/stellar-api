@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-18
+
+The alpha-deploy cut. A fresh instance is now safe to stand up in public — registration starts closed and the install checklist walks the admin to launch — and the release drops the korin ledger client the announce runbook proved redundant. CRS gains a channel-weight lever, ratio gains Freepass/Neutralpass, and the CRS design frontier is settled in the spec ahead of implementation.
+
 ### Added
 
 - **IRCScore channel-weight mechanism** (#141) — `channelQuality` now reads an `effectiveChannels` count that an optional `KORIN_CHANNEL_WEIGHTS` map (JSON `{"#channel": weight}`) can re-weight per channel, so a firehose everyone idles in can count for less than a niche channel. The map is empty by default and behaviour-identical to the previous raw channel count; actual weight values stay deferred until real multi-channel traffic exists to calibrate them (PRD-02). Ships with the first test coverage for `getIrcScore` and the CRS IRC dimension.
@@ -22,7 +26,8 @@ All notable changes to stellar-api are documented here.
 
 ### Docs
 
-- **ADR-0029 — integrity-monitoring / abuse-detection contract** (#300) — the follow-on ADR ADR-0016 deferred: defines the abuse-signal taxonomy, a cursor-pulled `GET /ledger/integrity` wire shape reusing the existing keys, and the stellar action model (evidence into staff review or a bounded CRS drag — never an automated gate). Reconciles ADR-0016 to Accepted (Phase 2 shipped via #261).
+- **ADR-0029 — integrity-monitoring / abuse-detection contract** (#300) — the follow-on ADR ADR-0016 deferred: defines the abuse-signal taxonomy, a cursor-pulled `GET /ledger/integrity` wire shape reusing the existing keys, and the stellar action model (evidence into staff review or a bounded CRS drag — never an automated gate). Its transport was withdrawn later in this same window along with the ledger sidecar, so the ADR ends the release marked blocked and stays Proposed: the taxonomy and action model are transport-independent and worth keeping, but any implementation must specify and justify its own substrate first.
+- **PRD-01 CRS design questions settled** (#122, #227, #229, #235, #236) — a design pass over the four CRS issues carrying `[design]`/`needs-info` framing found only one real open question. Wiki becomes a Contests sub-signal (cap 2) while Forum stays unscored (post volume is the only available signal and the only ungated input in the model); Contests is shaped to be buildable with independently capped sub-signals summed then clamped at the umbrella cap, and Stylesheet folds in — reversing "not folded yet" and resolving the double-count PRD-01 already acknowledged.
 - **ADR-0030 — access-gated announce delivery for private communities** (#177, design-only) — models the access-control feature ADR-0015 deferred: a dedicated `Community.visibility`, membership single-sourced from existing role relations ∩ verified nicks, an optional `target` on the announce push, and the crux decision that stellar projects membership while korin enforces the channel ACL.
 - **IRCScore magnitude reconcile** (#141) — corrected the stale `IRC_CAP = 6` in ADR-0013 to the pinned `2` and documented the channel-weight mechanism in ADR-0013 and PRD-02.
 
@@ -572,7 +577,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...v0.7.0
 [0.6.9]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...v0.6.9
 [0.6.4]: https://github.com/orphic-inc/stellar-api/compare/v0.6.3...v0.6.4
