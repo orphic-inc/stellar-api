@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-18
+
+Makes the 0.8.0 stack verifiable in place: a deployed container can now seed its own e2e fixtures, so an end-to-end pass against a live box needs no temporary database exposure.
+
 ### Changed
 
 - **The e2e fixture seeder ships in the image** — `seed-e2e-users.ts` moves from `prisma/scripts/` (outside the `rootDir: src` build, so it needed a ts-node toolchain and a reachable database port) into `src/scripts/`, compiling to `dist/scripts/seed-e2e-users.js`. A deployed container stack can now seed its own e2e fixtures with `docker compose exec api node dist/scripts/seed-e2e-users.js` instead of temporarily exposing Postgres to the host. Because the fixtures use known weak credentials and the script now reaches every deployment, it refuses to run when `NODE_ENV=production` unless `ALLOW_E2E_SEED=true` is set explicitly.
@@ -581,7 +585,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/orphic-inc/stellar-api/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...v0.7.0
 [0.6.9]: https://github.com/orphic-inc/stellar-api/compare/v0.6.4...v0.6.9
