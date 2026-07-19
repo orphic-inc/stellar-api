@@ -53,6 +53,7 @@ Copy `.env.default` → `.env`.
 | `STELLAR_DISABLED_CHANNEL` | IRC channel `${disabled_channel}` resolves to (PRD-09; default `#disabled`)                 |
 | `STELLAR_STAFFPM_PATH`     | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                          |
 | `STELLAR_PUBLIC_KB_BASE`   | Stellar Public KB root for `${*_article}` guidance links (PRD-09; default kb.stellargra.ph) |
+| `STELLAR_ASSET_MAX_BYTES`  | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                 |
 
 ## Architecture
 
@@ -65,6 +66,7 @@ src/
     asyncHandler.ts         # Wraps async routes; catches errors, 10s timeout
     installState.ts         # In-memory cache for isInstalled() check
     logging.ts              # Winston logger factory (JSON in prod, pretty in dev)
+    assetStore.ts           # Content-addressed binary asset store (ADR-0026): putAsset/getAssetByHash over a Postgres Bytes column
     linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse; applyHealthAccrual (per-contribution PASS-uptime accumulator, #95/ADR-0019)
     linkHealthJob.ts        # Background job: recheck stale contribution links every 24h
     communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
@@ -108,6 +110,7 @@ src/
     pagination.ts           # parsePage(req) → { skip, limit, page }
                             # paginatedResponse(res, data, total, pg)
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
+    assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, unlike cssSanitize
     jsonHelpers.ts          # appendToJsonArray, jsonObjectArray, removeFromJsonArrayAtIndex
     ttlCache.ts             # Generic TtlCache<K,V> + top10Cache singleton
   types/
@@ -153,6 +156,7 @@ src/
     random.ts               # Random release endpoint
     siteHistory.ts          # Site history log
     stylesheet.ts           # User stylesheets
+    asset.ts                # GET /:hash — content-addressed binary delivery, immutable caching (ADR-0026)
     wiki.ts                 # Wiki pages, aliases, revisions
     docs.ts                 # API docs endpoint
     communities/

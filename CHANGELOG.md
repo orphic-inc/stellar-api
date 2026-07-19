@@ -6,6 +6,12 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Binary asset store** ([ADR-0026](docs/adr/0026-static-asset-storage.md), #290 Phase 1) — an api-owned home for the binary assets a stored row references, so an asset is verifiable from the api that serves it rather than living unverified in another repo's static tree. An `Asset` row (content hash, mime, size, kind, optional owner) holds the bytes in Postgres, and `GET /api/asset/:hash` delivers them addressed by sha256: non-enumerable, deduplicated by content, and cacheable as genuinely `immutable` since the bytes at a hash can never change. Ingest identifies every payload by its magic bytes and rejects anything empty, oversize, unrecognized, or whose declared mime contradicts its content — the store never serves a byte it has not identified. `STELLAR_ASSET_MAX_BYTES` (default 2 MB) caps a single asset.
+
+  This is the substrate only. The authenticated upload path, reference counting / orphan sweep, and the migration of the asset-bearing themes (`proton`, `postmod`) to api-canonical `/css` fixtures are all still open — see the ADR amendment for the two blockers found while building it.
+
 ## [0.8.1] — 2026-07-18
 
 Makes the 0.8.0 stack verifiable in place: a deployed container can now seed its own e2e fixtures, so an end-to-end pass against a live box needs no temporary database exposure.

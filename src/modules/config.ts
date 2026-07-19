@@ -110,6 +110,13 @@ export const korin = {
   channelWeights: parseChannelWeights(process.env.KORIN_CHANNEL_WEIGHTS)
 };
 
+// Binary asset store (ADR-0026). The backend is a Postgres `Bytes` column, so
+// there is no connection to surface here — the only operational knob is the
+// store-time size ceiling, enforced by `validateAsset`.
+export const assets = {
+  maxBytes: parseInt(process.env.STELLAR_ASSET_MAX_BYTES ?? '2000000', 10) // 2 MB
+};
+
 export const email = {
   smtpHost: process.env.STELLAR_SMTP_HOST ?? '',
   smtpPort: parseInt(process.env.STELLAR_SMTP_PORT ?? '587', 10),

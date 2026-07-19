@@ -34,6 +34,26 @@ The parameters the implementation fixes:
 - **A new subsystem to own** — storage, a serve route, ingest safety, and lifecycle are real surface; the follow-up must scope them deliberately rather than growing a route per asset kind.
 - **Cross-repo drift keeps shrinking** — moving binary assets into an api-verifiable store extends the #285/#286 single-source-of-truth move from CSS to imagery.
 
+## Amendment (2026-07-19) — the parameters, fixed
+
+The store landed as #290 Phase 1. The choices this ADR left marked are now settled:
+
+- **Storage backend: a Postgres `Bytes` column**, not the object store named above as the scalable default. The api container has no writable volume and compose lives in a separate repo behind the [ADR-0027](0027-publish-vs-deploy-boundary.md) publish/deploy boundary, so a filesystem or S3 backend would not have worked anywhere until a cross-repo change landed — the feature would have shipped inert. Postgres is already the only stateful service and already covered by its bind mount, so the store inherits backup and lifecycle for free. This is deliberately bounded: it is right for theme imagery and wrong once content imagery is measured in gigabytes. `src/modules/assetStore.ts` is a two-function seam (`putAsset` / `getAssetByHash`) so a driver swap replaces bodies, not callers.
+- **Address: the content hash, not the row id.** `GET /api/asset/:hash` resolves a sha256. This makes the route non-enumerable (unlike the sibling `/css` route's sequential ids), makes `Cache-Control: immutable` literally true, and collapses duplicate bytes to one row.
+- **The serve route is unauthenticated.** Phase-1 assets are site-shipped theme imagery fetched as CSS subresources; an auth round-trip buys nothing over non-secret bytes at an unguessable address. Private user-uploaded assets are a Phase-2 concern and get an explicit visibility column and a gate then — this is not a standing licence to serve anything.
+- **Ingest is validate-and-reject.** `src/lib/assetValidate.ts` identifies a payload by magic bytes, cross-checks any declared mime against them, and throws. This inverts `sanitizeStylesheetSource`'s cleanse-don't-reject signature on purpose: you can neutralize a `url()` and still have valid CSS, but there is no partial-clean of an arbitrary binary. The fail-closed intent carries; the signature does not.
+
+**Phase 1 is the substrate only.** The authenticated upload path, reference counting / orphan sweep, and the theme-asset migration this ADR's Context motivates are all still open.
+
+### The registry split is not closed yet
+
+The migration of `proton`/`postmod` to api-canonical `/css` fixtures — the first force in the Context above — did **not** land with the store, for two independent reasons found during implementation:
+
+1. **`sanitizeStylesheetSource` corrupts escaped identifiers.** `stripOnce` emits `decodeCssEscapes(css)`, decoding the whole sheet rather than decoding only to detect danger, so `.hover\:text-white` (a class named `hover:text-white`) is rewritten to `.hover:text-white`. `proton` carries 54 such escapes, all Tailwind utility overrides. The module header calls this "the rare escape-dependent identifier … an accepted trade"; against a Tailwind ui it is the common case, and it silently mangles real author stylesheets today, independent of this ADR. Tracked separately; the theme migration is blocked on it.
+2. **`postmod` bundles commercial fonts** (Akzidenz-Grotesk, Avant Garde, Officina, Corpid). Moving them from a private ui bundle to a public API route is a redistribution question, not a technical one, and is unresolved.
+
+So the split stays temporary-by-design as this ADR predicted, with a named blocker rather than an open question.
+
 ## Follow-up
 
-Implementation is tracked separately (#290); this ADR is the design gate, not the build.
+Phase 1 shipped under #290. The upload path, lifecycle sweep, and theme migration remain tracked separately.

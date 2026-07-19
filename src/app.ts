@@ -43,6 +43,7 @@ import profileRouter from './routes/api/profile';
 import announcementsRouter from './routes/api/announcements';
 import statsRouter from './routes/api/stats';
 import stylesheetRouter from './routes/api/stylesheet';
+import assetRouter from './routes/api/asset';
 import commentsRouter from './routes/api/comments';
 import subscriptionsRouter from './routes/api/subscriptions';
 import notificationsRouter from './routes/api/notifications';
@@ -147,6 +148,7 @@ export const createApp = () => {
   app.use('/api/announcements', announcementsRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/stylesheet', stylesheetRouter);
+  app.use('/api/asset', assetRouter);
   app.use('/api/comments', commentsRouter);
   app.use('/api/subscriptions', subscriptionsRouter);
   app.use('/api/notifications', notificationsRouter);

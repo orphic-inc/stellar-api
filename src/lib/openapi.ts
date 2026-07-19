@@ -1818,6 +1818,30 @@ registry.registerPath({
   }
 });
 
+// Content-addressed binary delivery (ADR-0026). Addressed by sha256 rather than
+// row id, and unauthenticated — see the route for why. Body is the raw asset.
+registry.registerPath({
+  method: 'get',
+  path: '/asset/{hash}',
+  tags: ['Assets'],
+  request: { params: z.object({ hash: z.string() }) },
+  responses: {
+    200: {
+      description:
+        'The stored asset bytes, with the mime verified at ingest and immutable caching',
+      content: { 'application/octet-stream': { schema: z.string() } }
+    },
+    400: {
+      description: 'Malformed content address (not a 64-char lowercase sha256)',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/stylesheet',

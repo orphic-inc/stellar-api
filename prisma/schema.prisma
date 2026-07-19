@@ -534,6 +534,7 @@ model User {
   crsSnapshots             CrsSnapshot[]
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
   authoredStylesheets      AuthorStylesheet[]
+  ownedAssets              Asset[]
 
   @@index([userRankId])
   @@map("users")
@@ -654,6 +655,43 @@ model AuthorStylesheet {
 
   @@index([authorId])
   @@map("author_stylesheets")
+}
+
+enum AssetKind {
+  ThemeImage
+  ThemeFont
+}
+
+/// A binary asset a stored row references — theme imagery and web fonts today,
+/// content imagery (cover art, avatars, logos) later. ADR-0026: the api owns the
+/// bytes it serves, so a reference can be verified from the api that resolves it
+/// rather than pointing into another repo's static tree.
+///
+/// Content-addressed: `hash` (sha256 of `data`) is the public address, not `id`.
+/// That makes the serve route non-enumerable and `Cache-Control: immutable`
+/// honest — the bytes at a hash can never change. Identical bytes stored twice
+/// collapse to one row.
+///
+/// Backed by a Postgres `Bytes` column rather than an object store: the api
+/// container has no writable volume and compose lives behind the ADR-0027
+/// publish/deploy boundary, so a filesystem or S3 backend would not work until a
+/// cross-repo change landed. Deliberately bounded — revisit when content imagery
+/// makes the table large. `assetStore.ts` is the seam a driver swap replaces.
+model Asset {
+  id        Int       @id @default(autoincrement())
+  hash      String    @unique
+  mime      String
+  size      Int
+  kind      AssetKind
+  data      Bytes
+  /// Null = site-owned (the built-in theme fixtures). A user-owned asset dies
+  /// with its owner, extending the AuthorStylesheet cascade precedent.
+  ownerId   Int?
+  owner     User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([ownerId])
+  @@map("assets")
 }
 
 // ─── Forum ────────────────────────────────────────────────────────────────────

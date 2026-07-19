@@ -62,6 +62,7 @@ Copy `.env.default` → `.env`. `.env.default` is grouped and commented and is t
 | `STELLAR_SITE_NAME`, `STELLAR_IRC_URL`, `STELLAR_DISABLED_CHANNEL`, `STELLAR_STAFFPM_PATH`, `STELLAR_PUBLIC_KB_BASE` | Site identity + Golden-Rules `${...}` token resolution (PRD-09 / [ADR-0020](adr/0020-rules-tree-variable-resolution.md)); all optional with defaults |
 | `KORIN_API_URL`, `KORIN_PULL_KEY`, `KORIN_POLL_INTERVAL_MS`                                                          | korin.pink IRC metrics pull + announce push ([ADR-0013](adr/0013-korin-pink-irc-integration.md)); inert until set                                    |
 | `STELLAR_SERVICE_KEY`                                                                                                | Bearer korin presents on inbound calls; fails closed                                                                                                 |
+| `STELLAR_ASSET_MAX_BYTES`                                                                                            | Max size of a single stored binary asset ([ADR-0026](adr/0026-static-asset-storage.md)); default 2 MB                                                |
 
 **Production database access** (Google Cloud SQL): connecting to the live database uses the Cloud SQL Proxy with IAM access for a service account holding the Cloud SQL Client role; point `GOOGLE_APPLICATION_CREDENTIALS` at that account's JSON key. Deployment specifics live in the [stellar-compose](https://github.com/orphic-inc/stellar-compose) operator runbook.
 
