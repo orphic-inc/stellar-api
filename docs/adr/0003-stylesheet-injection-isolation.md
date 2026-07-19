@@ -42,6 +42,6 @@ The boundary is therefore **Arm 2 only**, realized as:
 
 - **Store-time sanitization** (API, `lib/cssSanitize.ts`): strips `@import` and constrains `url()` / `@font-face src` to `data:` / same-origin, so persisted author CSS can't fetch arbitrary hosts.
 - **Inject-time CSP** (stellar-ui, prod builds, via HtmlWebpackPlugin): permissive on resource axes (`style-src`/`img-src`/`font-src`/`connect-src`) to keep theming freedom, strict on execution (`script-src 'self'`, `object-src 'none'`, `base-uri`/`form-action 'self'`) — the real XSS gate. `frame-ancestors` needs a response header (tracked separately).
-- **Injector** stays a plain `<link href>` for URL themes (no CSS-injection surface; http(s) scheme gated), and future author raw CSS is injected as already-sanitized `<style>`.
+- **Injector** stays a plain `<link href>` for URL themes (no CSS-injection surface; http(s) scheme gated). Author raw CSS is delivered the same way — [ADR-0024](0024-stylesheet-delivery-contract.md) §1 settled it as a `text/css` API route the injector links, and rejected `<style>` text injection as a second delivery shape to audit. (This line originally anticipated an already-sanitized `<style>` element; ADR-0024 is the later decision and the implemented one.)
 
 No `data-stellar-chrome` markers, no chrome `@layer`. A bypass must defeat the store-time sanitizer and the CSP — there is no chrome layer in the model.

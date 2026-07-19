@@ -1,6 +1,6 @@
 # Stylesheet delivery contract — external URL + registry serving
 
-**Status: Proposed (2026-07-02).** Resolves PRD-03's open decision "AuthorStylesheetUrl storage shape (URL vs stored file) — pending ExternalStylesheet findings" and repairs the severed adopt→display pipe (adoption writes `activeAuthorStylesheetId`; nothing renders it). Companion UI decision: [stellar-ui ADR-0008](https://github.com/orphic-inc/stellar-ui/blob/main/docs/adr/0008-registry-stylesheet-injection.md) (injector third branch). Rides on the injection-safety boundary of [ADR-0003](0003-stylesheet-injection-isolation.md). (ADR number 0024 is next free on `main`.)
+**Status: Accepted (decided 2026-07-02, status recorded 2026-07-19 — the line was never updated after the code shipped; nothing in the ADR was left unresolved).** Resolves PRD-03's open decision "AuthorStylesheetUrl storage shape (URL vs stored file) — pending ExternalStylesheet findings" and repairs the severed adopt→display pipe (adoption writes `activeAuthorStylesheetId`; nothing renders it). Companion UI decision: [stellar-ui ADR-0008](https://github.com/orphic-inc/stellar-ui/blob/main/docs/adr/0008-registry-stylesheet-injection.md) (injector third branch). Rides on the injection-safety boundary of [ADR-0003](0003-stylesheet-injection-isolation.md). (ADR number 0024 is next free on `main`.)
 
 ## Context
 
@@ -55,7 +55,7 @@ First pass ships with the limit unenforced (status quo); #146 implements the gat
 - The "contest winner → official registry promotion" path (Stellarfic story) becomes mechanical later: promotion = staff creating a site `Stylesheet` row whose `cssUrl` is this ADR's `/css` route for the winning sheet. Named here, not built.
 - Serving user CSS from the API origin puts author sheets under `style-src https:` (prod) — no CSP change needed; dev proxying already routes `/api`.
 - PRD-03 edits ride along: amend `.scss/.css` → `.css` (§ Ubiquitous Language, § External disposition), close the open decision (storage shape = stored `source`, API-served; `AuthorStylesheetUrl` as a distinct URL-typed registry entry is dropped — Personal covers the URL case), and record the radio UAT flow.
-- stellar-api's `schemas/stylesheet.ts` and `lib/cssSanitize.ts` comments still cite the superseded ADR-0003 Arm 1 chrome layer — corrected in the same docs pass.
+- stellar-api's `schemas/stylesheet.ts` and `lib/cssSanitize.ts` comments still cite the superseded ADR-0003 Arm 1 chrome layer — corrected in the same docs pass. (Verified done 2026-07-19: both now describe Arm 1 as dropped and name the CSP as the boundary's other half.)
 
 ## Rejected
 
