@@ -29,7 +29,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "ts-node prisma/seed.ts",
     "db:seed-wiki": "ts-node prisma/scripts/seed-wiki-irc-community.ts",
-    "db:seed-e2e": "ts-node prisma/scripts/seed-e2e-users.ts",
+    "db:seed-e2e": "ts-node src/scripts/seed-e2e-users.ts",
     "db:studio": "prisma studio",
     "prepare": "husky install || true"
   },

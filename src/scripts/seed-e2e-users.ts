@@ -14,8 +14,13 @@
  * Requires ranks to exist (run `npm run db:seed` first). Credentials come from
  * the same env vars stellar-ui's e2e uses; defaults match its .env.example.
  *
+ * Lives under src/ (not prisma/scripts/) so tsc compiles it into the image —
+ * a deployed container stack can seed its own e2e fixtures without a ts-node
+ * toolchain or an exposed database port.
+ *
  * Run:
- *   npm run db:seed-e2e
+ *   npm run db:seed-e2e                        # dev, from source
+ *   node dist/scripts/seed-e2e-users.js        # inside the container
  *   TEST_USER_EMAIL=qa@stellar.test TEST_USER_PASSWORD=hunter2 npm run db:seed-e2e
  */
 import { PrismaClient, Prisma } from '@prisma/client';
@@ -113,6 +118,19 @@ async function setInviter(
 }
 
 async function main(): Promise<void> {
+  // These fixtures are minted with known, weak default credentials
+  // (testuser/changeme). Compiling the script into the image means it ships to
+  // every deployment, so refuse to run against a production environment unless
+  // the operator explicitly opts in — throwaway and staging stacks only.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ALLOW_E2E_SEED !== 'true'
+  ) {
+    throw new Error(
+      'Refusing to seed e2e fixtures with NODE_ENV=production: these accounts use known default credentials. Set ALLOW_E2E_SEED=true to override (throwaway/staging stacks only).'
+    );
+  }
+
   const testuserId = await upsertUser({ ...REGULAR, rankLevel: 100 });
   const staffuserId = await upsertUser({ ...STAFF, rankLevel: 500 });
 

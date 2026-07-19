@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The e2e fixture seeder ships in the image** — `seed-e2e-users.ts` moves from `prisma/scripts/` (outside the `rootDir: src` build, so it needed a ts-node toolchain and a reachable database port) into `src/scripts/`, compiling to `dist/scripts/seed-e2e-users.js`. A deployed container stack can now seed its own e2e fixtures with `docker compose exec api node dist/scripts/seed-e2e-users.js` instead of temporarily exposing Postgres to the host. Because the fixtures use known weak credentials and the script now reaches every deployment, it refuses to run when `NODE_ENV=production` unless `ALLOW_E2E_SEED=true` is set explicitly.
+
 ## [0.8.0] — 2026-07-18
 
 The alpha-deploy cut. A fresh instance is now safe to stand up in public — registration starts closed and the install checklist walks the admin to launch — and the release drops the korin ledger client the announce runbook proved redundant. CRS gains a channel-weight lever, ratio gains Freepass/Neutralpass, and the CRS design frontier is settled in the spec ahead of implementation.
