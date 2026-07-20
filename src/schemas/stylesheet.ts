@@ -43,11 +43,13 @@ export type StylesheetUpdateInput = z.infer<typeof stylesheetUpdateSchema>;
 
 // PRD-03 #118 — a user-authored stylesheet (many per author) saved for others to
 // adopt. `source` is raw CSS in transit; the ingestion path sanitizes it at
-// store-time via lib/cssSanitize.ts before persisting (ADR-0003 Arm 2), so the
-// stored artifact is already safe. The other half of the boundary is the
-// inject-time CSP in stellar-ui (ADR-0003 Arm 1 protected-chrome was dropped in
-// the 2026-06-23 amendment). Source is plain CSS, never SCSS (ADR-0024 §2); it is
-// delivered to the browser as text/css via the /css route, not as JSON to inject.
+// store-time via lib/cssSanitize.ts before persisting, so the stored artifact is
+// already safe. That pass is the sole exfiltration control: stellar-ui's CSP is
+// open on `img-src`/`font-src`/`connect-src`, so it backstops execution only —
+// see ADR-0031, which supersedes ADR-0003 and specifies the narrowed allowlist
+// and a rejecting (not cleaning) detector, neither yet implemented. Source is
+// plain CSS, never SCSS (ADR-0024 §2); it is delivered to the browser as
+// text/css via the /css route, not as JSON to inject.
 export const authorStylesheetSchema = z.object({
   name: z.string().min(1).max(100),
   source: z.string().min(1).max(100_000)

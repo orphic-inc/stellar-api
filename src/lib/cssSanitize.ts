@@ -19,11 +19,21 @@
  * is escape-decoded before matching, and the decode→strip pass repeats to a fixed
  * point (a decode can expose a fresh escape, e.g. `\5c` → `\`). Decoding yields
  * equivalent CSS for the cases themes use (color/content/spacing); the rare
- * escape-dependent identifier is an accepted trade — the inject-time CSP
- * (`script-src 'self'`, plus `img-src`/`font-src`/`connect-src`) is the other half
- * of this defense-in-depth boundary. (ADR-0003's Arm 1 protected-chrome layer was
- * dropped in the 2026-06-23 amendment — CSS cannot lock the cascade against
- * `!important`, so the boundary is code-injection only.)
+ * escape-dependent identifier is an accepted trade.
+ *
+ * This pass is the ONLY control against exfiltration — there is no second half.
+ * ADR-0003 paired it with a CSP that locked `img-src`/`font-src`/`connect-src`,
+ * but the 2026-06-23 amendment reversed those axes to preserve theming freedom
+ * and stellar-ui shipped them open (`img-src 'self' data: https: http:`). The
+ * prod CSP is strict on execution (`script-src 'self'`) and constrains nothing
+ * on resources, so a `url()` this pass misses reaches any host it names.
+ *
+ * [ADR-0031](../../docs/adr/0031-injected-css-threat-model.md) supersedes that
+ * model and is the decided target, NOT YET IMPLEMENTED here: the allowlist
+ * narrows to `/api/asset/<sha256>` and relative paths with `data:` removed, and
+ * this function is replaced by a detector that rejects rather than rewrites —
+ * because decoding the whole sheet in order to match is what persists mangled
+ * bytes (#340). Until then the text above describes what this code actually does.
  *
  * Source is treated as plain CSS (ADR-0003 scopes server-side SCSS compilation of
  * untrusted input out; ADR-0024 makes `.css`-only the user contract).

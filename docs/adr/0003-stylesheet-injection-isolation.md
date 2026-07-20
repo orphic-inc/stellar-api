@@ -1,6 +1,8 @@
 # Stylesheet injection isolation & sanitization
 
-**Status: Accepted, amended 2026-06-23.** Records the isolation + sanitization strategy for user-supplied stylesheets; see [PRD-03](../prd/03-stylesheet-themes-and-scoring.md). Resolves decision [#130](https://github.com/orphic-inc/stellar-api/issues/130). (ADR-0002 is reserved for community-health-pulse, [#75](https://github.com/orphic-inc/stellar-api/issues/75).) **Arm 1 (protected-chrome isolation) is superseded — see the [Amendment](#amendment-2026-06-23-arm-1-dropped-themes-are-visually-unrestricted) at the bottom; the boundary is now code-injection only (Arm 2).**
+**Status: Superseded (2026-07-19) by [ADR-0031](0031-injected-css-threat-model.md).** Retained as history — read ADR-0031 for the boundary in force. Arm 1 was already superseded by the [Amendment](#amendment-2026-06-23-arm-1-dropped-themes-are-visually-unrestricted) below; ADR-0031 supersedes the rest, because that same amendment silently hollowed out Arm 2's other half. The inject-time CSP this ADR pairs with the store-time sanitizer was reversed on its resource axes when it shipped (`img-src`/`font-src`/`connect-src` are open), so the "defense-in-depth" and "a bypass must defeat both" claims below were **not true as written** for exfiltration — the sanitizer stood alone. ADR-0031 restates the threat model, narrows the `url()` allowlist, converts the sanitizer from cleaning to rejecting, and describes the CSP's real, partial scope.
+
+Originally: records the isolation + sanitization strategy for user-supplied stylesheets; see [PRD-03](../prd/03-stylesheet-themes-and-scoring.md). Resolves decision [#130](https://github.com/orphic-inc/stellar-api/issues/130). (ADR-0002 is reserved for community-health-pulse, [#75](https://github.com/orphic-inc/stellar-api/issues/75).)
 
 ## Context
 
