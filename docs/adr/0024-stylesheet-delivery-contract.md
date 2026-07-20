@@ -47,7 +47,7 @@ Dead/unreachable externals stay a link-health concern (PRD-03: dead-external pen
 
 "Higher tier users get more registry spaces" is the already-deferred rank-gated `AuthorStylesheet` count limit ([#146](https://github.com/orphic-inc/stellar-api/issues/146)); donor-added spaces are PRD-07 $tylesheets. This ADR names the concept **registry spaces** and reserves it — distinct from PRD-03 **slots** (Site/Profile/Community render slots), which are a different axis. Do not overload "slot."
 
-First pass ships with the limit unenforced (status quo); #146 implements the gate. Gallery/browse UX is out of scope (later pass; adoption is by direct reference until then).
+~~First pass ships with the limit unenforced (status quo); #146 implements the gate.~~ #146 shipped the gate; its semantics are corrected by [ADR-0032](0032-authored-stylesheet-member-lifecycle.md) §4 (max across primary + secondary ranks, `0` means unlimited). ~~Gallery/browse UX is out of scope (later pass; adoption is by direct reference until then).~~ ADR-0032 §1 makes direct reference the decision rather than the interim state — there is no later pass, and no browse endpoint ships.
 
 ## Consequences
 
@@ -97,3 +97,51 @@ So content-addressing follows from **immutability**, which is what makes it poss
 §5 above defines contest-winner promotion as staff creating a `Stylesheet` row whose `cssUrl` points at the winning sheet's `/css` route. Combined with "adoption tracks edits", that would leave a promoted theme editable by its original author _after_ it became site-official — the first built-in whose bytes live under member control, and a case where the reviewed artifact is not the served artifact.
 
 Promotion therefore **copies** the source into a System-owned row rather than pointing at the author's live row, matching how the ten built-in fixtures already work. Noted against [#258](https://github.com/orphic-inc/stellar-api/issues/258), which owns the promotion lifecycle.
+
+## Amendment (2026-07-19b) — one delivery mechanism, and the enforcement this ADR never had
+
+Decides [#354](https://github.com/orphic-inc/stellar-api/issues/354) on the [authored-stylesheet wayfinder map](https://github.com/orphic-inc/stellar-api/issues/347). Completes the Consequences bullet above, which said of the `anorex` static file: "the stored row is canonical, no silent duplicate." That rule was written, never enforced, and violated within a release.
+
+### The evidence: four dead directories
+
+Charting the registry against stellar-ui's `src/stylesheets/` found the rule already broken in both directions nobody was looking:
+
+| Theme                                                                     | Registry `cssUrl`                               | ui static dir               | Reality                                                                     |
+| ------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `anorex`, `kuro`, `layer-cake`                                            | `/css` (reconciled by `seedStylesheetFixtures`) | present                     | Unreachable — shipped to every user, referenced by nothing                  |
+| `dark-ambient`, `shiro`, `mono`, `minimal`, `hydro`, `bubblegum`, `white` | `/css`                                          | absent                      | Clean                                                                       |
+| `sublime` (`isDefault`)                                                   | `/stylesheets/sublime/style.css`                | present, rule-free          | `cssUrl` is a fiction — see below                                           |
+| `proton`                                                                  | `/stylesheets/proton/style.css`                 | 24K + images                | Live; [#341](https://github.com/orphic-inc/stellar-api/issues/341)'s target |
+| `postmod`                                                                 | `/stylesheets/postmod/style.css`                | 756K, four commercial fonts | Live; gated on [#343](https://github.com/orphic-inc/stellar-api/issues/343) |
+
+The seeder upserts each fixture's registry row by name and reconciles `cssUrl` to the `/css` route, so three themes silently moved to api delivery while their static files kept shipping. Nothing detected it, because the one guard that exists (`stylesheetRegistry.integration.ts`) asserts only that `/css`-backed rows resolve — a row pointing outside the api is invisible to it.
+
+### 1. Asset-bearing themes migrate; bundling is not a second class of theme
+
+Bundling's claimed advantages are integrity, versioning with the app, and no runtime fetch. The first two are already available to fixtures — the CSS is checked into `prisma/seed-assets/`, ships in the image, and #341's design pre-rewrites every `url()` to `/api/asset/<sha256>`, which is stronger integrity than a bundled file gets. The third is real and cheap.
+
+What decides it is the table above. A second delivery mechanism is not free to keep dormant; its cost is drift that nothing detects, and that cost has already been paid once.
+
+Note for #341: its stated hard blocker (#340, the sanitizer mangling `proton`'s 54 escaped Tailwind identifiers) is **dissolved by construction** — [ADR-0031](0031-injected-css-threat-model.md) §5 stores bytes verbatim, so `proton` round-trips regardless. `postmod` remains gated on #343, and this ADR sharpens that question rather than answering it: migration moves those fonts from a private ui bundle to `/api/asset/:hash`, which is **unauthenticated** by design (see the 2026-07-19 amendment above). #343 is therefore not "may we bundle these" but "may we publish these".
+
+### 2. `/stylesheets` serving is retired, not left dormant
+
+`anorex`, `kuro`, `layer-cake` and `sublime` are deleted from stellar-ui immediately — all four are provably unreachable and none waits on a migration. `proton` follows #341; `postmod` follows its own migration. `common/global.css` is the theming contract (role tokens and `data-st` hooks, ui ADR-0005), not a theme: it reaches the app by `import` at `index.tsx:9`, not through the static tree, and moves out of `src/stylesheets/` rather than becoming the last tenant of a directory that exists for a retired mechanism.
+
+`postmod` is consequently the last thing holding the mechanism open. When it leaves, webpack's `CopyPlugin` entry and the devServer `static` entry go with it. Dormant is the state that produced this amendment; the end state is gone.
+
+### 3. Sublime models "renders nothing" as data, not as a name the UI recognises
+
+`sublime` ships no CSS rules by design — the bundled Tailwind defaults _are_ Sublime — and `StylesheetInjector.tsx` hardcodes `if (!siteAppearance || siteAppearance === 'sublime') return null`, so its `cssUrl` is a path nothing ever requests.
+
+**`Stylesheet.cssUrl` becomes nullable; `null` means the row has no delivery target.** Sublime keeps `isDefault` and its picker entry, and the injector links nothing because the row says so rather than because it recognises a string. This retires a cross-repo magic string paired with `getDefaultStylesheetName`'s `?? 'sublime'` fallback — the same shape that already drifted on the seeded-avatar sentinel.
+
+Seeding Sublime as an empty `/css` fixture was rejected: it buys uniformity by making the default theme depend on an authenticated fetch to receive nothing, and `/css` requires auth while the default must work for everyone.
+
+### 4. The guard becomes a total partition
+
+`stylesheetRegistry.integration.ts` is extended so that **every** registry row is either `/css`-backed or has a null `cssUrl`, and nothing else is legal. A future row pointing outside the api then fails CI on the way in.
+
+§3 is what makes this expressible. With Sublime carrying a fictional `cssUrl`, the assertion needs an exception carved by name — and an exception list is exactly where the next `proton` hides. A light stellar-ui check that the theme tree stays empty is secondary: the api guard catches the failure that matters (a row nobody can serve), while the ui one catches dead bytes in a bundle, which is cheaper to be wrong about.
+
+**Known seam, recorded not closed.** Neither guard is cross-repo. The api cannot see stellar-ui's tree and the ui cannot see the registry, so adding `src/stylesheets/newtheme/` without touching the api still fails silently — which is precisely today's failure. Do not mistake the api guard for full coverage.
