@@ -1,5 +1,4 @@
 import {
-  CSS_DELIVERY_ROUTE,
   authorStylesheetIdFromCssUrl,
   rowsOutsideDeliveryPartition
 } from './stylesheetRegistry';
@@ -36,8 +35,8 @@ describe('registry delivery partition', () => {
   });
 
   it('flags every illegal shape, not just the first', () => {
-    // A partition check that reports one row at a time turns a sweep into a
-    // game of whack-a-mole on CI.
+    // Reporting one row per run would make a sweep take as many CI runs as
+    // there are offenders.
     const rows = [
       row('a', '/stylesheets/a/style.css'),
       row('b', 'https://cdn.example.com/b.css'),
@@ -52,9 +51,8 @@ describe('registry delivery partition', () => {
   });
 
   it('rejects near-misses of the delivery route', () => {
-    // Anchored both ends: a path that merely CONTAINS the route, or omits the
-    // id, is not a delivery target. Without anchoring, an attacker-ish or
-    // fat-fingered value could slip through the guard while 404ing in delivery.
+    // Anchored both ends: a value that merely CONTAINS the route, or omits the
+    // id, would otherwise pass the guard while 404ing in delivery.
     const nearMisses = [
       '/api/stylesheet/author-stylesheet//css',
       '/api/stylesheet/author-stylesheet/abc/css',
@@ -75,10 +73,5 @@ describe('registry delivery partition', () => {
     expect(
       authorStylesheetIdFromCssUrl('/stylesheets/foo/style.css')
     ).toBeNull();
-  });
-
-  it('the route pattern is anchored', () => {
-    expect(CSS_DELIVERY_ROUTE.source.startsWith('^')).toBe(true);
-    expect(CSS_DELIVERY_ROUTE.source.endsWith('$')).toBe(true);
   });
 });

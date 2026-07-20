@@ -15,16 +15,15 @@
  * and `layer-cake` moved to api delivery while their ui static files kept
  * shipping to every user, referenced by nothing.
  *
- * Expressed as a **total** partition rather than a carve-out on purpose. The
- * nullable `cssUrl` is what makes that expressible without an exception list —
- * and an exception list is exactly where the next `proton` would hide. If you
- * find yourself wanting a `name !== 'sublime'` escape hatch here, the nullable
- * migration has not landed properly.
+ * Total partition, not a carve-out: the nullable `cssUrl` is what makes it
+ * expressible without an exception list, and an exception list is where the next
+ * `proton` would hide. A `name !== 'sublime'` escape hatch here means the
+ * nullable migration has not landed properly.
  *
- * Known seam, deliberately not oversold: this is **not** cross-repo. The api
- * cannot see stellar-ui's `src/stylesheets/` tree, so someone adding a static
- * theme directory without touching the api still fails silently here. The ui
- * half is its own exact-set guard (stellar-ui `stylesheetsDir.test.ts`, #167/#168).
+ * Not cross-repo. The api cannot see stellar-ui's `src/stylesheets/` tree, so
+ * adding a static theme directory without touching the api still fails silently
+ * here; the ui half is its own exact-set guard (stellar-ui
+ * `stylesheetsDir.test.ts`, #167/#168).
  */
 
 /**
@@ -54,7 +53,7 @@ export const authorStylesheetIdFromCssUrl = (
 };
 
 /** True when the row sits in one of the two legal arms. */
-export const isInDeliveryPartition = (row: RegistryDeliveryRow): boolean =>
+const isInDeliveryPartition = (row: RegistryDeliveryRow): boolean =>
   row.cssUrl === null || CSS_DELIVERY_ROUTE.test(row.cssUrl);
 
 /**
