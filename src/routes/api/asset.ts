@@ -13,12 +13,21 @@ const assetHashParamsSchema = z.object({
 
 // GET /api/asset/:hash — deliver a stored asset by content address (ADR-0026).
 //
-// Unauthenticated, unlike the sibling `/css` route. Two reasons: a hash is not
-// enumerable the way that route's sequential ids are, and these bytes are fetched
-// as CSS subresources by the browser, where an auth round-trip buys nothing over
-// content that is already site-shipped theme imagery. When user-uploaded private
-// assets land (Phase 2), they get an explicit visibility column and a gate here —
-// this is not a licence to serve anything.
+// Unauthenticated, unlike the sibling `/css` route, because of what these bytes
+// ARE: site-shipped theme imagery reviewed in the repository (`putAsset` is
+// reachable only from the seeder — ADR-0031 §4 leans on that normatively), so an
+// auth round-trip buys nothing over content that is already public and immutable.
+// `/css` stays authed because it serves member-authored content, and the instance
+// is invite-only (ADR-0024, 2026-07-19 amendment).
+//
+// Non-enumerability is a side effect of the content address, not the reason for
+// it — content-addressing follows from immutability, which is what makes it work.
+// The sibling route's sequential ids are enumerable and that is accepted: authored
+// sheets carry no confidentiality expectation, since adoption requires any member
+// to be able to fetch another member's sheet.
+//
+// When user-uploaded private assets land (Phase 2), they get an explicit
+// visibility column and a gate here — this is not a licence to serve anything.
 router.get(
   '/:hash',
   validateParams(assetHashParamsSchema),

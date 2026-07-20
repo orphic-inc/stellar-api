@@ -19,7 +19,7 @@ New route: `GET /api/stylesheet/author-stylesheet/:id/css` → `200`, `Content-T
 
 The injector stays a pure `<link href>` — the Registry branch links this route, same as Personal links an external URL. No `<style>` text injection path is added in stellar-ui; a single delivery mechanism keeps the ADR-0003 boundary one-shaped.
 
-The existing JSON read (`GET /author-stylesheet/:id`) continues to return `source` for editing (author + staff use). Registry listings return metadata only (id, authorId, name, timestamps) — no `source` in list payloads.
+The existing JSON read (`GET /author-stylesheet/:id`) continues to return `source` for editing (~~author + staff use~~ — see the 2026-07-19 amendment below: this parenthetical describes an access control that never shipped and cannot be enforced; the read is open to any authenticated member). Registry listings return metadata only (id, authorId, name, timestamps) — no `source` in list payloads.
 
 ### 2. The user contract is plain CSS — SCSS is rejected as user input
 
@@ -62,3 +62,38 @@ First pass ships with the limit unenforced (status quo); #146 implements the gat
 - **`<style>` text injection in the UI** — a second delivery shape, a second thing to audit; the link route is sufficient and keeps ADR-0003's "href, never CSS text" invariant.
 - **User-facing SCSS (compile-on-ingest or compile-on-serve)** — untrusted compilation surface + runtime dep; ADR-0003 scope-out stands.
 - **Fetching/validating external URLs at save time** — an SSRF surface for a liveness check link-health already owns.
+
+## Amendment (2026-07-19) — addressing, and why it differs from the asset store
+
+Decides [#350](https://github.com/orphic-inc/stellar-api/issues/350) on the [authored-stylesheet wayfinder map](https://github.com/orphic-inc/stellar-api/issues/347). The asset store ([ADR-0026](0026-static-asset-storage.md)) deliberately went content-addressed while this route serves sequential ids behind `requireAuth`, and the difference had no recorded reason — so it read as an oversight in a subsystem where the two paths will eventually sit adjacent serving the same themes.
+
+**Sequential ids stay. The asymmetry is provenance and mutability, not secrecy.**
+
+### Adoption tracks edits, so identity must be stable
+
+When an author edits an adopted sheet, every adopter sees the edit. The pointer (`UserSettings.activeAuthorStylesheetId`) names a stable identity whose content varies, which is what §1's `Cache-Control: no-cache` has assumed since this ADR shipped.
+
+Content-addressing is the opposite arrangement: the address _is_ the content, so it changes on every save, and every pointer at the sheet goes stale — each adopter's `activeAuthorStylesheetId` plus the registry row's `cssUrl`. Making a mutable resource content-addressed requires an indirection layer mapping stable identity to current hash, and that layer is the sequential id. It adds a hop to arrive where we started.
+
+This also runs the other way: [#351](https://github.com/orphic-inc/stellar-api/issues/351) decided `seedStylesheetFixtures` must propagate `source` on update, so a built-in theme's bytes change while its address holds. Content-addressing would rewrite every registry `cssUrl` on every fixture edit.
+
+### There is no confidentiality boundary here to defend
+
+An earlier reading held that enumerating ids leaks only metadata because the route is authed. That is wrong, and the correction matters: neither `GET /author-stylesheet/:id` nor `/css` is ownership-scoped (`getAuthorStylesheetById` is a bare `findUnique`), so any authenticated member can walk the ids and read every sheet's full `source`.
+
+That is **acceptable, and not fixable by addressing**. `/css` must serve non-authors or adoption cannot work — the adopter's browser is what fetches the sheet. An unguessable address is a capability, and this capability is published in a `<link>` in every adopter's DOM the moment the sheet is adopted. Authored stylesheets carry no confidentiality expectation.
+
+Consequently §1's "(author + staff use)" is struck as never-implemented and unenforceable, rather than treated as a gap to close. The list-payload exclusion of `source` stands as a payload-size measure, not a confidentiality control — the ids it returns lead straight to the bytes.
+
+### Why `/css` keeps `requireAuth` while `/api/asset/:hash` does not
+
+- **`/api/asset`** serves site-shipped bytes reviewed in the repository — `putAsset` is reachable only from the seeder, which [ADR-0031](0031-injected-css-threat-model.md) §4 relies on normatively. Public and immutable by construction, so auth buys nothing over the address, and `Cache-Control: immutable` is literally true.
+- **`/css`** serves member-authored, mutable content. "No confidentiality expectation" is scoped to _members of an invite-only instance_ — the instance boundary, not the open internet. Dropping auth would publish every member's authored CSS to anyone holding a URL.
+
+So content-addressing follows from **immutability**, which is what makes it possible, not from secrecy, which it does not provide. Enumerability is a side effect of the sequential form, not a weakness the asset route was designed to avoid; `src/routes/api/asset.ts` is corrected to say so.
+
+### Consequence for promotion (recorded, not decided here)
+
+§5 above defines contest-winner promotion as staff creating a `Stylesheet` row whose `cssUrl` points at the winning sheet's `/css` route. Combined with "adoption tracks edits", that would leave a promoted theme editable by its original author _after_ it became site-official — the first built-in whose bytes live under member control, and a case where the reviewed artifact is not the served artifact.
+
+Promotion therefore **copies** the source into a System-owned row rather than pointing at the author's live row, matching how the ten built-in fixtures already work. Noted against [#258](https://github.com/orphic-inc/stellar-api/issues/258), which owns the promotion lifecycle.

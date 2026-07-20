@@ -87,8 +87,15 @@ export const listAuthorStylesheets = (authorId: number, pg: PageParams) =>
 
 /**
  * Read a single AuthorStylesheet by its id, or null if it does not exist.
- * Returns `source` — this is the edit-path read (author + staff, ADR-0024 §1),
- * not the browser delivery path.
+ * Returns `source` — this is the edit-path read (ADR-0024 §1), not the browser
+ * delivery path.
+ *
+ * NOT ownership-scoped, deliberately: any authenticated member can read any
+ * sheet's source here, and the sibling `/css` route serves the same bytes because
+ * an adopter's browser must be able to fetch another member's sheet. Authored
+ * stylesheets carry no confidentiality expectation (ADR-0024, 2026-07-19
+ * amendment) — an earlier "author + staff" framing described a control that never
+ * shipped and cannot be enforced without breaking adoption.
  */
 export const getAuthorStylesheetById = (id: number) =>
   prisma.authorStylesheet.findUnique({ where: { id } });
