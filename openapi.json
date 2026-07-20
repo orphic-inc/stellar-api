@@ -2049,7 +2049,8 @@
             "type": "string"
           },
           "cssUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "isDefault": {
             "type": "boolean"
@@ -8249,6 +8250,7 @@
                   },
                   "cssUrl": {
                     "type": "string",
+                    "nullable": true,
                     "minLength": 1
                   },
                   "isDefault": {
@@ -8377,6 +8379,7 @@
                   },
                   "cssUrl": {
                     "type": "string",
+                    "nullable": true,
                     "minLength": 1
                   },
                   "isDefault": {

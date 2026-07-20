@@ -34,7 +34,7 @@ export const getStylesheetStats = async () => {
 export const createStylesheet = async (data: {
   name: string;
   description: string;
-  cssUrl: string;
+  cssUrl: string | null;
   isDefault: boolean;
 }) => {
   if (data.isDefault) {
@@ -54,7 +54,7 @@ export const updateStylesheet = async (
   data: Partial<{
     name: string;
     description: string;
-    cssUrl: string;
+    cssUrl: string | null;
     isDefault: boolean;
   }>
 ) => {

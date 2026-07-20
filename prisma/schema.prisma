@@ -626,11 +626,16 @@ model Profile {
 /// A partial unique index enforces exactly one default stylesheet at the DB level.
 /// This index is not representable in Prisma DSL and is created in raw SQL migration:
 /// CREATE UNIQUE INDEX "stylesheets_one_default" ON "stylesheets"("isDefault") WHERE "isDefault" = true;
+/// `cssUrl` is nullable: null means the row has no delivery target — it appears
+/// in the picker and renders nothing (Sublime, whose look is the bundled
+/// Tailwind itself). Every non-null value must be a `/css` delivery target; the
+/// total partition is defined and enforced in modules/stylesheetRegistry.ts
+/// (ADR-0024 §4, #371).
 model Stylesheet {
   id          Int      @id @default(autoincrement())
   name        String   @unique
   description String   @default("")
-  cssUrl      String
+  cssUrl      String?
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
 
