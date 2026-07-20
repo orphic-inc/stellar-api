@@ -9,13 +9,14 @@
  * The CSS lives on disk under `prisma/seed-assets/stylesheets/` (shipped in the
  * image — Dockerfile copies `prisma/`) so it is authored/reviewed as real `.css`,
  * and a drift-guard spec reads the same files. Themes are token-only (stellar-ui
- * ADR-0005): a `:root { --st-* }` block, no selectors/assets, so the store-time
- * `sanitizeStylesheetSource` pass is a no-op on them.
+ * ADR-0005): a `:root { --st-* }` block, no selectors or assets, so they carry
+ * nothing the store-time boundary (`lib/cssValidate.ts`) rejects — which the
+ * seeder asserts at boot rather than assuming.
  */
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { sanitizeStylesheetSource } from '../lib/cssSanitize';
+import { cssValidate, formatCssViolations } from '../lib/cssValidate';
 
 export const BUILTIN_STYLESHEET_FIXTURES = [
   {
@@ -134,12 +135,36 @@ export const authorStylesheetCssUrl = (id: number): string =>
  * site-registry row at the `/css` route. Idempotent: matches an existing fixture
  * by (authorId, name) and always reconciles the registry `cssUrl` to the fixture's
  * live id. Requires `seedSystemUser` (the owner) to have run.
+ *
+ * **Asserts rather than launders (ADR-0031 §5).** A shipped theme that violates
+ * the boundary fails at boot instead of being quietly cleaned into compliance.
+ * The fixtures are the earliest available signal of what a member-authored sheet
+ * will hit, and a canary that cannot fail is not a canary.
+ *
+ * **Propagates `source` on update (#351).** This previously read the CSS only on
+ * create, so on an already-seeded database the disk bytes and the served bytes
+ * diverged permanently — the boot assertion would read disk and pass while
+ * `/css` served something else, and a security fix to a shipped theme reached no
+ * existing instance. Clobbering is correct: the rows are System-owned, matched
+ * on (authorId, name), and ADR-0024 makes the disk file the canonical artifact.
  */
 export async function seedStylesheetFixtures(
   client: PrismaClient,
   systemUserId: number
 ): Promise<void> {
   for (const fixture of BUILTIN_STYLESHEET_FIXTURES) {
+    const source = readFixtureCss(fixture.file);
+
+    const violations = cssValidate(source);
+    if (violations.length > 0) {
+      throw new Error(
+        `Built-in stylesheet '${fixture.name}' (${fixture.file}) violates the ADR-0031 boundary:\n` +
+          formatCssViolations(violations)
+            .map((m) => `  - ${m}`)
+            .join('\n')
+      );
+    }
+
     const existing = await client.authorStylesheet.findFirst({
       where: { authorId: systemUserId, name: fixture.name },
       select: { id: true }
@@ -148,13 +173,13 @@ export async function seedStylesheetFixtures(
     let fixtureId: number;
     if (existing) {
       fixtureId = existing.id;
+      await client.authorStylesheet.update({
+        where: { id: existing.id },
+        data: { source }
+      });
     } else {
       const created = await client.authorStylesheet.create({
-        data: {
-          authorId: systemUserId,
-          name: fixture.name,
-          source: sanitizeStylesheetSource(readFixtureCss(fixture.file))
-        },
+        data: { authorId: systemUserId, name: fixture.name, source },
         select: { id: true }
       });
       fixtureId = created.id;

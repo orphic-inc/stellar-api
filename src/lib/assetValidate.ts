@@ -1,11 +1,14 @@
 /**
  * Store-time validation for binary assets (ADR-0026, #290).
  *
- * The sibling `cssSanitize` cleans rather than rejects — it can neutralize a
- * `url()` and still hand back valid CSS. A binary has no such middle ground: you
- * cannot strip the dangerous part of an arbitrary file and keep a usable one. So
- * this inverts the signature and throws, while keeping the same fail-closed
- * intent — the store never persists a byte it has not identified.
+ * Validate-and-reject, matching the sibling `cssValidate`. The two once diverged
+ * — CSS cleaned, binaries threw, on the reasoning that you can neutralize a
+ * `url()` and still hand back valid CSS while a binary has no such middle
+ * ground. ADR-0031 §5 retired the cleaning posture as a class: normalizing a
+ * whole sheet in order to match it is what persisted mangled bytes (#340), so
+ * CSS now rejects too and the two validators converge rather than invert.
+ * The fail-closed intent was always shared — the store never persists a byte it
+ * has not identified.
  *
  * Identification is by magic bytes, not by the caller's declared mime. A caller
  * claiming `image/png` over a payload that sniffs as something else is rejected

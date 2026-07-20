@@ -14,8 +14,8 @@
  */
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { AppError } from '../lib/errors';
-import { sanitizeStylesheetSource } from '../lib/cssSanitize';
+import { AppError, FieldError } from '../lib/errors';
+import { cssValidate, formatCssViolations } from '../lib/cssValidate';
 import { scoreStylesheetSelection } from './stylesheetScore';
 import type { AuthorStylesheetInput } from '../schemas/stylesheet';
 import type { PageParams } from '../lib/pagination';
@@ -28,8 +28,9 @@ import type { PageParams } from '../lib/pagination';
  * passed in rather than re-derived here, same scope as the collage-limit
  * precedent (secondary ranks are not consulted).
  *
- * `source` is sanitized at store-time (ADR-0003): the injected artifact is kept
- * safe in the database, not just at render. See `lib/cssSanitize.ts`.
+ * `source` is validated at store-time and stored **verbatim** (ADR-0031 §5): the
+ * boundary rejects an unsafe sheet rather than cleaning it, so the bytes on disk
+ * are the bytes the author submitted. See `lib/cssValidate.ts`.
  */
 export const createAuthorStylesheet = async (
   authorId: number,
@@ -52,13 +53,30 @@ export const createAuthorStylesheet = async (
     }
   }
 
+  assertSafeSource(input.source);
+
   return prisma.authorStylesheet.create({
-    data: {
-      authorId,
-      name: input.name,
-      source: sanitizeStylesheetSource(input.source)
-    }
+    data: { authorId, name: input.name, source: input.source }
   });
+};
+
+/**
+ * Reject a sheet that violates the ADR-0031 §3 boundary, reporting every
+ * violation at once against the `source` field.
+ *
+ * Fail-fast at the call site rather than cleaning in place: a silently stripped
+ * `url()` is a theme whose images vanish with nothing explaining why, and the
+ * strip is what corrupted escaped identifiers (#340). Shared by create and any
+ * future edit path, which is the third call site ADR-0031 §5 did not anticipate.
+ */
+export const assertSafeSource = (source: string): void => {
+  const violations = cssValidate(source);
+  if (violations.length > 0) {
+    throw new FieldError(
+      { source: formatCssViolations(violations) },
+      'Stylesheet rejected'
+    );
+  }
 };
 
 /**

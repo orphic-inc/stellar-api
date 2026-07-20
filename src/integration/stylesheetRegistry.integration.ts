@@ -14,7 +14,6 @@ import {
   readFixtureCss,
   BUILTIN_STYLESHEET_FIXTURES
 } from '../modules/stylesheetFixtures';
-import { sanitizeStylesheetSource } from '../lib/cssSanitize';
 
 const fixtureFileByName = new Map<string, string>(
   BUILTIN_STYLESHEET_FIXTURES.map((f) => [f.name, f.file])
@@ -47,13 +46,12 @@ const assertAllResolve = async () => {
       select: { name: true, source: true }
     });
     expect(fixture).not.toBeNull();
-    // Fidelity: what /css serves is exactly the authored file (stored through the
-    // store-time sanitizer, a no-op on these token-only sheets).
+    // Fidelity: what /css serves is byte-for-byte the authored file. Under
+    // ADR-0031 §5 the boundary validates and never rewrites, so the disk file is
+    // the expectation directly rather than the disk file put through a pass.
     const file = fixtureFileByName.get(row.name);
     expect(file).toBeDefined();
-    expect(fixture!.source).toBe(
-      sanitizeStylesheetSource(readFixtureCss(file!))
-    );
+    expect(fixture!.source).toBe(readFixtureCss(file!));
   }
 };
 

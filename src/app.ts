@@ -11,6 +11,7 @@ import cors from 'cors';
 import { getLogger } from './modules/logging';
 import { http, sentry } from './modules/config';
 import { prisma } from './lib/prisma';
+import { FieldError } from './lib/errors';
 import { appVersion } from './lib/version';
 import { sentryBeforeSend } from './lib/sentry';
 import { asyncHandler } from './modules/asyncHandler';
@@ -214,6 +215,12 @@ export const createApp = () => {
         log.error('Unhandled error', logMeta);
       } else {
         log.warn('Request error', logMeta);
+      }
+      // Field-scoped errors render as validate()'s envelope, not { msg }, so a
+      // form can attach each message to the input that caused it.
+      if (err instanceof FieldError) {
+        res.status(status).json({ errors: err.fieldErrors });
+        return;
       }
       const message =
         process.env.NODE_ENV === 'production' && status === 500

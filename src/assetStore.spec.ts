@@ -117,8 +117,9 @@ describe('assetUrl', () => {
     expect(assetUrl(PNG_HASH)).toBe(`/api/asset/${PNG_HASH}`);
   });
 
-  it('is scheme-less and same-origin, so the CSS sanitizer keeps it', () => {
-    // Pins the property the proton fixture depends on (cssSanitize isSafeUrlTarget).
+  it('is scheme-less and same-origin, so the CSS validator accepts it', () => {
+    // Pins the property the proton fixture depends on (cssValidate url allowlist,
+    // ADR-0031 §3: relative paths only, every scheme and `data:` rejected).
     expect(assetUrl(PNG_HASH).startsWith('/')).toBe(true);
     expect(assetUrl(PNG_HASH).startsWith('//')).toBe(false);
   });

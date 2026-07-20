@@ -110,7 +110,8 @@ src/
     pagination.ts           # parsePage(req) → { skip, limit, page }
                             # paginatedResponse(res, data, total, pg)
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
-    assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, unlike cssSanitize
+    cssValidate.ts          # Store-time CSS boundary (ADR-0031): detects and REJECTS, stores bytes verbatim; reports every violation with rule + location
+    assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, like cssValidate
     jsonHelpers.ts          # appendToJsonArray, jsonObjectArray, removeFromJsonArrayAtIndex
     ttlCache.ts             # Generic TtlCache<K,V> + top10Cache singleton
   types/

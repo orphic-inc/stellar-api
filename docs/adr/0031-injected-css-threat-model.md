@@ -1,6 +1,6 @@
 # Injected-CSS threat model and the store-time boundary
 
-**Status: Accepted (2026-07-19).** Supersedes [ADR-0003](0003-stylesheet-injection-isolation.md), which is retained as history. Decides [#349](https://github.com/orphic-inc/stellar-api/issues/349) on the [authored-stylesheet wayfinder map](https://github.com/orphic-inc/stellar-api/issues/347). Rides on the delivery contract of [ADR-0024](0024-stylesheet-delivery-contract.md) (Accepted) and the asset store of [ADR-0026](0026-static-asset-storage.md); binds [#342](https://github.com/orphic-inc/stellar-api/issues/342) normatively (§4).
+**Status: Accepted (2026-07-19). Implemented by [#360](https://github.com/orphic-inc/stellar-api/issues/360) — §3, §4 and §5 are live in `src/lib/cssValidate.ts`; §6's CSP tightening is stellar-ui's half and tracked separately.** Supersedes [ADR-0003](0003-stylesheet-injection-isolation.md), which is retained as history. Decides [#349](https://github.com/orphic-inc/stellar-api/issues/349) on the [authored-stylesheet wayfinder map](https://github.com/orphic-inc/stellar-api/issues/347). Rides on the delivery contract of [ADR-0024](0024-stylesheet-delivery-contract.md) (Accepted) and the asset store of [ADR-0026](0026-static-asset-storage.md); binds [#342](https://github.com/orphic-inc/stellar-api/issues/342) normatively (§4).
 
 ## Context
 

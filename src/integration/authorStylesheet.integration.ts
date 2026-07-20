@@ -121,20 +121,44 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
 });
 
 describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
-  it('serves the stored sanitized source; a bad @import is stripped before delivery', async () => {
+  it('refuses a sheet carrying an exfiltration vector — nothing is stored', async () => {
     const author = await createUser();
-    // Raw source with an exfiltration vector; store-time cssSanitize neutralizes
-    // it, and the /css read hands back the already-safe stored artifact.
+    // ADR-0031 §5: the boundary rejects rather than cleaning. This used to
+    // assert the @import was stripped and the sheet saved anyway; a save that
+    // silently mutates the author's bytes is the posture that was retired.
+    await expect(
+      createAuthorStylesheet(author.id, author.userRankId, {
+        name: 'Anorex',
+        source:
+          "@import url('http://evil.example/x.css'); body { color: #0f0; }"
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      fieldErrors: { source: [expect.stringContaining('another sheet')] }
+    });
+
+    expect(
+      await testPrisma.authorStylesheet.count({
+        where: { authorId: author.id }
+      })
+    ).toBe(0);
+  });
+
+  it('stores a clean sheet verbatim — /css returns the exact submitted bytes', async () => {
+    const author = await createUser();
+    // The other half of verbatim storage: escaped Tailwind identifiers survive.
+    // The cleaning sanitizer rewrote `.hover\:text-white` here and broke the
+    // selector for every adopter (#340).
+    const source =
+      'header .hover\\:text-white:hover { color: #111; }\nbody { color: #0f0; }';
     const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
-      name: 'Anorex',
-      source: "@import url('http://evil.example/x.css'); body { color: #0f0; }"
+      name: 'Verbatim',
+      source
     });
 
     const delivered = await getAuthorStylesheetCss(sheet.id);
     expect(delivered).not.toBeNull();
-    expect(delivered!.source).toContain('color: #0f0');
-    expect(delivered!.source).not.toContain('@import');
-    expect(delivered!.source).not.toContain('evil.example');
+    expect(delivered!.source).toBe(source);
   });
 
   it('returns null for a non-existent sheet (the route maps this to 404)', async () => {
