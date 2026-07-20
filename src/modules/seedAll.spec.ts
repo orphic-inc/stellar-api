@@ -1,9 +1,16 @@
 /**
- * seedAll is a thin orchestrator, but it owns one real invariant the individual
- * seeders can't enforce alone: the System user must be seeded *before* the
- * stylesheet fixtures it owns, and its returned id must be the one the fixtures
- * are authored under. A reorder or a wrong id would seed orphaned fixtures — pin
- * that wiring here.
+ * seedAll is a thin orchestrator, but it owns two real invariants the individual
+ * seeders can't enforce alone:
+ *
+ *   - the System user must be seeded *before* the stylesheet fixtures it owns,
+ *     and its returned id must be the one the fixtures are authored under — a
+ *     reorder or a wrong id would seed orphaned fixtures;
+ *   - theme assets must be stored *before* the stylesheets referencing them
+ *     (#341), or an asset-bearing theme is briefly served with dangling
+ *     `/api/asset` targets.
+ *
+ * Both are pure ordering facts invisible to the seeders themselves — pin that
+ * wiring here.
  */
 import type { PrismaClient } from '@prisma/client';
 
@@ -13,6 +20,7 @@ const seedForums = jest.fn();
 const seedSystemUser = jest.fn();
 const seedGoldenRules = jest.fn();
 const seedStylesheetFixtures = jest.fn();
+const seedAssetFixtures = jest.fn();
 
 const SYSTEM_USER_ID = 4242;
 
@@ -24,6 +32,9 @@ jest.mock('./bootstrap', () => ({
 }));
 jest.mock('./goldenRules', () => ({
   seedGoldenRules: (...a: unknown[]) => seedGoldenRules(...a)
+}));
+jest.mock('./assetFixtures', () => ({
+  seedAssetFixtures: (...a: unknown[]) => seedAssetFixtures(...a)
 }));
 jest.mock('./stylesheetFixtures', () => ({
   seedStylesheetFixtures: (...a: unknown[]) => seedStylesheetFixtures(...a)
@@ -49,6 +60,7 @@ describe('seedAll', () => {
       seedForums,
       seedGoldenRules,
       seedSystemUser,
+      seedAssetFixtures,
       seedStylesheetFixtures
     ]) {
       expect(fn).toHaveBeenCalledTimes(1);
@@ -63,5 +75,12 @@ describe('seedAll', () => {
     );
     // Fixtures are authored under exactly the id seedSystemUser returned.
     expect(seedStylesheetFixtures).toHaveBeenCalledWith(client, SYSTEM_USER_ID);
+  });
+
+  it('stores theme assets before the stylesheets that reference them', async () => {
+    await seedAll(client);
+    expect(seedAssetFixtures.mock.invocationCallOrder[0]).toBeLessThan(
+      seedStylesheetFixtures.mock.invocationCallOrder[0]
+    );
   });
 });

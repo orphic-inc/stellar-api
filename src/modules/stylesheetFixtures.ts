@@ -8,66 +8,103 @@
  *
  * The CSS lives on disk under `prisma/seed-assets/stylesheets/` (shipped in the
  * image — Dockerfile copies `prisma/`) so it is authored/reviewed as real `.css`,
- * and a drift-guard spec reads the same files. Themes are token-only (stellar-ui
- * ADR-0005): a `:root { --st-* }` block, no selectors or assets, so they carry
- * nothing the store-time boundary (`lib/cssValidate.ts`) rejects — which the
- * seeder asserts at boot rather than assuming.
+ * and a drift-guard spec reads the same files.
+ *
+ * Fixtures come in two kinds (`StylesheetFixtureKind`). Most are token-only
+ * (stellar-ui ADR-0005): a `:root { --st-* }` block, no selectors or assets.
+ * `proton` is the first asset-bearing one (#341) — real selectors, with imagery
+ * referenced as `/api/asset/<sha256>` out of the ADR-0026 store, seeded by
+ * `seedAssetFixtures` before this runs so the targets already resolve.
+ *
+ * Either way a fixture must carry nothing the store-time boundary
+ * (`lib/cssValidate.ts`) rejects — which the seeder asserts at boot rather than
+ * assuming.
  */
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { cssValidate, formatCssViolations } from '../lib/cssValidate';
 
+/**
+ * What kind of theme a fixture is, which selects the conformance assertion the
+ * drift guard applies to it:
+ *
+ *   - `token` — a `:root { --st-* }` block and nothing else (stellar-ui
+ *     ADR-0005). Checked against `REQUIRED_ST_PRIMITIVES`.
+ *   - `asset` — real selectors plus imagery from the asset store. Checked
+ *     against the shipped assets instead; `proton` defines zero `--st-*`
+ *     primitives, so the token assertion would fail it for being what it is.
+ *
+ * Both kinds are still checked against the ADR-0031 store-time boundary.
+ */
+export type StylesheetFixtureKind = 'token' | 'asset';
+
 export const BUILTIN_STYLESHEET_FIXTURES = [
   {
     name: 'anorex',
     description: 'Classic wood-toned theme — brown/cream',
-    file: 'anorex.css'
+    file: 'anorex.css',
+    kind: 'token'
   },
   {
     name: 'dark-ambient',
     description: 'Deep atmospheric theme with muted blue',
-    file: 'dark-ambient.css'
+    file: 'dark-ambient.css',
+    kind: 'token'
   },
   {
     name: 'kuro',
     description: 'Dark slate theme — muted blue accent',
-    file: 'kuro.css'
+    file: 'kuro.css',
+    kind: 'token'
   },
   {
     name: 'layer-cake',
     description: 'Classic light-grey theme (token reference)',
-    file: 'layer-cake.css'
+    file: 'layer-cake.css',
+    kind: 'token'
   },
   {
     name: 'shiro',
     description: 'Light neutral grey theme',
-    file: 'shiro.css'
+    file: 'shiro.css',
+    kind: 'token'
   },
   {
     name: 'mono',
     description: 'Clean light theme with a single blue accent',
-    file: 'mono.css'
+    file: 'mono.css',
+    kind: 'token'
   },
   {
     name: 'minimal',
     description: 'Dark neutral theme with a bright cyan accent',
-    file: 'minimal.css'
+    file: 'minimal.css',
+    kind: 'token'
   },
   {
     name: 'hydro',
     description: 'Soft slate-blue light theme',
-    file: 'hydro.css'
+    file: 'hydro.css',
+    kind: 'token'
   },
   {
     name: 'bubblegum',
     description: 'Pastel-cyan theme with a hot-pink accent',
-    file: 'bubblegum.css'
+    file: 'bubblegum.css',
+    kind: 'token'
   },
   {
     name: 'white',
     description: 'Clean white theme with a sky-blue accent',
-    file: 'white.css'
+    file: 'white.css',
+    kind: 'token'
+  },
+  {
+    name: 'proton',
+    description: 'Dark slate theme with layered background imagery',
+    file: 'proton.css',
+    kind: 'asset'
   }
 ] as const;
 

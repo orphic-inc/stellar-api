@@ -23,6 +23,7 @@ import {
   seedSystemUser
 } from './bootstrap';
 import { seedGoldenRules } from './goldenRules';
+import { seedAssetFixtures } from './assetFixtures';
 import { seedStylesheetFixtures } from './stylesheetFixtures';
 
 export async function seedAll(client: PrismaClient): Promise<void> {
@@ -30,6 +31,9 @@ export async function seedAll(client: PrismaClient): Promise<void> {
   await seedRankPromotionRules(client);
   await seedForums(client);
   await seedGoldenRules(client);
+  // Theme imagery must land before the stylesheets referencing it, or an
+  // asset-bearing theme is briefly served with dangling /api/asset targets.
+  await seedAssetFixtures(client);
   // System user must precede the stylesheet fixtures it owns (and needs ranks
   // to exist first — it takes the base User rank).
   const systemUserId = await seedSystemUser(client);

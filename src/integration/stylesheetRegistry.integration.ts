@@ -14,6 +14,11 @@ import {
   readFixtureCss,
   BUILTIN_STYLESHEET_FIXTURES
 } from '../modules/stylesheetFixtures';
+import {
+  seedAssetFixtures,
+  BUILTIN_ASSET_FIXTURES
+} from '../modules/assetFixtures';
+import { getAssetByHash, hashAsset } from '../modules/assetStore';
 
 const fixtureFileByName = new Map<string, string>(
   BUILTIN_STYLESHEET_FIXTURES.map((f) => [f.name, f.file])
@@ -75,6 +80,40 @@ describe('stylesheet registry ↔ /css delivery consistency (#286)', () => {
     });
     expect(fixtureCount).toBe(BUILTIN_STYLESHEET_FIXTURES.length);
     await assertAllResolve();
+  });
+
+  it('an asset-bearing fixture has every /api/asset target stored (#341)', async () => {
+    // The end-to-end the drift guard cannot reach: the guard proves the CSS and
+    // the shipped files agree on disk, this proves the seed actually put those
+    // bytes where the served CSS points. Asset seeding runs first, exactly as
+    // seedAll orders it.
+    await seedAssetFixtures(testPrisma);
+    const systemUserId = await seedSystemUser(testPrisma);
+    await seedStylesheetFixtures(testPrisma, systemUserId);
+
+    const proton = await testPrisma.authorStylesheet.findFirstOrThrow({
+      where: { authorId: systemUserId, name: 'proton' },
+      select: { source: true }
+    });
+
+    const hashes = Array.from(
+      proton.source.matchAll(/\/api\/asset\/([0-9a-f]{64})/g)
+    ).map((m) => m[1]);
+    expect(hashes).toHaveLength(3);
+
+    for (const hash of hashes) {
+      const asset = await getAssetByHash(hash, testPrisma);
+      expect(asset).not.toBeNull();
+      // Content-addressed: the stored bytes must hash back to the address the
+      // stylesheet names, or `Cache-Control: immutable` would be a lie.
+      expect(hashAsset(Buffer.from(asset!.data))).toBe(hash);
+    }
+  });
+
+  it('re-seeding assets is idempotent — no duplicate rows', async () => {
+    await seedAssetFixtures(testPrisma);
+    await seedAssetFixtures(testPrisma);
+    expect(await testPrisma.asset.count()).toBe(BUILTIN_ASSET_FIXTURES.length);
   });
 
   it('seeds the reserved System user as non-interactive', async () => {
