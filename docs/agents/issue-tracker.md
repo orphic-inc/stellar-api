@@ -34,16 +34,20 @@ How `/wayfinder`'s concepts map onto GitHub for this repo. Both sub-issues and i
 **Parentage** uses the native sub-issue API. It takes the child's internal `id`, not its number, and the field must be sent as an integer (`-F`, not `-f` — `-f` sends a string and the API rejects it with a 422):
 
 ```bash
-child_id=$(gh api repos/orphic-inc/stellar-api/issues/<child>/ --jq '.id')
+child_id=$(gh api repos/orphic-inc/stellar-api/issues/<child> --jq '.id')
 gh api -X POST repos/orphic-inc/stellar-api/issues/<map>/sub_issues -F sub_issue_id="$child_id"
 ```
 
 **Blocking** uses the native dependency relationship, which renders the frontier visually in GitHub's own UI. Same integer-`id` rule:
 
 ```bash
-blocker_id=$(gh api repos/orphic-inc/stellar-api/issues/<blocker>/ --jq '.id')
+blocker_id=$(gh api repos/orphic-inc/stellar-api/issues/<blocker> --jq '.id')
 gh api -X POST repos/orphic-inc/stellar-api/issues/<blocked>/dependencies/blocked_by -F issue_id="$blocker_id"
 ```
+
+**No trailing slash on the id lookup.** `issues/<n>/` returns a 404, so an unguarded `$(...)` leaves the id empty and the `-F` that follows fails on a blank value — the relationship silently never forms. Guard the lookup (`|| exit`) rather than trusting it, and read the relationship back to confirm it landed.
+
+Both recipes work cross-repo: swap the `repos/<owner>/<repo>` segment to file a dependency on `orphic-inc/stellar-ui`.
 
 Read an issue's blockers with `gh api repos/orphic-inc/stellar-api/issues/<n>/dependencies/blocked_by --jq '[.[].number]'`.
 
