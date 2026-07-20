@@ -134,7 +134,17 @@ describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 400,
-      fieldErrors: { source: [expect.stringContaining('another sheet')] }
+      fieldErrors: {
+        // Both violations, in source order — the `@import` and the external
+        // `url()` it carries. Reporting every one is deliberate (ADR-0032 §6):
+        // under a rejecting validator, first-fail turns a sheet with several
+        // bad constructs into several save attempts. Asserting the exact list
+        // is what makes that property fail loudly if it regresses to first-fail.
+        source: [
+          expect.stringContaining('another sheet'),
+          expect.stringContaining('external address')
+        ]
+      }
     });
 
     expect(
