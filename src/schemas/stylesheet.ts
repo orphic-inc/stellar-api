@@ -18,10 +18,14 @@ export const externalStylesheetUrl = z
   .optional()
   .or(z.literal(''));
 
+// `cssUrl: null` is the explicit "this row has no delivery target" value — it
+// appears in the picker and renders nothing (ADR-0024 §3/§4, #371). Nullable
+// rather than merely optional, so an admin can CLEAR a target on update; a
+// missing key means "leave unchanged", which is a different intent.
 export const stylesheetSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().default(''),
-  cssUrl: z.string().min(1, 'CSS URL is required'),
+  cssUrl: z.string().min(1, 'CSS URL is required').nullable(),
   isDefault: z.boolean().optional().default(false)
 });
 
@@ -30,7 +34,7 @@ export const stylesheetUpdateSchema = z
   .object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
-    cssUrl: z.string().min(1, 'CSS URL is required').optional(),
+    cssUrl: z.string().min(1, 'CSS URL is required').nullable().optional(),
     isDefault: z.boolean().optional()
   })
   .refine(

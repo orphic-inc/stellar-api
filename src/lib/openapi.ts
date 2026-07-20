@@ -1441,7 +1441,9 @@ const Stylesheet = registry.register(
     id: z.number(),
     name: z.string(),
     description: z.string(),
-    cssUrl: z.string(),
+    // null = no delivery target: the row is in the picker and renders nothing
+    // (Sublime). Clients must branch on null rather than on the name (#371).
+    cssUrl: z.string().nullable(),
     isDefault: z.boolean(),
     createdAt: z.string()
   })
