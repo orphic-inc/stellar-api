@@ -49,10 +49,37 @@ Read an issue's blockers with `gh api repos/orphic-inc/stellar-api/issues/<n>/de
 
 **Claiming** a ticket is assigning it: `gh issue edit <n> --add-assignee obrien-k`. An open, unassigned ticket is unclaimed.
 
-**The frontier** is the map's open children that are unassigned and have an empty `blocked_by` list. There is no single query for this — list the children, then check each one's dependencies:
+**The frontier** is the map's open children that are unassigned and whose blockers are **all closed** — not the ones with an empty `blocked_by` list. `blocked_by` keeps listing a blocker after it closes, so an empty list means "never had one", and testing for emptiness reports a frontier of nothing the moment a map starts resolving tickets. Filter on blocker _state_, not list length.
+
+There is no single query for this — list the children, then check each one's dependencies:
 
 ```bash
-gh api repos/orphic-inc/stellar-api/issues/<map>/sub_issues --jq '.[] | select(.state=="open") | .number'
+REPO=orphic-inc/stellar-api
+if ! children=$(gh api repos/$REPO/issues/<map>/sub_issues \
+    --jq '.[] | select(.state=="open") | .number' 2>/dev/null); then
+  echo "could not list children — retry"
+else
+  printf '%s\n' "$children" | while read -r n; do
+    [ -z "$n" ] && continue
+    if ! blockers=$(gh api repos/$REPO/issues/$n/dependencies/blocked_by \
+        --jq '[.[] | select(.state=="open") | .number] | join(",")' 2>/dev/null); then
+      echo "#$n UNKNOWN — request failed, retry"
+    elif [ -z "$blockers" ]; then
+      echo "#$n FRONTIER"
+    else
+      echo "#$n blocked by $blockers"
+    fi
+  done
+fi
 ```
+
+Iterate with `while read`, not `for n in $children`. Word splitting differs between the shells this gets pasted into: zsh does **not** split an unquoted `$children`, so a `for` loop runs once with all the numbers glued into a single value, while bash splits it as intended. (zsh _does_ split unquoted `$(...)`, so `for n in $(gh api …)` fails the opposite way — it shreds an error message into fake issue numbers.) Reading line by line is correct in both.
+
+**Both** exit-status guards are load-bearing, because this endpoint family 503s intermittently and every unchecked call fails in a way that looks like data:
+
+- Unchecked **inner** call — the error JSON lands in `$blockers` and reports as a bogus blocker, or as a phantom FRONTIER depending on how the filter is written.
+- Unchecked **outer** call — worse. The error text word-splits in the `for`, so each word becomes a fake issue number and you get a screenful of confident output about tickets that do not exist.
+
+Unknown is a third state, distinct from blocked and unblocked. A frontier reading with any UNKNOWN in it is incomplete — retry before acting on it.
 
 **Resolving** a ticket: post the answer as a comment, close the issue, then append a one-line pointer to the map's Decisions-so-far section.
