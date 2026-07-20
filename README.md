@@ -2,21 +2,24 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ddbd8663fbd640aa96f4a89770a387d6)](https://app.codacy.com/gh/orphic-inc/stellar-api/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
-This is the Node.js API backend for **Stellar**, a modern, next-generation community content tracker and forum software.
+This is the Node.js API backend for **Stellar**, a community content tracker.
 
-Stellar is an invite-only platform built around **Communities** with granular permissions, member contributions, and a **Community Reputation Score (CRS)** that rewards long-term, healthy participation.
+Stellar is an invite-only platform built around **Communities** with granular permissions, member contributions, and supporting features. These supporting features include: requests, reporting, extensive moderating tools, and collages. In addition to these community-first focuses, Stellar has community-centric communication tools, a forum, wiki, messaging, and notifications.
 
 ## Status: alpha
 
-Stellar is pre-1.0 software (currently 0.7.x). Running a public instance means running an alpha: interfaces and the database schema still change between releases, migrations may be destructive (pre-1.0 carries no backfill guarantees), and no data-durability promises are made yet. Trunk is kept deployable — every merge passes the full CI chain (format, lint, type-checks, unit and integration suites, and a boot-and-migrate container smoke test) — but treat any public deployment as disposable for now. A fresh install starts with registration `closed`; open it deliberately from site settings when you are ready to accept members.
+Stellar is pre-1.0 software (currently 0.8.x). Running a public instance means running an alpha: interfaces and the database schema still change between releases, migrations may be destructive (pre-1.0 carries no backfill guarantees), and no data-durability promises are made yet. Trunk is kept deployable — every merge passes the full CI chain (format, lint, type-checks, unit and integration suites, and a boot-and-migrate container smoke test) — but treat any public deployment as disposable for now. A fresh install starts with registration `closed`; open it deliberately from site settings when you are ready to accept members.
 
 ## What's here
 
 - **Communities, membership & staff** — invite tree, roles, granular per-permission checks ([ADR-0001](docs/adr/0001-granular-permission-checks.md)).
 - **Contributions & releases** — track releases, ratio accounting (contributed/consumed), download cost ledger.
-- **Community Reputation Score (CRS)** — composite reputation across social, contribution, donation, and longevity signals ([PRD-01](docs/prd/01-Community-Score.md)); fed by a community-health pulse ([ADR-0002](docs/adr/0002-community-health-pulse.md)).
 - **Stylesheets & theming** — built-in + user-authored themes with adoption scoring ([PRD-03](docs/prd/03-stylesheet-themes-and-scoring.md), [ADR-0003](docs/adr/0003-stylesheet-injection-isolation.md)).
 - **Link health** — periodic checks on contribution links, flapping detection, staff escalation, stale-link sweep.
+
+## What's deferred
+
+- **Community Reputation Score (CRS)** — composite reputation across social, contribution, donation, and longevity signals ([PRD-01](docs/prd/01-Community-Score.md)); fed by a community-health pulse ([ADR-0002](docs/adr/0002-community-health-pulse.md)).
 
 ## Documentation
 
