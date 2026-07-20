@@ -145,3 +145,15 @@ Seeding Sublime as an empty `/css` fixture was rejected: it buys uniformity by m
 §3 is what makes this expressible. With Sublime carrying a fictional `cssUrl`, the assertion needs an exception carved by name — and an exception list is exactly where the next `proton` hides. A light stellar-ui check that the theme tree stays empty is secondary: the api guard catches the failure that matters (a row nobody can serve), while the ui one catches dead bytes in a bundle, which is cheaper to be wrong about.
 
 **Known seam, recorded not closed.** Neither guard is cross-repo. The api cannot see stellar-ui's tree and the ui cannot see the registry, so adding `src/stylesheets/newtheme/` without touching the api still fails silently — which is precisely today's failure. Do not mistake the api guard for full coverage.
+
+## Amendment (2026-07-20) — what the shipped guard actually reaches
+
+§4 above says a future row pointing outside the api "fails CI on the way in". Implementing it (#371) established that this is true of _seeded_ rows only, and the gap is worth recording next to the claim rather than leaving the stronger reading in place.
+
+`stylesheetRegistry.integration.ts` truncates in `beforeEach`, so the partition is asserted over rows the tests seed — `seedStylesheetFixtures` output plus rows a test creates directly. It never inspects the registry a real `prisma migrate deploy` produces. A SQL data migration that inserts a `/stylesheets/…` row therefore still passes CI, which is the same class of vector that produced this amendment: the 2026-05-24 seed migration and `20260524200000_add_legacy_stylesheets` are exactly how the dead rows arrived.
+
+**`postmod` is that case today.** It is planted by migration, is not a seeded fixture, and stellar-ui still serves it — §2 above records it as the last thing holding `/stylesheets` open, gated on [#343](https://github.com/orphic-inc/stellar-api/issues/343). So the registry on a live database is _not_ a total partition right now, and no guard reports it. This is accepted rather than papered over: excluding `postmod` by name would be the exception list §4 exists to avoid, and failing CI until #343 clears would block unrelated work behind a licensing decision.
+
+The sequencing that closes it: #343 retires `postmod`, the partition becomes true of the shipped registry rather than only the seeded one, and the guard can then be extended to run against a migrated database. Until then, read §4's guarantee as covering seeding and fixtures — not migrations.
+
+Two adjacent gaps, both ticketed rather than fixed here: the write path (`POST`/`PUT /api/stylesheet`) accepts a null `cssUrl` but does not enforce the partition at runtime, so a strict-admin can still create an unservable row; and `getDefaultStylesheetName`'s `?? 'sublime'` fallback — named in #371 as half of the magic-string pair — is untouched, because retiring it makes `siteAppearance` nullable and is a materially larger change than the delivery contract.

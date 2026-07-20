@@ -20,10 +20,19 @@
  * `proton` would hide. A `name !== 'sublime'` escape hatch here means the
  * nullable migration has not landed properly.
  *
- * Not cross-repo. The api cannot see stellar-ui's `src/stylesheets/` tree, so
- * adding a static theme directory without touching the api still fails silently
- * here; the ui half is its own exact-set guard (stellar-ui
- * `stylesheetsDir.test.ts`, #167/#168).
+ * Two limits on the guard's reach, both known:
+ *
+ *   - **Not cross-repo.** The api cannot see stellar-ui's `src/stylesheets/`
+ *     tree, so adding a static theme directory without touching the api still
+ *     fails silently here; the ui half is its own exact-set guard (stellar-ui
+ *     `stylesheetsDir.test.ts`, #167/#168).
+ *   - **Migration-planted rows are out of reach.** The integration guard runs
+ *     after `truncateAll()`, so it only ever inspects rows the test seeds — not
+ *     the registry a real `prisma migrate deploy` produces. `postmod` is
+ *     currently outside the partition on a live DB (`/stylesheets/postmod/…`,
+ *     ADR-0024's "Live; gated on #343") and no guard sees it. Tighten this once
+ *     #343 retires that row, at which point the partition becomes true of the
+ *     shipped registry rather than only the seeded one.
  */
 
 /**
