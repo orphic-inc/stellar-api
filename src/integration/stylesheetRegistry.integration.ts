@@ -10,6 +10,12 @@
  * (`/css`-backed XOR null `cssUrl`), so a row pointing outside the api fails here
  * instead of being invisible. Also pins the seeders' idempotency and the System
  * account's non-interactive shape.
+ *
+ * Scope limit worth knowing before trusting this file: `beforeEach` truncates,
+ * so the partition is asserted over rows these tests SEED, never over the
+ * registry a real `prisma migrate deploy` produces. A SQL data migration adding
+ * a `/stylesheets/…` row still passes CI — `postmod` is exactly that today
+ * (ADR-0024: "Live; gated on #343"). See modules/stylesheetRegistry.ts.
  */
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import { seedSystemUser, SYSTEM_USERNAME } from '../modules/bootstrap';
