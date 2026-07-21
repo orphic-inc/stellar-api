@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CSS_DELIVERY_ROUTE } from '../modules/stylesheetRegistry';
 
 // The Personal source (ADR-0024 §3): a self-hosted external stylesheet URL.
 // `https:` only, end to end — `.url()` alone admits `ftp:`/`javascript:`, valid
@@ -22,10 +23,27 @@ export const externalStylesheetUrl = z
 // appears in the picker and renders nothing (ADR-0024 §3/§4, #371). Nullable
 // rather than merely optional, so an admin can CLEAR a target on update; a
 // missing key means "leave unchanged", which is a different intent.
+//
+// The non-null arm is the delivery partition, enforced here on the way in (#375)
+// and not only by the CI sweep — which reads rows the integration test seeds and
+// so never saw what this endpoint accepted. Shares CSS_DELIVERY_ROUTE with that
+// sweep deliberately: two encodings of "in the partition" is the drift this
+// whole area keeps producing.
+//
+// Shape only. That a target is well-formed does not mean the AuthorStylesheet it
+// names exists — modules/stylesheet.ts checks that, where there is a DB.
+const registryCssUrl = z
+  .string()
+  .regex(
+    CSS_DELIVERY_ROUTE,
+    'CSS URL must be an /api/stylesheet/author-stylesheet/{id}/css delivery target, or null'
+  )
+  .nullable();
+
 export const stylesheetSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().default(''),
-  cssUrl: z.string().min(1, 'CSS URL is required').nullable(),
+  cssUrl: registryCssUrl,
   isDefault: z.boolean().optional().default(false)
 });
 
@@ -34,7 +52,7 @@ export const stylesheetUpdateSchema = z
   .object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
-    cssUrl: z.string().min(1, 'CSS URL is required').nullable().optional(),
+    cssUrl: registryCssUrl.optional(),
     isDefault: z.boolean().optional()
   })
   .refine(

@@ -8251,7 +8251,7 @@
                   "cssUrl": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1
+                    "pattern": "^\\/api\\/stylesheet\\/author-stylesheet\\/(\\d+)\\/css$"
                   },
                   "isDefault": {
                     "type": "boolean",
@@ -8380,7 +8380,7 @@
                   "cssUrl": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1
+                    "pattern": "^\\/api\\/stylesheet\\/author-stylesheet\\/(\\d+)\\/css$"
                   },
                   "isDefault": {
                     "type": "boolean"

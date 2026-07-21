@@ -8,15 +8,26 @@ import {
 
 beforeEach(() => resetApiTestState());
 
+// A well-formed delivery target — the only non-null shape the registry accepts
+// (ADR-0024 §4, enforced on the write path by #375).
+const DELIVERY_URL = '/api/stylesheet/author-stylesheet/7/css';
+
+// Sublime carries `cssUrl: null`: the bundled Tailwind already is Sublime, so
+// there is no target to deliver. That is the partition's other legal arm, not a
+// missing value.
 const makeStylesheet = (overrides = {}) => ({
   id: 1,
   name: 'sublime',
   description: 'Default Stellar theme',
-  cssUrl: '/stylesheets/sublime/style.css',
+  cssUrl: null,
   isDefault: true,
   createdAt: new Date('2026-01-01'),
   ...overrides
 });
+
+/** The `AuthorStylesheet` a delivery target names, present by default. */
+const mockDeliveryTargetExists = (id = 7) =>
+  prismaMock.authorStylesheet.findUnique.mockResolvedValue({ id } as never);
 
 // ─── GET /api/stylesheet ──────────────────────────────────────────────────────
 
@@ -135,16 +146,22 @@ describe('POST /api/stylesheet', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ admin: true })
     );
+    mockDeliveryTargetExists();
   });
 
   it('creates a stylesheet and returns 201', async () => {
     prismaMock.stylesheet.create.mockResolvedValue(
-      makeStylesheet({ id: 3, name: 'custom', isDefault: false }) as never
+      makeStylesheet({
+        id: 3,
+        name: 'custom',
+        cssUrl: DELIVERY_URL,
+        isDefault: false
+      }) as never
     );
 
     const res = await request(app).post('/api/stylesheet').send({
       name: 'custom',
-      cssUrl: '/stylesheets/custom/style.css',
+      cssUrl: DELIVERY_URL,
       description: 'Custom'
     });
 
@@ -154,12 +171,26 @@ describe('POST /api/stylesheet', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           name: 'custom',
-          cssUrl: '/stylesheets/custom/style.css',
+          cssUrl: DELIVERY_URL,
           description: 'Custom',
           isDefault: false
         })
       })
     );
+  });
+
+  it('creates a no-delivery row when cssUrl is null', async () => {
+    prismaMock.stylesheet.create.mockResolvedValue(
+      makeStylesheet({ id: 3, name: 'custom', isDefault: false }) as never
+    );
+
+    const res = await request(app)
+      .post('/api/stylesheet')
+      .send({ name: 'custom', cssUrl: null });
+
+    expect(res.status).toBe(201);
+    // The null arm must not be mistaken for a target and looked up.
+    expect(prismaMock.authorStylesheet.findUnique).not.toHaveBeenCalled();
   });
 
   it('clears existing default when creating with isDefault: true', async () => {
@@ -169,7 +200,7 @@ describe('POST /api/stylesheet', () => {
 
     const res = await request(app).post('/api/stylesheet').send({
       name: 'custom',
-      cssUrl: '/stylesheets/custom/style.css',
+      cssUrl: DELIVERY_URL,
       isDefault: true
     });
 
@@ -187,11 +218,47 @@ describe('POST /api/stylesheet', () => {
     expect(res.status).toBe(400);
   });
 
+  // ─── the #375 write-path partition guard ───────────────────────────────────
+
+  it('rejects a cssUrl pointing into the retired ui static tree', async () => {
+    const res = await request(app)
+      .post('/api/stylesheet')
+      .send({ name: 'custom', cssUrl: '/stylesheets/custom/style.css' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors.cssUrl).toBeDefined();
+    expect(prismaMock.stylesheet.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cssUrl that merely contains the delivery route', async () => {
+    const res = await request(app).post('/api/stylesheet').send({
+      name: 'custom',
+      cssUrl: 'https://evil.example/api/stylesheet/author-stylesheet/7/css'
+    });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.stylesheet.create).not.toHaveBeenCalled();
+  });
+
+  // Shape is not resolution: a well-formed target naming a sheet that does not
+  // exist is the same dead picker entry, so the module checks the DB too.
+  it('rejects a well-formed target whose authored stylesheet does not exist', async () => {
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/stylesheet')
+      .send({ name: 'custom', cssUrl: DELIVERY_URL });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/does not exist/);
+    expect(prismaMock.stylesheet.create).not.toHaveBeenCalled();
+  });
+
   it('returns 403 without admin permission', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
     const res = await request(app)
       .post('/api/stylesheet')
-      .send({ name: 'custom', cssUrl: '/stylesheets/custom/style.css' });
+      .send({ name: 'custom', cssUrl: DELIVERY_URL });
     expect(res.status).toBe(403);
   });
 
@@ -201,7 +268,7 @@ describe('POST /api/stylesheet', () => {
     );
     const res = await request(app)
       .post('/api/stylesheet')
-      .send({ name: 'custom', cssUrl: '/stylesheets/custom/style.css' });
+      .send({ name: 'custom', cssUrl: DELIVERY_URL });
     expect(res.status).toBe(403);
   });
 });
@@ -213,6 +280,7 @@ describe('PUT /api/stylesheet/:id', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ admin: true })
     );
+    mockDeliveryTargetExists();
   });
 
   it('updates a stylesheet and returns 200', async () => {
@@ -267,6 +335,75 @@ describe('PUT /api/stylesheet/:id', () => {
   it('returns 400 when body is empty', async () => {
     const res = await request(app).put('/api/stylesheet/1').send({});
     expect(res.status).toBe(400);
+  });
+
+  // ─── the #375 write-path partition guard ───────────────────────────────────
+
+  it('rejects an update moving a row outside the partition', async () => {
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet() as never
+    );
+
+    const res = await request(app)
+      .put('/api/stylesheet/1')
+      .send({ cssUrl: '/stylesheets/custom/style.css' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors.cssUrl).toBeDefined();
+    expect(prismaMock.stylesheet.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects an update to a target that does not resolve', async () => {
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet() as never
+    );
+    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/stylesheet/1')
+      .send({ cssUrl: DELIVERY_URL });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.stylesheet.update).not.toHaveBeenCalled();
+  });
+
+  // Explicit null clears a target; omitting the key leaves it unchanged. The
+  // schema has to keep those distinguishable, hence nullable AND optional.
+  it('accepts an explicit null cssUrl, clearing the delivery target', async () => {
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet({ cssUrl: DELIVERY_URL }) as never
+    );
+    prismaMock.stylesheet.update.mockResolvedValue(
+      makeStylesheet({ cssUrl: null }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/stylesheet/1')
+      .send({ cssUrl: null });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.stylesheet.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ cssUrl: null })
+      })
+    );
+  });
+
+  it('leaves an existing target alone when cssUrl is omitted', async () => {
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet({ cssUrl: DELIVERY_URL }) as never
+    );
+    prismaMock.stylesheet.update.mockResolvedValue(
+      makeStylesheet({ cssUrl: DELIVERY_URL }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/stylesheet/1')
+      .send({ description: 'Updated' });
+
+    expect(res.status).toBe(200);
+    // "Leave unchanged" is not a target to validate.
+    expect(prismaMock.authorStylesheet.findUnique).not.toHaveBeenCalled();
   });
 
   it('returns 403 without admin permission', async () => {
