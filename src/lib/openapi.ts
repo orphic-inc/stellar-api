@@ -280,8 +280,15 @@ registry.registerPath({
           schema: z.object({
             installed: z.boolean(),
             registrationStatus: z.enum(['open', 'invite', 'closed']),
+            // Asymmetric on purpose (#333): the handler flattens configWarnings
+            // to `.message`, but setupChecklist keeps its `id` because that is
+            // what a dismissal writes to `dismissedLaunchChecklist`. Declaring
+            // both as string[] made generated clients type a field that never
+            // holds strings.
             configWarnings: z.array(z.string()),
-            setupChecklist: z.array(z.string())
+            setupChecklist: z.array(
+              z.object({ id: z.string(), message: z.string() })
+            )
           })
         }
       }
