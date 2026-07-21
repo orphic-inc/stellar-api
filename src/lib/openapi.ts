@@ -451,7 +451,8 @@ const ProfilePercentile = registry.register(
   z.object({
     percentile: z.number(),
     rank: z.number(),
-    total: z.number()
+    total: z.number(),
+    raw: z.number().nullable()
   })
 );
 
@@ -462,7 +463,9 @@ const ProfilePercentiles = registry.register(
     consumed: ProfilePercentile,
     contributions: ProfilePercentile,
     forumPosts: ProfilePercentile,
-    requestsFilled: ProfilePercentile
+    requestsFilled: ProfilePercentile,
+    artistsAdded: ProfilePercentile,
+    overall: z.number()
   })
 );
 

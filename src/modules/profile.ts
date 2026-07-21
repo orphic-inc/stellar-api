@@ -116,6 +116,12 @@ type ProfilePercentile = {
   percentile: number;
   rank: number;
   total: number;
+  /**
+   * The contributing value behind the percentile. `null` when the viewer's
+   * paranoia gate hides that stat outright (contributed/consumed bytes) — the
+   * percentile itself stays visible, as it always has.
+   */
+  raw: number | null;
 };
 
 type ProfilePercentileSummary = {
@@ -124,6 +130,9 @@ type ProfilePercentileSummary = {
   contributions: ProfilePercentile;
   forumPosts: ProfilePercentile;
   requestsFilled: ProfilePercentile;
+  artistsAdded: ProfilePercentile;
+  /** Weighted blend of the dimensions above, scaled by ratio. See OVERALL_WEIGHTS. */
+  overall: number;
 };
 
 type ProfileStaffPmSummary = {
@@ -593,10 +602,11 @@ const buildDonorPresentation = (
   return presentation;
 };
 
-const buildPercentile = async (
+const buildPercentile = (
   totalUsers: number,
-  aboveCount: number
-): Promise<ProfilePercentile> => {
+  aboveCount: number,
+  raw: number | null
+): ProfilePercentile => {
   const rank = aboveCount + 1;
   const percentile =
     totalUsers <= 1
@@ -606,13 +616,50 @@ const buildPercentile = async (
   return {
     percentile,
     rank,
-    total: totalUsers
+    total: totalUsers,
+    raw
   };
 };
 
-const getPercentileSummary = async (
-  user: ProfileUserRecord,
-  activitySummary: ProfileActivitySummary
+/**
+ * Provisional weights for the Overall composite. They encode what the site wants
+ * to reward: contributing the catalog outweighs consuming it, and forum/metadata
+ * activity is a tiebreaker rather than a route to the top. A bounty-style
+ * dimension has no analog until the deferred economy lands.
+ */
+const OVERALL_WEIGHTS = {
+  contributed: 15,
+  consumed: 8,
+  contributions: 25,
+  requestsFilled: 2,
+  forumPosts: 1,
+  artistsAdded: 1
+} as const;
+
+/**
+ * Weighted mean of the dimension percentiles, scaled by `min(ratio, 1)` so a
+ * member who consumes more than they contribute can't ride volume to the top.
+ * Pure so the composite is testable without a DB.
+ */
+export const buildOverallPercentile = (
+  dimensions: Record<keyof typeof OVERALL_WEIGHTS, { percentile: number }>,
+  ratio: number
+): number => {
+  const totalWeight = Object.values(OVERALL_WEIGHTS).reduce((a, b) => a + b, 0);
+  const weighted = (
+    Object.keys(OVERALL_WEIGHTS) as Array<keyof typeof OVERALL_WEIGHTS>
+  ).reduce(
+    (sum, key) => sum + dimensions[key].percentile * OVERALL_WEIGHTS[key],
+    0
+  );
+
+  return Math.round((weighted / totalWeight) * Math.min(ratio, 1));
+};
+
+export const getPercentileSummary = async (
+  user: Pick<ProfileUserRecord, 'id' | 'contributed' | 'consumed'>,
+  activitySummary: ProfileActivitySummary,
+  visibility: { canSeeContributed: boolean; canSeeConsumed: boolean }
 ): Promise<ProfilePercentileSummary> => {
   const [
     totalRow,
@@ -620,7 +667,9 @@ const getPercentileSummary = async (
     downloadedRows,
     contributionsRows,
     forumRows,
-    fillsRows
+    fillsRows,
+    artistsAddedRow,
+    artistsRows
   ] = await Promise.all([
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
@@ -672,32 +721,85 @@ const getPercentileSummary = async (
         GROUP BY u."id"
       ) ranked
       WHERE ranked.metric_count > ${activitySummary.requestsFilled}
+    `,
+    // An artist has no creator column; the author of its earliest history row is
+    // the member who added it (see createArtist in modules/artist.ts).
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
+        FROM "artist_histories" h
+        ORDER BY h."artistId", h."id" ASC
+      ) creators
+      WHERE creators."editedBy" = ${user.id}
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT u."id", COUNT(creators."artistId")::bigint AS metric_count
+        FROM "users" u
+        LEFT JOIN (
+          SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
+          FROM "artist_histories" h
+          ORDER BY h."artistId", h."id" ASC
+        ) creators ON creators."editedBy" = u."id"
+        WHERE u."disabled" = false
+        GROUP BY u."id"
+      ) ranked
+      WHERE ranked.metric_count > (
+        SELECT COUNT(*)::bigint
+        FROM (
+          SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
+          FROM "artist_histories" h
+          ORDER BY h."artistId", h."id" ASC
+        ) mine
+        WHERE mine."editedBy" = ${user.id}
+      )
     `
   ]);
 
   const totalUsers = Number(totalRow[0]?.count ?? BigInt(0));
+  const artistsAddedCount = Number(artistsAddedRow[0]?.count ?? BigInt(0));
 
-  const [contributed, consumed, contributions, forumPosts, requestsFilled] =
-    await Promise.all([
-      buildPercentile(totalUsers, Number(uploadedRows[0]?.count ?? BigInt(0))),
-      buildPercentile(
-        totalUsers,
-        Number(downloadedRows[0]?.count ?? BigInt(0))
-      ),
-      buildPercentile(
-        totalUsers,
-        Number(contributionsRows[0]?.count ?? BigInt(0))
-      ),
-      buildPercentile(totalUsers, Number(forumRows[0]?.count ?? BigInt(0))),
-      buildPercentile(totalUsers, Number(fillsRows[0]?.count ?? BigInt(0)))
-    ]);
+  const dimensions = {
+    contributed: buildPercentile(
+      totalUsers,
+      Number(uploadedRows[0]?.count ?? BigInt(0)),
+      visibility.canSeeContributed ? Number(user.contributed) : null
+    ),
+    consumed: buildPercentile(
+      totalUsers,
+      Number(downloadedRows[0]?.count ?? BigInt(0)),
+      visibility.canSeeConsumed ? Number(user.consumed) : null
+    ),
+    contributions: buildPercentile(
+      totalUsers,
+      Number(contributionsRows[0]?.count ?? BigInt(0)),
+      activitySummary.contributions
+    ),
+    forumPosts: buildPercentile(
+      totalUsers,
+      Number(forumRows[0]?.count ?? BigInt(0)),
+      activitySummary.forumPosts
+    ),
+    requestsFilled: buildPercentile(
+      totalUsers,
+      Number(fillsRows[0]?.count ?? BigInt(0)),
+      activitySummary.requestsFilled
+    ),
+    artistsAdded: buildPercentile(
+      totalUsers,
+      Number(artistsRows[0]?.count ?? BigInt(0)),
+      artistsAddedCount
+    )
+  };
 
   return {
-    contributed,
-    consumed,
-    contributions,
-    forumPosts,
-    requestsFilled
+    ...dimensions,
+    overall: buildOverallPercentile(
+      dimensions,
+      computeRatio(user.contributed, user.consumed)
+    )
   };
 };
 
@@ -851,7 +953,10 @@ const buildProfileView = async (
     canSeeDownloaded,
     viewer.isStaff // contagion drag + suspect flag are staff-only (ADR-0004 §3)
   );
-  const percentiles = await getPercentileSummary(user, activitySummary);
+  const percentiles = await getPercentileSummary(user, activitySummary, {
+    canSeeContributed: canSeeUploaded,
+    canSeeConsumed: canSeeDownloaded
+  });
   const donorPresentation = buildDonorPresentation(user);
   const derivedRatio = computeRatio(user.contributed, user.consumed);
 

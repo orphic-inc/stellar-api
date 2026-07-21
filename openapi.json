@@ -584,12 +584,17 @@
           },
           "total": {
             "type": "number"
+          },
+          "raw": {
+            "type": "number",
+            "nullable": true
           }
         },
         "required": [
           "percentile",
           "rank",
-          "total"
+          "total",
+          "raw"
         ]
       },
       "ProfilePercentiles": {
@@ -609,6 +614,12 @@
           },
           "requestsFilled": {
             "$ref": "#/components/schemas/ProfilePercentile"
+          },
+          "artistsAdded": {
+            "$ref": "#/components/schemas/ProfilePercentile"
+          },
+          "overall": {
+            "type": "number"
           }
         },
         "required": [
@@ -616,7 +627,9 @@
           "consumed",
           "contributions",
           "forumPosts",
-          "requestsFilled"
+          "requestsFilled",
+          "artistsAdded",
+          "overall"
         ]
       },
       "ProfileCollageShelf": {

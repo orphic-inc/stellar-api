@@ -643,11 +643,13 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 0
       },
       percentiles: {
-        contributed: { percentile: 100, rank: 1, total: 1 },
-        consumed: { percentile: 100, rank: 1, total: 1 },
-        contributions: { percentile: 100, rank: 1, total: 1 },
-        forumPosts: { percentile: 100, rank: 1, total: 1 },
-        requestsFilled: { percentile: 100, rank: 1, total: 1 }
+        contributed: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        consumed: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        contributions: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        forumPosts: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        requestsFilled: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        artistsAdded: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        overall: 100
       },
       donorPresentation: null,
       collageShelves: {
@@ -732,11 +734,13 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 8
       },
       percentiles: {
-        contributed: { percentile: 90, rank: 2, total: 10 },
-        consumed: { percentile: 80, rank: 3, total: 10 },
-        contributions: { percentile: 70, rank: 4, total: 10 },
-        forumPosts: { percentile: 60, rank: 5, total: 10 },
-        requestsFilled: { percentile: 50, rank: 6, total: 10 }
+        contributed: { percentile: 90, rank: 2, total: 10, raw: 900 },
+        consumed: { percentile: 80, rank: 3, total: 10, raw: 800 },
+        contributions: { percentile: 70, rank: 4, total: 10, raw: 1 },
+        forumPosts: { percentile: 60, rank: 5, total: 10, raw: 5 },
+        requestsFilled: { percentile: 50, rank: 6, total: 10, raw: 3 },
+        artistsAdded: { percentile: 40, rank: 7, total: 10, raw: 2 },
+        overall: 72
       },
       donorPresentation: null,
       collageShelves: {
@@ -803,11 +807,13 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 0
       },
       percentiles: {
-        contributed: { percentile: 10, rank: 9, total: 10 },
-        consumed: { percentile: 10, rank: 9, total: 10 },
-        contributions: { percentile: 10, rank: 9, total: 10 },
-        forumPosts: { percentile: 10, rank: 9, total: 10 },
-        requestsFilled: { percentile: 10, rank: 9, total: 10 }
+        contributed: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        consumed: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        contributions: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        forumPosts: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        requestsFilled: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        artistsAdded: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        overall: 10
       },
       donorPresentation: null,
       collageShelves: {
