@@ -25,6 +25,10 @@ export const DEFAULT_RANKS = [
     color: '',
     badge: '',
     personalCollageLimit: 1,
+    // Asset upload scales up the ladder like personalCollageLimit but starts at
+    // zero (#342): a brand-new User has no reason to upload a stylesheet asset,
+    // so they upload nothing. 0 = none, null = unlimited (staff).
+    assetLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -41,6 +45,7 @@ export const DEFAULT_RANKS = [
     color: '',
     badge: '',
     personalCollageLimit: 1,
+    assetLimit: 1,
     // One step past User: unlocks advanced discovery. Identity stays understated
     // (no color/badge) — the first earned rung, not yet a "notable" tier.
     permissions: {
@@ -60,6 +65,7 @@ export const DEFAULT_RANKS = [
     color: '#e2a822',
     badge: '',
     personalCollageLimit: 2,
+    assetLimit: 2,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -78,6 +84,7 @@ export const DEFAULT_RANKS = [
     color: '#3a9bd9',
     badge: '',
     personalCollageLimit: 3,
+    assetLimit: 3,
     // Top of the "earns new powers" range: adds elevated user search and collage
     // management. The auto ladder above Elite is prestige — identity, not new perms.
     permissions: {
@@ -102,6 +109,7 @@ export const DEFAULT_RANKS = [
     color: '#9b59d0',
     badge: '',
     personalCollageLimit: 4,
+    assetLimit: 4,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -121,6 +129,7 @@ export const DEFAULT_RANKS = [
     color: '#c061e8',
     badge: '',
     personalCollageLimit: 5,
+    assetLimit: 5,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -140,6 +149,7 @@ export const DEFAULT_RANKS = [
     color: '#d4a5ff',
     badge: '',
     personalCollageLimit: 6,
+    assetLimit: 6,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -159,6 +169,10 @@ export const DEFAULT_RANKS = [
     color: '#e22a2a',
     badge: '',
     personalCollageLimit: 3,
+    // Staff and SysOp are uncapped (null): they curate site fixtures and have no
+    // reason to hit an upload ceiling. Diverges from personalCollageLimit, which
+    // gives staff a concrete number — assets are the resource we want unlimited.
+    assetLimit: null,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -194,6 +208,7 @@ export const DEFAULT_RANKS = [
     color: '#a0d468',
     badge: '',
     personalCollageLimit: 4,
+    assetLimit: null,
     permissions: ALL_PERMISSIONS
   }
 ] as const;
@@ -414,6 +429,7 @@ export async function seedRanks(client: PrismaClient): Promise<void> {
         color: rank.color,
         badge: rank.badge,
         personalCollageLimit: rank.personalCollageLimit,
+        assetLimit: rank.assetLimit,
         permissions: rank.permissions
       }
     });

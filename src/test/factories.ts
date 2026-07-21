@@ -52,6 +52,7 @@ export function makeUserRank(
     uploadRequired: 0,
     personalCollageLimit: 0,
     authorStylesheetLimit: 0,
+    assetLimit: null,
     displayStaff: false,
     staffGroupId: null
   };

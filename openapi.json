@@ -243,6 +243,10 @@
               },
               "authorStylesheetLimit": {
                 "type": "integer"
+              },
+              "assetLimit": {
+                "type": "integer",
+                "nullable": true
               }
             },
             "required": [
@@ -2218,6 +2222,33 @@
           "createdBy"
         ]
       },
+      "AssetUploadResponse": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hash",
+          "url",
+          "mime",
+          "size",
+          "kind"
+        ]
+      },
       "Forum": {
         "type": "object",
         "properties": {
@@ -3661,6 +3692,10 @@
           },
           "authorStylesheetLimit": {
             "type": "integer"
+          },
+          "assetLimit": {
+            "type": "integer",
+            "nullable": true
           },
           "displayStaff": {
             "type": "boolean"
@@ -8221,8 +8256,66 @@
               }
             }
           },
+          "401": {
+            "description": "A member-uploaded asset fetched without authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/asset": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored asset address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty, oversize, non-image, or misdeclared payload, or the rank asset limit is reached (or zero)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
@@ -11458,6 +11551,11 @@
                     "type": "integer",
                     "minimum": 0
                   },
+                  "assetLimit": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
                   "displayStaff": {
                     "type": "boolean"
                   },
@@ -11798,6 +11896,11 @@
                   },
                   "authorStylesheetLimit": {
                     "type": "integer",
+                    "minimum": 0
+                  },
+                  "assetLimit": {
+                    "type": "integer",
+                    "nullable": true,
                     "minimum": 0
                   },
                   "displayStaff": {

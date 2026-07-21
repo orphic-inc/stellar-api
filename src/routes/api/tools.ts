@@ -88,6 +88,7 @@ const formatRank = (
   badge: r.badge,
   personalCollageLimit: r.personalCollageLimit,
   authorStylesheetLimit: r.authorStylesheetLimit,
+  assetLimit: r.assetLimit,
   displayStaff: r.displayStaff,
   staffGroupId: r.staffGroupId,
   primaryUserCount: r._count.users,
@@ -151,6 +152,7 @@ router.post(
       badge,
       personalCollageLimit,
       authorStylesheetLimit,
+      assetLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<CreateRankInput>(res);
@@ -188,6 +190,10 @@ router.post(
           badge: badge ?? '',
           personalCollageLimit: personalCollageLimit ?? 0,
           authorStylesheetLimit: authorStylesheetLimit ?? 0,
+          // Tri-state: undefined → default 0 (none); an explicit null → unlimited;
+          // N → cap. `?? 0` would collapse null to none, silently downgrading an
+          // uncapped rank, so branch on undefined instead.
+          assetLimit: assetLimit === undefined ? 0 : assetLimit,
           displayStaff: displayStaff ?? false,
           staffGroupId: effectiveStaffGroupId
         },
@@ -241,6 +247,7 @@ router.put(
       badge,
       personalCollageLimit,
       authorStylesheetLimit,
+      assetLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<UpdateRankInput>(res);
@@ -283,6 +290,9 @@ router.put(
           ...(authorStylesheetLimit !== undefined && {
             authorStylesheetLimit
           }),
+          // `!== undefined` keeps an explicit null (unlimited) while skipping an
+          // absent field — the tri-state the create path handles differently.
+          ...(assetLimit !== undefined && { assetLimit }),
           ...(displayStaff !== undefined && { displayStaff }),
           ...(effectiveStaffGroupId !== undefined && {
             staffGroupId: effectiveStaffGroupId

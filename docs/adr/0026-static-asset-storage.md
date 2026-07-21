@@ -56,6 +56,22 @@ The migration of `proton`/`postmod` to api-canonical `/css` fixtures — the fir
 
 So the split stays temporary-by-design as this ADR predicted, with a named blocker rather than an open question.
 
+## Amendment (2026-07-21) — Phase 2 landed (#342)
+
+The deferred upload path, `visibility`, and lifecycle sweep ship in #342 — but the shape below diverged from the Phase-1 sketch after a design grilling, and the divergences are the point of this amendment.
+
+- **Scope narrowed to theme imagery.** Avatars were pulled out to their own issue (#396). They had ridden along as a #361 fix, which made this a part-infra, part-security change reviewed under one lens; worse, the avatar work made an `img-src 'self'` CSP _reachable_ without actually closing #361 (no CSP tightening, no migration of existing hotlinked avatars). Half a fix in the wrong issue. So Phase 2's only consumer is the author uploading a background image for a stylesheet.
+
+- **No `visibility` column — delivery is derived from `ownerId`.** The Phase-1 note anticipated an explicit visibility column. With avatars gone, `ownerId` null ↔ public (site fixture) and `ownerId` set ↔ member-only is a _total, exceptionless_ mapping, so a separate column would only let the two drift and would make illegal states (`public + owned`, `members + unowned`) representable. The serve route reads `ownerId`: null serves unauthenticated with a `public` immutable cache; set requires auth and caches `private` so a shared cache cannot hand a member's bytes to an anonymous fetch. An owner-private tier is deferred with avatars — nothing produces one yet. When Phase 3 brings a case where policy ≠ provenance, the column is an additive migration then.
+
+- **Quota is a count (`UserRank.assetLimit`), not a byte budget.** The issue named the `authorStylesheetLimit` mould, which is a count; the per-asset 2 MB cap already bounds total bytes, so a count is the idiom-matching, staff-legible unit ("20 images", not "10485760 bytes"). Its semantic is deliberately the **opposite** of `authorStylesheetLimit`'s: `0` = none, `null` = unlimited, `N` = cap. That inversion is forced, not chosen — a brand-new User must be able to hold _no_ upload allowance, which `0 = unlimited` cannot express. The allowance scales up the rank ladder like `personalCollageLimit` (User `0`, Member `1`, … Stellarige `6`) with staff/SysOp uncapped (`null`). A brand-new member has no reason to upload a stylesheet asset, so they cannot; the gate lives in the quota, not a separate permission.
+
+- **Upload is image-only; fonts stay seeder-only.** `POST /api/asset` takes a raw body (not multipart — the payload is one binary identified by magic bytes, so a filename and a parser dependency buy nothing) and stores it through `uploadAsset`, which enforces `image/*` on top of `validateAsset`. This is load-bearing, not cosmetic: `cssValidate` permits `url(/api/asset/<hash>)` inside `@font-face`, so a member who could store font bytes under any kind would resurrect the #343 redistribution liability as _unbounded, user-generated_ content. Image-only keeps fonts to what staff deliberately ship.
+
+- **Orphan sweep, not reference counting.** A daily job (`assetSweepJob`) scans `AuthorStylesheet.source` for `/api/asset/<hash>` and deletes member-owned assets that are unreferenced and past a 24h grace window; site-owned assets are never swept. References live inside freeform CSS text, so extracting them means parsing that text regardless — a reference table would just cache that extraction behind a write path, which is where drift enters and whose failure mode is deleting a _live_ asset. The grace window covers the gap between an upload and the sheet that will reference it.
+
+**Still open after Phase 2:** the `proton`/`postmod` theme migration (#341, #343) and avatars + the #361 CSP work (#396).
+
 ## Follow-up
 
-Phase 1 shipped under #290. The upload path, lifecycle sweep, and theme migration remain tracked separately.
+Phase 1 shipped under #290; Phase 2 (upload, ownerId-derived delivery, sweep, count quota) under #342. The theme migration (#341/#343) and avatars/#361 (#396) remain tracked separately.

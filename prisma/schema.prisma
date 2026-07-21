@@ -330,6 +330,14 @@ model UserRank {
   uploadRequired        Int                 @default(0)
   personalCollageLimit  Int                 @default(0)
   authorStylesheetLimit Int                 @default(0)
+  /// How many stylesheet assets a member of this rank may upload (#342). NOTE:
+  /// the semantic is the OPPOSITE of authorStylesheetLimit above — here `0`
+  /// means none, `null` means unlimited, and a positive N is the cap. The
+  /// integer says exactly what it counts. A brand-new User uploads nothing; the
+  /// allowance scales up the ladder like personalCollageLimit; staff are null
+  /// (uncapped). Default 0, so a rank created without an explicit value can
+  /// upload nothing rather than everything.
+  assetLimit            Int?                @default(0)
   displayStaff          Boolean             @default(false)
   staffGroupId          Int?
   staffGroup            StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)

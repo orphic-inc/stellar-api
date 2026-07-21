@@ -186,7 +186,8 @@ const AuthUser = registry.register(
       badge: z.string().optional(),
       permissions: z.record(z.string(), z.boolean()).optional(),
       personalCollageLimit: z.number().int().optional(),
-      authorStylesheetLimit: z.number().int().optional()
+      authorStylesheetLimit: z.number().int().optional(),
+      assetLimit: z.number().int().nullable().optional()
     })
   })
 );
@@ -1831,7 +1832,8 @@ registry.registerPath({
 });
 
 // Content-addressed binary delivery (ADR-0026). Addressed by sha256 rather than
-// row id, and unauthenticated — see the route for why. Body is the raw asset.
+// row id. Site-shipped assets (ownerId null) serve unauthenticated; member
+// uploads require auth — the tier is derived from ownership. Body is the raw asset.
 registry.registerPath({
   method: 'get',
   path: '/asset/{hash}',
@@ -1847,8 +1849,52 @@ registry.registerPath({
       description: 'Malformed content address (not a 64-char lowercase sha256)',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'A member-uploaded asset fetched without authentication',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+const AssetUploadResponse = registry.register(
+  'AssetUploadResponse',
+  z.object({
+    hash: z.string(),
+    url: z.string(),
+    mime: z.string(),
+    size: z.number(),
+    kind: z.string()
+  })
+);
+
+// Authenticated, quota-gated upload (ADR-0026 Phase 2, #342). The body is the
+// raw image, identified by magic bytes; the declared Content-Type is checked
+// against them, never trusted. Only images (fonts stay seeder-only, #343).
+registry.registerPath({
+  method: 'post',
+  path: '/asset',
+  tags: ['Assets'],
+  request: {
+    body: {
+      content: { 'application/octet-stream': { schema: z.string() } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'The stored asset address',
+      content: { 'application/json': { schema: AssetUploadResponse } }
+    },
+    400: {
+      description:
+        'Empty, oversize, non-image, or misdeclared payload, or the rank asset limit is reached (or zero)',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -3083,6 +3129,7 @@ const UserRank = registry.register(
     badge: z.string().optional(),
     personalCollageLimit: z.number().int().optional(),
     authorStylesheetLimit: z.number().int().optional(),
+    assetLimit: z.number().int().nullable().optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().nullable().optional(),
     userCount: z.number().optional()

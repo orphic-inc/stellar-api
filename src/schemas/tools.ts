@@ -20,6 +20,10 @@ export const createRankSchema = z.object({
   badge: z.string().optional(),
   personalCollageLimit: z.number().int().min(0).optional(),
   authorStylesheetLimit: z.number().int().min(0).optional(),
+  // #342 semantic: 0 = no uploads, a positive N = the cap, null = unlimited.
+  // Nullable, unlike the count-only sibling limits above, because null is the
+  // uncapped tier staff hold.
+  assetLimit: z.number().int().min(0).nullable().optional(),
   displayStaff: z.boolean().optional(),
   staffGroupId: z.number().int().positive().nullable().optional()
 });
@@ -35,6 +39,7 @@ export const updateRankSchema = z
     badge: z.string().optional(),
     personalCollageLimit: z.number().int().min(0).optional(),
     authorStylesheetLimit: z.number().int().min(0).optional(),
+    assetLimit: z.number().int().min(0).nullable().optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().positive().nullable().optional()
   })
