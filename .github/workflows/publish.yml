@@ -163,6 +163,12 @@ jobs:
 
   publish:
     needs: [test, integration, smoke]
+    # Skipped on PRs, where every step below was a no-op: the build was discarded
+    # unpushed and the GHCR login bought nothing. This does NOT leave the image
+    # unvalidated pre-merge — `smoke` builds the same Dockerfile on PRs and boots
+    # it against a fresh DB, which is the gap stellar-ui#186 reports on that repo.
+    # Keep `smoke` running on pull_request or this becomes that bug.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -192,6 +198,6 @@ jobs:
         with:
           context: .
           provenance: false
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
