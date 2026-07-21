@@ -25,6 +25,7 @@ import {
 import { seedGoldenRules } from './goldenRules';
 import { seedAssetFixtures } from './assetFixtures';
 import { seedStylesheetFixtures } from './stylesheetFixtures';
+import { seedWikiFixtures } from './wikiFixtures';
 
 export async function seedAll(client: PrismaClient): Promise<void> {
   await seedRanks(client);
@@ -38,4 +39,7 @@ export async function seedAll(client: PrismaClient): Promise<void> {
   // to exist first — it takes the base User rank).
   const systemUserId = await seedSystemUser(client);
   await seedStylesheetFixtures(client, systemUserId);
+  // The wiki pages the Golden Rules link to. Also System-owned, so it needs the
+  // same predecessor; without it the seeded canon ships dead `/wiki/...` links.
+  await seedWikiFixtures(client, systemUserId);
 }

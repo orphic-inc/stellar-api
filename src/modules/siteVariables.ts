@@ -45,11 +45,18 @@ export async function resolveSiteVariables(
     autofp_article: `${kb}/autosnatch`,
     bugs_article: `${kb}/security-disclosure`,
     exploit_article: `${kb}/exploits`,
-    // internal app-feature references (existing docs / UI routes)
+    // internal app-feature references — seeded WikiPage rows (`wikiFixtures.ts`).
+    // Anything added here needs a fixture, or the canon ships another dead link.
     invite_article: '/wiki/invite',
     classes_article: '/wiki/classes',
     requests_article: '/wiki/requests',
     interfaces_article: '/wiki/interfaces',
+    // sub-ruleset pages. Forum/Staff are member-only, so they live in the
+    // auth-gated in-app wiki; IRC conduct is public because the Interview that
+    // gates registration happens on IRC, and applicants have no account (#126).
+    forum_rules_article: '/wiki/forum-rules',
+    staff_rules_article: '/wiki/staff-rules',
+    irc_rules_article: `${kb}/irc/etiquette`,
     // the seeded Bugs forum (id-based; resolved by name)
     bugs_forum: bugsForum ? `/forums/${bugsForum.id}` : '/forums'
   };

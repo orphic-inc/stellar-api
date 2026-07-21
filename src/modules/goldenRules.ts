@@ -135,19 +135,19 @@ export const GOLDEN_RULES: readonly GoldenRuleDef[] = [
         code: 'respect-staff-decisions',
         title: 'Do not disrespect staff decisions',
         description:
-          'Disagreements must be discussed privately with the deciding moderator. If the moderator has retired or is unavailable, you may send a ${staffpm}. Do not contact multiple moderators hoping to find one amenable to your cause; however, you may contact a site administrator if you require a second opinion. Options for contacting staff include private message, Staff PM, and ${disabled_channel} on ${irc}.'
+          'Disagreements must be discussed privately with the deciding moderator. If the moderator has retired or is unavailable, you may send a ${staffpm}. Do not contact multiple moderators hoping to find one amenable to your cause; however, you may contact a site administrator if you require a second opinion. Options for contacting staff include private message, Staff PM, and ${disabled_channel} on ${irc}. Staff are bound by the [Staff Rules](${staff_rules_article}) in turn; report a breach of those the same way you would report anything else.'
       },
       {
         code: 'no-impersonate-staff',
         title: 'Do not impersonate staff',
         description:
-          'Impersonating staff or official service accounts (e.g., stellar-irc-bridge) on-site, off-site, or on IRC is prohibited. Deceptively misrepresenting staff decisions is also prohibited.'
+          'Impersonating staff or official service accounts (e.g., stellar-irc-bridge) on-site, off-site, or on IRC is prohibited. Deceptively misrepresenting staff decisions is also prohibited. Conduct on the IRC network is additionally governed by the [IRC Rules](${irc_rules_article}).'
       },
       {
         code: 'no-backseat-moderate',
         title: 'Do not backseat moderate',
         description:
-          '"Backseat moderation" occurs when users police other users. Confronting, provoking, or chastising users suspected of violating rules—or users suspected of submitting reports—is prohibited. Submit a report if you see a rule violation.'
+          '"Backseat moderation" occurs when users police other users. Confronting, provoking, or chastising users suspected of violating rules—or users suspected of submitting reports—is prohibited. Submit a report if you see a rule violation. The [Forum Rules](${forum_rules_article}) cover how threads are moderated and what gets a post removed.'
       },
       {
         code: 'no-request-events',

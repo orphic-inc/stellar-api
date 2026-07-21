@@ -2,9 +2,9 @@
  * seedAll is a thin orchestrator, but it owns two real invariants the individual
  * seeders can't enforce alone:
  *
- *   - the System user must be seeded *before* the stylesheet fixtures it owns,
- *     and its returned id must be the one the fixtures are authored under — a
- *     reorder or a wrong id would seed orphaned fixtures;
+ *   - the System user must be seeded *before* the fixtures it owns — stylesheets
+ *     and wiki pages alike — and its returned id must be the one they are
+ *     authored under; a reorder or a wrong id would seed orphaned fixtures;
  *   - theme assets must be stored *before* the stylesheets referencing them
  *     (#341), or an asset-bearing theme is briefly served with dangling
  *     `/api/asset` targets.
@@ -21,6 +21,7 @@ const seedSystemUser = jest.fn();
 const seedGoldenRules = jest.fn();
 const seedStylesheetFixtures = jest.fn();
 const seedAssetFixtures = jest.fn();
+const seedWikiFixtures = jest.fn();
 
 const SYSTEM_USER_ID = 4242;
 
@@ -38,6 +39,9 @@ jest.mock('./assetFixtures', () => ({
 }));
 jest.mock('./stylesheetFixtures', () => ({
   seedStylesheetFixtures: (...a: unknown[]) => seedStylesheetFixtures(...a)
+}));
+jest.mock('./wikiFixtures', () => ({
+  seedWikiFixtures: (...a: unknown[]) => seedWikiFixtures(...a)
 }));
 
 import { seedAll } from './seedAll';
@@ -61,7 +65,8 @@ describe('seedAll', () => {
       seedGoldenRules,
       seedSystemUser,
       seedAssetFixtures,
-      seedStylesheetFixtures
+      seedStylesheetFixtures,
+      seedWikiFixtures
     ]) {
       expect(fn).toHaveBeenCalledTimes(1);
       expect(fn.mock.calls[0][0]).toBe(client);
@@ -73,8 +78,12 @@ describe('seedAll', () => {
     expect(seedSystemUser.mock.invocationCallOrder[0]).toBeLessThan(
       seedStylesheetFixtures.mock.invocationCallOrder[0]
     );
+    expect(seedSystemUser.mock.invocationCallOrder[0]).toBeLessThan(
+      seedWikiFixtures.mock.invocationCallOrder[0]
+    );
     // Fixtures are authored under exactly the id seedSystemUser returned.
     expect(seedStylesheetFixtures).toHaveBeenCalledWith(client, SYSTEM_USER_ID);
+    expect(seedWikiFixtures).toHaveBeenCalledWith(client, SYSTEM_USER_ID);
   });
 
   it('stores theme assets before the stylesheets that reference them', async () => {

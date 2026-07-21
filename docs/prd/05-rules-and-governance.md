@@ -4,7 +4,7 @@
 **Decisions:** [ADR-0001 granular permissions](../adr/0001-granular-permission-checks.md) (enforcement), [ADR-0002 community-health-pulse](../adr/0002-community-health-pulse.md) (standing trend), [ADR-0004 standing → CRS + warnings/bans](../adr/0004-standing-warnings-bans.md)
 **Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · **PRD-05 Rules & Governance** · PRD-06 Ratio · PRD-07 Donations · PRD-08 Collages & Cover Art · PRD-09 Golden-Rules Surfacing
 
-> The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose. The canonical prose lives in two mirrors: the in-app `RulesPage` (rendered per-site with `${...}` placeholders) and the repo's [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) (the prose home). The 7-rule **model** stays here in the PRD.
+> The wide opus. Governs behavior across the site and Communities, and is a backbone of the CRS. Rules are **composable and CRS-weighted**; this PRD defines the model, not the full rule prose. The canonical prose lives in two mirrors: the in-app `RulesPage` (rendered per-site with `${...}` placeholders) and the repo's [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) (the prose home). The 6-rule **model** stays here in the PRD.
 
 ## The Golden Rules (6 — canonical, site-wide, immutable)
 
@@ -45,10 +45,10 @@ GoldenRule (site-wide, 1..6)
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **GoldenRules**    | the 6 above (canonical, immutable — seeded from `CODE_OF_CONDUCT.md`, surfaced via PRD-09)                                                                                                         |
 | **CommunityRules** | composable per-Community tree (above) — leans on `Community`, `UserRank`, `RulesPage`                                                                                                              |
-| **StaffRules**     | staff conduct + the +50 CRS/week-served signal (cross-ref PRD-01) — `StaffGroup`, `UserRank` — [documented as built](../governance/forum-and-staff-rules.md#staffrules-built)                      |
-| **InterviewRules** | recruitment/interview conduct — net-new                                                                                                                                                            |
-| **ForumRules**     | governance for the **already-built** forum (class-gates + `RulesPage` + rule tree; `ForumSpecificRule` is a stub) — [documented as built](../governance/forum-and-staff-rules.md#forumrules-built) |
-| **IRCRules**       | conduct on the IRC network — **rules here; the IRC feature itself is PRD-02**                                                                                                                      |
+| **StaffRules**     | staff conduct — wiki page `/wiki/staff-rules` (`${staff_rules_article}`), seeded here; enforcement is `StaffGroup`/`UserRank` + ADR-0001 permissions                                               |
+| **InterviewRules** | recruitment/interview conduct — public wiki (korin.pink), `${interview_article}`; applicants have no account, so it cannot live behind the login                                                   |
+| **ForumRules**     | forum conduct — wiki page `/wiki/forum-rules` (`${forum_rules_article}`), seeded here; enforcement is the class-gate system (`ForumSpecificRule` is a stub)                                        |
+| **IRCRules**       | conduct on the IRC network — public wiki (korin.pink), `${irc_rules_article}`; **the IRC feature itself is PRD-02**. IRC is the intake funnel under invite-only registration, so it is pre-account |
 
 ## Bridges to existing decisions
 
@@ -58,21 +58,25 @@ GoldenRule (site-wide, 1..6)
 
 ## Concept → code (descent map)
 
-| Concept                                                    | Lives in                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Forum + forum rules                                        | `forum.ts`, `ForumSpecificRule`, `RulesPage`, `Thread` (built)              |
-| Staff / ranks / reports                                    | `staff.ts`, `staffInbox.ts`, `reports.ts`, `StaffGroup`, `UserRank` (built) |
-| Permissions enforcement                                    | ADR-0001 — `requirePermission` / `hasPermission`                            |
-| Warnings/Bans, IRC rules, Community rule-tree, CRS weights | **net-new**                                                                 |
+| Concept                                         | Lives in                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| Forum + forum rules                             | `forum.ts`, `ForumSpecificRule`, `RulesPage`, `Thread` (built)              |
+| Staff / ranks / reports                         | `staff.ts`, `staffInbox.ts`, `reports.ts`, `StaffGroup`, `UserRank` (built) |
+| Permissions enforcement                         | ADR-0001 — `requirePermission` / `hasPermission`                            |
+| Forum/Staff rule prose                          | `wikiFixtures.ts` + `prisma/seed-wiki/` (built, #126)                       |
+| IRC / Interview rule prose                      | korin-pink public wiki (external)                                           |
+| Warnings/Bans, Community rule-tree, CRS weights | **net-new** (CRS deferred post-v1)                                          |
 
 ## Red-green descent targets
 
 1. ~~**Rule model** — a `Rule`/`SubRule` tree with a CRS-weight field + a pure `ruleImpact(...)` function (table-driven, mirroring the PRD-03 stylesheet slice).~~ **Shipped: [#123](https://github.com/orphic-inc/stellar-api/issues/123).** `Rule`/`SubRule` models (compliance/violation weights, `onDelete: Cascade`), the pure table-driven `ruleImpact()` (`src/modules/ruleImpact.ts` — standing-tier × per-node weights, magnitudes still TBD per the open questions below), and `GET /api/rules/tree`. The standing tier it consumes is computed by descent target #2 (ADR-0004).
 2. ~~**Warning/Ban model** + standing computation (ADR-0004).~~ **Standing computation shipped: [#124](https://github.com/orphic-inc/stellar-api/issues/124).** Pure `computeStanding()` (`src/modules/standing.ts`) rolls active `UserWarning` rows (accrual + expiry) and ban state into the 5-tier `Standing` that `ruleImpact()` (#1) consumes; surfaced on the profile read path (`PublicProfile.standing`). Thresholds are ADR-0004 placeholders (TBD). The fuller Warning/Ban _entity_ model (suspensions, escalation ladder, ban-evasion linkage) remains for ADR-0004 to finalize — this slice computes standing over the existing `UserWarning` + `banDate`.
-3. **Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new. **Documentation half shipped: [#126](https://github.com/orphic-inc/stellar-api/issues/126)** — ForumRules + StaffRules documented as built in [governance/forum-and-staff-rules.md](../governance/forum-and-staff-rules.md) (sub-rule list, the `ruleImpact()` weights as implemented, and an honest built-vs-stub map: `ForumSpecificRule` is a stub, the staff "+50 CRS/week-served" signal is not yet a CRS dimension). The IRCRules + InterviewRules specs remain net-new (HITL — content + weights need product decisions).
+3. ~~**Document ForumRules/StaffRules** against the built code; spec IRCRules + InterviewRules as net-new.~~ **Shipped: [#126](https://github.com/orphic-inc/stellar-api/issues/126)**, on a corrected model — the sub-rulesets are **wiki pages the canon links to**, not tree nodes carrying CRS weights. Forum + Staff pages are seeded here (`wikiFixtures.ts`, prose under `prisma/seed-wiki/`); IRC + Interview are public-wiki pages owned by korin-pink, because the Interview gates registration and applicants have no account. The same slice fixed the canon's dead links: `${invite_article}`, `${classes_article}`, `${requests_article}` and `${interfaces_article}` had always resolved to `/wiki/...` routes nothing created, and `STELLAR_PUBLIC_KB_BASE` pointed at a domain that does not exist. See [governance/forum-and-staff-rules.md](../governance/forum-and-staff-rules.md).
 4. ~~**Seed the GoldenRules + surface them**~~ — the 6-rule tree is seeded from `CODE_OF_CONDUCT.md` (`seedGoldenRules()`, drift-guarded), and `GET /api/rules/tree` ships the resolved `${...}` `variables` map for the UI. Spec: **[PRD-09](09-golden-rules-surfacing.md)** / **[ADR-0020](../adr/0020-rules-tree-variable-resolution.md)**.
 
 ## Open questions
+
+> **CRS rule-scoring is deferred until post-v1** (2026-07-21). The magnitude questions below stay open but are not v1 work, and nothing should be built against them meanwhile. State on `main`: `ruleImpact()` has zero production callers, `warnUser()` takes a free-text reason with no rule reference, and every weight column defaults to `0`. Wiring it needs a warning→rule linkage that does not exist.
 
 - CRS magnitudes: the ×10 pristine reward, the repeat-offender hammer curve, and per-rule/SubRule micro-impact values — TBD.
 - Warning/Ban model shape (entities, escalation, ban-evasion detection) — ADR-0004.

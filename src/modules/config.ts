@@ -66,14 +66,19 @@ export const http = {
 // Site identity + the canonical targets the Golden Rules `${...}` tokens resolve
 // to at read time (PRD-09 / ADR-0020). `GET /api/rules/tree` ships these as a
 // `variables` map the UI substitutes; the API single-sources the values here.
-// `publicKbBase` is the Stellar Public KB root — a public-facing wiki peer to IRC
-// that hosts the policy/guidance articles.
+// `publicKbBase` is the public wiki root — korin.pink's Astro Starlight site,
+// which hosts the guidance articles anyone may need BEFORE they have an account.
+// That "before" is load-bearing: registration is invite-only, access runs through
+// an Interview held on IRC, and every in-app wiki route sits behind requireAuth —
+// so onboarding and IRC prose cannot live in the in-app wiki without locking
+// applicants out of the front door. IRC is korin's system, so korin documents it
+// and we link (#126).
 export const site = {
   name: process.env.STELLAR_SITE_NAME || 'Stellar',
   ircUrl: process.env.STELLAR_IRC_URL || '/irc',
   disabledChannel: process.env.STELLAR_DISABLED_CHANNEL || '#disabled',
   staffPmPath: process.env.STELLAR_STAFFPM_PATH || '/inbox/staff',
-  publicKbBase: process.env.STELLAR_PUBLIC_KB_BASE || 'https://kb.stellargra.ph'
+  publicKbBase: process.env.STELLAR_PUBLIC_KB_BASE || 'https://korin.pink/wiki'
 };
 
 export const economy = {

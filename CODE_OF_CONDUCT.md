@@ -1,6 +1,6 @@
 # Code of Conduct — Stellar Golden Rules
 
-These are Stellar's six site-wide Golden Rules — the non-negotiable behavioral standard baked into the software. Per-Community rules may only ever be a subset or extension of these six. `${...}` placeholders (including the links below) are resolved at read time: `GET /api/rules/tree` ships a `variables` map the UI substitutes (see PRD-09 / ADR-0020); public guidance articles live in the Stellar Public KB. The rule _model_ lives in `docs/prd/05-rules-and-governance.md`; this file is the canonical prose, mirrored into the seed by a CI drift-guard.
+These are Stellar's six site-wide Golden Rules — the non-negotiable behavioral standard baked into the software. Per-Community rules may only ever be a subset or extension of these six. `${...}` placeholders (including the links below) are resolved at read time: `GET /api/rules/tree` ships a `variables` map the UI substitutes (see PRD-09 / ADR-0020). Links resolve to one of two places, decided by who needs to read them: member-facing pages live in the in-app wiki, while guidance anyone may need _before_ they have an account — onboarding, the Interview, IRC conduct — lives on the public wiki, because registration is invite-only and the in-app wiki is behind the login. The rule _model_ lives in `docs/prd/05-rules-and-governance.md`; this file is the canonical prose, mirrored into the seed by a CI drift-guard.
 
 **1.1 Do not create more than one account.** Users are allowed one account per lifetime. If your account is disabled, contact staff in ${disabled_channel} on ${irc}.
 
@@ -34,11 +34,11 @@ These are Stellar's six site-wide Golden Rules — the non-negotiable behavioral
 
 **4.2 Do not scam or defraud.** Scams (e.g., phishing) of any kind are prohibited.
 
-**4.3 Do not disrespect staff decisions.** Disagreements must be discussed privately with the deciding moderator. If the moderator has retired or is unavailable, you may send a ${staffpm}. Do not contact multiple moderators hoping to find one amenable to your cause; however, you may contact a site administrator if you require a second opinion. Options for contacting staff include private message, Staff PM, and ${disabled_channel} on ${irc}.
+**4.3 Do not disrespect staff decisions.** Disagreements must be discussed privately with the deciding moderator. If the moderator has retired or is unavailable, you may send a ${staffpm}. Do not contact multiple moderators hoping to find one amenable to your cause; however, you may contact a site administrator if you require a second opinion. Options for contacting staff include private message, Staff PM, and ${disabled_channel} on ${irc}. Staff are bound by the [Staff Rules](${staff_rules_article}) in turn; report a breach of those the same way you would report anything else.
 
-**4.4 Do not impersonate staff.** Impersonating staff or official service accounts (e.g., stellar-irc-bridge) on-site, off-site, or on IRC is prohibited. Deceptively misrepresenting staff decisions is also prohibited.
+**4.4 Do not impersonate staff.** Impersonating staff or official service accounts (e.g., stellar-irc-bridge) on-site, off-site, or on IRC is prohibited. Deceptively misrepresenting staff decisions is also prohibited. Conduct on the IRC network is additionally governed by the [IRC Rules](${irc_rules_article}).
 
-**4.5 Do not backseat moderate.** "Backseat moderation" occurs when users police other users. Confronting, provoking, or chastising users suspected of violating rules—or users suspected of submitting reports—is prohibited. Submit a report if you see a rule violation.
+**4.5 Do not backseat moderate.** "Backseat moderation" occurs when users police other users. Confronting, provoking, or chastising users suspected of violating rules—or users suspected of submitting reports—is prohibited. Submit a report if you see a rule violation. The [Forum Rules](${forum_rules_article}) cover how threads are moderated and what gets a post removed.
 
 **4.6 Do not request special events.** Special events (e.g., freepass, neutral pass, picks) are launched at the discretion of the staff. They do not adhere to a fixed schedule, and may not be requested by users.
 

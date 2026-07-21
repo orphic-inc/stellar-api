@@ -1,81 +1,93 @@
-# ForumRules & StaffRules — as built
+# Governance sub-rulesets — where rules live and what enforces them
 
-> PRD-05 descent target #3, documentation half ([#126](https://github.com/orphic-inc/stellar-api/issues/126)). This documents the **already-built** ForumRules and StaffRules against the code on `main` — it is reference, not a spec. The net-new IRCRules and InterviewRules sub-rulesets are the HITL half of #126 and are **not** covered here (they need product decisions on content + CRS weights before they can be spec'd). Parent: [PRD-05 Rules & Governance](../prd/05-rules-and-governance.md). Substrate shipped in [#123](https://github.com/orphic-inc/stellar-api/issues/123) (Rule/SubRule + `ruleImpact()`) and [#124](https://github.com/orphic-inc/stellar-api/issues/124) (standing).
+> PRD-05 descent target #3 ([#126](https://github.com/orphic-inc/stellar-api/issues/126)). Reference for the code on `main` — if this text and the code disagree, the code wins. Parent: [PRD-05 Rules & Governance](../prd/05-rules-and-governance.md).
+>
+> **Rewritten 2026-07-21.** An earlier version framed the sub-rulesets as CRS-weighted `Rule`/`SubRule` tree nodes. That was wrong twice over: the sub-rulesets are prose pages, and CRS is deferred until post-v1. The built-vs-stub map for forum and staff enforcement survives from that version; the scoring framing does not.
 
-## What "ForumRules" and "StaffRules" actually are
+## The model in one paragraph
 
-Neither is a single model. Both are **views over shared governance substrate**: the composable `Rule`/`SubRule` tree and its pure CRS scorer, the `RulesPage` prose store, and the granular-permission enforcement layer (ADR-0001). ForumRules additionally lean on the forum's built **class-gate** access system; StaffRules additionally lean on `StaffGroup`/`UserRank`. This doc maps each to the code that backs it and flags, honestly, what is wired versus what is still a stub.
+There are exactly two kinds of rule content. **The six Golden Rules** are the canon — seeded `Rule`/`SubRule` rows mirroring [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md) verbatim under a CI drift-guard, immutable in substance, served by `GET /api/rules/tree`. **Everything else is a wiki page** the canon links to with a `${...}` token. There is no third mechanism, and a sub-ruleset is not a tree node.
 
-## Shared substrate (backs both)
+## Where each ruleset lives
 
-### The Rule/SubRule tree + `ruleImpact()`
+The split is decided by **earliest-needed audience**: if someone without an account may need to read it, it is public. That is not a stylistic preference — registration is invite-only, access runs through an Interview held on IRC, and every in-app wiki route sits behind `requireAuth` (`src/routes/api/wiki.ts`). Onboarding prose in the in-app wiki would lock applicants out of the front door.
 
-The data-driven rule tree (`prisma/schema.prisma` → `Rule`, `SubRule`) is the governance backbone. Each node carries its own CRS micro-impact so rules are data, not hardcoded branches.
+| Ruleset        | Home                             | Token                    | Owner       |
+| -------------- | -------------------------------- | ------------------------ | ----------- |
+| GoldenRules    | seeded `Rule`/`SubRule` tree     | —                        | stellar-api |
+| ForumRules     | in-app wiki, `/wiki/forum-rules` | `${forum_rules_article}` | stellar-api |
+| StaffRules     | in-app wiki, `/wiki/staff-rules` | `${staff_rules_article}` | stellar-api |
+| IRCRules       | public wiki, korin.pink          | `${irc_rules_article}`   | korin-pink  |
+| InterviewRules | public wiki, korin.pink          | `${interview_article}`   | korin-pink  |
+| CommunityRules | per-Community, unbuilt           | —                        | —           |
 
-- **`Rule`** — `code` (machine-stable, unique, e.g. `golden.accounts`), `title`, `description`, `complianceWeight` (CRS reward when adhered to, ≥ 0), `violationWeight` (CRS penalty magnitude when breached, ≥ 0), `sortOrder`. Has many `SubRule`.
-- **`SubRule`** — child of a `Rule` (`onDelete: Cascade`, `@@unique([ruleId, code])`); same weight pair; its weight composes **additively** on top of the parent's.
-- **Exposure** — `GET /api/rules/tree` (`src/routes/api/rules.ts`) returns the ordered tree with weights; it is the read-only substrate `ruleImpact()` consumes. Login-gated only (rules are site-wide and visible to every member).
+IRC content lives in korin-pink because IRC is korin's system and applicants must read it pre-account. Keeping a copy here would be a cross-repo drift pair with no guard — which is exactly what `prisma/scripts/seed-wiki-irc-community.ts` had become before it was deleted (its pages already existed at `packages/web/src/content/docs/wiki/irc/`).
 
-The pure scorer is `ruleImpact(event)` (`src/modules/ruleImpact.ts`). Given an `outcome` (`compliance` | `violation`), the node weights, and the actor's `Standing` tier, it returns a signed CRS delta:
+## Seeding
 
-- **Compliance** scales **up** with good standing — `pristine ×10, clean ×3, neutral ×1, poor ×0.5, hammer ×0.25`. Pristine long-term standing is the strongest positive; the long-term poor barely earn back.
-- **Violation** scales **up** with bad standing — `pristine/clean/neutral ×1, poor ×3, hammer ×10`. A clean record takes the face-value hit; the repeat offender takes the "mighty hammer."
-- Sub-rule weight is added to the parent's before the multiplier is applied.
+`seedWikiFixtures()` (`src/modules/wikiFixtures.ts`) seeds the in-app pages, owned by the reserved System user, with prose authored as real markdown under `prisma/seed-wiki/` — the same shape `stylesheetFixtures` uses for CSS, so it reviews as prose in a diff.
 
-> **CRS weights as implemented:** every `Rule`/`SubRule` weight column defaults to `0`, and the standing multipliers above are **placeholders**. PRD-05's open questions flag the ×10 pristine reward, the hammer curve, and per-node micro-impacts as **TBD** — the _structure_ is settled, the _magnitudes_ are not. The code comment is explicit: change the tables in `ruleImpact.ts` and the spec together.
+It seeds six pages: the two sub-ruleset pages, plus the four the canon has always cited and nothing ever created — `invite`, `classes`, `requests`, `interfaces`. Those four were live dead links in every install.
 
-The `Standing` tier itself (`pristine | clean | neutral | poor | hammer`) is computed by `computeStanding()` (`src/modules/standing.ts`, #124) from active `UserWarning` rows + ban state, surfaced as `PublicProfile.standing`. Thresholds are ADR-0004 placeholders.
+Two gotchas worth knowing before touching this:
 
-### The `RulesPage` prose store
+- **Wiki bodies are served verbatim.** `${...}` substitution happens only for `GET /api/rules/tree` (ADR-0020). A token written into a wiki page renders literally. `wikiFixtures.spec.ts` asserts fixture bodies carry none.
+- **Create-if-absent per slug, not a table-wide guard.** Pages are editable in-app once seeded, so re-running must not clobber operator edits — while a new fixture in a later release still lands on an existing install. The table-wide shape is the trap [#388](https://github.com/orphic-inc/stellar-api/issues/388) records against `seedGoldenRules`, where one pre-existing row suppresses the entire set.
 
-Human-readable rule prose lives in `RulesPage` (`slug` unique, `title`, `body`, `isMain`, `sortOrder`, `author`). One row may be the main page (`isMain`, enforced single-main in a transaction at the API layer). CRUD is in `src/routes/api/rules.ts`, gated by the `rules_manage` permission, audited (`rules.create` / `rules.edit` / `rules.delete`), with `body` run through `sanitizeHtml`. The main page cannot be deleted; slugs are immutable after creation.
+`wikiFixtures.spec.ts` guards the link contract: every internal `/wiki/...` token in `resolveSiteVariables()` must have a fixture. That is the test that stops the dead-link bug recurring.
 
-### Enforcement layer (ADR-0001)
+## ForumRules — what actually enforces them
 
-There are **no named role checks**. Every rule gate names an explicit permission via `requirePermission` / `hasPermission` ([ADR-0001](../adr/0001-granular-permission-checks.md)). `rules_manage` (`src/lib/rankPermissions.ts`) is the permission that governs rule-content management. This is the substrate both ForumRules and StaffRules enforce through.
+Forum governance is two layers: access control, which is wired, and prose, which is the wiki page above.
 
-## ForumRules (built)
+### Class gates (wired)
 
-Forum governance is **two layers**: access control (who may read/write/create where) and rule prose/weights (what the rules are).
+`Forum` carries three independent integer thresholds — `minClassRead`, `minClassWrite`, `minClassCreate` (default `0`) — plus an `isTrash` flag. Enforcement is `canAccessForumLevel(user, forumId, minClass)` (`src/lib/userRankAccess.ts`), called from `src/routes/api/forum/forumTopic.ts`, `forumLastReadTopic.ts`, and `src/modules/forum.ts`. The member's `userRankLevel`, carried on `req.user` by the auth middleware, is compared against the forum's requirement for the action. A forum above your read class is not listed rather than erroring.
 
-### Access control — the class-gate system (wired)
-
-The `Forum` model carries three integer gates — `minClassRead`, `minClassWrite`, `minClassCreate` (default `0`) — plus an `isTrash` flag. Enforcement is `canAccessForumLevel(user, forumId, minClass)` (`src/lib/userRankAccess.ts`), called across the forum routes (`src/routes/api/forum/forumTopic.ts`, `forumLastReadTopic.ts`, and `src/modules/forum.ts`). A member's `userRankLevel` (carried on `req.user` from the auth middleware) is compared against the forum's required class for the action. This is the governance that is **actually enforced** on the forum today.
-
-### Rule prose/weights (shared substrate)
-
-Forum rule prose lives in `RulesPage`; forum-relevant `Rule`/`SubRule` nodes (e.g. forum-conduct rules) carry the CRS weights and are scored by `ruleImpact()` as above. There is no forum-specific scorer — ForumRules reuse the shared tree.
+This is the governance actually enforced on the forum today.
 
 ### `ForumSpecificRule` — stub, not wired
 
-The schema defines `ForumSpecificRule` (`targetType` → `ForumRuleTarget` enum `Forum | Thread | Topic`, plus nullable `forum` / `thread` / `forumTopic` relations) for attaching a rule to a specific forum, thread, or topic. **It has zero code usage** — no routes, no module reads or writes it. It is a planned model (CLAUDE.md "Stub models"), the intended home for per-forum/topic/thread rule overlays once that feature is built. Documented here so the gap is explicit: today, forum-level governance is the class-gate system + the shared rule tree, **not** per-node `ForumSpecificRule` overlays.
+The schema defines `ForumSpecificRule` (`targetType` → `ForumRuleTarget` enum `Forum | Thread | Topic`, plus nullable `forum` / `thread` / `forumTopic` relations) for attaching a rule to a specific forum, thread, or topic. **Zero code usage** — no routes, no module reads or writes it. It is the intended home for per-node rule overlays once that feature is built. Today, forum governance is class gates plus the shared canon, not per-node overlays.
 
-## StaffRules (built)
+## StaffRules — what actually enforces them
 
-Staff conduct is governed canonically by **Golden Rule #7, "Respect Staff"** ("staff are volunteers; their interpretation of the rules is final; raise disputes privately") — a site-wide `Rule` node like any other, scored by `ruleImpact()`.
+Staff conduct is canonically the **`respect-staff-decisions` sub-rule under Golden Rule 4, Conduct**, which now also links out to the staff rules page. Earlier drafts carried "Respect Staff" as a standalone 7th rule; it folded into Conduct, and the canon is six. `golden.conduct` also carries `no-impersonate-staff` and `no-backseat-moderate`, which govern members' conduct _toward_ staff rather than staff's own.
 
-### Staff structure & enforcement (wired)
+- **`StaffGroup`** (`name` unique, `sortOrder`) groups `UserRank`s — organisational only; the group carries no power.
+- **`UserRank`** (`level`, `permissions`) carries it. Staff powers are granular permissions, never a named `isStaff` role ([ADR-0001](../adr/0001-granular-permission-checks.md)).
+- **Surfaces operating under these rules:** `staffInbox.ts` (tickets), `reports.ts` (claim/resolve), `staffPm.ts`.
 
-- **`StaffGroup`** (`name` unique, `sortOrder`) groups `UserRank`s — the organizational unit for staff.
-- **`UserRank`** (`level`, `permissions`) is the rank/permission carrier; staff powers are granted as granular permissions, never as a named "isStaff" role (ADR-0001). Staff conduct rules are enforced through the same permission gates as everything else.
-- **Staff workflow surfaces** that operate under these rules: `staffInbox.ts` (support tickets), `reports.ts` (report claim/resolve), `staffPm.ts` (staff-to-staff messaging).
+## Enforcement substrate (both)
 
-### The "+50 CRS / week-served" signal — planned, NOT built
+There are **no named role checks**. Every gate names an explicit permission via `requirePermission` / `hasPermission` (ADR-0001). `rules_manage` (`src/lib/rankPermissions.ts`) governs rule-content management; wiki pages use `minEditLevel` plus the wiki route's own permission checks.
 
-PRD-05 lists StaffRules as carrying a "+50 CRS/week-served signal (cross-ref PRD-01)." **This is not implemented on `main`.** The CRS dimension registry (`src/modules/reputation.ts`) has no staff-tenure dimension — the built dimensions are longevity, ratio, friends, and IRC. The week-served reward is a PRD-01/PRD-05 concept awaiting a scoring decision (magnitude is HITL, like every other CRS magnitude), and should be tracked as a CRS-dimension follow-up rather than assumed present.
+The `RulesPage` model is a separate, untouched surface: operator-authored supplementary prose, admin CRUD in `src/routes/api/rules.ts`, rendered by the UI beneath the canon. It is not where sub-rulesets live.
+
+## CRS — deferred, and not partially built
+
+CRS scoring of rule outcomes is **deferred until post-v1**. State on `main`, stated plainly so nobody builds on a mechanism that isn't there:
+
+- `ruleImpact()` (`src/modules/ruleImpact.ts`) is a pure, tested function with **zero production callers**. No rule violation has ever moved CRS.
+- `warnUser()` (`src/modules/user.ts`) takes a free-text `reason` and carries **no reference to any rule node**. Warnings and rules are unconnected.
+- Every `Rule`/`SubRule` weight column defaults to `0`, and all six Golden Rules seed at `0`.
+- `computeStanding()` **is** wired, on the profile read path only (`PublicProfile.standing`).
+
+Wiring these is post-v1 work and needs a warning→rule linkage that does not exist yet.
 
 ## Built vs. stub — summary
 
-| Surface                               | Status             | Backed by                                                  |
-| ------------------------------------- | ------------------ | ---------------------------------------------------------- |
-| Rule/SubRule tree + weights           | **Built** (#123)   | `Rule`, `SubRule`, `GET /api/rules/tree`                   |
-| `ruleImpact()` scorer (structure)     | **Built** (#123)   | `src/modules/ruleImpact.ts` — magnitudes TBD               |
-| Standing tier feeding the scorer      | **Built** (#124)   | `src/modules/standing.ts`                                  |
-| `RulesPage` prose + CRUD              | **Built**          | `src/routes/api/rules.ts`, `rules_manage`                  |
-| Forum class-gates (read/write/create) | **Built**          | `Forum.minClass*`, `canAccessForumLevel`                   |
-| Permission enforcement                | **Built**          | ADR-0001 `requirePermission`/`hasPermission`               |
-| Staff structure                       | **Built**          | `StaffGroup`, `UserRank`, staff surfaces                   |
-| `ForumSpecificRule` per-node overlays | **Stub**           | model only, no code                                        |
-| Staff "+50 CRS/week-served"           | **Planned**        | not in `reputation.ts` (CRS-dimension follow-up)           |
-| CRS magnitudes (all rule weights)     | **TBD**            | placeholders in `ruleImpact.ts` + weight columns default 0 |
-| IRCRules / InterviewRules             | **Net-new (HITL)** | the deferred spec half of #126                             |
+| Surface                                     | Status               | Backed by                                                     |
+| ------------------------------------------- | -------------------- | ------------------------------------------------------------- |
+| Golden Rules canon + drift-guard            | **Built**            | `goldenRules.ts`, `CODE_OF_CONDUCT.md`, `goldenRules.spec.ts` |
+| `GET /api/rules/tree` + variable resolution | **Built**            | `rules.ts`, `siteVariables.ts` (ADR-0020)                     |
+| Forum/Staff rule wiki pages                 | **Built** (#126)     | `wikiFixtures.ts`, `prisma/seed-wiki/`                        |
+| Forum class gates                           | **Built**            | `Forum.minClass*`, `canAccessForumLevel`                      |
+| Permission enforcement                      | **Built**            | ADR-0001                                                      |
+| Staff structure                             | **Built**            | `StaffGroup`, `UserRank`, staff surfaces                      |
+| Standing tier                               | **Built** (#124)     | `computeStanding()` — profile read only                       |
+| IRC / Interview rule pages                  | **External**         | korin-pink public wiki                                        |
+| `ForumSpecificRule` overlays                | **Stub**             | model only, no code                                           |
+| Staff "+50 CRS/week-served"                 | **Planned**          | not a dimension in `reputation.ts`                            |
+| Rule-outcome CRS scoring                    | **Deferred post-v1** | `ruleImpact()` has no callers                                 |
+| CommunityRules tree                         | **Unbuilt**          | —                                                             |

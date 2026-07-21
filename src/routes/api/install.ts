@@ -22,6 +22,7 @@ import {
 } from '../../modules/bootstrap';
 import { seedGoldenRules } from '../../modules/goldenRules';
 import { seedStylesheetFixtures } from '../../modules/stylesheetFixtures';
+import { seedWikiFixtures } from '../../modules/wikiFixtures';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
 import { getDefaultStylesheetName } from '../../modules/stylesheet';
@@ -180,6 +181,8 @@ router.post(
     // rows at the /css delivery route). Needs ranks; independent of the SysOp.
     const systemUserId = await seedSystemUser(prisma);
     await seedStylesheetFixtures(prisma, systemUserId);
+    // Also System-owned: the wiki pages the seeded Golden Rules link to (#126).
+    await seedWikiFixtures(prisma, systemUserId);
 
     const sysopRank = await prisma.userRank.findFirst({
       where: { level: 1000 }
