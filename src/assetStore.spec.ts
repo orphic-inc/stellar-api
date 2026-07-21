@@ -14,8 +14,10 @@ import { AppError } from './lib/errors';
 import {
   assetUrl,
   getAssetByHash,
+  getOwnedAssetBytes,
   hashAsset,
-  putAsset
+  putAsset,
+  uploadAsset
 } from './modules/assetStore';
 
 beforeEach(() => mockReset(prismaMock));
@@ -55,20 +57,74 @@ describe('putAsset', () => {
         size: PNG.length,
         kind: 'ThemeImage',
         data: PNG,
-        ownerId: null
+        ownerId: null,
+        visibility: 'Members'
       }
     });
   });
 
+  it('defaults to Members but stores Public when asked (the seeder path)', async () => {
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockResolvedValue({ id: 9 } as never);
+
+    await putAsset({ data: PNG, kind: 'ThemeImage', visibility: 'Public' });
+
+    expect(prismaMock.asset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ visibility: 'Public' })
+      })
+    );
+  });
+
   it('is idempotent by content: a repeat put returns the existing row', async () => {
     // What makes seeding safe to re-run on every container boot.
-    const existing = { id: 7, hash: PNG_HASH } as never;
+    const existing = {
+      id: 7,
+      hash: PNG_HASH,
+      visibility: 'Members'
+    } as never;
     prismaMock.asset.findUnique.mockResolvedValue(existing);
 
     const result = await putAsset({ data: PNG, kind: 'ThemeImage' });
 
     expect(result).toBe(existing);
     expect(prismaMock.asset.create).not.toHaveBeenCalled();
+  });
+
+  it('widens an existing row to Public on a dedup collision, never narrows', async () => {
+    // A member's bytes collide with a to-be-seeded fixture, or the seeder
+    // re-runs over a Members row: Public must win so logged-out delivery works.
+    const existing = {
+      id: 7,
+      hash: PNG_HASH,
+      visibility: 'Members'
+    } as never;
+    prismaMock.asset.findUnique.mockResolvedValue(existing);
+    prismaMock.asset.update.mockResolvedValue({
+      id: 7,
+      visibility: 'Public'
+    } as never);
+
+    await putAsset({ data: PNG, kind: 'ThemeImage', visibility: 'Public' });
+
+    expect(prismaMock.asset.update).toHaveBeenCalledWith({
+      where: { hash: PNG_HASH },
+      data: { visibility: 'Public' }
+    });
+  });
+
+  it('does not narrow a Public row when a Members put collides with it', async () => {
+    const existing = {
+      id: 7,
+      hash: PNG_HASH,
+      visibility: 'Public'
+    } as never;
+    prismaMock.asset.findUnique.mockResolvedValue(existing);
+
+    const result = await putAsset({ data: PNG, kind: 'ThemeImage' });
+
+    expect(result).toBe(existing);
+    expect(prismaMock.asset.update).not.toHaveBeenCalled();
   });
 
   it('records an owner when one is given', async () => {
@@ -97,6 +153,107 @@ describe('putAsset', () => {
       putAsset({ data: PNG, mime: 'font/woff2', kind: 'ThemeFont' })
     ).rejects.toThrow(/image\/png/);
     expect(prismaMock.asset.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('uploadAsset', () => {
+  const asUploaded = { id: 5, hash: PNG_HASH } as never;
+
+  it('charges the byte budget and stores when under it', async () => {
+    prismaMock.asset.findFirst.mockResolvedValue(null); // not already owned
+    prismaMock.asset.aggregate.mockResolvedValue({
+      _sum: { size: 100 }
+    } as never);
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockResolvedValue(asUploaded);
+
+    const result = await uploadAsset({
+      data: PNG,
+      kind: 'Avatar',
+      ownerId: 42,
+      assetByteLimit: 100000
+    });
+
+    expect(result).toBe(asUploaded);
+    expect(prismaMock.asset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ownerId: 42, visibility: 'Members' })
+      })
+    );
+  });
+
+  it('rejects when the upload would exceed the byte budget', async () => {
+    prismaMock.asset.findFirst.mockResolvedValue(null);
+    prismaMock.asset.aggregate.mockResolvedValue({
+      _sum: { size: 999_990 }
+    } as never);
+
+    await expect(
+      uploadAsset({
+        data: PNG,
+        kind: 'Avatar',
+        ownerId: 42,
+        assetByteLimit: 1_000_000
+      })
+    ).rejects.toThrow(/storage limit/);
+    expect(prismaMock.asset.create).not.toHaveBeenCalled();
+  });
+
+  it('does not charge for re-uploading bytes the member already owns', async () => {
+    // Content-addressing means this stores nothing new; charging it would be
+    // rent on a row that already exists.
+    prismaMock.asset.findFirst.mockResolvedValue({ id: 5 } as never);
+    prismaMock.asset.findUnique.mockResolvedValue(asUploaded);
+
+    await uploadAsset({
+      data: PNG,
+      kind: 'Avatar',
+      ownerId: 42,
+      assetByteLimit: 1 // absurdly low, but the owned check short-circuits it
+    });
+
+    expect(prismaMock.asset.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('validates before counting, so an oversize file reports as a bad file', async () => {
+    await expect(
+      uploadAsset({
+        data: Buffer.from('not an image'),
+        kind: 'Avatar',
+        ownerId: 42,
+        assetByteLimit: 1_000_000
+      })
+    ).rejects.toThrow(/Unsupported asset type/);
+    expect(prismaMock.asset.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('skips the budget check entirely when the limit is 0 (unlimited)', async () => {
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockResolvedValue(asUploaded);
+
+    await uploadAsset({
+      data: PNG,
+      kind: 'Avatar',
+      ownerId: 42,
+      assetByteLimit: 0
+    });
+
+    expect(prismaMock.asset.aggregate).not.toHaveBeenCalled();
+    expect(prismaMock.asset.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('getOwnedAssetBytes', () => {
+  it('sums the owner rows and treats no rows as zero', async () => {
+    prismaMock.asset.aggregate.mockResolvedValue({
+      _sum: { size: null }
+    } as never);
+
+    expect(await getOwnedAssetBytes(42)).toBe(0);
+    expect(prismaMock.asset.aggregate).toHaveBeenCalledWith({
+      where: { ownerId: 42 },
+      _sum: { size: true }
+    });
   });
 });
 

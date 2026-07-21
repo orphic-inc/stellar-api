@@ -1,8 +1,27 @@
 import { z } from 'zod';
 import { externalStylesheetUrl } from './stylesheet';
 
+/**
+ * A stored asset's address, as an avatar may reference it (#342). This is the
+ * self-hosted arm that makes an `img-src 'self'` CSP reachable and closes the
+ * hotlink disclosure in #361 — a member pointing their avatar at a host they
+ * control otherwise collects IP, user agent, and timing for every viewer of
+ * their profile and posts.
+ *
+ * Remote URLs still validate here: tightening `avatar` to self-hosted only is
+ * #361's call to make, and this change is what gives that decision something to
+ * migrate to. Note the deliberate ordering — the asset-path branch is tried
+ * first because `z.string().url()` would not match a relative path anyway.
+ */
+export const avatarAssetPath = z
+  .string()
+  .regex(
+    /^\/api\/asset\/[0-9a-f]{64}$/,
+    'Avatar asset path must be /api/asset/<sha256>'
+  );
+
 export const profileUpdateSchema = z.object({
-  avatar: z.string().url().optional().or(z.literal('')),
+  avatar: avatarAssetPath.or(z.string().url()).optional().or(z.literal('')),
   avatarMouseoverText: z.string().max(256).optional(),
   profileTitle: z.string().max(128).optional(),
   profileInfo: z.string().max(10000).optional(),

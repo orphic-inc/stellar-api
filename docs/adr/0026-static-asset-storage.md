@@ -56,6 +56,24 @@ The migration of `proton`/`postmod` to api-canonical `/css` fixtures — the fir
 
 So the split stays temporary-by-design as this ADR predicted, with a named blocker rather than an open question.
 
+## Amendment (2026-07-21) — Phase 2 landed (#342)
+
+The three deferred pieces the Decision left open now ship together, because each is about assets the _site_ did not put there and they only make sense as a set.
+
+- **Authenticated upload.** `POST /api/asset?kind=…` stores one binary through the new `uploadAsset` seam. The body is raw (`express.raw`, not multipart): the payload is exactly one binary that `validateAsset` identifies by magic bytes, so the filename and part headers multipart carries are things the route would discard — and avoiding it keeps a parser dependency out of the tree. `kind` is restricted to `ThemeImage`/`Avatar`; `ThemeFont` stays seeder-only because shipping a font is the redistribution question #343 is about, not something an uploader can answer for the site. The declared `Content-Type` is cross-checked against the bytes, never trusted.
+
+- **`Asset.visibility`, two tiers.** `Public` is the site-shipped fixture set — reviewed in this repository, served unauthenticated as before. `Members` is everything uploaded, and the serve route gates it behind `requireAuth`, matching the `/css` route on an invite-only instance. There is deliberately **no owner-private tier**: both current consumers are member-visible by nature (theme imagery is referenced from adoptable sheets; an avatar renders to every viewer), and an unexercised authorization branch is one that rots. The column defaults to `Members` — an asset arriving without an explicit tier is an upload, and the gated tier is the safe end to fail toward; the migration moves the pre-existing `ownerId IS NULL` fixtures to `Public`. Member assets are cached `private` so a shared cache cannot hand the bytes to an anonymous fetch.
+
+- **Orphan sweep, not reference counting.** A daily job (`assetSweepJob`, the `linkHealthJob` mould) derives the referenced-hash set by scanning stylesheet sources and avatars for `/api/asset/<sha256>`, then deletes member-owned assets that nothing references and that are past a 24h grace window. Content-addressing means one asset can be referenced from many rows, so deleting alongside a single referrer is wrong; a reference table maintained on every write is exact until one call site forgets, and its failure mode is deleting a _live_ asset. A scan derives the reference set from the rows themselves, so it cannot drift, and it stays correct when a row is edited outside the write path. The grace window is load-bearing: an upload exists before the row that references it, so a graceless sweep would collect assets mid-compose. Site-owned assets (`ownerId: null`) are never swept.
+
+- **Quota: a byte budget.** `UserRank.assetByteLimit` (0 = unlimited, matching the sibling limits) caps the sum of a member's stored asset sizes. Bytes rather than a row count because bytes are what a Postgres-backed store spends — a count limit paired with the 2 MB per-asset cap still lets a rank hold far more than intended. Re-uploading bytes the member already owns is not charged, since content-addressing stores nothing new.
+
+### Avatars, and the #361 hotlink hole
+
+The `Avatar` kind plus a self-hosted `avatar` path (`/api/asset/<sha256>`, validated in `schemas/profile.ts`) is what makes an `img-src 'self'` CSP _reachable_, which is the proper fix for [#361](https://github.com/orphic-inc/stellar-api/issues/361) — a member pointing their avatar at a host they control otherwise harvests IP, user agent, and timing for every viewer of their profile and posts. This ADR supplies the destination; tightening `avatar` to self-hosted-only (and the CSP with it) stays #361's call, and remote URLs still validate until it is made.
+
+The theme migration (#341, proton) and the postmod font question (#343) are unchanged by this phase.
+
 ## Follow-up
 
-Phase 1 shipped under #290. The upload path, lifecycle sweep, and theme migration remain tracked separately.
+Phase 1 shipped under #290; Phase 2 (upload, visibility, sweep, quota) under #342. The postmod commercial-font migration (#343) and the CSP tightening that closes #361 remain tracked separately.

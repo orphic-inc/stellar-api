@@ -57,13 +57,18 @@ export const readFixtureAsset = (theme: string, file: string): Buffer =>
  * `ownerId` — these belong to the install, not to the reserved System user that
  * owns the stylesheet rows (ADR-0026: asset ownership is about write
  * authorization, and nothing may overwrite a built-in).
+ *
+ * `Public` is asserted explicitly (#342): these are the only assets served
+ * without auth, and they are reviewed in this repository. Everything else
+ * defaults to `Members`.
  */
 export async function seedAssetFixtures(client: PrismaClient): Promise<void> {
   for (const fixture of BUILTIN_ASSET_FIXTURES) {
     await putAsset(
       {
         data: readFixtureAsset(fixture.theme, fixture.file),
-        kind: fixture.kind
+        kind: fixture.kind,
+        visibility: 'Public'
       },
       client
     );

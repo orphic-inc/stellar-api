@@ -243,6 +243,9 @@
               },
               "authorStylesheetLimit": {
                 "type": "integer"
+              },
+              "assetByteLimit": {
+                "type": "integer"
               }
             },
             "required": [
@@ -2216,6 +2219,58 @@
           "expiresAt",
           "createdAt",
           "createdBy"
+        ]
+      },
+      "AssetUploadResponse": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ThemeImage",
+              "ThemeFont",
+              "Avatar"
+            ]
+          }
+        },
+        "required": [
+          "hash",
+          "url",
+          "mime",
+          "size",
+          "kind"
+        ]
+      },
+      "AssetUsageResponse": {
+        "type": "object",
+        "properties": {
+          "usedBytes": {
+            "type": "number"
+          },
+          "limitBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxAssetBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "usedBytes",
+          "limitBytes",
+          "maxAssetBytes"
         ]
       },
       "Forum": {
@@ -6876,8 +6931,16 @@
                   "avatar": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "format": "uri"
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\/api\\/asset\\/[0-9a-f]{64}$"
+                          },
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        ]
                       },
                       {
                         "type": "string",
@@ -8221,8 +8284,109 @@
               }
             }
           },
+          "401": {
+            "description": "A Members-visibility asset fetched without authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/asset": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ThemeImage",
+                "Avatar"
+              ]
+            },
+            "required": true,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored asset address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty, oversize, unrecognized, or misdeclared payload, or the rank byte budget would be exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/asset/usage": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's stored bytes against their rank budget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUsageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
@@ -11458,6 +11622,10 @@
                     "type": "integer",
                     "minimum": 0
                   },
+                  "assetByteLimit": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
                   "displayStaff": {
                     "type": "boolean"
                   },
@@ -11797,6 +11965,10 @@
                     "minimum": 0
                   },
                   "authorStylesheetLimit": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "assetByteLimit": {
                     "type": "integer",
                     "minimum": 0
                   },

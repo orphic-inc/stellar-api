@@ -330,6 +330,12 @@ model UserRank {
   uploadRequired        Int                 @default(0)
   personalCollageLimit  Int                 @default(0)
   authorStylesheetLimit Int                 @default(0)
+  /// Total bytes of stored assets a member of this rank may own. 0 = unlimited,
+  /// matching the sibling limits. A byte budget rather than a row count because
+  /// bytes are what a Postgres-backed store actually spends (ADR-0026): a count
+  /// limit paired with the 2 MB per-asset cap still lets a rank hold far more
+  /// than intended.
+  assetByteLimit        Int                 @default(0)
   displayStaff          Boolean             @default(false)
   staffGroupId          Int?
   staffGroup            StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
@@ -665,6 +671,22 @@ model AuthorStylesheet {
 enum AssetKind {
   ThemeImage
   ThemeFont
+  Avatar
+}
+
+/// Who may fetch a stored asset (ADR-0026 Phase 2, #342).
+///
+/// Two tiers, because two is what has consumers. `Public` is the site-shipped
+/// fixture set: theme imagery reviewed in this repository, served unauthenticated
+/// as CSS subresources. `Members` is everything a member uploaded — readable by
+/// any authenticated member, matching the `/css` route, because the instance is
+/// invite-only and both current consumers are member-visible by nature (theme
+/// imagery is referenced from ADOPTABLE sheets; an avatar renders to every viewer
+/// of a profile or post). There is deliberately no owner-private tier: nothing
+/// produces one yet, and an unexercised authorization branch is one that rots.
+enum AssetVisibility {
+  Public
+  Members
 }
 
 /// A binary asset a stored row references — theme imagery and web fonts today,
@@ -683,17 +705,21 @@ enum AssetKind {
 /// cross-repo change landed. Deliberately bounded — revisit when content imagery
 /// makes the table large. `assetStore.ts` is the seam a driver swap replaces.
 model Asset {
-  id        Int       @id @default(autoincrement())
-  hash      String    @unique
-  mime      String
-  size      Int
-  kind      AssetKind
-  data      Bytes
+  id         Int             @id @default(autoincrement())
+  hash       String          @unique
+  mime       String
+  size       Int
+  kind       AssetKind
+  data       Bytes
   /// Null = site-owned (the built-in theme fixtures). A user-owned asset dies
   /// with its owner, extending the AuthorStylesheet cascade precedent.
-  ownerId   Int?
-  owner     User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
+  ownerId    Int?
+  owner      User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Defaults to Members: an asset arriving without an explicit tier is an
+  /// upload, and the gated tier is the safe end to fail toward. The seeder is
+  /// the only caller that asks for Public.
+  visibility AssetVisibility @default(Members)
+  createdAt  DateTime        @default(now())
 
   @@index([ownerId])
   @@map("assets")

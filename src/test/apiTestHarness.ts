@@ -149,6 +149,7 @@ jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
   http: { port: 8080, corsOrigin: 'http://localhost:3000' },
   logging: { level: 'error', timestampFormat: undefined },
+  assets: { maxBytes: 2000000 },
   economy: { minimumBounty: 104857600 },
   ranks: { progressionIntervalMs: 3600000 },
   sentry: { dsn: '' },
