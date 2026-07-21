@@ -27,7 +27,15 @@ IRC content lives in korin-pink because IRC is korin's system and applicants mus
 
 `seedWikiFixtures()` (`src/modules/wikiFixtures.ts`) seeds the in-app pages, owned by the reserved System user, with prose authored as real markdown under `prisma/seed-wiki/` — the same shape `stylesheetFixtures` uses for CSS, so it reviews as prose in a diff.
 
-It seeds six pages: the two sub-ruleset pages, plus the four the canon has always cited and nothing ever created — `invite`, `classes`, `requests`, `interfaces`. Those four were live dead links in every install.
+It seeds eleven pages in three groups:
+
+- the two **sub-ruleset** pages (`forum-rules`, `staff-rules`) — normative, rules in their own right;
+- the four **feature explainers** the canon has always cited and nothing ever created — `invite`, `classes`, `requests`, `interfaces`. Those four were live dead links in every install;
+- the five **policy guidance** pages behind Golden Rules 5 and 6 — `vpns`, `ips`, `autosnatch`, `security-disclosure`, `exploits` ([#215](https://github.com/orphic-inc/stellar-api/issues/215)).
+
+That third group was originally filed as public-KB content on korin.pink. It is in-app because the earliest-needed-audience test puts it there: every behaviour those pages govern — browsing through a proxy, snatching freepass, probing the live site — requires an account, so nothing is lost by gating them. Only the Interview and IRC pages clear the pre-account bar.
+
+`security-disclosure` and the repo's `SECURITY.md` are split by audience rather than mirrored: the wiki page is the member reporting route, `SECURITY.md` carries the coordinated-disclosure terms for researchers working from the repository. They cross-reference and deliberately do not restate each other, so there is no drift pair to guard.
 
 Two gotchas worth knowing before touching this:
 

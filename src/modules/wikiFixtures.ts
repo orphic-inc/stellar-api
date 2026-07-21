@@ -5,12 +5,18 @@
  * must exist for the Golden Rules to make sense:
  *
  *   - the sub-ruleset pages (`forum-rules`, `staff-rules`) the canon points at;
- *   - the guidance pages the canon already cites by name — `${invite_article}`,
- *     `${classes_article}`, `${requests_article}`, `${interfaces_article}`.
+ *   - the feature explainers the canon cites by name — `${invite_article}`,
+ *     `${classes_article}`, `${requests_article}`, `${interfaces_article}`;
+ *   - the policy guidance behind rules 5 and 6 — `vpns`, `ips`, `autosnatch`,
+ *     `security-disclosure`, `exploits` (#215).
  *
  * That second group is why this is a fix and not just a feature: those four
  * tokens have always resolved to `/wiki/...` routes, and nothing ever created
  * the pages. Every install shipped a canon with dead links in it.
+ *
+ * The third group reached the same place by a different route: it was filed as
+ * public-KB content, but every behaviour it governs requires an account, so by
+ * the earliest-needed-audience test it is member-only like the rest of these.
  *
  * Prose lives on disk as real markdown under `prisma/seed-wiki/` (shipped in the
  * image — the Dockerfile copies `prisma/`), mirroring how `stylesheetFixtures`
@@ -46,7 +52,16 @@ export const BUILTIN_WIKI_FIXTURES: readonly WikiFixture[] = [
   { slug: 'invite', title: 'Invites', citedByCanon: true },
   { slug: 'classes', title: 'User Classes', citedByCanon: true },
   { slug: 'requests', title: 'Requests', citedByCanon: true },
-  { slug: 'interfaces', title: 'Interface Whitelist', citedByCanon: true }
+  { slug: 'interfaces', title: 'Interface Whitelist', citedByCanon: true },
+  { slug: 'vpns', title: 'Proxies and VPNs', citedByCanon: true },
+  { slug: 'ips', title: 'Static and Shared IP Addresses', citedByCanon: true },
+  { slug: 'autosnatch', title: 'Automated Snatching', citedByCanon: true },
+  {
+    slug: 'security-disclosure',
+    title: 'Reporting a Security Vulnerability',
+    citedByCanon: true
+  },
+  { slug: 'exploits', title: 'Exploits', citedByCanon: true }
 ];
 
 /** Read a fixture's markdown body off disk. Exported so the drift spec reads the same bytes. */

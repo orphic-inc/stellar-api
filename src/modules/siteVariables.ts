@@ -38,19 +38,23 @@ export async function resolveSiteVariables(
     irc: site.ircUrl,
     staffpm: site.staffPmPath,
     public_kb: kb,
-    // Stellar Public KB articles (public-facing; authored under the KB)
+    // Stellar Public KB articles. Only pre-account content earns a place here:
+    // the Interview is the front door, and it is held on IRC (#215).
     interview_article: `${kb}/interview`,
-    vpns_article: `${kb}/vpns`,
-    ips_article: `${kb}/ips`,
-    autofp_article: `${kb}/autosnatch`,
-    bugs_article: `${kb}/security-disclosure`,
-    exploit_article: `${kb}/exploits`,
     // internal app-feature references — seeded WikiPage rows (`wikiFixtures.ts`).
     // Anything added here needs a fixture, or the canon ships another dead link.
     invite_article: '/wiki/invite',
     classes_article: '/wiki/classes',
     requests_article: '/wiki/requests',
     interfaces_article: '/wiki/interfaces',
+    // policy guidance behind rules 5 and 6. Member-only: every behaviour these
+    // govern (browsing via a proxy, snatching freepass, probing the live site)
+    // requires an account, so the auth-gated wiki is the right home (#215).
+    vpns_article: '/wiki/vpns',
+    ips_article: '/wiki/ips',
+    autofp_article: '/wiki/autosnatch',
+    bugs_article: '/wiki/security-disclosure',
+    exploit_article: '/wiki/exploits',
     // sub-ruleset pages. Forum/Staff are member-only, so they live in the
     // auth-gated in-app wiki; IRC conduct is public because the Interview that
     // gates registration happens on IRC, and applicants have no account (#126).

@@ -34,7 +34,7 @@ describe('built-in wiki fixtures', () => {
 
     // Guards the assumption itself — if the tokens are renamed away from
     // /wiki/..., this test would vacuously pass while the canon rots.
-    expect(linked.length).toBeGreaterThanOrEqual(6);
+    expect(linked.length).toBeGreaterThanOrEqual(11);
 
     const missing = linked.filter((l) => !slugs.includes(l.slug));
     expect(missing).toEqual([]);
