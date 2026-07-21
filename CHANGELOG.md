@@ -12,6 +12,44 @@ All notable changes to stellar-api are documented here.
 
   This is the substrate only. The authenticated upload path, reference counting / orphan sweep, and the migration of the asset-bearing themes (`proton`, `postmod`) to api-canonical `/css` fixtures are all still open — see the ADR amendment for the two blockers found while building it.
 
+- **Store-time CSS boundary** ([ADR-0031](docs/adr/0031-injected-css-threat-model.md), #360) — `lib/cssValidate.ts` implements the threat model's instrument: it detects and rejects rather than cleansing, and stores the author's bytes verbatim. `url()` narrows to `/api/asset/<sha256>` and relative paths, and `data:` is removed for everyone — it was the content-smuggling vector and no shipped theme used it. Every violation is reported with its rule and location instead of only the first, so an author fixing a sheet sees the whole set. Replaces the previous cleanse-don't-reject posture, which is what corrupted escaped identifiers (#340): a detector that only answers yes/no can normalize freely because it never writes.
+
+- **`proton` migrated to an api-canonical `/css` fixture** ([ADR-0026](docs/adr/0026-static-asset-storage.md), #341) — the first asset-bearing theme to move off stellar-ui's static tree and onto api delivery, with its imagery in the asset store. `postmod` remains on the ui side, blocked on the commercial-font licensing question in #343.
+
+- **Nullable `cssUrl` for no-render registry rows** (#371) — a `Stylesheet` row may now carry `cssUrl: null`, meaning it appears in the theme picker and renders nothing. That is Sublime: the bundled Tailwind already is Sublime, so there was never a sheet to deliver. Expressing it as null rather than a fabricated URL makes the delivery contract a total partition — every row is `/css`-backed or null — which is checkable without an exception list, and an exception list is where the next dead entry would hide. A CI guard asserts the partition over the seeded registry.
+
+### Changed
+
+- **The registry delivery partition is enforced on the write path** (#375) — `POST`/`PUT /api/stylesheet` previously accepted any non-empty `cssUrl`, so a strict-admin could still create a row pointing at the retired `/stylesheets/…` tree: it lands in the picker and renders nothing. The schema now validates the delivery-route shape (sharing the predicate with the CI guard rather than restating it), and the module additionally verifies the row resolves to a real `AuthorStylesheet` — a well-formed URL naming a sheet that does not exist is the same dead entry. `null` remains the explicit no-delivery value, and stays distinct from an omitted key meaning "leave unchanged". Published in the OpenAPI contract, so generated clients inherit the constraint.
+
+- **`publish` no longer runs on pull requests** (#380) — the job logged into GHCR, built the image, and discarded it, since `push:` was already gated to non-PR events. Gating the job itself is safe here because `smoke` builds the same Dockerfile on PRs and boots it against a fresh database, so the image is still validated before merge — by the job that also proves it runs.
+
+- **GitHub Releases are created from the CHANGELOG on tag push** — tagging never produced a Release, and the manual habit lapsed after v0.5.6, leaving that version advertised as "Latest" through nine subsequent releases. A tag-triggered job now publishes the tag's CHANGELOG section as its Release notes, gated behind a successful image publish so a Release never announces an artifact that does not exist. The nine missing Releases (v0.6.0 through v0.8.1) were backfilled from the same sections.
+
+- **`AGENTS.md` is the canonical agent-instruction file** — `CLAUDE.md` reduces to an `@import` of it, ending the drift between two files that had been maintained in parallel.
+
+### Fixed
+
+- **The `cssUrl` migration is scoped to Sublime alone** (#371) — the nullable-`cssUrl` data migration originally matched the whole retired `/stylesheets/…` prefix, which would have blanked `postmod` while it is still served from stellar-ui. Narrowed to Sublime's exact dead path.
+
+- **The partition guard asserts every violation, not just the first** — the test reported one offending row per run, so a sweep would have needed as many CI runs as there were bad rows.
+
+- **The tracker frontier query returned an empty frontier when three tickets were ready** — `blocked_by` keeps listing a blocker after it closes, so the original test never matched once a map started resolving, and the snippet fabricated data on failure rather than erroring.
+
+### Docs
+
+- **[ADR-0031](docs/adr/0031-injected-css-threat-model.md) — the injected-CSS threat model, superseding ADR-0003** (#349) — ADR-0003's amendment correctly dropped the cascade-lock arm, but in preserving theming freedom it also reversed the CSP's resource axes, and stellar-ui shipped `img-src`/`font-src`/`connect-src` open. For exfiltration the CSP constrains nothing, leaving the store-time sanitizer standing alone while five places across the two repos claimed it had a partner. The ADR writes the model for the non-consenting viewer rather than the consenting adopter, since PRD-03's page-context-first precedence means a profile sheet executes in every visitor's browser.
+
+- **[ADR-0024](docs/adr/0024-stylesheet-delivery-contract.md) accepted, and its delivery-contract drift reconciled** (#348) — the ADR had been Proposed since 2026-07-02 while the code treated it as settled. Three later amendments record what shipped: that the second delivery mechanism is retired, what the partition guard actually reaches (seeded rows only — migration-planted rows such as `postmod` remain out of reach), and that the UI half landed.
+
+- **[ADR-0032](docs/adr/0032-authored-stylesheet-member-lifecycle.md) — the authored-stylesheet member lifecycle** — what happens to an authored sheet and its adopters when the author leaves or the sheet is withdrawn.
+
+- **The `/css` addressing decision recorded, and a control that never shipped struck** — the route's id-based addressing is documented, and a control the ADR claimed but which was never implemented is removed rather than left as a false claim.
+
+- **[ADR-0026](docs/adr/0026-static-asset-storage.md) annotated where ADR-0031 collapsed its rationale** (#351) — §44 justified the asset validator's validate-and-reject signature by contrasting it with the CSS sanitizer's cleanse-don't-reject posture. ADR-0031 retired that posture, so the two converged and the stated rationale reads backwards. Annotated rather than rewritten: the ADR records why they diverged at the time.
+
+- **Wayfinder tracker operations documented** (#356) — how this repo expresses maps, parentage, blocking, and the frontier. Sub-issue parentage and issue-dependency blocking are both native here, and both APIs take the internal `id` as an integer field.
+
 ## [0.8.1] — 2026-07-18
 
 Makes the 0.8.0 stack verifiable in place: a deployed container can now seed its own e2e fixtures, so an end-to-end pass against a live box needs no temporary database exposure.
