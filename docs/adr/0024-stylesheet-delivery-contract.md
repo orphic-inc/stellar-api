@@ -132,11 +132,15 @@ Note for #341: its stated hard blocker (#340, the sanitizer mangling `proton`'s 
 
 ### 3. Sublime models "renders nothing" as data, not as a name the UI recognises
 
-`sublime` ships no CSS rules by design — the bundled Tailwind defaults _are_ Sublime — and `StylesheetInjector.tsx` hardcodes `if (!siteAppearance || siteAppearance === 'sublime') return null`, so its `cssUrl` is a path nothing ever requests.
+`sublime` ships no CSS rules by design — the bundled Tailwind defaults _are_ Sublime — and, at the time this was decided, `StylesheetInjector.tsx` hardcoded `if (!siteAppearance || siteAppearance === 'sublime') return null`, so its `cssUrl` was a path nothing ever requested. (That comparison is gone; see **UI half landed** below.)
 
 **`Stylesheet.cssUrl` becomes nullable; `null` means the row has no delivery target.** Sublime keeps `isDefault` and its picker entry, and the injector links nothing because the row says so rather than because it recognises a string. This retires a cross-repo magic string paired with `getDefaultStylesheetName`'s `?? 'sublime'` fallback — the same shape that already drifted on the seeded-avatar sentinel.
 
 Seeding Sublime as an empty `/css` fixture was rejected: it buys uniformity by making the default theme depend on an authenticated fetch to receive nothing, and `/css` requires auth while the default must work for everyone.
+
+**UI half landed (2026-07-21).** [stellar-ui#196](https://github.com/orphic-inc/stellar-ui/issues/196) removed the `siteAppearance === 'sublime'` comparison ([ui#200](https://github.com/orphic-inc/stellar-ui/pull/200)), so §3 now describes shipped behaviour on both sides: the injector resolves Sublime through the registry like any other row and links nothing because `cssUrl` is null. Two effects beyond deleting the string, both consequences of the comparison having short-circuited _ahead_ of the injector's "queries still loading" guard — an operator who repoints Sublime at a real delivery target now gets it honoured (which this ADR's migration deliberately preserves by conditioning on the old dead value), and a Sublime user's pre-applied `<link>` is no longer torn down mid-load.
+
+Note the retirement is **half** done, not complete: the paragraph above says this "retires a cross-repo magic string paired with `getDefaultStylesheetName`'s `?? 'sublime'` fallback", but only the UI side of that pair is gone. The api-side fallback is still in place, deferred to [#376](https://github.com/orphic-inc/stellar-api/issues/376) — see the closing paragraph of the amendment below.
 
 ### 4. The guard becomes a total partition
 
