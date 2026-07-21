@@ -1,5 +1,7 @@
 # Compute community health as a read-time link pulse; defer persistence and scoring
 
+**Status:** Accepted (2026-06-10). Both deferrals in the title have since been closed additively, without displacing the read-time pulse as the source of truth: persistence landed in v0.5.5 (PR #161, `communityHealthHistory.ts` — see the update note below), and the `CommunityScore` CRS fold (#75) landed in [ADR-0017](0017-communityscore-crs-dimension.md). The computed-on-read question this ADR left open was settled by [ADR-0007](0007-crs-read-time-and-event-ledger.md). Quality-weighting (#76) remains deferred.
+
 `01-Community-Score.md` favours communities that stay "active, healthy, and
 self-sustaining." LinkHealth already gives that health a per-contribution
 signal: submitting through the contribution form sets `Contribution.linkStatus`

@@ -37,15 +37,15 @@ Three patterns the corpus makes non-negotiable:
 
 ## Concept → existing code (the descent map)
 
-| Concept                        | Lives in                                                                                                                                                       |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collage CRUD / entries / subs  | `stellar-api` collage routes; `stellar-ui` `collageApi.ts`, `components/collages/`                                                                             |
-| Collage detail surface         | `stellar-ui` `CollageDetail.tsx` (flat today — the gap)                                                                                                        |
-| **Edition / lossless model**   | **PRD-04** (Contribution/Release/Music) — net-new                                                                                                              |
-| Contribution weighting → CRS   | [PRD-01](01-Community-Score.md) `ContributionScore`, `statsHistory.ts`                                                                                         |
-| Theme contract for the surface | stellar-ui [ADR-0001](../../../stellar-ui/docs/adr/0001-injected-theme-contract.md), `src/stylesheets/common/global.css` (`data-st` hooks seeded for this PRD) |
-| CommunityStylesheet ↔ Collage | [PRD-03](03-stylesheet-themes-and-scoring.md) (CommunityStylesheet is "Community-scoped theme — tied to Contests")                                             |
-| Comments                       | `stellar-ui` `CommentsSection`                                                                                                                                 |
+| Concept                        | Lives in                                                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collage CRUD / entries / subs  | `stellar-api` collage routes; `stellar-ui` `collageApi.ts`, `components/collages/`                                                          |
+| Collage detail surface         | `stellar-ui` `CollageDetail.tsx` (flat today — the gap)                                                                                     |
+| **Edition / lossless model**   | **PRD-04** (Contribution/Release/Music) — net-new                                                                                           |
+| Contribution weighting → CRS   | [PRD-01](01-Community-Score.md) `ContributionScore`, `statsHistory.ts`                                                                      |
+| Theme contract for the surface | stellar-ui [ADR-0001](../../../stellar-ui/docs/adr/0001-injected-theme-contract.md), `src/global.css` (`data-st` hooks seeded for this PRD) |
+| CommunityStylesheet ↔ Collage | [PRD-03](03-stylesheet-themes-and-scoring.md) (CommunityStylesheet is "Community-scoped theme — tied to Contests")                          |
+| Comments                       | `stellar-ui` `CommentsSection`                                                                                                              |
 
 ## Red-green descent targets
 

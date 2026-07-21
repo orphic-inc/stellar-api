@@ -1,5 +1,7 @@
 # Model music releases in three tiers driven by the upload form; edition data is edition-scoped
 
+**Status:** Accepted (2026-06-10). Implemented — `Release` carries `ReleaseArtist` role credits and `Edition[]` in place of the single `artistId` and untyped `edition Json?`, and per-file encoding moved to the `ReleaseFile` satellite. Where each type-specific field belongs is recorded in [ADR-0008](0008-contribution-metadata-satellites.md); the generalized Contribution spine is [PRD-04](../prd/04-contribution-release-music.md).
+
 The music contribution model has drifted from the thing that defines a release —
 the upload form. The form captures **Artist(s) with a role** (Main, Guest, …), a
 **release** (title, year, type, label, catalogue №), an **edition** (remaster /

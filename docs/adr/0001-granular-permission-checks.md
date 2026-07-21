@@ -1,5 +1,7 @@
 # Use granular permission checks; do not introduce role convenience functions
 
+**Status:** Accepted (2026-05-27). Enforced — `isModerator`/`isStaffUser` were removed from all call sites and no role helper exists in the tree; `src/middleware/permissions.ts` exports only permission-named gates.
+
 Stellar has a per-permission system where each user rank stores an explicit map of
 granted permissions (e.g. `forums_moderate`, `reports_manage`, `staff_inbox_manage`).
 We deliberately do not expose named role checks like `isModerator()` or `isStaffUser()`
