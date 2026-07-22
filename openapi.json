@@ -321,6 +321,9 @@
               "profileInfo": {
                 "type": "string",
                 "nullable": true
+              },
+              "profileInfoHtml": {
+                "type": "string"
               }
             },
             "required": [
@@ -360,6 +363,9 @@
           "profileInfo": {
             "type": "string",
             "nullable": true
+          },
+          "profileInfoHtml": {
+            "type": "string"
           }
         },
         "required": [

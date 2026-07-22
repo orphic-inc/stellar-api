@@ -184,7 +184,7 @@ src/
     assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, like cssValidate
     jsonHelpers.ts          # appendToJsonArray, jsonObjectArray, removeFromJsonArrayAtIndex
     ttlCache.ts             # Generic TtlCache<K,V> + top10Cache singleton
-    bbcode.ts               # parseBBCode — BBCode → escaped HTML
+    bbcode/                 # renderBBCode — content-addressed BBCode → sanitized HTML, cached, render-at-read (#398)
     serialize.ts            # sizeBytesToNumber — Contribution.sizeInBytes BigInt → number, overriding the global BigInt→string toJSON for this one contract field
     rankPermissions.ts      # PERMISSION_GROUPS registry + Permission/PermissionMap types and labels — the vocabulary behind requirePermission
     userRankAccess.ts       # computeUserRankAccess/getUserRankAccess + canAccessForumLevel — resolved rank capability slice

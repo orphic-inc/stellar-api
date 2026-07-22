@@ -12,10 +12,14 @@ jest.mock('../lib/prisma', () => ({
   prisma: prismaMock
 }));
 
-// Avoid pulling isomorphic-dompurify (jsdom ESM) through profile.ts → sanitize.
+// Avoid pulling isomorphic-dompurify (jsdom ESM) through profile.ts → sanitize
+// and → bbcode/sanitizeConfig.
 jest.mock('../lib/sanitize', () => ({
   sanitizeHtml: (v: string) => v,
   sanitizePlain: (v: string) => v
+}));
+jest.mock('../lib/bbcode/sanitizeConfig', () => ({
+  sanitizeBBCode: (v: string) => v
 }));
 
 import { buildOverallPercentile, getPercentileSummary } from './profile';

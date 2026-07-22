@@ -3,10 +3,14 @@
  * the pure shaping + paranoia gating in `buildCommunityStats`.
  */
 
-// Avoid pulling isomorphic-dompurify (jsdom ESM) through profile.ts → sanitize.
+// Avoid pulling isomorphic-dompurify (jsdom ESM) through profile.ts → sanitize
+// and → bbcode/sanitizeConfig.
 jest.mock('../lib/sanitize', () => ({
   sanitizeHtml: (v: string) => v,
   sanitizePlain: (v: string) => v
+}));
+jest.mock('../lib/bbcode/sanitizeConfig', () => ({
+  sanitizeBBCode: (v: string) => v
 }));
 
 import { buildCommunityStats } from './profile';

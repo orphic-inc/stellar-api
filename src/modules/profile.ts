@@ -7,11 +7,12 @@ import type {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
-import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
-// The pre-#398 store-time parser; Phase 2 migrates profile onto renderBBCode and
-// retires this (#402). Imported from legacy directly so this consumer doesn't pull
-// the render subsystem's DOMPurify dependency.
-import { parseBBCode } from '../lib/bbcode/legacy';
+import { sanitizePlain } from '../lib/sanitize';
+// Profile info is stored as raw BBCode and transcribed at read time via
+// renderBBCode — the API is the single source of transcription (#398/#402).
+import { renderBBCode } from '../lib/bbcode';
+// Aliased: `createInvite` below has a local `email` parameter.
+import { email as emailConfig } from './config';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
@@ -894,12 +895,21 @@ const buildProfileView = async (
   includeInviteTree: boolean
 ) => {
   const settings = user.userSettings as UserSettingsView;
-  const profile = user.profile ?? {
+  const rawProfile = user.profile ?? {
     id: user.profileId,
     avatar: null,
     avatarMouseoverText: null,
     profileTitle: null,
     profileInfo: null
+  };
+  // Additive render-at-read: keep raw `profileInfo` (the editor round-trips the
+  // source) and attach the transcribed, sanitized `profileInfoHtml` (#398/#402).
+  const profile = {
+    ...rawProfile,
+    profileInfoHtml: await renderBBCode(rawProfile.profileInfo ?? '', {
+      db: prisma,
+      siteUrl: emailConfig.siteUrl
+    })
   };
   const canSeeEmail = viewer.isOwner || viewer.isStaff || settings.showEmail;
   const canSeeLastSeen =
@@ -1184,9 +1194,9 @@ export const updateProfile = async (
             : null
         }),
         ...(data.profileInfo !== undefined && {
-          profileInfo: data.profileInfo
-            ? sanitizeHtml(parseBBCode(data.profileInfo))
-            : null
+          // Store raw BBCode; transcription + sanitization happen at read time
+          // via renderBBCode (#398/#402).
+          profileInfo: data.profileInfo || null
         })
       }
     }),
