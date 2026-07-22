@@ -30,6 +30,8 @@ git remote add upstream git@github.com:orphic-inc/stellar-api.git   # or: git wi
 
 **Dependency bumps** are isolated (own branch/PR), pinned, ADR'd, and atomic with the regen/migration they force — never entangled with feature work (ADR-0009).
 
+> **Adding a dependency with a conditional `exports` map.** Packages whose `package.json` resolves through a conditional `exports` map (e.g. `katex`, `isomorphic-dompurify`, `@sentry/node`, `@prisma/client`) can't be followed by the `import/no-unresolved` resolver Codacy Static Code Analysis runs, so the **Codacy** PR check fails with an unresolved-import issue even though `import katex from 'katex'` type-checks and runs fine. Local `npm run lint` can pass — the local node resolver reads the package's `main` field — so a green local lint is **not** proof the Codacy check will pass. The fix is the established one: add the bare package name to the `ignore` array of the `import/no-unresolved` rule in `.eslintrc.cjs` (that list exists for exactly this class of module). Verify with `npm run lint`, and confirm the Codacy check on the PR goes green.
+
 ## Local pre-commit gate
 
 The **husky** `pre-commit` hook does more than format staged files — it runs, in order:

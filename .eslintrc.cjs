@@ -31,6 +31,7 @@ module.exports = {
           'express-rate-limit',
           'isomorphic-dompurify',
           'jest-mock-extended',
+          'katex',
           'nodemailer'
         ]
       }
