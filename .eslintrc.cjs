@@ -29,6 +29,7 @@ module.exports = {
           '@sentry/node',
           'bcryptjs',
           'express-rate-limit',
+          'isomorphic-dompurify',
           'jest-mock-extended',
           'nodemailer'
         ]
