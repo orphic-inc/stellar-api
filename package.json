@@ -45,7 +45,6 @@
     "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@prisma/client": "^6.19.3",
     "@sentry/node": "^10.55.0",
-    "prisma": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -55,7 +54,9 @@
     "isomorphic-dompurify": "^3.9.0",
     "jsdom": "^29.0.2",
     "jsonwebtoken": "^9.0.2",
+    "katex": "^0.16.47",
     "nodemailer": "^8.0.7",
+    "prisma": "^6.19.3",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.10.0",
     "zod": "^4.3.6"
