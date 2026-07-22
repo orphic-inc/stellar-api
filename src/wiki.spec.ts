@@ -155,6 +155,18 @@ describe('GET /api/wiki/:id', () => {
     expect(res.body.title).toBe('Test Page');
   });
 
+  it('transcribes the raw BBCode body into bodyHtml at read time (#398)', async () => {
+    prismaMock.wikiPage.findFirst.mockResolvedValue(
+      makePage({ body: '[b]Wiki[/b] body' }) as never
+    );
+
+    const res = await request(app).get('/api/wiki/2');
+
+    expect(res.status).toBe(200);
+    expect(res.body.body).toBe('[b]Wiki[/b] body'); // raw source round-trips for the editor
+    expect(res.body.bodyHtml).toBe('<strong>Wiki</strong> body');
+  });
+
   it('returns 404 when page does not exist', async () => {
     prismaMock.wikiPage.findFirst.mockResolvedValue(null);
 

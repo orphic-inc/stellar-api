@@ -15,7 +15,9 @@ import {
   parsedParams,
   parsedQuery
 } from '../../middleware/validate';
-import { sanitizeHtml, sanitizePlain } from '../../lib/sanitize';
+import { sanitizePlain } from '../../lib/sanitize';
+import { renderBBCode } from '../../lib/bbcode';
+import { email } from '../../modules/config';
 import { audit } from '../../lib/audit';
 import {
   createWikiPageSchema,
@@ -38,6 +40,21 @@ const router = express.Router();
 
 // ID of the root wiki article — protected from deletion
 const INDEX_ARTICLE_ID = 1;
+
+// Bodies are stored as raw BBCode and transcribed at read time — the API is the
+// single source of transcription (#398). `renderBBCode` is cached and sanitizes
+// its own output; `siteUrl` drives on-site URL shortening. Attach `bodyHtml`
+// alongside the raw `body` so the editor round-trips the source and the view
+// renders the HTML.
+async function withBodyHtml<T extends { body: string }>(
+  page: T
+): Promise<T & { bodyHtml: string }> {
+  const bodyHtml = await renderBBCode(page.body, {
+    db: prisma,
+    siteUrl: email.siteUrl
+  });
+  return { ...page, bodyHtml };
+}
 
 const PAGE_SELECT = {
   id: true,
@@ -177,7 +194,7 @@ router.get(
         .status(403)
         .json({ msg: 'Insufficient rank to view this page' });
     }
-    res.json(record.page);
+    res.json(await withBodyHtml(record.page));
   })
 );
 
@@ -198,7 +215,7 @@ router.get(
         .status(403)
         .json({ msg: 'Insufficient rank to view this page' });
     }
-    res.json(page);
+    res.json(await withBodyHtml(page));
   })
 );
 
@@ -392,7 +409,8 @@ router.post(
     const minEditLevel = canManage ? (input.minEditLevel ?? 0) : 0;
 
     const title = sanitizePlain(input.title).trim();
-    const body = sanitizeHtml(input.body);
+    // Store raw BBCode; transcription + sanitization happen at read time (#398).
+    const body = input.body;
     const slug = input.slug ? normalizeSlug(input.slug) : normalizeSlug(title);
 
     if (!slug)
@@ -472,7 +490,8 @@ router.put(
     );
 
     const title = input.title ? sanitizePlain(input.title).trim() : page.title;
-    const body = input.body ? sanitizeHtml(input.body) : page.body;
+    // Store raw BBCode; transcription + sanitization happen at read time (#398).
+    const body = input.body ? input.body : page.body;
     const minReadLevel =
       canManage && input.minReadLevel !== undefined
         ? input.minReadLevel

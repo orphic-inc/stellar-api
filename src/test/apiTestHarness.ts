@@ -244,6 +244,13 @@ jest.mock('../lib/sanitize', () => ({
   sanitizePlain: (value: string) => value
 }));
 
+// Same reason as lib/sanitize: the BBCode server sanitizer eagerly loads
+// isomorphic-dompurify (jsdom ESM), which jest can't parse. The emitter's
+// escaping is the real guarantee; render output is asserted in bbcode.spec.ts.
+jest.mock('../lib/bbcode/sanitizeConfig', () => ({
+  sanitizeBBCode: (value: string) => value
+}));
+
 import supertest from 'supertest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';

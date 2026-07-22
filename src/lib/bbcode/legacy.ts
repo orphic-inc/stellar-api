@@ -1,3 +1,6 @@
+// The pre-#398 store-time regex parser. Superseded by renderBBCode (this
+// directory's index) and kept only for its one remaining consumer, profile.ts,
+// until Phase 2 migrates it and deletes this file (#402). Do not add callers.
 const escape = (str: string) =>
   str
     .replace(/&/g, '&amp;')

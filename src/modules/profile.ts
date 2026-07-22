@@ -8,7 +8,10 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
-import { parseBBCode } from '../lib/bbcode';
+// The pre-#398 store-time parser; Phase 2 migrates profile onto renderBBCode and
+// retires this (#402). Imported from legacy directly so this consumer doesn't pull
+// the render subsystem's DOMPurify dependency.
+import { parseBBCode } from '../lib/bbcode/legacy';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
