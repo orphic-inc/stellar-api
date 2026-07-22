@@ -35,6 +35,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 export interface WikiFixture {
+  /**
+   * Deterministic page id (#399). Pinned so `/wiki/:id` (the route is numeric,
+   * not slug) is reproducible across installs and seed cross-links can hard-
+   * reference a stable id. Unique, contiguous from 1; must stay below
+   * WIKI_USER_PAGE_ID_FLOOR.
+   */
+  id: number;
   /** URL slug — also the filename stem under prisma/seed-wiki/. Max 50 chars. */
   slug: string;
   /** Display title. Max 100 chars. */
@@ -46,22 +53,45 @@ export interface WikiFixture {
   citedByCanon: boolean;
 }
 
+/**
+ * User-created wiki pages start here; ids below it are reserved for fixtures
+ * (#399). Leaves headroom (12..999) to add fixtures later without a future id
+ * colliding with member content, which begins at 1000.
+ */
+export const WIKI_USER_PAGE_ID_FLOOR = 1000;
+
 export const BUILTIN_WIKI_FIXTURES: readonly WikiFixture[] = [
-  { slug: 'forum-rules', title: 'Forum Rules', citedByCanon: true },
-  { slug: 'staff-rules', title: 'Staff Rules', citedByCanon: true },
-  { slug: 'invite', title: 'Invites', citedByCanon: true },
-  { slug: 'classes', title: 'User Classes', citedByCanon: true },
-  { slug: 'requests', title: 'Requests', citedByCanon: true },
-  { slug: 'interfaces', title: 'Interface Whitelist', citedByCanon: true },
-  { slug: 'vpns', title: 'Proxies and VPNs', citedByCanon: true },
-  { slug: 'ips', title: 'Static and Shared IP Addresses', citedByCanon: true },
-  { slug: 'autosnatch', title: 'Automated Snatching', citedByCanon: true },
+  { id: 1, slug: 'forum-rules', title: 'Forum Rules', citedByCanon: true },
+  { id: 2, slug: 'staff-rules', title: 'Staff Rules', citedByCanon: true },
+  { id: 3, slug: 'invite', title: 'Invites', citedByCanon: true },
+  { id: 4, slug: 'classes', title: 'User Classes', citedByCanon: true },
+  { id: 5, slug: 'requests', title: 'Requests', citedByCanon: true },
   {
+    id: 6,
+    slug: 'interfaces',
+    title: 'Interface Whitelist',
+    citedByCanon: true
+  },
+  { id: 7, slug: 'vpns', title: 'Proxies and VPNs', citedByCanon: true },
+  {
+    id: 8,
+    slug: 'ips',
+    title: 'Static and Shared IP Addresses',
+    citedByCanon: true
+  },
+  {
+    id: 9,
+    slug: 'autosnatch',
+    title: 'Automated Snatching',
+    citedByCanon: true
+  },
+  {
+    id: 10,
     slug: 'security-disclosure',
     title: 'Reporting a Security Vulnerability',
     citedByCanon: true
   },
-  { slug: 'exploits', title: 'Exploits', citedByCanon: true }
+  { id: 11, slug: 'exploits', title: 'Exploits', citedByCanon: true }
 ];
 
 /** Read a fixture's markdown body off disk. Exported so the drift spec reads the same bytes. */
@@ -80,6 +110,13 @@ export function readWikiFixtureBody(slug: string): string {
  * edits — but a NEW fixture added in a later release still lands on an existing
  * install. (The table-wide shape is the trap #388 records against
  * `seedGoldenRules`, where one existing row suppresses the whole set.)
+ *
+ * Ids are pinned deterministically (#399). Explicit-id inserts don't advance the
+ * autoincrement sequence, so afterwards we push it to WIKI_USER_PAGE_ID_FLOOR
+ * (never regressing past the current MAX) — otherwise the next member-created
+ * page would reuse a fixture id. Note: create-if-absent means the pin only takes
+ * on a fresh row; renumbering an already-populated table needs a reset (a
+ * destructive migration, acceptable pre-alpha per #399).
  */
 export async function seedWikiFixtures(
   client: PrismaClient,
@@ -94,6 +131,7 @@ export async function seedWikiFixtures(
 
     await client.wikiPage.create({
       data: {
+        id: fixture.id,
         slug: fixture.slug,
         title: fixture.title,
         body: readWikiFixtureBody(fixture.slug),
@@ -101,4 +139,16 @@ export async function seedWikiFixtures(
       }
     });
   }
+
+  // Reserve the fixture id block: advance the sequence to the user-page floor,
+  // but never below the current MAX (a busy install may already be past it).
+  // $queryRaw (not $executeRaw) because `SELECT setval` returns a row.
+  await client.$queryRawUnsafe(
+    `SELECT setval(
+       pg_get_serial_sequence('wiki_pages', 'id'),
+       GREATEST(${
+         WIKI_USER_PAGE_ID_FLOOR - 1
+       }, COALESCE((SELECT MAX(id) FROM wiki_pages), 0))
+     )`
+  );
 }

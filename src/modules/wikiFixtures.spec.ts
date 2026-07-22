@@ -14,7 +14,12 @@
 import { PrismaClient } from '@prisma/client';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { BUILTIN_WIKI_FIXTURES, readWikiFixtureBody } from './wikiFixtures';
+import {
+  BUILTIN_WIKI_FIXTURES,
+  WIKI_USER_PAGE_ID_FLOOR,
+  readWikiFixtureBody,
+  seedWikiFixtures
+} from './wikiFixtures';
 import { resolveSiteVariables } from './siteVariables';
 
 // resolveSiteVariables only touches forum.findFirst (the Bugs forum lookup).
@@ -68,5 +73,54 @@ describe('built-in wiki fixtures', () => {
       expect(fixture.title.length).toBeLessThanOrEqual(100);
     }
     expect(new Set(slugs).size).toBe(slugs.length);
+  });
+
+  it('pins deterministic ids: unique, contiguous from 1, below the floor (#399)', () => {
+    const ids = BUILTIN_WIKI_FIXTURES.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(ids.map((_, i) => i + 1)); // 1..N in order
+    expect(Math.max(...ids)).toBeLessThan(WIKI_USER_PAGE_ID_FLOOR);
+  });
+});
+
+describe('seedWikiFixtures', () => {
+  it('creates pages with their pinned ids and reserves the id block (#399)', async () => {
+    const create = jest.fn(async () => ({}));
+    const queryRawUnsafe = jest.fn(async (_sql: string) => 1);
+    const client = {
+      wikiPage: { findUnique: async () => null, create },
+      $queryRawUnsafe: queryRawUnsafe
+    } as unknown as PrismaClient;
+
+    await seedWikiFixtures(client, 42);
+
+    // Every fresh fixture is created with its explicit id (not autoincrement).
+    expect(create).toHaveBeenCalledTimes(BUILTIN_WIKI_FIXTURES.length);
+    for (const fixture of BUILTIN_WIKI_FIXTURES) {
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ id: fixture.id, slug: fixture.slug })
+      });
+    }
+
+    // The sequence is advanced once so member pages don't reuse a fixture id.
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+    const sql = queryRawUnsafe.mock.calls[0][0];
+    expect(sql).toContain('setval');
+    expect(sql).toContain('wiki_pages');
+    expect(sql).toContain(String(WIKI_USER_PAGE_ID_FLOOR - 1));
+  });
+
+  it('skips fixtures that already exist but still reserves the block', async () => {
+    const create = jest.fn(async () => ({}));
+    const queryRawUnsafe = jest.fn(async (_sql: string) => 1);
+    const client = {
+      wikiPage: { findUnique: async () => ({ id: 1 }), create },
+      $queryRawUnsafe: queryRawUnsafe
+    } as unknown as PrismaClient;
+
+    await seedWikiFixtures(client, 42);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
   });
 });
