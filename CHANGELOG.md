@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-07-22
+
 ### Added
 
 - **Server-side BBCode transcription — the API is now the single source of BBCode rendering** ([#398](https://github.com/orphic-inc/stellar-api/issues/398), [#402](https://github.com/orphic-inc/stellar-api/issues/402), [#403](https://github.com/orphic-inc/stellar-api/issues/403)) — every prose surface stored raw BBCode and left each client to parse it, so the UI shipped a second, drifting transcriber. A content-addressed BBCode subsystem (`lib/bbcode/`) now renders raw BBCode to sanitized HTML at read time, cached by content hash, behind one seam (`modules/bbcodeRender.ts`): **Phase 1** re-authored the built-in wiki seeds in the BBCode dialect and wired the wiki read path to emit an additive `bodyHtml`; **Phase 2** extended that render-at-read to forum posts, comments, collages, releases, contributions and staff bios (each gains `bodyHtml`/`descriptionHtml`/`staffBioHtml` beside its unchanged raw field), and moved profile info to store raw BBCode with a rendered `profileInfoHtml`; **Phase 3** added the `[tex]` tag as server-side KaTeX, emitting MathML + HTML spans (and a little inline SVG) and widening the authoritative DOMPurify allowlist to pass that surface. The rendered field is additive — the raw field still round-trips the editor — and the API's allowlist is the authority the UI mirrors (stellar-ui [#207]). The legacy client parser is retired downstream.
@@ -641,7 +643,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/orphic-inc/stellar-api/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/orphic-inc/stellar-api/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/orphic-inc/stellar-api/compare/v0.6.9...v0.7.0
