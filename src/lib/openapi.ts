@@ -347,7 +347,9 @@ const PublicUser = registry.register(
       avatar: z.string().nullable().optional(),
       avatarMouseoverText: z.string().nullable().optional(),
       profileTitle: z.string().nullable().optional(),
-      profileInfo: z.string().nullable().optional()
+      // Raw BBCode; `profileInfoHtml` is the render-time transcription (#398/#402).
+      profileInfo: z.string().nullable().optional(),
+      profileInfoHtml: z.string().optional()
     })
   })
 );
@@ -359,7 +361,9 @@ const ProfileDetails = registry.register(
     avatar: z.string().nullable().optional(),
     avatarMouseoverText: z.string().nullable().optional(),
     profileTitle: z.string().nullable().optional(),
-    profileInfo: z.string().nullable().optional()
+    // Raw BBCode; `profileInfoHtml` is the render-time transcription (#398/#402).
+    profileInfo: z.string().nullable().optional(),
+    profileInfoHtml: z.string().optional()
   })
 );
 

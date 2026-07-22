@@ -11535,6 +11535,7 @@ export interface components {
         avatarMouseoverText?: string | null;
         profileTitle?: string | null;
         profileInfo?: string | null;
+        profileInfoHtml?: string;
       };
     };
     ProfileDetails: {
@@ -11543,6 +11544,7 @@ export interface components {
       avatarMouseoverText?: string | null;
       profileTitle?: string | null;
       profileInfo?: string | null;
+      profileInfoHtml?: string;
     };
     UserRankSummary: {
       name: string;

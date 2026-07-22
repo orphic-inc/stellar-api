@@ -592,7 +592,8 @@ describe('API auth/profile/user flows', () => {
         avatar: null,
         avatarMouseoverText: null,
         profileTitle: 'New Title',
-        profileInfo: null
+        profileInfo: null,
+        profileInfoHtml: ''
       },
       userSettings: {
         id: 4,
@@ -707,7 +708,8 @@ describe('API auth/profile/user flows', () => {
         avatar: null,
         avatarMouseoverText: null,
         profileTitle: 'Title',
-        profileInfo: '<p>bio</p>'
+        profileInfo: '<p>bio</p>',
+        profileInfoHtml: '<p>bio</p>'
       },
       userSettings: {
         id: 4,
@@ -794,7 +796,8 @@ describe('API auth/profile/user flows', () => {
         avatar: null,
         avatarMouseoverText: null,
         profileTitle: 'Hidden Stats',
-        profileInfo: '<p>bio</p>'
+        profileInfo: '<p>bio</p>',
+        profileInfoHtml: '<p>bio</p>'
       },
       activitySummary: {
         contributions: 0,
