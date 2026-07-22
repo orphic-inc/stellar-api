@@ -2,3 +2,8 @@
 # committed file never drifts from a fresh `prisma generate` / export.
 docs/erd.md
 openapi.json
+
+# Wiki seed bodies carry BBCode, not Markdown (transcribed at read time by
+# renderBBCode, #398). Prettier's Markdown formatter corrupts them — it escapes
+# the `[*]` list markers to `[\*]`, which the tokenizer no longer recognizes.
+prisma/seed-wiki/
