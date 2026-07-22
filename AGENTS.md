@@ -105,6 +105,7 @@ src/
     asyncHandler.ts         # Wraps async routes; catches errors, 10s timeout
     installState.ts         # In-memory cache for isInstalled() check
     logging.ts              # Winston logger factory (JSON in prod, pretty in dev)
+    bbcodeRender.ts         # renderSiteBBCode/withBodyHtml — wires the app prisma+siteUrl into lib/bbcode; the render-at-read seam every prose surface uses (#402)
     assetStore.ts           # Content-addressed binary asset store (ADR-0026): putAsset/getAssetByHash over a Postgres Bytes column
     linkHealth.ts           # HEAD-request link checker + auto-warn on 3+ reports; computePulse + getCommunityHealthPulse; applyHealthAccrual (per-contribution PASS-uptime accumulator, #95/ADR-0019)
     linkHealthJob.ts        # Background job: recheck stale contribution links every 24h

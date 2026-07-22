@@ -33,6 +33,7 @@ import {
 } from '../../../lib/pagination';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
+import { renderSiteBBCode } from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
@@ -75,9 +76,12 @@ const editHistoryInclude = {
   }
 };
 
-const serializeForumPost = (post: RawPost) => ({
+const serializeForumPost = async (post: RawPost) => ({
   ...post,
   author: toAuthorRefOrNull(post.author),
+  // Additive render-at-read: `body` is unchanged; `bodyHtml` is the
+  // server-rendered transcription display surfaces consume (#402).
+  bodyHtml: await renderSiteBBCode(post.body),
   ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
   edits: undefined
 });
@@ -128,7 +132,7 @@ router.get(
     ]);
     paginatedResponse(
       res,
-      posts.map((post) => serializeForumPost(post)),
+      await Promise.all(posts.map((post) => serializeForumPost(post))),
       total,
       pg
     );
@@ -168,7 +172,7 @@ router.get(
       include: publicPostInclude
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    res.json(serializeForumPost(post));
+    res.json(await serializeForumPost(post));
   })
 );
 
@@ -239,7 +243,9 @@ router.post(
     };
 
     const post = await replyToTopic(forumId, forumTopicId, actor, body);
-    res.status(201).json(post);
+    res
+      .status(201)
+      .json({ ...post, bodyHtml: await renderSiteBBCode(post.body) });
   })
 );
 
@@ -285,7 +291,7 @@ router.put(
       include: publicPostInclude
     });
     if (!updated) return res.status(404).json({ msg: 'Post not found' });
-    res.json(serializeForumPost(updated));
+    res.json(await serializeForumPost(updated));
   })
 );
 

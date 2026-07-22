@@ -31,6 +31,7 @@ import {
 } from '../../../schemas/contribution';
 import { getSettings } from '../../../modules/settings';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
+import { renderSiteBBCode } from '../../../modules/bbcodeRender';
 
 const router = express.Router();
 const contributionIdParamsSchema = z.object({
@@ -141,10 +142,13 @@ router.get(
     res.json({
       ...contribution,
       sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes),
-      comments: contribution.comments.map((comment) => ({
-        ...comment,
-        author: toAuthorRefOrNull(comment.author)
-      }))
+      comments: await Promise.all(
+        contribution.comments.map(async (comment) => ({
+          ...comment,
+          author: toAuthorRefOrNull(comment.author),
+          bodyHtml: await renderSiteBBCode(comment.body)
+        }))
+      )
     });
   })
 );

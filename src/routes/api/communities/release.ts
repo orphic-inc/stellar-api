@@ -39,6 +39,7 @@ import {
   deleteCommunityRelease
 } from '../../../modules/releaseLifecycle';
 import { listCommunityReleases } from '../../../modules/releaseBrowse';
+import { renderSiteBBCode } from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
 const communityIdParamsSchema = z.object({
@@ -51,9 +52,12 @@ const releaseParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive()
 });
 
-const serializeReleaseWorkbenchView = (view: ReleaseWorkbenchView) => {
+const serializeReleaseWorkbenchView = async (view: ReleaseWorkbenchView) => {
   return {
     ...view.release,
+    // Additive render-at-read: raw `description` is unchanged; `descriptionHtml`
+    // is the server-rendered BBCode transcription the detail view consumes (#402).
+    descriptionHtml: await renderSiteBBCode(view.release.description),
     tags: view.tags,
     myVote: view.myVote,
     releaseTags: view.releaseTags,
@@ -141,7 +145,7 @@ router.post(
       permissions: req.user.permissions
     });
     const view = await session.revertHistory({ historyId });
-    res.json(serializeReleaseWorkbenchView(view));
+    res.json(await serializeReleaseWorkbenchView(view));
   })
 );
 
@@ -161,7 +165,7 @@ router.get(
       releaseId,
       permissions: req.user.permissions
     });
-    res.json(serializeReleaseWorkbenchView(await session.getView()));
+    res.json(await serializeReleaseWorkbenchView(await session.getView()));
   })
 );
 
@@ -208,7 +212,7 @@ router.put(
       year,
       editSummary
     });
-    res.json(serializeReleaseWorkbenchView(view));
+    res.json(await serializeReleaseWorkbenchView(view));
   })
 );
 

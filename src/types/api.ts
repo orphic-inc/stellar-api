@@ -12047,6 +12047,7 @@ export interface components {
       forumTopicId: number;
       authorId: number;
       body: string;
+      bodyHtml?: string;
       lastEdit?: components['schemas']['ForumPostLastEdit'];
       author?: {
         id: number;
@@ -12245,6 +12246,7 @@ export interface components {
       releaseType?: string | null;
       image?: string | null;
       description?: string | null;
+      descriptionHtml?: string;
       createdAt?: string;
       artist?: components['schemas']['ReleaseArtist'] & unknown;
       tags?: components['schemas']['ReleaseTag'][];
@@ -12340,6 +12342,7 @@ export interface components {
       rankColor: string;
       lastSeen: string | null;
       staffBio: string | null;
+      staffBioHtml?: string;
     };
     StaffGroupWithMembers: {
       id: number | null;
@@ -12351,6 +12354,7 @@ export interface components {
       id: number;
       page: string;
       body: string;
+      bodyHtml?: string;
       authorId: number;
       createdAt: string;
       author?: {

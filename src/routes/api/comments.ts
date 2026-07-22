@@ -29,6 +29,7 @@ import {
   type UpdateCommentInput
 } from '../../schemas/comment';
 import { deleteComment } from '../../modules/comment';
+import { renderSiteBBCode } from '../../modules/bbcodeRender';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
 const router = express.Router();
@@ -67,10 +68,13 @@ router.get(
       }),
       prisma.comment.count({ where: { ...where, deletedAt: null } })
     ]);
-    const mapped = comments.map((comment) => ({
-      ...comment,
-      author: toAuthorRefOrNull(comment.author)
-    }));
+    const mapped = await Promise.all(
+      comments.map(async (comment) => ({
+        ...comment,
+        author: toAuthorRefOrNull(comment.author),
+        bodyHtml: await renderSiteBBCode(comment.body)
+      }))
+    );
     paginatedResponse(res, mapped, total, pg);
   })
 );
@@ -88,7 +92,11 @@ router.get(
       }
     });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
-    res.json({ ...comment, author: toAuthorRefOrNull(comment.author) });
+    res.json({
+      ...comment,
+      author: toAuthorRefOrNull(comment.author),
+      bodyHtml: await renderSiteBBCode(comment.body)
+    });
   })
 );
 
@@ -183,9 +191,11 @@ router.post(
       return created;
     });
 
-    res
-      .status(201)
-      .json({ ...comment, author: toAuthorRefOrNull(comment.author) });
+    res.status(201).json({
+      ...comment,
+      author: toAuthorRefOrNull(comment.author),
+      bodyHtml: await renderSiteBBCode(comment.body)
+    });
   })
 );
 
@@ -267,7 +277,7 @@ router.put(
       return result;
     });
 
-    res.json(updated);
+    res.json({ ...updated, bodyHtml: await renderSiteBBCode(updated.body) });
   })
 );
 

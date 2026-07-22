@@ -2195,7 +2195,9 @@ const ForumPost = registry.register(
     id: z.number(),
     forumTopicId: z.number(),
     authorId: z.number(),
+    // Raw BBCode; `bodyHtml` is the render-time transcription (#402).
     body: z.string(),
+    bodyHtml: z.string().optional(),
     lastEdit: ForumPostLastEdit.optional(),
     author: AuthorRef.optional(),
     createdAt: z.string(),
@@ -3076,7 +3078,9 @@ const Release = registry.register(
     type: z.string().nullable().optional(),
     releaseType: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
+    // Raw BBCode; `descriptionHtml` is the render-time transcription (#402).
     description: z.string().nullable().optional(),
+    descriptionHtml: z.string().optional(),
     createdAt: z.string().optional(),
     artist: ReleaseArtist.nullable().optional(),
     tags: z.array(ReleaseTag).optional(),
@@ -3158,7 +3162,9 @@ const StaffMember = registry.register(
     rankName: z.string(),
     rankColor: z.string(),
     lastSeen: z.string().nullable(),
-    staffBio: z.string().nullable()
+    // Raw BBCode; `staffBioHtml` is the render-time transcription (#402).
+    staffBio: z.string().nullable(),
+    staffBioHtml: z.string().optional()
   })
 );
 
@@ -3702,7 +3708,9 @@ const Comment = registry.register(
   z.object({
     id: z.number(),
     page: z.string(),
+    // Raw BBCode; `bodyHtml` is the render-time transcription (#402).
     body: z.string(),
+    bodyHtml: z.string().optional(),
     authorId: z.number(),
     createdAt: z.string(),
     author: AuthorRef.optional()

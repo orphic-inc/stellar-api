@@ -8,6 +8,13 @@ jest.mock('../lib/prisma', () => ({
   }
 }));
 
+// staff → bbcodeRender → bbcode/sanitizeConfig eagerly loads isomorphic-dompurify
+// (jsdom ESM), which jest can't parse. Stub the sanitizer; render output is
+// covered by bbcode.spec.ts.
+jest.mock('../lib/bbcode/sanitizeConfig', () => ({
+  sanitizeBBCode: (v: string) => v
+}));
+
 import { getStaffList } from './staff';
 
 const makeGroup = (id: number, name: string, sortOrder: number) => ({
