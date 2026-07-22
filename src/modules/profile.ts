@@ -8,11 +8,10 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { sanitizePlain } from '../lib/sanitize';
-// Profile info is stored as raw BBCode and transcribed at read time via
-// renderBBCode — the API is the single source of transcription (#398/#402).
-import { renderBBCode } from '../lib/bbcode';
-// Aliased: `createInvite` below has a local `email` parameter.
-import { email as emailConfig } from './config';
+// Profile info is stored as raw BBCode and transcribed at read time via the
+// shared render-at-read seam — the API is the single source of transcription
+// (#398/#402).
+import { renderSiteBBCode } from './bbcodeRender';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
@@ -906,10 +905,7 @@ const buildProfileView = async (
   // source) and attach the transcribed, sanitized `profileInfoHtml` (#398/#402).
   const profile = {
     ...rawProfile,
-    profileInfoHtml: await renderBBCode(rawProfile.profileInfo ?? '', {
-      db: prisma,
-      siteUrl: emailConfig.siteUrl
-    })
+    profileInfoHtml: await renderSiteBBCode(rawProfile.profileInfo)
   };
   const canSeeEmail = viewer.isOwner || viewer.isStaff || settings.showEmail;
   const canSeeLastSeen =
