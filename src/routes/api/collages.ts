@@ -21,6 +21,7 @@ import {
   withPrimaryArtist
 } from '../../modules/releaseCredits';
 import { sanitizeHtml } from '../../lib/sanitize';
+import { renderSiteBBCode } from '../../modules/bbcodeRender';
 import {
   parsedPage,
   paginatedResponse,
@@ -131,7 +132,13 @@ router.get(
       prisma.collage.count({ where })
     ]);
 
-    paginatedResponse(res, collages, total, pg);
+    const mapped = await Promise.all(
+      collages.map(async (collage) => ({
+        ...collage,
+        descriptionHtml: await renderSiteBBCode(collage.description)
+      }))
+    );
+    paginatedResponse(res, mapped, total, pg);
   })
 );
 
@@ -207,6 +214,7 @@ router.get(
 
     res.json({
       ...collage,
+      descriptionHtml: await renderSiteBBCode(collage.description),
       entries: collage.entries.map((entry) => ({
         ...entry,
         release: withPrimaryArtist(entry.release)
@@ -276,7 +284,10 @@ router.post(
       include: collageInclude
     });
 
-    res.status(201).json(collage);
+    res.status(201).json({
+      ...collage,
+      descriptionHtml: await renderSiteBBCode(collage.description)
+    });
   })
 );
 
@@ -368,7 +379,10 @@ router.put(
       include: collageInclude
     });
 
-    res.json(updated);
+    res.json({
+      ...updated,
+      descriptionHtml: await renderSiteBBCode(updated.description)
+    });
   })
 );
 
@@ -439,7 +453,10 @@ router.post(
       include: collageInclude
     });
 
-    res.json(updated);
+    res.json({
+      ...updated,
+      descriptionHtml: await renderSiteBBCode(updated.description)
+    });
   })
 );
 

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { renderSiteBBCode } from './bbcodeRender';
 
 export async function getStaffList() {
   const [groups, staffUsers] = await Promise.all([
@@ -29,28 +30,33 @@ export async function getStaffList() {
     byGroup.get(key)!.push(u);
   }
 
-  const toMember = (u: (typeof staffUsers)[number]) => ({
+  // Additive render-at-read: raw `staffBio` is unchanged; `staffBioHtml` is the
+  // server-rendered BBCode transcription the staff roster consumes (#402).
+  const toMember = async (u: (typeof staffUsers)[number]) => ({
     userId: u.id,
     username: u.username,
     rankName: u.userRank.name,
     rankColor: u.userRank.color,
     lastSeen: u.lastLogin?.toISOString() ?? null,
-    staffBio: u.staffBio ?? null
+    staffBio: u.staffBio ?? null,
+    staffBioHtml: await renderSiteBBCode(u.staffBio)
   });
 
   type StaffGroupRow = {
     id: number | null;
     name: string;
     sortOrder: number;
-    members: ReturnType<typeof toMember>[];
+    members: Awaited<ReturnType<typeof toMember>>[];
   };
 
-  const result: StaffGroupRow[] = groups.map((g) => ({
-    id: g.id,
-    name: g.name,
-    sortOrder: g.sortOrder,
-    members: (byGroup.get(g.id) ?? []).map(toMember)
-  }));
+  const result: StaffGroupRow[] = await Promise.all(
+    groups.map(async (g) => ({
+      id: g.id,
+      name: g.name,
+      sortOrder: g.sortOrder,
+      members: await Promise.all((byGroup.get(g.id) ?? []).map(toMember))
+    }))
+  );
 
   const ungrouped = byGroup.get(null) ?? [];
   if (ungrouped.length > 0) {
@@ -58,7 +64,7 @@ export async function getStaffList() {
       id: null,
       name: 'Ungrouped',
       sortOrder: 9999,
-      members: ungrouped.map(toMember)
+      members: await Promise.all(ungrouped.map(toMember))
     });
   }
 

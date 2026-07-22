@@ -9,6 +9,7 @@ import {
   castVote
 } from './forum';
 import { authorRefSelect, toAuthorRefOrNull } from './authorRef';
+import { renderSiteBBCode } from './bbcodeRender';
 import type { PageParams } from '../lib/pagination';
 
 // ─── Actor ───────────────────────────────────────────────────────────────────
@@ -57,9 +58,12 @@ type RawPost = Awaited<
   >
 >[number];
 
-const serializePost = (post: RawPost) => ({
+const serializePost = async (post: RawPost) => ({
   ...post,
   author: toAuthorRefOrNull(post.author),
+  // Additive render-at-read: raw `body` is unchanged; `bodyHtml` is the
+  // server-rendered transcription display surfaces consume (#402).
+  bodyHtml: await renderSiteBBCode(post.body),
   ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
   edits: undefined
 });
@@ -137,7 +141,7 @@ export const getTopicSession = async (
     })
   ]);
 
-  const serializedPosts = posts.map(serializePost);
+  const serializedPosts = await Promise.all(posts.map(serializePost));
   const lastVisiblePostId =
     serializedPosts.length > 0
       ? serializedPosts[serializedPosts.length - 1].id
