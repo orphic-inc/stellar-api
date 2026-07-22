@@ -1,3 +1,4 @@
+import katex from 'katex';
 import { BBCtx } from './ctx';
 import { extractReleaseId, ResolveMaps } from './resolve';
 import { Node } from './types';
@@ -59,6 +60,23 @@ function linkFromUrl(url: string, ctx: BBCtx): string {
     escapeText(display),
     external && !safe.startsWith(ctx.siteUrl)
   );
+}
+
+// [tex] is a raw-content tag: its body is literal LaTeX, rendered server-side by
+// KaTeX (#403). The output (MathML + HTML spans + a little SVG) is passed through
+// the sanitize allowlist like everything else. `throwOnError: false` renders a
+// parse error inline as a red node rather than throwing; the try/catch is the
+// belt-and-suspenders so a render-at-read call can never 500 — on any failure we
+// fall back to the Phase 1 literal-source rendering.
+function renderTex(src: string): string {
+  try {
+    return katex.renderToString(src, {
+      throwOnError: false,
+      output: 'htmlAndMathml'
+    });
+  } catch {
+    return `<code class="bbcode-tex">${escapeText(src)}</code>`;
+  }
 }
 
 function emitText(value: string, ctx: BBCtx, opts: Opts): string {
@@ -256,12 +274,11 @@ function emitNode(
 ): string {
   if (node.kind === 'text') return emitText(node.value, ctx, opts);
   if (node.kind === 'raw') {
-    const content = escapeText(node.content);
-    if (node.tag === 'pre') return `<pre class="bbcode-pre">${content}</pre>`;
+    if (node.tag === 'pre')
+      return `<pre class="bbcode-pre">${escapeText(node.content)}</pre>`;
     if (node.tag === 'code')
-      return `<code class="bbcode-code">${content}</code>`;
-    // tex: Phase 1 shows the literal LaTeX source; #403 swaps in server KaTeX.
-    return `<code class="bbcode-tex">${content}</code>`;
+      return `<code class="bbcode-code">${escapeText(node.content)}</code>`;
+    return renderTex(node.content);
   }
   return emitElement(node, maps, ctx, opts);
 }

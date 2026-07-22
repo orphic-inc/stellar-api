@@ -180,6 +180,20 @@ describe('bbcode — raw-content tags', () => {
       '<pre class="bbcode-pre">  two  spaces</pre>'
     );
   });
+  it('tex renders LaTeX via server KaTeX (MathML + html)', () => {
+    const out = bb('[tex]E = mc^2[/tex]');
+    expect(out).toContain('<span class="katex">');
+    expect(out).toContain('<math xmlns="http://www.w3.org/1998/Math/MathML">');
+    // The source round-trips verbatim in the MathML annotation.
+    expect(out).toContain(
+      '<annotation encoding="application/x-tex">E = mc^2</annotation>'
+    );
+  });
+  it('tex does not parse its body as BBCode', () => {
+    const out = bb('[tex][i]x[/i][/tex]');
+    expect(out).not.toContain('<em>'); // [i] reached KaTeX as literal LaTeX
+    expect(out).toContain('[i]x[/i]'); // preserved verbatim in the annotation
+  });
 });
 
 describe('bbcode — tokenizer/stack semantics', () => {
