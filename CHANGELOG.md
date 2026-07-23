@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Bulk-remove consumed release bookmarks** ([#296](https://github.com/orphic-inc/stellar-api/issues/296)) — the bookmark list is a consumption queue, but it was read-only once a member started grabbing from it: clearing the releases you had already consumed meant unbookmarking them one at a time. `DELETE /api/bookmarks/releases/consumed` now removes the caller's release bookmarks for any release they hold a live (`COMPLETED`) `DownloadAccessGrant` on, returning `{ removed: n }`. A release fans out to many contributions (editions/rips), so a single grab clears the bookmark; a reversed grant (claw-back flips the status to `REVERSED`) does not count, while a Freepass/Neutralpass grant does, since the member still downloaded it. Self-scoped and idempotent — `removed: 0` is a success, not a 404. The paired stellar-ui "Remove consumed" button is tracked downstream.
+
 ### Changed
 
 - **`User.ratio` is computed at read time, not stored** ([#294](https://github.com/orphic-inc/stellar-api/issues/294)) — the column was a denormalization of `computeRatio(contributed, consumed)`, a pure function of two adjacent columns, and it appeared in no `WHERE` and no `ORDER BY` (the top-10 user ranking orders by contribution/consume _speed_, never ratio), so the stored copy bought no query performance and only created drift surface. Every read site now derives it — `auth.ts`, `profile.ts`, `search.ts`, and both the ORM and raw-SQL branches of `top10.ts` — and every response payload still carries `ratio`, so the API contract is unchanged. Two dead columns go with it: `ratioWatchDownload`, superseded by `RatioPolicyState` (which carries `consumedAtWatchStart` and derives the watch-period delta), and `totalEarned`, which nothing read. `canDownload` stays — it is an independent download-capability flag read as a hard gate on the grant path, documented in the schema as such rather than a projection of ratio.

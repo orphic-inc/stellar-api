@@ -8,6 +8,7 @@ import {
   releaseCreditsSelect,
   withPrimaryArtist
 } from '../../modules/releaseCredits';
+import { removeConsumedReleaseBookmarks } from '../../modules/bookmark';
 
 const router = express.Router();
 
@@ -122,6 +123,17 @@ router.post(
       data: { userId: req.user.id, releaseId }
     });
     res.json({ bookmarked: true });
+  })
+);
+
+// Static segment must precede '/releases/:releaseId' or Express shadows it and
+// validateParams 400s on "consumed".
+router.delete(
+  '/releases/consumed',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const removed = await removeConsumedReleaseBookmarks(req.user.id);
+    res.json({ removed });
   })
 );
 

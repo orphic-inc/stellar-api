@@ -6978,6 +6978,23 @@ registerBookmark('releases', 'releaseId', releaseBookmark);
 registerBookmark('communities', 'communityId', communityBookmark);
 registerBookmark('requests', 'requestId', requestBookmark);
 
+registry.registerPath({
+  method: 'delete',
+  path: '/bookmarks/releases/consumed',
+  tags: ['Bookmarks'],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: {
+      description: 'Removed the caller’s release bookmarks they have consumed',
+      content: {
+        'application/json': {
+          schema: z.object({ removed: z.number() })
+        }
+      }
+    }
+  }
+});
+
 // ─── Random ───────────────────────────────────────────────────────────────────
 
 registry.registerPath({

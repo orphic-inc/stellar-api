@@ -19052,6 +19052,38 @@
         }
       }
     },
+    "/bookmarks/releases/consumed": {
+      "delete": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed the caller’s release bookmarks they have consumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "removed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/random/release": {
       "get": {
         "tags": [
