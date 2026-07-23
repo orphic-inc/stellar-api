@@ -6,6 +6,14 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **`User.ratio` is computed at read time, not stored** ([#294](https://github.com/orphic-inc/stellar-api/issues/294)) — the column was a denormalization of `computeRatio(contributed, consumed)`, a pure function of two adjacent columns, and it appeared in no `WHERE` and no `ORDER BY` (the top-10 user ranking orders by contribution/consume _speed_, never ratio), so the stored copy bought no query performance and only created drift surface. Every read site now derives it — `auth.ts`, `profile.ts`, `search.ts`, and both the ORM and raw-SQL branches of `top10.ts` — and every response payload still carries `ratio`, so the API contract is unchanged. Two dead columns go with it: `ratioWatchDownload`, superseded by `RatioPolicyState` (which carries `consumedAtWatchStart` and derives the watch-period delta), and `totalEarned`, which nothing read. `canDownload` stays — it is an independent download-capability flag read as a hard gate on the grant path, documented in the schema as such rather than a projection of ratio.
+
+### Fixed
+
+- **Balance claw-backs floor at zero instead of going negative** ([#294](https://github.com/orphic-inc/stellar-api/issues/294)) — the download-reversal and request-unfill/refund paths decremented `contributed`/`consumed` unclamped while computing the derived ratio from a floored value, so a balance set out-of-band below the reversed amount (as the e2e seed does, and any future staff balance-adjustment would) could be driven negative. A single tested `floorSub` helper now floors every reversal site at zero.
+
 ## [0.8.2] — 2026-07-22
 
 ### Added
