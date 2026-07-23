@@ -558,7 +558,6 @@ describe('GET /api/search/users', () => {
           email: true,
           lastLogin: true,
           disabled: true,
-          ratio: true,
           contributed: true,
           consumed: true
         })

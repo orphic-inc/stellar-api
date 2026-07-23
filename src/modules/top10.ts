@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { computeRatio } from './ratio';
 import type {
   ReleasesQuery,
   UsersQuery,
@@ -286,7 +287,6 @@ type SpeedRow = {
   avatar: string | null;
   contributed: bigint;
   consumed: bigint;
-  ratio: number;
   dateRegistered: Date;
   rankName: string;
   rankLevel: number;
@@ -311,7 +311,6 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
         u.avatar,
         u.contributed,
         u.consumed,
-        u.ratio,
         u."dateRegistered",
         ur.name AS "rankName",
         ur.level AS "rankLevel",
@@ -334,7 +333,7 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
         AND u.contributed > 0
         AND us."showContributedStats" = true
         AND us."showConsumedStats" = true
-      GROUP BY u.id, u.username, u.avatar, u.contributed, u.consumed, u.ratio,
+      GROUP BY u.id, u.username, u.avatar, u.contributed, u.consumed,
                u."dateRegistered", ur.name, ur.level
       ORDER BY ${orderCol} DESC
       LIMIT ${limit}
@@ -347,7 +346,7 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
       avatar: row.avatar,
       contributed: String(row.contributed),
       consumed: String(row.consumed),
-      ratio: row.ratio,
+      ratio: computeRatio(row.contributed, row.consumed),
       numContributions: Number(row.numContributions),
       contributionSpeed: Number(row.contributionSpeed),
       consumeSpeed: Number(row.consumeSpeed),
@@ -383,7 +382,6 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
       avatar: true,
       contributed: true,
       consumed: true,
-      ratio: true,
       dateRegistered: true,
       userRank: { select: { name: true, level: true } },
       _count: { select: { contributions: true } }
@@ -399,7 +397,7 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
       avatar: u.avatar,
       contributed: String(u.contributed),
       consumed: String(u.consumed),
-      ratio: u.ratio,
+      ratio: computeRatio(u.contributed, u.consumed),
       numContributions: u._count.contributions,
       contributionSpeed: Number(u.contributed) / secondsAlive,
       consumeSpeed: Number(u.consumed) / secondsAlive,

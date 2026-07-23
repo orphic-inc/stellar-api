@@ -25,7 +25,6 @@ export const authUserSelect = {
   lastLogin: true,
   contributed: true,
   consumed: true,
-  ratio: true,
   userRank: {
     select: {
       id: true,
@@ -60,6 +59,8 @@ type RawAuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
 export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
   contributed: string;
   consumed: string;
+  // Derived from contributed/consumed at read time (computeRatio), not stored.
+  ratio: number;
 };
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => ({

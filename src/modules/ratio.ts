@@ -29,6 +29,12 @@ export const computeRatio = (contributed: bigint, consumed: bigint): number => {
   return Number(contributed) / Number(consumed);
 };
 
+// Floored subtraction for balance claw-backs: never returns a negative. Balances
+// can be set out-of-band (seeds, staff adjustment) below the amount being
+// reversed, and an unclamped decrement would drive `contributed`/`consumed`
+// negative. One tested helper so every reversal/refund site clamps identically.
+export const floorSub = (a: bigint, b: bigint): bigint => (a >= b ? a - b : 0n);
+
 export const getConsumptionBracket = (
   consumedBytes: bigint
 ): { maxRequired: number; minRequired: number; label: string } => {

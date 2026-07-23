@@ -1012,13 +1012,11 @@ describe('requests.unfillRequest', () => {
       canModerateRequests: true
     });
 
+    // Claw-back clamps to the floored value (110000000 - 110000000 = 0).
     expect(prismaMock.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 42 },
-        data: expect.objectContaining({
-          contributed: { decrement: BigInt(110_000_000) },
-          ratio: expect.any(Number)
-        })
+        data: { contributed: 0n }
       })
     );
   });

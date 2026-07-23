@@ -6,7 +6,7 @@ import {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { getLogger } from './logging';
-import { computeRatio } from './ratio';
+import { floorSub } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
 
 const log = getLogger('downloads');
@@ -105,37 +105,25 @@ export const grantDownloadAccess = async (
         throw new AppError(400, 'Insufficient contributed balance');
 
       // CAS: atomically increment consumed, guarding against concurrent balance drain
-      const newConsumed = consumer.consumed + cost;
-      const newRatio = computeRatio(consumer.contributed, newConsumed);
       const debited = await tx.user.updateMany({
         where: {
           id: consumerId,
           consumed: { lte: consumer.contributed - cost }
         },
         data: {
-          consumed: { increment: cost },
-          ratio: newRatio
+          consumed: { increment: cost }
         }
       });
       if (debited.count === 0)
         throw new AppError(409, 'Balance changed concurrently, please retry');
     }
 
-    // Credit contributor balance and recompute ratio (skipped for NEUTRALPASS).
+    // Credit contributor balance (skipped for NEUTRALPASS).
     if (!suppressContributor) {
-      const contributor = await tx.user.findUniqueOrThrow({
-        where: { id: contribution.userId },
-        select: { consumed: true, contributed: true }
-      });
-      const newContributorRatio = computeRatio(
-        contributor.contributed + cost,
-        contributor.consumed
-      );
       await tx.user.update({
         where: { id: contribution.userId },
         data: {
-          contributed: { increment: cost },
-          ratio: newContributorRatio
+          contributed: { increment: cost }
         }
       });
     }
@@ -241,37 +229,21 @@ export const reverseDownloadAccess = async (
     const suppressConsumer = grant.ratioExempt !== RatioExempt.NONE;
     const suppressContributor = grant.ratioExempt === RatioExempt.NEUTRALPASS;
 
-    // Refund consumer (consumed decrements; contributed unchanged).
+    // Refund consumer (consumed decrements; contributed unchanged). floorSub keeps
+    // the balance from going negative if it was set out-of-band below the grant.
     if (!suppressConsumer) {
-      const consumerNewConsumed = consumer.consumed - grant.amountBytes;
-      const consumerNewRatio = computeRatio(
-        consumer.contributed,
-        consumerNewConsumed < 0n ? 0n : consumerNewConsumed
-      );
       await tx.user.update({
         where: { id: grant.consumerId },
-        data: {
-          consumed: { decrement: grant.amountBytes },
-          ratio: consumerNewRatio
-        }
+        data: { consumed: floorSub(consumer.consumed, grant.amountBytes) }
       });
     }
 
-    // Claw back from contributor balance.
+    // Claw back from contributor balance, floored at zero (same rationale).
     if (!suppressContributor) {
-      const contribNewContributed =
-        contributor.contributed >= grant.amountBytes
-          ? contributor.contributed - grant.amountBytes
-          : 0n;
-      const contribNewRatio = computeRatio(
-        contribNewContributed,
-        contributor.consumed
-      );
       await tx.user.update({
         where: { id: grant.contributorId },
         data: {
-          contributed: { decrement: grant.amountBytes },
-          ratio: contribNewRatio
+          contributed: floorSub(contributor.contributed, grant.amountBytes)
         }
       });
     }

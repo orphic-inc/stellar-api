@@ -232,8 +232,7 @@ describe('createRequest', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          consumed: { increment: MINIMUM_BOUNTY },
-          ratio: expect.any(Number)
+          consumed: { increment: MINIMUM_BOUNTY }
         })
       })
     );
@@ -315,8 +314,7 @@ describe('addBounty', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          consumed: { increment: MINIMUM_BOUNTY },
-          ratio: expect.any(Number)
+          consumed: { increment: MINIMUM_BOUNTY }
         })
       })
     );
@@ -452,8 +450,7 @@ describe('fillRequest', () => {
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          contributed: { increment: bountyAmount },
-          ratio: expect.any(Number)
+          contributed: { increment: bountyAmount }
         })
       })
     );
@@ -694,13 +691,11 @@ describe('unfillRequest', () => {
       reason: 'Incorrect fill'
     });
 
+    // Claw-back clamps to the floored value (209715200 - 209715200 = 0).
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 7 },
-        data: expect.objectContaining({
-          contributed: { decrement: BigInt('209715200') },
-          ratio: expect.any(Number)
-        })
+        data: { contributed: 0n }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
@@ -798,24 +793,19 @@ describe('deleteRequest', () => {
     });
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
+    // Refunds clamp to the floored value (each user's consumed == its bounty → 0).
     expect(mockTx.user.update).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         where: { id: 1 },
-        data: expect.objectContaining({
-          consumed: { decrement: BigInt('104857600') },
-          ratio: expect.any(Number)
-        })
+        data: { consumed: 0n }
       })
     );
     expect(mockTx.user.update).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         where: { id: 2 },
-        data: expect.objectContaining({
-          consumed: { decrement: BigInt('52428800') },
-          ratio: expect.any(Number)
-        })
+        data: { consumed: 0n }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);

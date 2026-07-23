@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler } from '../../modules/asyncHandler';
+import { computeRatio } from '../../modules/ratio';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
 import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
@@ -489,7 +490,6 @@ const USER_SELECT_STAFF = {
   email: true,
   lastLogin: true,
   disabled: true,
-  ratio: true,
   contributed: true,
   consumed: true
 } as const;
@@ -553,7 +553,13 @@ router.get(
       prisma.user.count({ where })
     ]);
 
-    paginatedResponse(res, data, total, pg);
+    // `ratio` is derived from contributed/consumed at read time, not stored.
+    const rows = data.map((u) => ({
+      ...u,
+      ratio: computeRatio(u.contributed, u.consumed)
+    }));
+
+    paginatedResponse(res, rows, total, pg);
   })
 );
 

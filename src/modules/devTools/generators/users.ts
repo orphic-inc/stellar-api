@@ -159,9 +159,6 @@ export async function generateUsers(
       consumed = makeTransferBytes(rng) / 5n;
     }
 
-    const ratio =
-      consumed === 0n ? 1.0 : Number(contributed) / Number(consumed);
-
     // Disability & warning state
     const warned = archetype === 'problem' && randBool(0.6, rng);
     const disabled = archetype === 'problem' && warned && randBool(0.4, rng);
@@ -172,12 +169,6 @@ export async function generateUsers(
     // Staff bio
     const staffBio =
       archetype === 'staff' ? 'Seed-generated staff user.' : null;
-
-    // Ratio watch — schema field is Int? (bytes as integer, capped at 2 GB)
-    const ratioWatchDownload =
-      archetype === 'problem' && !disabled && randBool(0.3, rng)
-        ? Math.floor(Number(makeTransferBytes(rng)) / 1_000_000) // store as MB-scale int
-        : null;
 
     // Create UserSettings
     const settings = await prisma.userSettings.create({
@@ -219,7 +210,6 @@ export async function generateUsers(
         profileId: profile.id,
         contributed,
         consumed,
-        ratio,
         dateRegistered,
         lastLogin,
         disabled,
@@ -239,7 +229,6 @@ export async function generateUsers(
         banReason: disabled
           ? 'Repeated rule violations — seed-generated'
           : null,
-        ratioWatchDownload,
         lastIp: `10.${randInt(0, 255, rng)}.${randInt(0, 255, rng)}.${randInt(
           1,
           254,

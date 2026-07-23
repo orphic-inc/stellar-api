@@ -184,7 +184,6 @@ const PROFILE_BASE_SELECT = {
   staffBio: true,
   contributed: true,
   consumed: true,
-  ratio: true,
   userRank: {
     select: {
       id: true,

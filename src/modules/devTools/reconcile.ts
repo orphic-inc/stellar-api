@@ -9,7 +9,6 @@
  *   - Request.voteCount (from RequestVote)
  *   - Collage.numEntries (from CollageEntry)
  *   - Tag.occurrences (isolated mode — seed.* tags only)
- *   - User.ratio (from contributed/consumed)
  *   - ReleaseVoteAggregate (already created by releases generator, but re-verified here)
  */
 
@@ -71,26 +70,6 @@ export async function reconcile(
         data: { occurrences: count }
       });
     }
-  }
-
-  // ─── User.ratio ───────────────────────────────────────────────────────────
-
-  for (const userId of ctx.generatedUserIds) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { contributed: true, consumed: true }
-    });
-    if (!user) continue;
-    const ratio =
-      user.consumed === 0n
-        ? user.contributed === 0n
-          ? 1.0
-          : 100.0
-        : Number(user.contributed) / Number(user.consumed);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { ratio }
-    });
   }
 
   // ─── Collage.numSubscribers ───────────────────────────────────────────────

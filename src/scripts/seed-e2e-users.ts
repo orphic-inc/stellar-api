@@ -66,10 +66,6 @@ async function upsertUser(a: UpsertArgs): Promise<number> {
   }
 
   const hashed = await bcrypt.hash(a.password, await bcrypt.genSalt(10));
-  const ratio =
-    a.consumed && a.consumed > 0n
-      ? Number(a.contributed ?? 0n) / Number(a.consumed)
-      : 1;
 
   const data = {
     email: a.email,
@@ -77,7 +73,6 @@ async function upsertUser(a: UpsertArgs): Promise<number> {
     userRankId: rank.id,
     contributed: a.contributed ?? 0n,
     consumed: a.consumed ?? 0n,
-    ratio,
     isDonor: a.isDonor ?? false,
     disabled: a.disabled ?? false
   };

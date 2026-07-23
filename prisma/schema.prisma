@@ -421,14 +421,15 @@ model User {
   inviteCount           Int                 @default(0)
   contributed           BigInt              @default(0)
   consumed              BigInt              @default(0)
-  totalEarned           BigInt              @default(0)
-  ratio                 Float               @default(1)
-  ratioWatchDownload    Int?
   lastLogin             DateTime?
   dateRegistered        DateTime            @default(now())
   disabled              Boolean             @default(false)
   isArtist              Boolean             @default(false)
   isDonor               Boolean             @default(false)
+  // Independent download-capability flag, NOT a projection of ratio. Ratio policy
+  // (ratioPolicy.ts) is its first writer, pairing it atomically with
+  // RatioPolicyState; future abuse suspensions may gate it for unrelated reasons.
+  // Read as a hard gate on the download hot path (downloads.ts). See #294.
   canDownload           Boolean             @default(true)
   // Staff-pinned rank: when true the automated progression engine
   // (rankProgressionJob) will not promote or demote this user (USER_CLASSES_PLAN

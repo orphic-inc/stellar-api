@@ -2,7 +2,7 @@ import { ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
-import { computeRatio } from './ratio';
+import { floorSub } from './ratio';
 import { CreateRequestInput, UpdateRequestInput } from '../schemas/requests';
 import { emitNotifications } from '../lib/notifications';
 
@@ -254,13 +254,10 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
       throw new AppError(400, 'Insufficient contributed balance');
     }
 
-    const newConsumed = user.consumed + input.bounty;
-    const newRatio = computeRatio(user.contributed, newConsumed);
     await tx.user.update({
       where: { id: userId },
       data: {
-        consumed: { increment: input.bounty },
-        ratio: newRatio
+        consumed: { increment: input.bounty }
       }
     });
 
@@ -330,13 +327,10 @@ export async function addBounty(
       throw new AppError(400, 'Insufficient contributed balance');
     }
 
-    const newConsumed = user.consumed + amount;
-    const newRatio = computeRatio(user.contributed, newConsumed);
     await tx.user.update({
       where: { id: userId },
       data: {
-        consumed: { increment: amount },
-        ratio: newRatio
+        consumed: { increment: amount }
       }
     });
 
@@ -467,19 +461,10 @@ export async function fillRequest(
     }
 
     if (totalBounty > BigInt(0)) {
-      const filler = await tx.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { consumed: true, contributed: true }
-      });
-      const newFillerRatio = computeRatio(
-        filler.contributed + totalBounty,
-        filler.consumed
-      );
       await tx.user.update({
         where: { id: userId },
         data: {
-          contributed: { increment: totalBounty },
-          ratio: newFillerRatio
+          contributed: { increment: totalBounty }
         }
       });
 
@@ -583,16 +568,10 @@ export async function unfillRequest({
         where: { id: request.fillerId },
         select: { consumed: true, contributed: true }
       });
-      const clawedContributed =
-        filler.contributed >= totalBounty
-          ? filler.contributed - totalBounty
-          : 0n;
-      const newFillerRatio = computeRatio(clawedContributed, filler.consumed);
       await tx.user.update({
         where: { id: request.fillerId },
         data: {
-          contributed: { decrement: totalBounty },
-          ratio: newFillerRatio
+          contributed: floorSub(filler.contributed, totalBounty)
         }
       });
 
@@ -674,14 +653,10 @@ export async function deleteRequest({
           where: { id: bounty.userId },
           select: { consumed: true, contributed: true }
         });
-        const refundedConsumed =
-          user.consumed >= bounty.amount ? user.consumed - bounty.amount : 0n;
-        const refundedRatio = computeRatio(user.contributed, refundedConsumed);
         await tx.user.update({
           where: { id: bounty.userId },
           data: {
-            consumed: { decrement: bounty.amount },
-            ratio: refundedRatio
+            consumed: floorSub(user.consumed, bounty.amount)
           }
         });
         await tx.economyTransaction.create({

@@ -15,6 +15,7 @@ jest.mock('../lib/prisma', () => ({
 
 import {
   computeRatio,
+  floorSub,
   getConsumptionBracket,
   computeRequiredRatio,
   getEligibleContributionBytes,
@@ -36,6 +37,20 @@ describe('computeRatio', () => {
     expect(computeRatio(10n * GiB, 10n * GiB)).toBeCloseTo(1.0);
     expect(computeRatio(5n * GiB, 10n * GiB)).toBeCloseTo(0.5);
     expect(computeRatio(0n, 10n * GiB)).toBeCloseTo(0.0);
+  });
+});
+
+// ─── floorSub ─────────────────────────────────────────────────────────────────
+
+describe('floorSub', () => {
+  it('subtracts when the minuend is large enough', () => {
+    expect(floorSub(10n, 3n)).toBe(7n);
+    expect(floorSub(5n, 5n)).toBe(0n);
+  });
+
+  it('floors at zero rather than going negative', () => {
+    expect(floorSub(3n, 10n)).toBe(0n);
+    expect(floorSub(0n, 1n)).toBe(0n);
   });
 });
 

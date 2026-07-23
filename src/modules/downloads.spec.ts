@@ -184,10 +184,7 @@ describe('grantDownloadAccess', () => {
     );
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          contributed: { increment: cost },
-          ratio: expect.any(Number)
-        })
+        data: { contributed: { increment: cost } }
       })
     );
   });
@@ -217,19 +214,13 @@ describe('grantDownloadAccess', () => {
           id: 7,
           consumed: { lte: expect.anything() }
         }),
-        data: expect.objectContaining({
-          consumed: { increment: cost },
-          ratio: expect.any(Number)
-        })
+        data: { consumed: { increment: cost } }
       })
     );
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 99 },
-        data: {
-          contributed: { increment: cost },
-          ratio: expect.any(Number)
-        }
+        data: { contributed: { increment: cost } }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
@@ -269,18 +260,19 @@ describe('reverseDownloadAccess', () => {
     });
   });
 
-  it('reverses ledger, updates balances with ratio, marks grant REVERSED', async () => {
+  it('reverses ledger, clamps balances to the clawed-back value, marks grant REVERSED', async () => {
     const grant = makeGrant();
+    const twice = grant.amountBytes * 2n;
     mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
     // findUniqueOrThrow called for consumer then contributor
     mockTx.user.findUniqueOrThrow
       .mockResolvedValueOnce({
-        consumed: grant.amountBytes,
+        consumed: twice,
         contributed: BigInt('2000000000')
       }) // consumer
       .mockResolvedValueOnce({
         consumed: 0n,
-        contributed: grant.amountBytes
+        contributed: twice
       }); // contributor
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -293,24 +285,18 @@ describe('reverseDownloadAccess', () => {
     const result = await reverseDownloadAccess(99, 1, 'Dead link');
 
     expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // contributor deducted (contributed balance + ratio)
+    // contributor clawed back (contributed set to twice - amount = amount)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.contributorId },
-        data: expect.objectContaining({
-          contributed: { decrement: grant.amountBytes },
-          ratio: expect.any(Number)
-        })
+        data: { contributed: grant.amountBytes }
       })
     );
-    // consumer refunded (consumed decrements + ratio; contributed unchanged)
+    // consumer refunded (consumed set to twice - amount = amount; contributed unchanged)
     expect(mockTx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: grant.consumerId },
-        data: expect.objectContaining({
-          consumed: { decrement: grant.amountBytes },
-          ratio: expect.any(Number)
-        })
+        data: { consumed: grant.amountBytes }
       })
     );
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
@@ -321,5 +307,43 @@ describe('reverseDownloadAccess', () => {
     expect(ledgerCalls.every((r) => r.reason === 'STAFF_REVERSAL')).toBe(true);
     expect(ledgerCalls.every((r) => r.actorUserId === 99)).toBe(true);
     expect(result.status).toBe(DownloadGrantStatus.REVERSED);
+  });
+
+  it('clamps oversized reversal to zero rather than driving balances negative', async () => {
+    // Balances set out-of-band (e.g. seed-e2e-users or a staff adjustment) can be
+    // smaller than the grant being reversed. The claw-back must floor at zero, not
+    // subtract past it into negative territory.
+    const grant = makeGrant();
+    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
+    mockTx.user.findUniqueOrThrow
+      .mockResolvedValueOnce({
+        consumed: BigInt(1000), // < amountBytes
+        contributed: BigInt('2000000000')
+      }) // consumer
+      .mockResolvedValueOnce({
+        consumed: 0n,
+        contributed: BigInt(1000) // < amountBytes
+      }); // contributor
+    mockTx.user.update.mockResolvedValue(undefined);
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+    mockTx.downloadAccessGrant.update.mockResolvedValue({
+      ...grant,
+      status: DownloadGrantStatus.REVERSED
+    });
+
+    await reverseDownloadAccess(99, 1, 'Dead link');
+
+    expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: grant.consumerId },
+        data: { consumed: 0n }
+      })
+    );
+    expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: grant.contributorId },
+        data: { contributed: 0n }
+      })
+    );
   });
 });
