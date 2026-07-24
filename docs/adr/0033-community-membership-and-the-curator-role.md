@@ -1,6 +1,6 @@
 # Community membership is the role union; community staff becomes Curator
 
-**Status: Proposed (2026-07-24).** Narrows the invariant of [ADR-0021](0021-community-leader-role.md) (Accepted) and adopts the Axis-1/Axis-2 vocabulary of [ADR-0030](0030-private-community-announce-delivery.md) §Decision 2. Follows [#419](https://github.com/orphic-inc/stellar-api/issues/419), which landed the access half of this model. Revises one line of [PRD-08](../prd/08-collages-and-cover-art.md).
+**Status: Accepted (2026-07-24).** Narrows the invariant of [ADR-0021](0021-community-leader-role.md) (Accepted, amended accordingly) and adopts the Axis-1/Axis-2 vocabulary of [ADR-0030](0030-private-community-announce-delivery.md) §Decision 2. Follows [#419](https://github.com/orphic-inc/stellar-api/issues/419), which landed the access half of this model. Revises one line of [PRD-08](../prd/08-collages-and-cover-art.md). Implementation tracked in [#422](https://github.com/orphic-inc/stellar-api/issues/422); paired UI work in stellar-ui#216. See [Acceptance note](#acceptance-note-2026-07-24).
 
 ## Context
 
@@ -63,6 +63,13 @@ The detail response gains a `members` view derived from the union, each entry ca
 - **Drop the leader upsert and leave the read surface alone.** Cheapest change, and wrong: the leader silently disappears from the rendered member roster, trading a modelling error for a visible regression.
 - **Keep "staff" for both concepts and disambiguate in prose.** This is the status quo, and ADR-0030 already paid for it once in a paragraph written solely to stop the two from being confused.
 - **Compute a true member count on the browse list.** Rejected on cost: a per-row union count across a 25-row page, for a number that is decoration on a list surface.
+
+## Acceptance note (2026-07-24)
+
+Accepted with no change to the decisions. The review looked for a blocker and found none: unlike ADR-0030, this ADR has no cross-repo prerequisite — it is stellar-api-only plus a contract resync, and stellar-ui#216 is blocked _on_ it rather than the reverse. Two things it did turn up, both handled rather than deferred:
+
+- **ADR-0021's Status line did not carry the amendment.** Decision 3 narrows an invariant of an Accepted ADR, and while ADR-0021's Decision bullet already recorded the narrowing inline, a reader checking its status would not have seen it. ADR-0021 is now marked amended at the header, and its Merge seam paragraph — which instructs `seedDefaultCommunity` to seed the flagship community as staff **and** consumer — points here for the removal.
+- **Ordering against ADR-0030's remaining slices is a real cost, not a blocker.** `communityRoleUnion` currently names its third arm `staff`; Decision 2 renames it `curators`. ADR-0030 slice 4 (announce `target` + membership reconcile) composes that same fragment, so whichever of the two lands second rewrites the other's touch points. The cost is small and symmetric — the shared fragment is exactly what bounds it — so the order is a scheduling call for #422 and #328, not a design one.
 
 ## Cross-references
 

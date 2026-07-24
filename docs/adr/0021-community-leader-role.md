@@ -1,6 +1,8 @@
 # CommunityLeader: a first-class, single-holder community leader pointer
 
-**Status: Accepted.** Serves [PRD-08 collages & cover art](../prd/08-collages-and-cover-art.md) (the sole `CommunityLeader` mention); reuses the `communities_manage` gate from [ADR-0001 granular permission checks](0001-granular-permission-checks.md). Resolves #216. Ships the leader _model_; the Requests → new-community flow that will consume it is deferred (see below).
+**Status: Accepted — amended by [ADR-0033](0033-community-membership-and-the-curator-role.md) (Accepted 2026-07-24).** Serves [PRD-08 collages & cover art](../prd/08-collages-and-cover-art.md) (the sole `CommunityLeader` mention); reuses the `communities_manage` gate from [ADR-0001 granular permission checks](0001-granular-permission-checks.md). Resolves #216. Ships the leader _model_; the Requests → new-community flow that will consume it is deferred (see below).
+
+**The amendment, in one line:** the superset invariant narrows from `leaderId ⟹ user ∈ staff ∧ user is a Consumer` to `leaderId ⟹ user ∈ curators` — the `Consumer` half is dropped and `staff` is renamed `curators`. Everything else below stands. The narrowing is marked at each affected point.
 
 ## Context
 
@@ -29,7 +31,7 @@ Settled properties:
 - **Audited.** Every leader set/change emits `audit(..., 'community.leader.set', 'community', id, { leaderId, previousLeaderId? })`, so a future succession policy has history to read.
 - **Naming: `ownerId` → `leaderId`.** The `POST /communities` body param is renamed. "Owner" was always a fiction with no backing field; there is one concept here and it gets one honest name. Pre-alpha + the gated OpenAPI contract means the rename rides along with stellar-ui's `api.ts` resync.
 
-Write paths enforcing the invariant on trunk today: **`POST /communities`** and **`PUT /communities/:id`**.
+Write paths enforcing the invariant on trunk today: **`POST /communities`** and **`PUT /communities/:id`**. (Since merged, `seedDefaultCommunity` is the third — see Merge seam.) **Per ADR-0033 the `Consumer` upsert is removed from all three**; each keeps only the curator connection.
 
 ## Explicitly deferred
 
@@ -40,6 +42,8 @@ Write paths enforcing the invariant on trunk today: **`POST /communities`** and 
 ## Merge seam
 
 `seedDefaultCommunity()` does not exist on trunk — it arrives via the unmerged `feat/golden-rules-surfacing` branch (seeds the flagship community as staff+consumer). **When that branch merges, the seed must also set `leaderId = ownerUserId`** to make the SysOp the flagship community's leader and hold the invariant. This is the third write path named in #216; it is documented here rather than built because it isn't on trunk yet.
+
+**Resolved (#221):** the branch merged and the seed sets `leaderId`. Its `Consumer` upsert is removed by ADR-0033 along with the other two, so the seeded flagship leader is a curator and nothing more — the narrowed invariant. ADR-0033 also requires the curator relation survive the rename migration, so this community keeps its curator rather than being re-seeded into one.
 
 ## Consequences
 
