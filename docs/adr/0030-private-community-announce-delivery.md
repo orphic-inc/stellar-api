@@ -4,6 +4,7 @@
 **Date:** 2026-07-15
 **Revised:** 2026-07-23 — grill pass corrected the delivery-leg premise, replaced the withdrawn ADR-0016 delta precedent with a full-set reconcile, unified the membership predicate, and split routing from ACL projection. See [Revision note](#revision-note-2026-07-23).
 **Revised:** 2026-07-24 — accepted after a second grill pass: delivery-leg prerequisite (korin-pink#70) landed, so Decision 0 is satisfied; the "single predicate" is narrowed to a single **role-union fragment** composed per call-site; site staff is stated out of the eligibility union; the `POST /irc/membership` wire contract is pinned; and the piggyback projection is best-effort (never gates the announce cursor). See [Revision note](#revision-note-2026-07-24).
+**Revised:** 2026-07-25 — third grill pass: the role union has **four** call-sites, not two (two of them authorization gates), so the shared unit moves to a new `communityAccess.ts` module and `isCommunityMember` is renamed `hasCommunityAccess`; the field is renamed `announceVisibility` and stated never to gate access; Consequence 3 is extracted to #419 and lands ahead of the epic. See [Revision note](#revision-note-2026-07-25).
 **Repos:** orphic-inc/stellar-api (membership + emit), obrien-k/korin-pink (channel ACL enforcement)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (ownership split) · [ADR-0015 — verified IRC nick link](0015-verified-irc-nick-link.md) (§Scope names this as the deferred, unmodeled access-control feature)
 **Serves:** [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
@@ -38,9 +39,11 @@ Before any private gating, korin must actually deliver a rendered announce line 
 
 **Status: satisfied.** korin-pink#70 built the deliver-to-channel primitive — an `api → bridge` `POST /say { channel, message }`, an IRC-plain renderer beside `renderMinimalIrc`, connected-state tracking, and channel validation against the bridge's joined set (korin ADR-006). It was built so **stellar requires no change** for the public leg (`renderMinimalIrc` and the `/irc/announce` response shape untouched); durability rides stellar's existing at-least-once `runAnnounceCycle` cursor, and korin returns 503 (never a buffering 202) on failure. The private `#c-<id>` routing (Decisions 3–4) reuses this exact primitive.
 
-### 1. Privacy model — a dedicated `Community.visibility`
+### 1. Privacy model — a dedicated `Community.announceVisibility`
 
-Add `Community.visibility` (`PUBLIC` | `PRIVATE`, default `PUBLIC`). Do **not** overload `registrationStatus`: "invite-only registration" and "private/hidden" are orthogonal (a community can have open registration but private announce, or vice versa), and conflating them repeats the overloaded-field trap. Only `PRIVATE` communities route announces to a gated channel; `PUBLIC` keeps the current `#announce` behaviour unchanged.
+Add `Community.announceVisibility` (`PUBLIC` | `PRIVATE`, default `PUBLIC`). Do **not** overload `registrationStatus`: "invite-only registration" and "private/hidden" are orthogonal (a community can have open registration but private announce, or vice versa), and conflating them repeats the overloaded-field trap. Only `PRIVATE` communities route announces to a gated channel; `PUBLIC` keeps the current `#announce` behaviour unchanged.
+
+**The field gates announce routing and nothing else — it must never enter an access check.** It is named `announceVisibility`, not `visibility`, for that reason: a column named `visibility` sitting beside a predicate named `hasCommunityAccess` (Decision 2) invites exactly the wiring that would convert a routing flag into an authorization gate, violating the hard constraint above (ADR-0015, Golden Rule 3). Access stays governed by `registrationStatus` + the role union; a `PRIVATE` community with `registrationStatus: open` remains readable by anyone. The seam in `communityAccess.ts` carries a comment stating the omission, and a test asserts the `PRIVATE` + `open` case stays public. Only the stellar column is renamed — the pinned wire contract keeps its `target: { visibility, … }` field name (Decision 3).
 
 ### 2. Membership source of truth — the existing relations, resolved in stellar, one shared role-union fragment
 
@@ -51,13 +54,18 @@ Eligible viewers of a private community's announce = the **union of its existing
 **One role-union fragment, composed per call-site — not one predicate.** The eligibility set and the browse/list filter genuinely diverge, and forcing a single `where` object through both reintroduces a bug: the browse filter shows _every open-registration community to everyone_ (`registrationStatus.open`) and must not require a verified nick, while eligibility must exclude the `open` arm and _must_ intersect verified nicks. So the shared unit is only the **role-union where-fragment** (`consumer ∪ contributor ∪ community-staff`), exported once, with each call-site composing its own outer terms:
 
 - browse (`GET /communities`): `OR: [ registrationStatus.open, roleUnion ]`
-- announce eligibility: `AND: [ roleUnion, verifiedNick, visibility PRIVATE ]`
+- the access gate (`hasCommunityAccess`): `open || roleUnion`
+- announce eligibility: `AND: [ roleUnion, verifiedNick, announceVisibility PRIVATE ]`
 
-The existing browse filter is **not** consumers-only as an earlier draft stated — it already ORs `registrationStatus.open`, `consumers.some`, and `contributors.some` (`communities.ts`). Refactoring it to consume `roleUnion` adds the `staff` arm. (Consequence: "my communities" browse widens so a community's **staff-only** members — added via `POST /:id/staff` with no `Consumer` row — start seeing the communities they staff; this reads as a latent-bug fix, not a regression, and is flagged to stellar-ui as an intended behaviour change. Owned in the implementation issue.)
+**Four call-sites, not two.** A third grill pass (2026-07-25) found the union expressed in four places, not the two an earlier draft named — and two of them are **authorization gates**, not browse filters: `isCommunityMember` (`communities.ts:54`), serving `GET /:id`, `GET /:id/health`, `GET /:id/health/history` and `releaseBrowse.ts:25`, plus a byte-identical private duplicate at `releaseWorkbench/authority.ts:18` gating release edits. The shared fragment and the gate move to a new **`src/modules/communityAccess.ts`** (which later also holds this ADR's `communityAnnounceNicks`), and the duplicate folds into it — incidentally clearing `releaseBrowse.ts:5`, the only module→route import in `src/modules/`.
+
+`isCommunityMember` is **renamed `hasCommunityAccess`** in the same move. ADR-0001 is not violated by the `staff` arm — that ADR governs the rank-permission map (Axis-2), while `Community.staff[]` is an Axis-1 relation, and `communities.ts` already pairs relation checks with exactly-named rank permissions in four places. But ADR-0001's deeper complaint does apply: one collapsed predicate standing in for several distinct authorizations. The four sites ask different questions — read a community, read its health, list its releases, **edit a release in it** — so widening a predicate named "member" would grant all four silently, the last being a write gate. The rename makes the widening legible at each site.
+
+The existing browse filter is **not** consumers-only as an earlier draft stated — it already ORs `registrationStatus.open`, `consumers.some`, and `contributors.some` (`communities.ts`). Refactoring it to consume `roleUnion` adds the `staff` arm. (Consequence: "my communities" browse widens so a community's **staff-only** members — added via `POST /:id/staff` with no `Consumer` row — start seeing the communities they staff; this reads as a latent-bug fix, not a regression, and is flagged to stellar-ui as an intended behaviour change. The gate half of the same bug is sharper: such a member can administer a community's roster today but gets a 403 reading it. Owned in #419.)
 
 ### 3. Announce contract extension — an optional routing target, backward-compatible
 
-Extend the `POST /irc/announce` body with an optional `target: { visibility, community, channel? }`. Omitted or `PUBLIC` ⇒ today's `#announce` path (no breaking change). `PRIVATE` ⇒ korin routes the rendered line to the community's gated channel instead of the firehose. The stellar side derives the target from the Contribution's community `visibility`. The channel is **korin-derived from the community id** (`#c-<id>`) — stable across community renames; `channel?` stays in the wire contract as a forward-compat slot for a future admin-bound channel, sent empty for now (no new stellar field beyond `visibility`).
+Extend the `POST /irc/announce` body with an optional `target: { visibility, community, channel? }`. Omitted or `PUBLIC` ⇒ today's `#announce` path (no breaking change). `PRIVATE` ⇒ korin routes the rendered line to the community's gated channel instead of the firehose. The stellar side derives the target from the Contribution's community `announceVisibility` (Decision 1) — note the wire field stays `visibility`; only the column is renamed. The channel is **korin-derived from the community id** (`#c-<id>`) — stable across community renames; `channel?` stays in the wire contract as a forward-compat slot for a future admin-bound channel, sent empty for now (no new stellar field beyond `announceVisibility`).
 
 `target` is **routing only**. It does not carry the member set — membership projection is a separate payload and endpoint (Decision 4), because the periodic reconcile has no announce to ride on.
 
@@ -86,7 +94,7 @@ Body:   { "community": <numeric Community.id>, "nicks": [<verified ircNick>, ...
 
 ### 5. Permissions
 
-Configuring a community's `visibility` rides the existing community-management authority — the community `leaderId`/`staff` for their own community, and site-staff via the existing data-driven `communities_manage` rank permission. The existing member/staff routes already gate on `communities_manage || admin || community-staff`, and a `visibility` toggle rides the same gate. No new permission key is expected; if one proves warranted it is a catalog addition (auto-surfaced in the UserRanks editor), decided at implementation time — not a new gating model.
+Configuring a community's `announceVisibility` rides the existing community-management authority — the community `leaderId`/`staff` for their own community, and site-staff via the existing data-driven `communities_manage` rank permission. The existing member/staff routes already gate on `communities_manage || admin || community-staff`, and an `announceVisibility` toggle rides the same gate. No new permission key is expected; if one proves warranted it is a catalog addition (auto-surfaced in the UserRanks editor), decided at implementation time — not a new gating model.
 
 ---
 
@@ -106,11 +114,11 @@ Configuring a community's `visibility` rides the existing community-management a
 Filed separately; none built in this pass (#177 is design-only). Ordered by dependency:
 
 1. **korin (prerequisite) — DONE (korin-pink#70):** the public delivery leg — korin posts a rendered announce line into `#announce`. Was the blocker on everything below; now satisfied (Decision 0).
-2. **stellar:** `Community.visibility` field + migration (default `PUBLIC`). Independent, forward-safe.
-3. **stellar:** the shared role-union fragment (`consumer ∪ contributor ∪ community-staff`, `leaderId` defensive-redundant) + refactor the browse filter to compose it (`OR: [ open, roleUnion ]`) while eligibility composes `AND: [ roleUnion, verifiedNick, PRIVATE ]` + tests — one fragment, two call-sites. Owns the browse-widening (staff-only members appear).
+2. **stellar:** `Community.announceVisibility` field + migration (default `PUBLIC`). Independent, forward-safe.
+3. **stellar — extracted to #419, lands ahead of the epic:** the shared role-union fragment (`consumer ∪ contributor ∪ community-staff`, `leaderId` defensive-redundant) in a new `communityAccess.ts`, the `isCommunityMember` → `hasCommunityAccess` rename, the `releaseWorkbench/authority.ts` duplicate folded in, and the browse filter refactored to compose the fragment (`OR: [ open, roleUnion ]`) + tests. Owns both halves of the widening — browse (staff-only members appear) and the gate (staff-only members stop 403ing). No schema change and no korin dependency, which is why it ships standalone.
 4. **stellar:** announce contract `target` (routing) derived from community visibility, plus the `POST /irc/membership` projection emit (full nick set) and the periodic reconcile job.
 5. **korin (paired issue):** the `#c-<id>` channel-ACL receiver + Ergo/ChanServ enforcement (invite/op from the projected nick set, materialized-view overwrite each projection).
-6. **stellar-ui:** a `visibility` toggle in the community manager (`CommunityManager.tsx`), gated by `communities_manage`.
+6. **stellar-ui:** an `announceVisibility` toggle in the community manager (`CommunityManager.tsx`), gated by `communities_manage`.
 7. **permission confirmation:** verify `communities_manage` + leader/staff covers visibility config; add a key only if warranted.
 
 Until accepted and implemented, all announces remain public (current behaviour), and #177 stays the tracker for this design.
@@ -138,6 +146,17 @@ A second grill pass against the code accepted the ADR and tightened four things:
 - **"Single predicate" → one role-union _fragment_, composed per call-site.** The prior wording oversold a shared `where`. The two call-sites genuinely diverge — browse ORs `registrationStatus.open` and needs no verified nick; eligibility excludes `open` and intersects verified nicks — so only the role-union fragment (`consumer ∪ contributor ∪ community-staff`) is shared; each side composes its own outer terms. Corrected the "consumers-only browse filter" claim (the real filter already ORs open + consumers + contributors).
 - **Two axes stated explicitly.** Membership is Axis-1 (per-community relations); site staff (`communities_manage`/`admin`) is Axis-2 (a config permission) and is **out of the eligibility union** — it never populates `#c-<id>`. `leaderId` is defensive-redundant (leader ⊆ staff per ADR-0021).
 - **`POST /irc/membership` contract pinned** (numeric `Community.id`, full verified-nick set, `x-pull-key` auth, idempotent no-cursor-hold, empty set verbatim), and the piggyback projection made **best-effort** — attempted before routing but never gating the shared announce cursor.
+
+---
+
+## Revision note (2026-07-25)
+
+A third grill pass tested one question — does the role-union fragment's `staff` arm apply only to the browse filter, or also to the authorization gate — and amended four things:
+
+- **Four call-sites, not two, and two of them are authorization gates.** Beyond the browse `where` fragment, the union is expressed as `isCommunityMember` (serving community detail, health, health history, and `releaseBrowse`) plus a byte-identical private duplicate in `releaseWorkbench/authority.ts` gating release edits. The staff arm applies to all of them: a staff-only member (added via `POST /:id/staff`, which never upserts a `Consumer` — unlike the leader path, which holds ADR-0021's invariant) can administer a community's roster today but gets a 403 reading the community, its health, its releases, or editing a release in it.
+- **`isCommunityMember` → `hasCommunityAccess`, in a new `communityAccess.ts`.** ADR-0001 is not violated by the staff arm (that ADR governs the Axis-2 rank-permission map; `staff[]` is an Axis-1 relation, and the codebase already pairs the two correctly), but its deeper complaint — one collapsed predicate standing in for several distinct authorizations — is real, so the rename ships with the widening rather than after it. The move also clears the only module→route import in `src/modules/`.
+- **`visibility` → `announceVisibility`, and stated never to gate access.** Named for what it gates, so the routing flag cannot be mistaken for an authorization input; defended by a comment at the seam and a test asserting a `PRIVATE` + `open`-registration community stays readable by a non-member. The pinned wire contract is unchanged.
+- **Consequence 3 extracted to #419**, landing ahead of the epic — no schema change, no korin dependency — with a paired stellar-ui heads-up (stellar-ui#215) on the browse-widening.
 
 ---
 
