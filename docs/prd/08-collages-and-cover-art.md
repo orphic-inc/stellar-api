@@ -23,7 +23,7 @@ Three patterns the corpus makes non-negotiable:
 
 1. **A Release is a stack of Editions** (format / encoding / media), with **lossless** as the headline quality axis. The Collage row must disclose this, not collapse it. _(Edition model: PRD-04.)_
 2. **Contribution is power-law.** Every healthy Collage has one or two curators carrying the bulk (one curator 261/330 ≈ 88%; another 90/126 ≈ 71%) over a long tail. The surface must credit **both** — and this weight is exactly the contribution signal **[PRD-01 CRS](01-Community-Score.md)** rewards (`ContributionScore` dimension).
-3. **Discussion is part of the artifact.** Comments are where CommunityLeaders/CommunityStaff curate and report; they carry activity weight alongside entry contributions.
+3. **Discussion is part of the artifact.** Comments are where a community's Leader and Curators (ADR-0033; formerly "CommunityStaff") curate and report; they carry activity weight alongside entry contributions.
 
 ## Collage categories (existing)
 
