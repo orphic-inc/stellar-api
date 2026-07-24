@@ -1,8 +1,9 @@
 # ADR-0030: Access-gated announce delivery for private communities
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-15
 **Revised:** 2026-07-23 — grill pass corrected the delivery-leg premise, replaced the withdrawn ADR-0016 delta precedent with a full-set reconcile, unified the membership predicate, and split routing from ACL projection. See [Revision note](#revision-note-2026-07-23).
+**Revised:** 2026-07-24 — accepted after a second grill pass: delivery-leg prerequisite (korin-pink#70) landed, so Decision 0 is satisfied; the "single predicate" is narrowed to a single **role-union fragment** composed per call-site; site staff is stated out of the eligibility union; the `POST /irc/membership` wire contract is pinned; and the piggyback projection is best-effort (never gates the announce cursor). See [Revision note](#revision-note-2026-07-24).
 **Repos:** orphic-inc/stellar-api (membership + emit), obrien-k/korin-pink (channel ACL enforcement)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (ownership split) · [ADR-0015 — verified IRC nick link](0015-verified-irc-nick-link.md) (§Scope names this as the deferred, unmodeled access-control feature)
 **Serves:** [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
@@ -31,19 +32,28 @@ This gates the **visibility of an announcement**, never content access. It must 
 
 ## Decision
 
-### 0. Prerequisite — build the public delivery leg first
+### 0. Prerequisite — build the public delivery leg first — **landed (korin-pink#70)**
 
 Before any private gating, korin must actually deliver a rendered announce line into a channel — the public `#announce` case. This is a named blocker on the implementation epic, not part of the gating work: private routing is meaningless until _some_ channel delivery exists to route. The gated path (Decisions 3–4) is a routing choice layered on top of a working deliver-to-channel primitive; that primitive is built once, for `#announce`, and reused.
+
+**Status: satisfied.** korin-pink#70 built the deliver-to-channel primitive — an `api → bridge` `POST /say { channel, message }`, an IRC-plain renderer beside `renderMinimalIrc`, connected-state tracking, and channel validation against the bridge's joined set (korin ADR-006). It was built so **stellar requires no change** for the public leg (`renderMinimalIrc` and the `/irc/announce` response shape untouched); durability rides stellar's existing at-least-once `runAnnounceCycle` cursor, and korin returns 503 (never a buffering 202) on failure. The private `#c-<id>` routing (Decisions 3–4) reuses this exact primitive.
 
 ### 1. Privacy model — a dedicated `Community.visibility`
 
 Add `Community.visibility` (`PUBLIC` | `PRIVATE`, default `PUBLIC`). Do **not** overload `registrationStatus`: "invite-only registration" and "private/hidden" are orthogonal (a community can have open registration but private announce, or vice versa), and conflating them repeats the overloaded-field trap. Only `PRIVATE` communities route announces to a gated channel; `PUBLIC` keeps the current `#announce` behaviour unchanged.
 
-### 2. Membership source of truth — the existing relations, resolved in stellar, single predicate
+### 2. Membership source of truth — the existing relations, resolved in stellar, one shared role-union fragment
 
-Eligible viewers of a private community's announce = the **union of its existing role relations** — `Consumer[]` (the membership relation), `Contributor`, `staff[]`, and `leaderId` — intersected with **verified IRC links** (`ircNick`, ADR-0015). No new `CommunityMember` join table: introducing a parallel membership store is exactly the dual-source drift ADR-0010 warned against.
+Eligible viewers of a private community's announce = the **union of its existing per-community role relations** — `Consumer[]` (the membership relation), `Contributor`, and `staff[]` — intersected with **verified IRC links** (`ircNick`, ADR-0015). No new `CommunityMember` join table: introducing a parallel membership store is exactly the dual-source drift ADR-0010 warned against.
 
-The union is strictly broader than the app's _current_ notion of "member of community X," which is consumers-only (the browse/list filter). A community staffer added via `POST /:id/staff` gets a `staff` connection but no `Consumer` row, so the two sets genuinely diverge. To avoid shipping a _second definition_ of membership — the same dual-source drift ADR-0010 warns against, just in code instead of a table — the union is defined **once** as a single exported predicate (a shared `isMember` where-fragment / `resolveCommunityMembers`), and the existing consumers-only browse filter is refactored to consume it. One definition, two call-sites. (Consequence: "my communities" browse widens to include staff/contributor-only members; owned in the implementation issue.)
+**Two axes, kept apart.** Membership is an _Axis-1_ property — the per-community relations on the `Community` model. It is **not** the _Axis-2_ global capability: a site staffer (the `communities_manage` / `admin` rank permission) is not a "member" of every private community and does **not** enter the eligibility union. Site staff appears only as the permission gate on the visibility-toggle route (Decision 5); it never populates a `#c-<id>` channel. `leaderId` is a distinguished element of `staff[]`, not a separate set — ADR-0021 always folds the leader into `staff[]` (and upserts a `Consumer`), so the honest union is `consumer ∪ contributor ∪ community-staff`; `leaderId` is kept only as a **defensive, redundant** arm guarding against an ADR-0021 invariant violation, not as load-bearing membership.
+
+**One role-union fragment, composed per call-site — not one predicate.** The eligibility set and the browse/list filter genuinely diverge, and forcing a single `where` object through both reintroduces a bug: the browse filter shows _every open-registration community to everyone_ (`registrationStatus.open`) and must not require a verified nick, while eligibility must exclude the `open` arm and _must_ intersect verified nicks. So the shared unit is only the **role-union where-fragment** (`consumer ∪ contributor ∪ community-staff`), exported once, with each call-site composing its own outer terms:
+
+- browse (`GET /communities`): `OR: [ registrationStatus.open, roleUnion ]`
+- announce eligibility: `AND: [ roleUnion, verifiedNick, visibility PRIVATE ]`
+
+The existing browse filter is **not** consumers-only as an earlier draft stated — it already ORs `registrationStatus.open`, `consumers.some`, and `contributors.some` (`communities.ts`). Refactoring it to consume `roleUnion` adds the `staff` arm. (Consequence: "my communities" browse widens so a community's **staff-only** members — added via `POST /:id/staff` with no `Consumer` row — start seeing the communities they staff; this reads as a latent-bug fix, not a regression, and is flagged to stellar-ui as an intended behaviour change. Owned in the implementation issue.)
 
 ### 3. Announce contract extension — an optional routing target, backward-compatible
 
@@ -57,6 +67,23 @@ Consistent with ADR-0013's non-overlapping ownership: **stellar owns "who may se
 
 **Full-set reconcile, not deltas.** The projection is a full-set replace, driven by (i) a periodic reconcile job iterating `PRIVATE` communities (reuse `KORIN_POLL_INTERVAL_MS`) and (ii) a sync piggybacked on each private announce push. This deliberately **replaces** the delta-push posture the original draft borrowed from ADR-0016 `/ledger/sync`: that ADR is **Superseded and withdrawn** (2026-07-18), and even as-written it was never delta-only — deltas were paired with a full-snapshot reseed korin pulled on boot. A full-set reconcile is the honest form of "korin is never authoritative": there is no per-seam delta instrumentation to miss (membership here is _derived_ from ~8 scattered mutation points — member/staff/contributor add-remove, leader change, nick verify/re-verify/unverify, disable/ban, visibility flip — with no single choke-point), and it self-heals across korin restarts. The visibility-only hard constraint makes the small staleness window of a periodic reconcile costless: at worst a just-added member misses one announce line until the next tick, and even a mis-gated channel leaks only the _existence_ of a release, never access.
 
+**No eager per-seam projection; removals ride the tick.** None of the ~8 mutation points (including a `PUBLIC→PRIVATE` flip and a ban/unverify) triggers an eager projection — that is exactly the fragile per-seam instrumentation the full-set posture exists to avoid. A removed member keeps channel membership for at most one `KORIN_POLL_INTERVAL_MS` tick; because the constraint is visibility-only, the worst case is a just-removed member seeing _the existence_ of one release for ≤ one tick, never access. The periodic tick plus the pre-announce piggyback already cover the flip case (no private line can route to a channel before the piggyback that precedes it freshens the ACL).
+
+**Piggyback ordering is best-effort, never a gate.** On a private announce in `runAnnounceCycle`, the membership projection is _attempted before_ the line is routed, so the first announce after a membership change lands in a fresh `#c-<id>`. But projection and delivery are independent failure domains sharing one ordered cursor: if the `POST /irc/membership` fails, the announce **still goes out** (logged, not held). Gating the announce on projection success would let a single membership-endpoint outage wedge the entire ordered announce firehose — public included — and it contradicts the visibility-only tolerance that already makes a stale ACL costless; the next periodic tick self-heals the ACL, and korin-pink#70 already accepts a duplicate line.
+
+**The `POST /irc/membership` wire contract (pinned).**
+
+```
+POST /irc/membership
+Header: x-pull-key: <KORIN_PULL_KEY>     # same outbound stellar→korin credential publishAnnounceItem already sends
+Body:   { "community": <numeric Community.id>, "nicks": [<verified ircNick>, ...] }
+```
+
+- **Identifier** is the numeric `Community.id`; korin derives `#c-<id>` from it (stable across renames) — never a name/slug.
+- **`nicks`** is the _full_ eligible verified-nick set every projection; korin overwrites its channel ACL from it (materialized view, never diffed).
+- **Empty set** (`nicks: []`) is projected verbatim — korin overwrites the ACL to empty; in-app notify-and-link is unaffected. No special-casing a memberless private community.
+- **Failure posture** differs from announce: a full-set reconcile is idempotent, so on a non-2xx stellar does **not** hold a cursor — it logs and lets the next periodic tick re-project. stellar ignores the response body (mirroring how it discards the `/irc/announce` response); an applied-count echo is a korin-side observability nice-to-have, not required.
+
 ### 5. Permissions
 
 Configuring a community's `visibility` rides the existing community-management authority — the community `leaderId`/`staff` for their own community, and site-staff via the existing data-driven `communities_manage` rank permission. The existing member/staff routes already gate on `communities_manage || admin || community-staff`, and a `visibility` toggle rides the same gate. No new permission key is expected; if one proves warranted it is a catalog addition (auto-surfaced in the UserRanks editor), decided at implementation time — not a new gating model.
@@ -66,7 +93,7 @@ Configuring a community's `visibility` rides the existing community-management a
 ## Rationale
 
 - **Reuses ADR-0013's ownership split** rather than inventing a new one: membership authority stays in stellar (where the data lives), enforcement stays in korin (where the ircd lives).
-- **No parallel membership store and no second definition** — one predicate, so no drift, the single most likely failure mode for this feature (ADR-0010).
+- **No parallel membership store and no second definition** — one shared role-union fragment composed per call-site, so no drift, the single most likely failure mode for this feature (ADR-0010).
 - **Full-set reconcile over deltas** — no fragile per-seam instrumentation of a derived quantity, self-healing across restarts, and it stops leaning on a withdrawn precedent (ADR-0016).
 - **Backward-compatible wire change** — public communities are untouched; only a `PRIVATE` community opts into gated routing.
 - **Narrow reach is acceptable** — only nick-verified members populate `#c-<id>`, realistically a minority; in-app notify-and-link stays universal. The feature's job is preventing private releases from leaking into the _public_ channel, and that holds at any IRC-adoption level.
@@ -78,9 +105,9 @@ Configuring a community's `visibility` rides the existing community-management a
 
 Filed separately; none built in this pass (#177 is design-only). Ordered by dependency:
 
-1. **korin (prerequisite):** the public delivery leg — korin actually posts a rendered announce line into `#announce`. Blocks everything below; private routing has nothing to layer on until it exists (Decision 0).
+1. **korin (prerequisite) — DONE (korin-pink#70):** the public delivery leg — korin posts a rendered announce line into `#announce`. Was the blocker on everything below; now satisfied (Decision 0).
 2. **stellar:** `Community.visibility` field + migration (default `PUBLIC`). Independent, forward-safe.
-3. **stellar:** the single membership predicate (union of role relations ∩ verified nicks) + refactor the consumers-only browse filter onto it + tests — one definition, two call-sites.
+3. **stellar:** the shared role-union fragment (`consumer ∪ contributor ∪ community-staff`, `leaderId` defensive-redundant) + refactor the browse filter to compose it (`OR: [ open, roleUnion ]`) while eligibility composes `AND: [ roleUnion, verifiedNick, PRIVATE ]` + tests — one fragment, two call-sites. Owns the browse-widening (staff-only members appear).
 4. **stellar:** announce contract `target` (routing) derived from community visibility, plus the `POST /irc/membership` projection emit (full nick set) and the periodic reconcile job.
 5. **korin (paired issue):** the `#c-<id>` channel-ACL receiver + Ergo/ChanServ enforcement (invite/op from the projected nick set, materialized-view overwrite each projection).
 6. **stellar-ui:** a `visibility` toggle in the community manager (`CommunityManager.tsx`), gated by `communities_manage`.
@@ -100,6 +127,17 @@ A grill pass against the code found the design resting on a false premise and a 
 - **Routing split from ACL.** `target` on `/irc/announce` is routing only; the member set travels on its own endpoint (Decisions 3–4).
 - **Channel identity fixed.** `PRIVATE` → korin-derived `#c-<id>`; `channel?` is an unused forward-compat slot; no new stellar field (Decision 3).
 - **Narrow reach accepted; permissions confirmed** against the existing member/staff route gating (Rationale, Decision 5).
+
+---
+
+## Revision note (2026-07-24)
+
+A second grill pass against the code accepted the ADR and tightened four things:
+
+- **Prerequisite landed → accepted.** korin-pink#70 shipped the deliver-to-channel primitive (built so stellar needs no change for the public leg). Decision 0 is satisfied; Status flips Proposed → Accepted.
+- **"Single predicate" → one role-union _fragment_, composed per call-site.** The prior wording oversold a shared `where`. The two call-sites genuinely diverge — browse ORs `registrationStatus.open` and needs no verified nick; eligibility excludes `open` and intersects verified nicks — so only the role-union fragment (`consumer ∪ contributor ∪ community-staff`) is shared; each side composes its own outer terms. Corrected the "consumers-only browse filter" claim (the real filter already ORs open + consumers + contributors).
+- **Two axes stated explicitly.** Membership is Axis-1 (per-community relations); site staff (`communities_manage`/`admin`) is Axis-2 (a config permission) and is **out of the eligibility union** — it never populates `#c-<id>`. `leaderId` is defensive-redundant (leader ⊆ staff per ADR-0021).
+- **`POST /irc/membership` contract pinned** (numeric `Community.id`, full verified-nick set, `x-pull-key` auth, idempotent no-cursor-hold, empty set verbatim), and the piggyback projection made **best-effort** — attempted before routing but never gating the shared announce cursor.
 
 ---
 
