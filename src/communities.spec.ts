@@ -7,7 +7,7 @@ import {
   request,
   resetApiTestState
 } from './test/apiTestHarness';
-import { isCommunityMember } from './routes/api/communities/communities';
+import { communityRoleUnion } from './modules/communityAccess';
 
 const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -31,35 +31,8 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => resetApiTestState());
 
-describe('isCommunityMember', () => {
-  it('returns true immediately for open communities', async () => {
-    await expect(
-      isCommunityMember(1, 7, RegistrationStatus.open)
-    ).resolves.toBe(true);
-    expect(prismaMock.consumer.findFirst).not.toHaveBeenCalled();
-    expect(prismaMock.contributor.findFirst).not.toHaveBeenCalled();
-  });
-
-  it('returns true for consumer or contributor membership and false otherwise', async () => {
-    prismaMock.consumer.findFirst.mockResolvedValueOnce({ id: 4 } as never);
-    prismaMock.contributor.findFirst.mockResolvedValueOnce(null);
-    await expect(
-      isCommunityMember(1, 7, RegistrationStatus.invite)
-    ).resolves.toBe(true);
-
-    prismaMock.consumer.findFirst.mockResolvedValueOnce(null);
-    prismaMock.contributor.findFirst.mockResolvedValueOnce({ id: 8 } as never);
-    await expect(
-      isCommunityMember(1, 7, RegistrationStatus.closed)
-    ).resolves.toBe(true);
-
-    prismaMock.consumer.findFirst.mockResolvedValueOnce(null);
-    prismaMock.contributor.findFirst.mockResolvedValueOnce(null);
-    await expect(
-      isCommunityMember(1, 7, RegistrationStatus.invite)
-    ).resolves.toBe(false);
-  });
-});
+// The predicate itself is unit-tested in modules/communityAccess.spec.ts; here
+// it is exercised through the routes that gate on it.
 
 describe('GET /api/communities', () => {
   it('returns paginated communities the user can access', async () => {
@@ -76,8 +49,7 @@ describe('GET /api/communities', () => {
         where: {
           OR: [
             { registrationStatus: RegistrationStatus.open },
-            { consumers: { some: { userId: 7 } } },
-            { contributors: { some: { userId: 7 } } }
+            communityRoleUnion(7)
           ]
         }
       })
@@ -99,13 +71,31 @@ describe('GET /api/communities/:id', () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/communities/1');
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ msg: 'Not a member of this community' });
+  });
+
+  it('lets a staff-only member read a closed community (#419)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({
+        registrationStatus: RegistrationStatus.closed,
+        staff: [{ id: 7, username: 'staffer' }]
+      }) as never
+    );
+    // The role union matches on the staff arm — no Consumer row involved.
+    prismaMock.community.findFirst.mockResolvedValue({ id: 1 } as never);
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findFirst).toHaveBeenCalledWith({
+      where: { id: 1, ...communityRoleUnion(7) },
+      select: { id: true }
+    });
   });
 
   it('returns the community when the user is allowed to view it', async () => {
@@ -156,13 +146,38 @@ describe('GET /api/communities/:id/health', () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/communities/1/health');
 
     expect(res.status).toBe(403);
     expect(getCommunityHealthPulseMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the pulse to a staff-only member of a closed community (#419)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.closed }) as never
+    );
+    prismaMock.community.findFirst.mockResolvedValue({ id: 1 } as never);
+    getCommunityHealthPulseMock.mockResolvedValue({
+      pass: 1,
+      warn: 0,
+      fail: 0,
+      unknown: 0,
+      total: 1,
+      checked: 1,
+      coverage: 1,
+      pulse: 1,
+      status: 'Healthy'
+    });
+
+    const res = await request(app).get('/api/communities/1/health');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findFirst).toHaveBeenCalledWith({
+      where: { id: 1, ...communityRoleUnion(7) },
+      select: { id: true }
+    });
   });
 });
 
@@ -236,13 +251,28 @@ describe('GET /api/communities/:id/health/history', () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/communities/1/health/history');
 
     expect(res.status).toBe(403);
     expect(prismaMock.communityHealthSnapshot.findMany).not.toHaveBeenCalled();
+  });
+
+  it('serves history to a staff-only member of a closed community (#419)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.closed }) as never
+    );
+    prismaMock.community.findFirst.mockResolvedValue({ id: 1 } as never);
+    prismaMock.communityHealthSnapshot.findMany.mockResolvedValue([] as never);
+
+    const res = await request(app).get('/api/communities/1/health/history');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findFirst).toHaveBeenCalledWith({
+      where: { id: 1, ...communityRoleUnion(7) },
+      select: { id: true }
+    });
   });
 });
 

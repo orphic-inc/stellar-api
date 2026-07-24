@@ -6,6 +6,10 @@ import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { getCommunityHealthPulse } from '../../../modules/linkHealth';
 import { getCommunityHealthHistory } from '../../../modules/communityHealthHistory';
+import {
+  communityRoleUnion,
+  hasCommunityAccess
+} from '../../../modules/communityAccess';
 import { requireAuth } from '../../../middleware/auth';
 import {
   requirePermission,
@@ -51,21 +55,6 @@ const healthHistoryQuerySchema = z.object({
   period: z.nativeEnum(StatSnapshotPeriod).default(StatSnapshotPeriod.Daily)
 });
 
-export async function isCommunityMember(
-  communityId: number,
-  userId: number,
-  registrationStatus: RegistrationStatus
-): Promise<boolean> {
-  if (registrationStatus === RegistrationStatus.open) return true;
-  const [consumer, contributor] = await Promise.all([
-    prisma.consumer.findFirst({
-      where: { userId, communities: { some: { id: communityId } } }
-    }),
-    prisma.contributor.findFirst({ where: { userId, communityId } })
-  ]);
-  return !!(consumer || contributor);
-}
-
 // GET /api/communities — only returns communities the user can access
 router.get(
   '/',
@@ -74,16 +63,17 @@ router.get(
   authHandler(async (req, res) => {
     const pg = parsedPage(res);
     const userId = req.user.id;
-    const memberFilter = {
+    // Same union the gates use (#419), so a staff-only member sees the
+    // communities they administer instead of only the ones they consume.
+    const accessFilter = {
       OR: [
         { registrationStatus: RegistrationStatus.open },
-        { consumers: { some: { userId } } },
-        { contributors: { some: { userId } } }
+        communityRoleUnion(userId)
       ]
     };
     const [communities, total] = await Promise.all([
       prisma.community.findMany({
-        where: memberFilter,
+        where: accessFilter,
         skip: pg.skip,
         take: pg.limit,
         include: {
@@ -93,7 +83,7 @@ router.get(
           }
         }
       }),
-      prisma.community.count({ where: memberFilter })
+      prisma.community.count({ where: accessFilter })
     ]);
     paginatedResponse(res, communities, total, pg);
   })
@@ -120,7 +110,7 @@ router.get(
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
     if (
-      !(await isCommunityMember(id, req.user.id, community.registrationStatus))
+      !(await hasCommunityAccess(id, req.user.id, community.registrationStatus))
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
@@ -141,7 +131,7 @@ router.get(
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
     if (
-      !(await isCommunityMember(id, req.user.id, community.registrationStatus))
+      !(await hasCommunityAccess(id, req.user.id, community.registrationStatus))
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
@@ -165,7 +155,7 @@ router.get(
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
     if (
-      !(await isCommunityMember(id, req.user.id, community.registrationStatus))
+      !(await hasCommunityAccess(id, req.user.id, community.registrationStatus))
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }

@@ -1,8 +1,6 @@
-import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sizeBytesToNumber } from '../lib/serialize';
-import { AppError } from '../lib/errors';
-import { isCommunityMember } from '../routes/api/communities/communities';
+import { assertCommunityAccess } from './communityAccess';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
 
 const buildPlainTags = (
@@ -12,32 +10,13 @@ const buildPlainTags = (
     .map((releaseTag) => releaseTag.tag)
     .sort((a, b) => a.name.localeCompare(b.name));
 
-const getAccessibleCommunity = async (
-  communityId: number,
-  userId: number
-): Promise<{ registrationStatus: RegistrationStatus }> => {
-  const community = await prisma.community.findUnique({
-    where: { id: communityId },
-    select: { registrationStatus: true }
-  });
-  if (!community) throw new AppError(404, 'Community not found');
-
-  const isMember = await isCommunityMember(
-    communityId,
-    userId,
-    community.registrationStatus
-  );
-  if (!isMember) throw new AppError(403, 'Not a member of this community');
-  return community;
-};
-
 export const listCommunityReleases = async (input: {
   actorId: number;
   communityId: number;
   page: number;
   limit: number;
 }) => {
-  await getAccessibleCommunity(input.communityId, input.actorId);
+  await assertCommunityAccess(input.communityId, input.actorId);
 
   const skip = (input.page - 1) * input.limit;
   const [releases, total] = await Promise.all([

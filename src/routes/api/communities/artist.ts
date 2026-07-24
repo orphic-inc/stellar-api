@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { communityRoleUnion } from '../../../modules/communityAccess';
 import {
   createArtist,
   updateArtist,
@@ -259,28 +260,18 @@ router.get(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    // Determine communities the requesting user can access
-    const [consumer, contributor, openCommunities] = await Promise.all([
-      prisma.consumer.findUnique({
-        where: { userId: req.user.id },
-        select: { communities: { select: { id: true } } }
-      }),
-      prisma.contributor.findUnique({
-        where: { userId: req.user.id },
-        select: { communityId: true }
-      }),
-      prisma.community.findMany({
-        where: { registrationStatus: RegistrationStatus.open },
-        select: { id: true }
-      })
-    ]);
-
-    const accessibleIds = [
-      ...(consumer?.communities.map((c) => c.id) ?? []),
-      ...(contributor ? [contributor.communityId] : []),
-      ...openCommunities.map((c) => c.id)
-    ];
-    const accessibleCommunityIds = [...new Set(accessibleIds)];
+    // Communities the requesting user can access — the same union the gates
+    // use (#419), so credits from a community they staff are no longer hidden.
+    const accessible = await prisma.community.findMany({
+      where: {
+        OR: [
+          { registrationStatus: RegistrationStatus.open },
+          communityRoleUnion(req.user.id)
+        ]
+      },
+      select: { id: true }
+    });
+    const accessibleCommunityIds = accessible.map((c) => c.id);
 
     const [artist, subscription] = await Promise.all([
       prisma.artist.findUnique({
