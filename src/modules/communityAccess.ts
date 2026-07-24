@@ -12,8 +12,8 @@ import { AppError } from '../lib/errors';
  * `staff` (setting it connects the staff row and upserts a Consumer), so the
  * arm only bites if a row drifts from that invariant.
  *
- * Deliberately omits `Community.announceVisibility` (ADR-0030 slice 2). That
- * field routes announcements and nothing else; access is governed by
+ * Deliberately omits `Community.announceVisibility`. That field routes
+ * announcements and nothing else; access is governed by
  * `registrationStatus` plus this union, so a `PRIVATE` community registered
  * `open` stays readable by anyone (ADR-0015, Golden Rule 3). Reading it here
  * would convert a routing flag into an authorization gate.

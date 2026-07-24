@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AnnounceVisibility,
   ArtistRole,
   CommunityType,
   RegistrationStatus,
@@ -20,6 +21,12 @@ const registrationStatusEnum = z.enum(
     ...RegistrationStatus[]
   ]
 );
+const announceVisibilityEnum = z.enum(
+  Object.values(AnnounceVisibility) as [
+    AnnounceVisibility,
+    ...AnnounceVisibility[]
+  ]
+);
 const releaseTypeEnum = z.enum(
   Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]
 );
@@ -34,6 +41,7 @@ export const createCommunitySchema = z
     image: z.string().url().optional(),
     type: communityTypeEnum,
     registrationStatus: registrationStatusEnum,
+    announceVisibility: announceVisibilityEnum.optional(),
     allowDuplicateFormats: z.boolean().optional(),
     staffIds: z.array(z.number().int().positive()).optional(),
     leaderId: z.number().int().positive().optional()
@@ -54,6 +62,7 @@ export const updateCommunitySchema = z.object({
   description: z.string().max(2000).optional(),
   image: z.string().url().optional(),
   registrationStatus: registrationStatusEnum.optional(),
+  announceVisibility: announceVisibilityEnum.optional(),
   allowDuplicateFormats: z.boolean().optional(),
   staffIds: z.array(z.number().int().positive()).optional(),
   leaderId: z.number().int().positive().optional()

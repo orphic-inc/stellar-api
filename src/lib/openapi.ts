@@ -2855,6 +2855,8 @@ const Community = registry.register(
     description: z.string().nullable().optional(),
     type: z.string().nullable().optional(),
     registrationStatus: z.string().nullable().optional(),
+    // Announce routing only — never an access gate (ADR-0030, ADR-0015).
+    announceVisibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
     image: z.string().nullable().optional(),
     allowDuplicateFormats: z.boolean(),
     leaderId: z.number().nullable().optional(),

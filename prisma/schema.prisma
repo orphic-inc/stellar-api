@@ -75,6 +75,14 @@ enum RegistrationStatus {
   closed
 }
 
+// Where a community's contributions are announced (ADR-0030). Orthogonal to
+// RegistrationStatus, which gates joining — a community can register openly and
+// announce privately, or the reverse.
+enum AnnounceVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 enum ReleaseType {
   Music
   Applications
@@ -1029,6 +1037,14 @@ model Community {
   registrationStatus    RegistrationStatus
   type                  CommunityType
   allowDuplicateFormats Boolean                   @default(true)
+  // Routes announce delivery and nothing else (ADR-0030): PUBLIC goes to
+  // korin's `#announce`, PRIVATE to a gated `#c-<id>`. Deliberately NOT named
+  // `visibility` — it must never enter an access check. Access is governed by
+  // `registrationStatus` + the role union in modules/communityAccess.ts, so a
+  // PRIVATE community registered `open` stays readable by anyone (ADR-0015,
+  // Golden Rule 3). Non-retroactive: a flip is picked up on the next reconcile
+  // tick and does not unsend past lines.
+  announceVisibility    AnnounceVisibility        @default(PUBLIC)
   consumers             Consumer[]                @relation("CommunityConsumers")
   contributors          Contributor[]
   releases              Release[]
