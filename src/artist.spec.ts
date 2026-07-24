@@ -1,3 +1,4 @@
+import { RegistrationStatus } from '@prisma/client';
 import {
   request,
   app,
@@ -8,6 +9,7 @@ import {
   updateArtistMock,
   revertArtistFromHistoryMock
 } from './test/apiTestHarness';
+import { communityRoleUnion } from './modules/communityAccess';
 
 beforeEach(() => resetApiTestState());
 
@@ -213,15 +215,10 @@ describe('POST /api/artists', () => {
 
 describe('GET /api/artists/:id', () => {
   const setupAccessMocks = () => {
-    prismaMock.consumer.findUnique.mockResolvedValue({
-      userId: 7,
-      communities: [{ id: 1 }]
-    } as never);
-    prismaMock.contributor.findUnique.mockResolvedValue({
-      userId: 7,
-      communityId: 2
-    } as never);
-    prismaMock.community.findMany.mockResolvedValue([{ id: 3 }] as never);
+    prismaMock.community.findMany.mockResolvedValue([
+      { id: 1 },
+      { id: 3 }
+    ] as never);
   };
 
   it('returns an artist with community-filtered releases and isSubscribed false', async () => {
@@ -267,15 +264,31 @@ describe('GET /api/artists/:id', () => {
     expect(res.status).toBe(400);
   });
 
-  it('builds accessible community list when consumer and contributor are both null', async () => {
-    prismaMock.consumer.findUnique.mockResolvedValue(null);
-    prismaMock.contributor.findUnique.mockResolvedValue(null);
+  it('filters credits by the same access union the community gates use (#419)', async () => {
     prismaMock.community.findMany.mockResolvedValue([{ id: 5 }] as never);
     prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
 
     const res = await request(app).get('/api/artists/1');
 
     expect(res.status).toBe(200);
+    expect(prismaMock.community.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { registrationStatus: RegistrationStatus.open },
+          communityRoleUnion(7)
+        ]
+      },
+      select: { id: true }
+    });
+    expect(prismaMock.artist.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          credits: expect.objectContaining({
+            where: { release: { communityId: { in: [5] } } }
+          })
+        })
+      })
+    );
   });
 });
 

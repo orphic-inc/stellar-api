@@ -60,8 +60,7 @@ describe('GET /api/communities/:communityId/releases', () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/communities/1/releases');
 
@@ -257,8 +256,7 @@ describe('GET /api/communities/:communityId/releases/:releaseId/contributions', 
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get(
       '/api/communities/1/releases/3/contributions'
@@ -932,8 +930,7 @@ describe('GET /api/communities/:communityId/releases/:releaseId/history', () => 
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.invite }) as never
     );
-    prismaMock.consumer.findFirst.mockResolvedValue(null);
-    prismaMock.contributor.findFirst.mockResolvedValue(null);
+    prismaMock.community.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/communities/1/releases/3/history');
 
