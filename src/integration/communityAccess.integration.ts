@@ -1,4 +1,5 @@
 import {
+  AnnounceVisibility,
   CommunityType,
   RegistrationStatus,
   ReleaseCategory,
@@ -40,7 +41,8 @@ const createUser = async (tag: string) => {
 
 const createCommunity = (
   registrationStatus: RegistrationStatus,
-  staffId?: number
+  staffId?: number,
+  announceVisibility?: AnnounceVisibility
 ) =>
   testPrisma.community.create({
     data: {
@@ -48,6 +50,7 @@ const createCommunity = (
       image: '',
       registrationStatus,
       type: CommunityType.Music,
+      ...(announceVisibility !== undefined && { announceVisibility }),
       ...(staffId !== undefined && { staff: { connect: { id: staffId } } })
     }
   });
@@ -158,12 +161,10 @@ describe('a non-member of a closed community', () => {
 });
 
 describe('registrationStatus is the only thing that opens a community', () => {
-  // Half of ADR-0030's hard constraint: registration status alone decides
-  // whether a non-member gets in. The PRIVATE + `open` case it also demands
-  // cannot be expressed until `Community.announceVisibility` lands (slice 2) —
-  // until then the standing guard is the structural one in
-  // modules/communityAccess.spec.ts, which fails if a visibility arm is ever
-  // added to the union (ADR-0015, Golden Rule 3).
+  // ADR-0030's hard constraint: registration status alone decides whether a
+  // non-member gets in, and `announceVisibility` never does (ADR-0015, Golden
+  // Rule 3). Paired with the structural guard in modules/communityAccess.spec.ts,
+  // which fails if a visibility arm is ever added to the union.
   it('lets a non-member read an open community', async () => {
     const outsider = await createUser('open-outsider');
     const community = await createCommunity(RegistrationStatus.open);
@@ -184,5 +185,51 @@ describe('registrationStatus is the only thing that opens a community', () => {
       limit: 25
     });
     expect(browsed.total).toBe(1);
+  });
+
+  it('keeps a PRIVATE-announce community readable when registration is open', async () => {
+    const outsider = await createUser('private-announce-outsider');
+    const community = await createCommunity(
+      RegistrationStatus.open,
+      undefined,
+      AnnounceVisibility.PRIVATE
+    );
+    await createRelease(community.id);
+
+    expect(community.announceVisibility).toBe(AnnounceVisibility.PRIVATE);
+
+    await expect(
+      hasCommunityAccess(
+        community.id,
+        outsider.id,
+        community.registrationStatus
+      )
+    ).resolves.toBe(true);
+
+    const browsed = await listCommunityReleases({
+      actorId: outsider.id,
+      communityId: community.id,
+      page: 1,
+      limit: 25
+    });
+    expect(browsed.total).toBe(1);
+  });
+
+  it('does not let PRIVATE announce visibility open a closed community', async () => {
+    const outsider = await createUser('private-announce-closed');
+    const community = await createCommunity(
+      RegistrationStatus.closed,
+      undefined,
+      AnnounceVisibility.PRIVATE
+    );
+    await createRelease(community.id);
+
+    await expect(
+      hasCommunityAccess(
+        community.id,
+        outsider.id,
+        community.registrationStatus
+      )
+    ).resolves.toBe(false);
   });
 });

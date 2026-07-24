@@ -305,6 +305,7 @@ router.post(
       image,
       type,
       registrationStatus,
+      announceVisibility,
       allowDuplicateFormats,
       staffIds,
       leaderId
@@ -339,6 +340,7 @@ router.post(
         type,
         registrationStatus,
         image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
+        ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
         ...(allStaffIds.length && {
@@ -388,6 +390,7 @@ router.put(
       description,
       image,
       registrationStatus,
+      announceVisibility,
       allowDuplicateFormats,
       staffIds,
       leaderId
@@ -414,6 +417,7 @@ router.put(
         ...(description !== undefined && { description }),
         ...(image !== undefined && { image }),
         ...(registrationStatus !== undefined && { registrationStatus }),
+        ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
         ...(staffConnect !== undefined && {

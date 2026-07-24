@@ -1,4 +1,8 @@
-import { CommunityType, RegistrationStatus } from '@prisma/client';
+import {
+  AnnounceVisibility,
+  CommunityType,
+  RegistrationStatus
+} from '@prisma/client';
 import {
   app,
   getCommunityHealthPulseMock,
@@ -16,6 +20,7 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
   image: '/images/defaults/music.png',
   type: CommunityType.Music,
   registrationStatus: RegistrationStatus.open,
+  announceVisibility: AnnounceVisibility.PUBLIC,
   allowDuplicateFormats: false,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -523,6 +528,63 @@ describe('POST /api/communities', () => {
       })
     });
   });
+
+  it('persists announceVisibility when given, and omits it otherwise', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.create.mockResolvedValue(
+      makeCommunity({
+        id: 4,
+        announceVisibility: AnnounceVisibility.PRIVATE
+      }) as never
+    );
+
+    const withVisibility = await request(app).post('/api/communities').send({
+      name: 'Jazz',
+      type: 'Music',
+      registrationStatus: 'open',
+      announceVisibility: 'PRIVATE'
+    });
+
+    expect(withVisibility.status).toBe(201);
+    expect(prismaMock.community.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ announceVisibility: 'PRIVATE' })
+    });
+
+    // Omitted leaves the column to its PUBLIC default rather than writing one.
+    prismaMock.community.create.mockClear();
+    prismaMock.community.create.mockResolvedValue(
+      makeCommunity({ id: 5 }) as never
+    );
+
+    const withoutVisibility = await request(app).post('/api/communities').send({
+      name: 'Blues',
+      type: 'Music',
+      registrationStatus: 'open'
+    });
+
+    expect(withoutVisibility.status).toBe(201);
+    expect(
+      prismaMock.community.create.mock.calls[0][0].data
+    ).not.toHaveProperty('announceVisibility');
+  });
+
+  it('rejects an announceVisibility outside the enum', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+
+    const res = await request(app).post('/api/communities').send({
+      name: 'Jazz',
+      type: 'Music',
+      registrationStatus: 'open',
+      announceVisibility: 'SECRET'
+    });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.community.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('PUT /api/communities/:id', () => {
@@ -564,6 +626,30 @@ describe('PUT /api/communities/:id', () => {
         registrationStatus: 'invite',
         staff: { set: [{ id: 8 }, { id: 9 }] }
       }
+    });
+  });
+
+  it('flips announceVisibility without touching registrationStatus', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.community.update.mockResolvedValue(
+      makeCommunity({
+        announceVisibility: AnnounceVisibility.PRIVATE
+      }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ announceVisibility: 'PRIVATE' });
+
+    expect(res.status).toBe(200);
+    // The two are orthogonal (ADR-0030 Decision 1): a PRIVATE-announce
+    // community can stay openly registered.
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { announceVisibility: 'PRIVATE' }
     });
   });
 

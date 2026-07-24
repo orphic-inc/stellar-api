@@ -2826,6 +2826,13 @@
             "type": "string",
             "nullable": true
           },
+          "announceVisibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "PRIVATE"
+            ]
+          },
           "image": {
             "type": "string",
             "nullable": true
