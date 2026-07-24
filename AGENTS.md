@@ -178,7 +178,7 @@ src/
     audit.ts                # audit(prisma, actorId, action, targetType, targetId, meta?)
     errors.ts               # AppError class (extends Error with statusCode)
     mailer.ts               # SMTP email utility (sendInviteEmail)
-    openapi.ts              # Auto-generated OpenAPI type definitions
+    openapi.ts              # Zod→OpenAPI registry (@asteasolutions/zod-to-openapi) — the contract source of truth. Registration is manual: a route absent from it is invisible to openapi.json and to stellar-ui
     pagination.ts           # parsePage(req) → { skip, limit, page }
                             # paginatedResponse(res, data, total, pg)
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
@@ -194,12 +194,11 @@ src/
     versionConsistency.ts   # Pure checkVersionConsistency (#79) — manifest is the source of truth; CLI wrapper in scripts/ feeds it the real surfaces
     sentry.ts               # userContextFromRequest + sentryBeforeSend — Sentry scrubbing/user context
   types/
-    api.ts                  # Auto-generated OpenAPI interface definitions
     auth.ts                 # AuthUser type (id, userRankId, userRankLevel; optional contributed/consumed)
     express.d.ts            # Express Request augmentation for req.user?
   schemas/                  # Zod schemas + inferred types, one file per domain
   scripts/
-    export-openapi.ts       # Generates openapi.ts from route definitions
+    export-openapi.ts       # Exports lib/openapi.ts's registry to openapi.json (gated in CI). stellar-ui vendors that file and generates its OWN types from it — this repo keeps no generated copy
   test/
     apiTestHarness.ts       # Supertest harness helpers for route-level tests
     dbHelpers.ts            # DB setup/teardown utilities for integration tests
