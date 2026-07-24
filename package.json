@@ -65,7 +65,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "devDependencies": {
-    "@babel/eslint-parser": "^7.22.9",
+    "@babel/eslint-parser": "^8.0.0",
     "@types/bcryptjs": "^2.4.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
