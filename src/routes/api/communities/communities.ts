@@ -226,12 +226,12 @@ router.delete(
     // route strips a role as a side effect of removing a membership
     // (ADR-0033 §Decision 5). Curators go through DELETE /:id/curators/:userId,
     // the leader through PUT /:id.
-    const blockingRole =
-      community.leaderId === userId
-        ? 'leader'
-        : community.curators.some((c) => c.id === userId)
-        ? 'curator'
-        : null;
+    // Leader is checked first: it is the role that has to be reassigned, and
+    // the invariant means a leader is always also a curator.
+    let blockingRole: string | null = null;
+    if (community.leaderId === userId) blockingRole = 'leader';
+    else if (community.curators.some((c) => c.id === userId))
+      blockingRole = 'curator';
     if (blockingRole) {
       return res.status(409).json({
         msg: `User is the community ${blockingRole}; remove that role first`
