@@ -1,4 +1,6 @@
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import { getSystemStats } from '../modules/stats';
+import { seedSystemUser, SYSTEM_USERNAME } from '../modules/bootstrap';
 
 beforeEach(async () => {
   await truncateAll();
@@ -149,5 +151,36 @@ describe('stats/user-flow DB query', () => {
 
     expect(funnel.length).toBeGreaterThanOrEqual(1);
     expect(funnel.every((f) => typeof f._count === 'number')).toBe(true);
+  });
+});
+
+describe('getSystemStats excludes the reserved System user', () => {
+  it('does not count System in totalUsers', async () => {
+    const before = await getSystemStats();
+    await seedSystemUser(testPrisma);
+    const after = await getSystemStats();
+
+    // The row exists...
+    await expect(
+      testPrisma.user.findUnique({ where: { username: SYSTEM_USERNAME } })
+    ).resolves.not.toBeNull();
+    // ...and is not a member of the site. Seeding machinery must not move the
+    // member count, nor eat a slot against maxUsers.
+    expect(after.totalUsers).toBe(before.totalUsers);
+
+    // A real signup still counts, so the filter is not simply suppressing.
+    await createUser('system-check');
+    const withMember = await getSystemStats();
+    expect(withMember.totalUsers).toBe(before.totalUsers + 1);
+  });
+
+  it('leaves the adjacent counts alone — they already exclude System', async () => {
+    await seedSystemUser(testPrisma);
+    const stats = await getSystemStats();
+
+    // System is `disabled` and never sets lastLogin, so these needed no filter.
+    expect(stats.enabledUsers).toBe(0);
+    expect(stats.activeToday).toBe(0);
+    expect(stats.activeThisMonth).toBe(0);
   });
 });
