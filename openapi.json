@@ -2767,7 +2767,7 @@
           "readState"
         ]
       },
-      "CommunityStaffMember": {
+      "CommunityCurator": {
         "type": "object",
         "properties": {
           "id": {
@@ -2782,27 +2782,32 @@
           "username"
         ]
       },
-      "CommunityConsumer": {
+      "CommunityMember": {
         "type": "object",
         "properties": {
-          "user": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "username": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "username"
-            ]
+          "id": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "consumer",
+                "contributor",
+                "curator",
+                "leader"
+              ]
+            }
           }
         },
         "required": [
-          "user"
+          "id",
+          "username",
+          "roles"
         ]
       },
       "Community": {
@@ -2844,16 +2849,16 @@
             "type": "number",
             "nullable": true
           },
-          "staff": {
+          "curators": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CommunityStaffMember"
+              "$ref": "#/components/schemas/CommunityCurator"
             }
           },
-          "consumers": {
+          "members": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CommunityConsumer"
+              "$ref": "#/components/schemas/CommunityMember"
             }
           },
           "_count": {

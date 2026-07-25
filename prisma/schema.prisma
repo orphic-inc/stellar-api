@@ -467,7 +467,7 @@ model User {
   invitees                 InviteTree[]                     @relation("InviteTreeInviter")
   friendRequestsSent       FriendRelationship[]             @relation("FriendRequester")
   friendRequestsReceived   FriendRelationship[]             @relation("FriendRecipient")
-  communityStaff           Community[]                      @relation("CommunityStaff")
+  communitiesCurated       Community[]                      @relation("CommunityCurators")
   communitiesLed           Community[]                      @relation("CommunityLeader")
   consumer                 Consumer?
   contributor              Contributor?
@@ -1049,9 +1049,13 @@ model Community {
   contributors          Contributor[]
   releases              Release[]
   comments              Comment[]
-  staff                 User[]                    @relation("CommunityStaff")
-  // The founding/owning member. A superset of `staff`: setting it always
-  // connects the same user to `staff` + upserts a Consumer (ADR-0021).
+  // Per-community role relation (Axis-1). Named Curator, not staff: "staff" is
+  // reserved site-wide for the Axis-2 rank capability in rankPermissions.ts,
+  // and the two meet in the same code path (ADR-0033).
+  curators              User[]                    @relation("CommunityCurators")
+  // The founding/owning member. A superset of `curators`: setting it always
+  // connects the same user to `curators` (ADR-0021, narrowed by ADR-0033 —
+  // no Consumer is written; belonging is the role union, not consumption).
   // Nullable so a disabled/departed leader leaves a recoverable pointer
   // rather than orphaning the community.
   leaderId              Int?

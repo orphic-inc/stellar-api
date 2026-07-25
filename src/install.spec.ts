@@ -408,17 +408,18 @@ describe('POST /api/install', () => {
     });
 
     expect(res.status).toBe(201);
-    // Named after the site, public, with the SysOp connected as CommunityStaff.
+    // Named after the site, public, with the SysOp connected as curator.
     expect(prismaMock.community.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           name: 'Stellar',
           registrationStatus: 'open',
-          staff: { connect: { id: 1 } }
+          curators: { connect: { id: 1 } }
         })
       })
     );
-    // Owner is also registered as a Consumer (mirrors POST /api/communities).
-    expect(prismaMock.consumer.upsert).toHaveBeenCalled();
+    // And NOT as a Consumer (ADR-0033 §3): belonging is the role union, not a
+    // claim that whoever installed the site downloads from it.
+    expect(prismaMock.consumer.upsert).not.toHaveBeenCalled();
   });
 });

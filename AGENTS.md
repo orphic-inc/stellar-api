@@ -150,7 +150,7 @@ src/
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
-    communityAccess.ts        # The shared community access predicate (#419, ADR-0030): communityRoleUnion where-fragment (consumer ∪ contributor ∪ staff), the hasCommunityAccess gate (ex-`isCommunityMember`) and its load-then-gate assertCommunityAccess. Never reads announceVisibility
+    communityAccess.ts        # Community membership + access (#419, ADR-0030, ADR-0033): the communityRoleUnion where-fragment (consumer ∪ contributor ∪ curator) that DEFINES membership, the hasCommunityAccess gate (ex-`isCommunityMember`) and its load-then-gate assertCommunityAccess, plus listCommunityMembers projecting the same union into a roster. Never reads announceVisibility
     releaseBrowse.ts          # listCommunityReleases — the community release browse/list read
     releaseCredits.ts         # ReleaseArtist role credits; derives the legacy release.artist display field from the Main credit
     releaseLifecycle.ts       # Community release create/delete with history + snapshotting

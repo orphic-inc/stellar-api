@@ -576,7 +576,10 @@ export async function seedDefaultCommunity(
   });
   if (existing) return;
 
-  const community = await client.community.create({
+  // The SysOp becomes leader and curator, and nothing more: no Consumer is
+  // written (ADR-0033 §Decision 3). Belonging is the role union, not a claim
+  // that whoever installed the site downloads from it.
+  await client.community.create({
     data: {
       name: site.name,
       description: `The official ${site.name} community.`,
@@ -584,16 +587,7 @@ export async function seedDefaultCommunity(
       registrationStatus: RegistrationStatus.open,
       image: '/images/defaults/music.png',
       leader: { connect: { id: ownerUserId } },
-      staff: { connect: { id: ownerUserId } }
+      curators: { connect: { id: ownerUserId } }
     }
-  });
-
-  await client.consumer.upsert({
-    where: { userId: ownerUserId },
-    create: {
-      userId: ownerUserId,
-      communities: { connect: { id: community.id } }
-    },
-    update: { communities: { connect: { id: community.id } } }
   });
 }
