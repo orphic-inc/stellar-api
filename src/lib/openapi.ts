@@ -2834,17 +2834,23 @@ registry.registerPath({
 
 // ─── Communities ──────────────────────────────────────────────────────────────
 
-const CommunityStaffMember = registry.register(
-  'CommunityStaffMember',
+const CommunityCurator = registry.register(
+  'CommunityCurator',
   z.object({
     id: z.number(),
     username: z.string()
   })
 );
 
-const CommunityConsumer = registry.register(
-  'CommunityConsumer',
-  z.object({ user: z.object({ id: z.number(), username: z.string() }) })
+// A community's membership is the role union, not its consumer list (ADR-0033):
+// `roles` is why a curator who has never downloaded still appears in the roster.
+const CommunityMember = registry.register(
+  'CommunityMember',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    roles: z.array(z.enum(['consumer', 'contributor', 'curator', 'leader']))
+  })
 );
 
 const Community = registry.register(
@@ -2860,8 +2866,9 @@ const Community = registry.register(
     image: z.string().nullable().optional(),
     allowDuplicateFormats: z.boolean(),
     leaderId: z.number().nullable().optional(),
-    staff: z.array(CommunityStaffMember).optional(),
-    consumers: z.array(CommunityConsumer).optional(),
+    curators: z.array(CommunityCurator).optional(),
+    // Detail view only — the browse list keeps cheap relation counts instead.
+    members: z.array(CommunityMember).optional(),
     _count: z
       .object({
         releases: z.number(),

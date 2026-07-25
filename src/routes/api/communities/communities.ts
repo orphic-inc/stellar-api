@@ -8,7 +8,8 @@ import { getCommunityHealthPulse } from '../../../modules/linkHealth';
 import { getCommunityHealthHistory } from '../../../modules/communityHealthHistory';
 import {
   communityRoleUnion,
-  hasCommunityAccess
+  hasCommunityAccess,
+  listCommunityMembers
 } from '../../../modules/communityAccess';
 import { requireAuth } from '../../../middleware/auth';
 import {
@@ -63,7 +64,7 @@ router.get(
   authHandler(async (req, res) => {
     const pg = parsedPage(res);
     const userId = req.user.id;
-    // Same union the gates use (#419), so a staff-only member sees the
+    // Same union the gates use (#419), so a curator-only member sees the
     // communities they administer instead of only the ones they consume.
     const accessFilter = {
       OR: [
@@ -77,7 +78,7 @@ router.get(
         skip: pg.skip,
         take: pg.limit,
         include: {
-          staff: { select: { id: true, username: true } },
+          curators: { select: { id: true, username: true } },
           _count: {
             select: { contributors: true, releases: true, consumers: true }
           }
@@ -99,10 +100,7 @@ router.get(
     const community = await prisma.community.findUnique({
       where: { id },
       include: {
-        staff: { select: { id: true, username: true } },
-        consumers: {
-          select: { user: { select: { id: true, username: true } } }
-        },
+        curators: { select: { id: true, username: true } },
         _count: {
           select: { contributors: true, releases: true, consumers: true }
         }
@@ -114,7 +112,11 @@ router.get(
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
-    res.json(community);
+    // `members` replaces the `consumers[]`-plus-Staff-chip idiom the UI used to
+    // reconstruct a roster from (ADR-0033 §Decision 4). Loaded after the gate so
+    // a 403 costs nothing extra; `_count` stays relation counts, which is what
+    // it always was.
+    res.json({ ...community, members: await listCommunityMembers(id) });
   })
 );
 
@@ -163,7 +165,7 @@ router.get(
   })
 );
 
-// POST /api/communities/:id/members — add user (communities_manage or community staff)
+// POST /api/communities/:id/members — add a consuming member (communities_manage or curator)
 router.post(
   '/:id/members',
   requireAuth,
@@ -175,14 +177,14 @@ router.post(
 
     const community = await prisma.community.findUnique({
       where: { id },
-      include: { staff: { select: { id: true } } }
+      include: { curators: { select: { id: true } } }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
 
     const perms = await loadPermissions(req, res);
     const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCommunityStaff = community.staff.some((s) => s.id === req.user.id);
-    if (!isAdmin && !isCommunityStaff) {
+    const isCurator = community.curators.some((c) => c.id === req.user.id);
+    if (!isAdmin && !isCurator) {
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
@@ -198,7 +200,7 @@ router.post(
   })
 );
 
-// DELETE /api/communities/:id/members/:userId — remove user (communities_manage or community staff)
+// DELETE /api/communities/:id/members/:userId — remove a consuming member (communities_manage or curator)
 router.delete(
   '/:id/members/:userId',
   requireAuth,
@@ -208,15 +210,32 @@ router.delete(
 
     const community = await prisma.community.findUnique({
       where: { id },
-      include: { staff: { select: { id: true } } }
+      include: { curators: { select: { id: true } } }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
 
     const perms = await loadPermissions(req, res);
     const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCommunityStaff = community.staff.some((s) => s.id === req.user.id);
-    if (!isAdmin && !isCommunityStaff) {
+    const isCurator = community.curators.some((c) => c.id === req.user.id);
+    if (!isAdmin && !isCurator) {
       return res.status(403).json({ msg: 'Permission denied' });
+    }
+
+    // This route operates on the Consumer link only. When the target also holds
+    // a curator or leader role, refuse rather than partially removing them: no
+    // route strips a role as a side effect of removing a membership
+    // (ADR-0033 §Decision 5). Curators go through DELETE /:id/curators/:userId,
+    // the leader through PUT /:id.
+    const blockingRole =
+      community.leaderId === userId
+        ? 'leader'
+        : community.curators.some((c) => c.id === userId)
+        ? 'curator'
+        : null;
+    if (blockingRole) {
+      return res.status(409).json({
+        msg: `User is the community ${blockingRole}; remove that role first`
+      });
     }
 
     const consumer = await prisma.consumer.findUnique({ where: { userId } });
@@ -230,9 +249,9 @@ router.delete(
   })
 );
 
-// POST /api/communities/:id/staff — add user to community staff (communities_manage or community staff)
+// POST /api/communities/:id/curators — add a curator (communities_manage or curator)
 router.post(
-  '/:id/staff',
+  '/:id/curators',
   requireAuth,
   validateParams(communityIdParamsSchema),
   validate(addMemberSchema),
@@ -242,14 +261,14 @@ router.post(
 
     const community = await prisma.community.findUnique({
       where: { id },
-      include: { staff: { select: { id: true } } }
+      include: { curators: { select: { id: true } } }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
 
     const perms = await loadPermissions(req, res);
     const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCommunityStaff = community.staff.some((s) => s.id === req.user.id);
-    if (!isAdmin && !isCommunityStaff) {
+    const isCurator = community.curators.some((c) => c.id === req.user.id);
+    if (!isAdmin && !isCurator) {
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
@@ -258,15 +277,15 @@ router.post(
 
     await prisma.community.update({
       where: { id },
-      data: { staff: { connect: { id: userId } } }
+      data: { curators: { connect: { id: userId } } }
     });
     res.status(204).send();
   })
 );
 
-// DELETE /api/communities/:id/staff/:userId — remove from community staff (communities_manage or community staff)
+// DELETE /api/communities/:id/curators/:userId — remove a curator (communities_manage or curator)
 router.delete(
-  '/:id/staff/:userId',
+  '/:id/curators/:userId',
   requireAuth,
   validateParams(memberParamsSchema),
   authHandler(async (req, res) => {
@@ -274,20 +293,20 @@ router.delete(
 
     const community = await prisma.community.findUnique({
       where: { id },
-      include: { staff: { select: { id: true } } }
+      include: { curators: { select: { id: true } } }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
 
     const perms = await loadPermissions(req, res);
     const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCommunityStaff = community.staff.some((s) => s.id === req.user.id);
-    if (!isAdmin && !isCommunityStaff) {
+    const isCurator = community.curators.some((c) => c.id === req.user.id);
+    if (!isAdmin && !isCurator) {
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
     await prisma.community.update({
       where: { id },
-      data: { staff: { disconnect: { id: userId } } }
+      data: { curators: { disconnect: { id: userId } } }
     });
     res.status(204).send();
   })
@@ -307,7 +326,7 @@ router.post(
       registrationStatus,
       announceVisibility,
       allowDuplicateFormats,
-      staffIds,
+      curatorIds,
       leaderId
     } = parsedBody<CreateCommunityInput>(res);
 
@@ -327,9 +346,9 @@ router.post(
       Comics: '/images/defaults/comics.png'
     };
 
-    // Leader is a superset of staff (ADR-0021): always fold into the staff set.
-    const allStaffIds = [
-      ...(staffIds ?? []),
+    // Leader is a superset of curators (ADR-0021): always fold into the set.
+    const allCuratorIds = [
+      ...(curatorIds ?? []),
       ...(leaderId !== undefined ? [leaderId] : [])
     ];
 
@@ -343,23 +362,19 @@ router.post(
         ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
-        ...(allStaffIds.length && {
-          staff: {
-            connect: [...new Set(allStaffIds)].map((sid) => ({ id: sid }))
+        ...(allCuratorIds.length && {
+          curators: {
+            connect: [...new Set(allCuratorIds)].map((cid) => ({ id: cid }))
           }
         })
       }
     });
 
+    // No Consumer is written for the leader (ADR-0033 §Decision 3). That upsert
+    // existed only so the old `consumer ∪ contributor` checks would pass; the
+    // role union reads `curators` directly, and asserting that a leader consumes
+    // releases may simply be false.
     if (leaderId !== undefined) {
-      await prisma.consumer.upsert({
-        where: { userId: leaderId },
-        create: {
-          userId: leaderId,
-          communities: { connect: { id: community.id } }
-        },
-        update: { communities: { connect: { id: community.id } } }
-      });
       await audit(
         prisma,
         req.user!.id,
@@ -392,7 +407,7 @@ router.put(
       registrationStatus,
       announceVisibility,
       allowDuplicateFormats,
-      staffIds,
+      curatorIds,
       leaderId
     } = parsedBody<UpdateCommunityInput>(res);
 
@@ -402,13 +417,13 @@ router.put(
         return res.status(404).json({ msg: 'Leader user not found' });
     }
 
-    // `staffIds` (when given) replaces the whole staff set, so the new leader
-    // might not be in it — fold them back in to preserve the leader⊇staff
-    // invariant (ADR-0021).
-    const staffConnect =
-      leaderId !== undefined && staffIds !== undefined
-        ? [...new Set([...staffIds, leaderId])]
-        : staffIds;
+    // `curatorIds` (when given) replaces the whole curator set, so the new leader
+    // might not be in it — fold them back in to preserve the leader ⊇ curators
+    // invariant (ADR-0021, narrowed by ADR-0033).
+    const curatorConnect =
+      leaderId !== undefined && curatorIds !== undefined
+        ? [...new Set([...curatorIds, leaderId])]
+        : curatorIds;
 
     const community = await prisma.community.update({
       where: { id },
@@ -420,27 +435,20 @@ router.put(
         ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
-        ...(staffConnect !== undefined && {
-          staff: { set: staffConnect.map((sid: number) => ({ id: sid })) }
+        ...(curatorConnect !== undefined && {
+          curators: { set: curatorConnect.map((cid: number) => ({ id: cid })) }
         }),
-        // Leader given but staff set untouched: connect (don't replace) so the
-        // invariant holds without disturbing existing staff.
+        // Leader given but curator set untouched: connect (don't replace) so the
+        // invariant holds without disturbing existing curators.
         ...(leaderId !== undefined &&
-          staffIds === undefined && {
-            staff: { connect: { id: leaderId } }
+          curatorIds === undefined && {
+            curators: { connect: { id: leaderId } }
           })
       }
     });
 
+    // No Consumer upsert here either — see the create path (ADR-0033 §3).
     if (leaderId !== undefined) {
-      await prisma.consumer.upsert({
-        where: { userId: leaderId },
-        create: {
-          userId: leaderId,
-          communities: { connect: { id: community.id } }
-        },
-        update: { communities: { connect: { id: community.id } } }
-      });
       await audit(
         prisma,
         req.user!.id,

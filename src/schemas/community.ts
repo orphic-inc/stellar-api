@@ -43,7 +43,7 @@ export const createCommunitySchema = z
     registrationStatus: registrationStatusEnum,
     announceVisibility: announceVisibilityEnum.optional(),
     allowDuplicateFormats: z.boolean().optional(),
-    staffIds: z.array(z.number().int().positive()).optional(),
+    curatorIds: z.array(z.number().int().positive()).optional(),
     leaderId: z.number().int().positive().optional()
   })
   .refine(
@@ -64,7 +64,7 @@ export const updateCommunitySchema = z.object({
   registrationStatus: registrationStatusEnum.optional(),
   announceVisibility: announceVisibilityEnum.optional(),
   allowDuplicateFormats: z.boolean().optional(),
-  staffIds: z.array(z.number().int().positive()).optional(),
+  curatorIds: z.array(z.number().int().positive()).optional(),
   leaderId: z.number().int().positive().optional()
 });
 

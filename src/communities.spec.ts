@@ -24,8 +24,13 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
   allowDuplicateFormats: false,
   createdAt: new Date(),
   updatedAt: new Date(),
-  staff: [],
+  curators: [],
+  leaderId: null,
+  // GET /:id issues a second findUnique for the member roster; the shared mock
+  // answers both, so it carries the roster's relations too.
+  leader: null,
   consumers: [],
+  contributors: [],
   _count: {
     contributors: 0,
     releases: 0,
@@ -84,14 +89,14 @@ describe('GET /api/communities/:id', () => {
     expect(res.body).toEqual({ msg: 'Not a member of this community' });
   });
 
-  it('lets a staff-only member read a closed community (#419)', async () => {
+  it('lets a curator-only member read a closed community (#419)', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({
         registrationStatus: RegistrationStatus.closed,
-        staff: [{ id: 7, username: 'staffer' }]
+        curators: [{ id: 7, username: 'curator' }]
       }) as never
     );
-    // The role union matches on the staff arm — no Consumer row involved.
+    // The role union matches on the curator arm — no Consumer row involved.
     prismaMock.community.findFirst.mockResolvedValue({ id: 1 } as never);
 
     const res = await request(app).get('/api/communities/1');
@@ -110,6 +115,45 @@ describe('GET /api/communities/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Jazz');
+  });
+
+  it('reports members as the role union, not the consumer list', async () => {
+    // ADR-0033 §4. The curator holds no Consumer row and the consumer holds no
+    // curator row; both are members, and the response says which is which.
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({
+        leaderId: 9,
+        leader: { id: 9, username: 'ada' },
+        curators: [
+          { id: 9, username: 'ada' },
+          { id: 11, username: 'grace' }
+        ],
+        consumers: [{ user: { id: 8, username: 'bob' } }],
+        contributors: [{ user: { id: 12, username: 'carol' } }]
+      }) as never
+    );
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.members).toEqual([
+      { id: 9, username: 'ada', roles: ['curator', 'leader'] },
+      { id: 8, username: 'bob', roles: ['consumer'] },
+      { id: 12, username: 'carol', roles: ['contributor'] },
+      { id: 11, username: 'grace', roles: ['curator'] }
+    ]);
+    // The detail query stops fetching `consumers[]` — the array `members`
+    // replaces. Asserted on the query, not the body: the shared mock ignores
+    // `include` and would echo it back regardless. `_count` stays as it was.
+    expect(prismaMock.community.findUnique).toHaveBeenCalledWith({
+      where: { id: 1 },
+      include: {
+        curators: { select: { id: true, username: true } },
+        _count: {
+          select: { contributors: true, releases: true, consumers: true }
+        }
+      }
+    });
   });
 });
 
@@ -159,7 +203,7 @@ describe('GET /api/communities/:id/health', () => {
     expect(getCommunityHealthPulseMock).not.toHaveBeenCalled();
   });
 
-  it('serves the pulse to a staff-only member of a closed community (#419)', async () => {
+  it('serves the pulse to a curator-only member of a closed community (#419)', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.closed }) as never
     );
@@ -264,7 +308,7 @@ describe('GET /api/communities/:id/health/history', () => {
     expect(prismaMock.communityHealthSnapshot.findMany).not.toHaveBeenCalled();
   });
 
-  it('serves history to a staff-only member of a closed community (#419)', async () => {
+  it('serves history to a curator-only member of a closed community (#419)', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
       makeCommunity({ registrationStatus: RegistrationStatus.closed }) as never
     );
@@ -292,7 +336,7 @@ describe('POST /api/communities/:id/members', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 403 when the caller lacks admin or community staff access', async () => {
+  it('returns 403 when the caller lacks admin or curator access', async () => {
     prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
 
     const res = await request(app)
@@ -305,7 +349,7 @@ describe('POST /api/communities/:id/members', () => {
 
   it('returns 404 when the target user does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ staff: [{ id: 7 }] }) as never
+      makeCommunity({ curators: [{ id: 7 }] }) as never
     );
     prismaMock.user.findUnique.mockResolvedValue(null);
 
@@ -316,9 +360,9 @@ describe('POST /api/communities/:id/members', () => {
     expect(res.status).toBe(404);
   });
 
-  it('adds a member for community staff', async () => {
+  it('adds a consuming member for a curator', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ staff: [{ id: 7 }] }) as never
+      makeCommunity({ curators: [{ id: 7 }] }) as never
     );
     prismaMock.user.findUnique.mockResolvedValue({ id: 8 } as never);
     prismaMock.consumer.upsert.mockResolvedValue({ id: 9, userId: 8 } as never);
@@ -339,13 +383,51 @@ describe('POST /api/communities/:id/members', () => {
 describe('DELETE /api/communities/:id/members/:userId', () => {
   it('returns 404 when the consumer record does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ staff: [{ id: 7 }] }) as never
+      makeCommunity({ curators: [{ id: 7 }] }) as never
     );
     prismaMock.consumer.findUnique.mockResolvedValue(null);
 
     const res = await request(app).delete('/api/communities/1/members/8');
 
     expect(res.status).toBe(404);
+  });
+
+  it('refuses with 409 when the target is a curator', async () => {
+    // ADR-0033 §5: no route strips a role as a side effect of removing a
+    // membership. Removing a curator goes through DELETE /:id/curators/:userId.
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ curators: [{ id: 7 }, { id: 8 }] }) as never
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+
+    const res = await request(app).delete('/api/communities/1/members/8');
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      msg: 'User is the community curator; remove that role first'
+    });
+    expect(prismaMock.consumer.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses with 409 when the target is the leader, naming that role', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+
+    const res = await request(app).delete('/api/communities/1/members/8');
+
+    expect(res.status).toBe(409);
+    // Leader wins over curator in the message — it is the blocking role that
+    // has to be reassigned, via PUT /:id.
+    expect(res.body).toEqual({
+      msg: 'User is the community leader; remove that role first'
+    });
+    expect(prismaMock.consumer.update).not.toHaveBeenCalled();
   });
 
   it('disconnects a member for admins', async () => {
@@ -366,21 +448,21 @@ describe('DELETE /api/communities/:id/members/:userId', () => {
   });
 });
 
-describe('POST /api/communities/:id/staff', () => {
+describe('POST /api/communities/:id/curators', () => {
   it('returns 404 when the user does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ staff: [{ id: 7 }] }) as never
+      makeCommunity({ curators: [{ id: 7 }] }) as never
     );
     prismaMock.user.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
-      .post('/api/communities/1/staff')
+      .post('/api/communities/1/curators')
       .send({ userId: 8 });
 
     expect(res.status).toBe(404);
   });
 
-  it('adds staff membership for admins', async () => {
+  it('adds a curator for admins', async () => {
     prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
@@ -389,30 +471,30 @@ describe('POST /api/communities/:id/staff', () => {
     prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
 
     const res = await request(app)
-      .post('/api/communities/1/staff')
+      .post('/api/communities/1/curators')
       .send({ userId: 8 });
 
     expect(res.status).toBe(204);
     expect(prismaMock.community.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { staff: { connect: { id: 8 } } }
+      data: { curators: { connect: { id: 8 } } }
     });
   });
 });
 
-describe('DELETE /api/communities/:id/staff/:userId', () => {
-  it('removes staff membership for community staff', async () => {
+describe('DELETE /api/communities/:id/curators/:userId', () => {
+  it('removes a curator for another curator', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ staff: [{ id: 7 }] }) as never
+      makeCommunity({ curators: [{ id: 7 }] }) as never
     );
     prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
 
-    const res = await request(app).delete('/api/communities/1/staff/8');
+    const res = await request(app).delete('/api/communities/1/curators/8');
 
     expect(res.status).toBe(204);
     expect(prismaMock.community.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { staff: { disconnect: { id: 8 } } }
+      data: { curators: { disconnect: { id: 8 } } }
     });
   });
 });
@@ -445,13 +527,13 @@ describe('POST /api/communities', () => {
     expect(res.body).toEqual({ msg: 'Leader user not found' });
   });
 
-  it('creates a community, setting the leader as a superset of staff', async () => {
+  it('creates a community, setting the leader as a superset of curators', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
     prismaMock.user.findUnique.mockResolvedValue({ id: 9 } as never);
     prismaMock.community.create.mockResolvedValue(
-      makeCommunity({ id: 4, staff: [] }) as never
+      makeCommunity({ id: 4, curators: [] }) as never
     );
     prismaMock.consumer.upsert.mockResolvedValue({
       id: 10,
@@ -465,7 +547,7 @@ describe('POST /api/communities', () => {
         type: 'Music',
         registrationStatus: 'open',
         leaderId: 9,
-        staffIds: [9, 11]
+        curatorIds: [9, 11]
       });
 
     expect(res.status).toBe(201);
@@ -476,16 +558,15 @@ describe('POST /api/communities', () => {
         registrationStatus: 'open',
         image: '/images/defaults/music.png',
         leaderId: 9,
-        staff: {
+        curators: {
           connect: [{ id: 9 }, { id: 11 }]
         }
       })
     });
-    expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
-      where: { userId: 9 },
-      create: { userId: 9, communities: { connect: { id: 4 } } },
-      update: { communities: { connect: { id: 4 } } }
-    });
+    // ADR-0033 §3: no Consumer is synthesised for the leader. `Consumer` is the
+    // consumption identity, not a membership marker — the leader belongs via
+    // the curator connection above.
+    expect(prismaMock.consumer.upsert).not.toHaveBeenCalled();
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -497,13 +578,13 @@ describe('POST /api/communities', () => {
     );
   });
 
-  it('folds the leader into staff even when omitted from staffIds', async () => {
+  it('folds the leader into curators even when omitted from curatorIds', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
     prismaMock.user.findUnique.mockResolvedValue({ id: 9 } as never);
     prismaMock.community.create.mockResolvedValue(
-      makeCommunity({ id: 4, staff: [] }) as never
+      makeCommunity({ id: 4, curators: [] }) as never
     );
     prismaMock.consumer.upsert.mockResolvedValue({
       id: 10,
@@ -517,14 +598,14 @@ describe('POST /api/communities', () => {
         type: 'Music',
         registrationStatus: 'open',
         leaderId: 9,
-        staffIds: [11]
+        curatorIds: [11]
       });
 
     expect(res.status).toBe(201);
     expect(prismaMock.community.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         leaderId: 9,
-        staff: { connect: [{ id: 11 }, { id: 9 }] }
+        curators: { connect: [{ id: 11 }, { id: 9 }] }
       })
     });
   });
@@ -601,7 +682,7 @@ describe('PUT /api/communities/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('updates mutable fields and staff assignments', async () => {
+  it('updates mutable fields and curator assignments', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -615,7 +696,7 @@ describe('PUT /api/communities/:id', () => {
       .send({
         name: 'Updated',
         registrationStatus: 'invite',
-        staffIds: [8, 9]
+        curatorIds: [8, 9]
       });
 
     expect(res.status).toBe(200);
@@ -624,7 +705,7 @@ describe('PUT /api/communities/:id', () => {
       data: {
         name: 'Updated',
         registrationStatus: 'invite',
-        staff: { set: [{ id: 8 }, { id: 9 }] }
+        curators: { set: [{ id: 8 }, { id: 9 }] }
       }
     });
   });
@@ -668,7 +749,7 @@ describe('PUT /api/communities/:id', () => {
     expect(res.body).toEqual({ msg: 'Leader user not found' });
   });
 
-  it('reassigns the leader and connects them to staff (transfer)', async () => {
+  it('reassigns the leader and connects them to curators (transfer)', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -688,14 +769,11 @@ describe('PUT /api/communities/:id', () => {
       where: { id: 1 },
       data: {
         leaderId: 7,
-        staff: { connect: { id: 7 } }
+        curators: { connect: { id: 7 } }
       }
     });
-    expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
-      where: { userId: 7 },
-      create: { userId: 7, communities: { connect: { id: 1 } } },
-      update: { communities: { connect: { id: 1 } } }
-    });
+    // No Consumer on transfer either (ADR-0033 §3).
+    expect(prismaMock.consumer.upsert).not.toHaveBeenCalled();
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -707,7 +785,7 @@ describe('PUT /api/communities/:id', () => {
     );
   });
 
-  it('folds the new leader into a replaced staff set', async () => {
+  it('folds the new leader into a replaced curator set', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
@@ -720,14 +798,14 @@ describe('PUT /api/communities/:id', () => {
 
     const res = await request(app)
       .put('/api/communities/1')
-      .send({ leaderId: 7, staffIds: [8, 9] });
+      .send({ leaderId: 7, curatorIds: [8, 9] });
 
     expect(res.status).toBe(200);
     expect(prismaMock.community.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: {
         leaderId: 7,
-        staff: { set: [{ id: 8 }, { id: 9 }, { id: 7 }] }
+        curators: { set: [{ id: 8 }, { id: 9 }, { id: 7 }] }
       }
     });
   });

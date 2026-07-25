@@ -123,13 +123,13 @@ export async function generateCommunities(
 
     createdCommunityIds.push(community.id);
 
-    // Add staff users as community staff
-    for (const staffId of staffUsers.slice(0, 2)) {
+    // Add staff-ranked users as community curators
+    for (const curatorId of staffUsers.slice(0, 2)) {
       try {
         await prisma.community.update({
           where: { id: community.id },
           data: {
-            staff: { connect: { id: staffId } }
+            curators: { connect: { id: curatorId } }
           }
         });
       } catch {

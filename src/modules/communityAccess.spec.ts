@@ -2,14 +2,19 @@
  * Unit tests for the shared community access predicate (#419, ADR-0030 slice 3).
  */
 
-const mockPrismaCommunity = { findFirst: jest.fn() };
+const mockPrismaCommunity = { findFirst: jest.fn(), findUnique: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
   prisma: { community: mockPrismaCommunity }
 }));
 
 import { RegistrationStatus } from '@prisma/client';
-import { communityRoleUnion, hasCommunityAccess } from './communityAccess';
+import {
+  COMMUNITY_ROLES,
+  communityRoleUnion,
+  hasCommunityAccess,
+  listCommunityMembers
+} from './communityAccess';
 
 describe('communityRoleUnion', () => {
   it('unions every Axis-1 relation that makes a user part of a community', () => {
@@ -17,7 +22,7 @@ describe('communityRoleUnion', () => {
       OR: [
         { consumers: { some: { userId: 7 } } },
         { contributors: { some: { userId: 7 } } },
-        { staff: { some: { id: 7 } } },
+        { curators: { some: { id: 7 } } },
         { leaderId: 7 }
       ]
     });
@@ -36,9 +41,66 @@ describe('communityRoleUnion', () => {
     expect(arms.flatMap((arm) => Object.keys(arm))).toEqual([
       'consumers',
       'contributors',
-      'staff',
+      'curators',
       'leaderId'
     ]);
+  });
+});
+
+describe('listCommunityMembers', () => {
+  const community = {
+    leader: { id: 1, username: 'ada' },
+    curators: [
+      { id: 1, username: 'ada' },
+      { id: 2, username: 'grace' }
+    ],
+    consumers: [{ user: { id: 3, username: 'bob' } }],
+    contributors: [{ user: { id: 4, username: 'carol' } }]
+  };
+
+  it('reports every role-holder, including one who holds a single role', async () => {
+    mockPrismaCommunity.findUnique.mockResolvedValueOnce(community);
+
+    // The point of ADR-0033: a curator with no Consumer row is a member.
+    // Alphabetical by username, roles in COMMUNITY_ROLES order.
+    await expect(listCommunityMembers(1)).resolves.toEqual([
+      { id: 1, username: 'ada', roles: ['curator', 'leader'] },
+      { id: 3, username: 'bob', roles: ['consumer'] },
+      { id: 4, username: 'carol', roles: ['contributor'] },
+      { id: 2, username: 'grace', roles: ['curator'] }
+    ]);
+  });
+
+  it('agrees with communityRoleUnion on which relations confer membership', () => {
+    // The roster projects the union the other way round and cannot reuse it
+    // literally, so this is the guard against the two drifting: a fifth arm
+    // added to one and not the other fails here (ADR-0010).
+    const arms = communityRoleUnion(7).OR as Array<Record<string, unknown>>;
+    const unionRelations = arms.flatMap((arm) => Object.keys(arm));
+    const rosterRelations = COMMUNITY_ROLES.map((role) =>
+      role === 'leader' ? 'leaderId' : `${role}s`
+    );
+    expect(rosterRelations).toEqual(unionRelations);
+  });
+
+  it('still lists a leader whose curator row drifted away', async () => {
+    // The union's leaderId arm would match them, so the roster must too —
+    // otherwise the gate and the display disagree about who belongs.
+    mockPrismaCommunity.findUnique.mockResolvedValueOnce({
+      ...community,
+      curators: [{ id: 2, username: 'grace' }]
+    });
+
+    await expect(listCommunityMembers(1)).resolves.toContainEqual({
+      id: 1,
+      username: 'ada',
+      roles: ['leader']
+    });
+  });
+
+  it('returns an empty roster for a community that does not exist', async () => {
+    mockPrismaCommunity.findUnique.mockResolvedValueOnce(null);
+    await expect(listCommunityMembers(99)).resolves.toEqual([]);
   });
 });
 
