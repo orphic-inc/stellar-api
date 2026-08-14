@@ -8,6 +8,7 @@ import { AppError } from '../lib/errors';
 import { getLogger } from './logging';
 import { floorSub } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
+import { runInBackground } from './backgroundTasks';
 
 const log = getLogger('downloads');
 
@@ -192,9 +193,11 @@ export const grantDownloadAccess = async (
 
   // Evaluate ratio policy outside the transaction so a policy error never
   // rolls back an already-committed grant.
-  evaluateRatioPolicy(consumerId).catch((err) => {
-    log.warn('Ratio policy evaluation failed', { consumerId, err });
-  });
+  runInBackground(
+    evaluateRatioPolicy(consumerId).catch((err) => {
+      log.warn('Ratio policy evaluation failed', { consumerId, err });
+    })
+  );
 
   return result;
 };

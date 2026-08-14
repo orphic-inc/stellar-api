@@ -12,6 +12,7 @@ import { audit } from '../lib/audit';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
 import { checkContributionLink } from './linkHealth';
+import { runInBackground } from './backgroundTasks';
 import { assertWithinSizeCap } from './contributionLimits';
 import { resolveTagNames } from './tag';
 import type {
@@ -252,11 +253,13 @@ export const createContributionSubmission = async ({
     });
   });
 
-  checkContributionLink(contribution.id).catch((err) =>
-    log.warn('Initial link check failed', {
-      contributionId: contribution.id,
-      err
-    })
+  runInBackground(
+    checkContributionLink(contribution.id).catch((err) =>
+      log.warn('Initial link check failed', {
+        contributionId: contribution.id,
+        err
+      })
+    )
   );
 
   return {
@@ -358,11 +361,13 @@ export const addContributionToRelease = async ({
       });
     })
     .then((contribution) => {
-      checkContributionLink(contribution.id).catch((err) =>
-        log.warn('Initial link check failed', {
-          contributionId: contribution.id,
-          err
-        })
+      runInBackground(
+        checkContributionLink(contribution.id).catch((err) =>
+          log.warn('Initial link check failed', {
+            contributionId: contribution.id,
+            err
+          })
+        )
       );
       return {
         ...contribution,

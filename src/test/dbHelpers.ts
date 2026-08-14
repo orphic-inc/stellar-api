@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { drainBackgroundTasks } from '../modules/backgroundTasks';
 
 const testUrl = process.env.STELLAR_PSQL_URI_TEST!;
 
@@ -14,15 +15,21 @@ export const testPrisma: PrismaClient = new PrismaClient({
 /**
  * Truncates every table (except _prisma_migrations) and resets sequences.
  *
- * Deliberately a per-table loop, NOT a single `TRUNCATE a, b, c … CASCADE`: the
- * batched form takes ACCESS EXCLUSIVE locks on every table at once, which
- * deadlocks (40P01) under CI when a prior test's fire-and-forget query (e.g. the
- * downloads ratio-policy eval) still holds a lock. Truncating one table at a
- * time keeps the lock set per statement small enough to avoid that. The #165
- * flake was setup running slow under load, not this being wrong — the fix is the
- * hook-timeout headroom in devTools.integration.ts, not batching the locks.
+ * Waits for tracked background work first. That drain is what actually keeps
+ * this safe: a query still in flight from the previous test holds row locks, and
+ * truncating underneath it deadlocks (40P01, #424).
+ *
+ * The per-table loop is a leftover mitigation, kept only because it is harmless.
+ * It does NOT bound the lock set, contrary to what this comment used to claim —
+ * the loop runs inside one `DO $$ … $$` block, so it is a single transaction and
+ * every ACCESS EXCLUSIVE lock it takes is held until the block commits, exactly
+ * like the batched `TRUNCATE a, b, c` form. If anything, acquiring them one at a
+ * time widens the window for a cycle, since another connection can take a
+ * conflicting lock on a table the loop has not reached yet. It narrowed the odds
+ * and was mistaken for a fix; the drain above is the fix.
  */
 export const truncateAll = async (): Promise<void> => {
+  await drainBackgroundTasks();
   await testPrisma.$executeRawUnsafe(`
     DO $$ DECLARE r RECORD; BEGIN
       FOR r IN (
