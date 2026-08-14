@@ -9,7 +9,6 @@ import { tokenize } from './tokenize';
 // server sanitize is a second net exercised at the route/integration level.
 jest.mock('./sanitizeConfig', () => ({ sanitizeBBCode: (v: string) => v }));
 
-// eslint-disable-next-line import/first, @typescript-eslint/no-var-requires
 import { renderBBCode } from './index';
 
 const SITE = 'https://stellar.test';

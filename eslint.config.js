@@ -80,6 +80,29 @@ module.exports = [
       ],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
 
+      // Both off because the advice is wrong here, not merely noisy. Each was
+      // tried before being switched off, and each broke something.
+      //
+      // no-named-as-default flags `import rateLimit from 'express-rate-limit'`
+      // and suggests the named export. Plain `require()` agrees the two are the
+      // same function — but under ts-jest's CJS interop the named form resolves
+      // to undefined and every suite that transitively imports the rate limiter
+      // dies with `(0, express_rate_limit_1.rateLimit) is not a function`.
+      // 1742 passing unit tests drop to 497.
+      //
+      // no-named-as-default-member flags `DOMPurify.sanitize(…)` the same way,
+      // and there the two genuinely differ:
+      //
+      //   require('isomorphic-dompurify').sanitize === m.default.sanitize  // false
+      //
+      // Taking that suggestion would change which function sanitizes user HTML.
+      // That is the XSS boundary; it does not move on a lint hint.
+      //
+      // Neither rule fired before eslint-plugin-import 2.32, which the eslint 9
+      // peer range requires — so this is new advice about unchanged code.
+      'import/no-named-as-default': 'off',
+      'import/no-named-as-default-member': 'off',
+
       // TypeScript already resolves identifiers, and no-undef cannot see type-only
       // names, so it reports false positives on a TS codebase. This is what
       // plugin:@typescript-eslint/recommended did for us under eslintrc.
