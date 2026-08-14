@@ -2,6 +2,7 @@ import { LinkHealthStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
 import { sendSystemMessage } from './pm';
+import { runInBackground } from './backgroundTasks';
 
 const log = getLogger('linkHealth');
 
@@ -255,8 +256,10 @@ export const recordContributionReport = async (
         distinctReporters: distinctReporters.length
       });
       // Kick off a recheck so status can be corrected if the link is actually fine
-      checkContributionLink(contributionId).catch((err) =>
-        log.warn('Post-report link recheck failed', { contributionId, err })
+      runInBackground(
+        checkContributionLink(contributionId).catch((err) =>
+          log.warn('Post-report link recheck failed', { contributionId, err })
+        )
       );
     }
   }
