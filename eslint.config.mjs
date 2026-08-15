@@ -7,14 +7,14 @@
  * was there to stop (a checkout nested inside another checkout picking up the
  * outer repo's config and loading @typescript-eslint from two node_modules).
  */
-const js = require('@eslint/js');
-const globals = require('globals');
-const tsPlugin = require('@typescript-eslint/eslint-plugin');
-const tsParser = require('@typescript-eslint/parser');
-const importPlugin = require('eslint-plugin-import');
-const prettierRecommended = require('eslint-plugin-prettier/recommended');
+import js from '@eslint/js';
+import globals from 'globals';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
+import importPlugin from 'eslint-plugin-import';
+import prettierRecommended from 'eslint-plugin-prettier/recommended';
 
-module.exports = [
+export default [
   {
     ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'prisma/erd/**']
   },
