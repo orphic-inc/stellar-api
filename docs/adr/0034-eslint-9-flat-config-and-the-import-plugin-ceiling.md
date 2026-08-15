@@ -4,7 +4,7 @@
 **Date:** 2026-08-14
 **Repos:** orphic-inc/stellar-api
 **Relates:** [ADR-0018 — development lifecycle & the API/UI contract gate](0018-development-lifecycle-and-contract-gate.md)
-**Cross-links:** [#367 — eslint v10](https://github.com/orphic-inc/stellar-api/pull/367) (stays open), [#362 — @babel/eslint-parser v8](https://github.com/orphic-inc/stellar-api/pull/362) (closed by this), [#431 — eslint-config-prettier v10](https://github.com/orphic-inc/stellar-api/pull/431) (superseded by this)
+**Cross-links:** [#367 — eslint v10](https://github.com/orphic-inc/stellar-api/pull/367) (closed unmerged; this ADR is the record), [#362 — @babel/eslint-parser v8](https://github.com/orphic-inc/stellar-api/pull/362) (closed by this), [#431 — eslint-config-prettier v10](https://github.com/orphic-inc/stellar-api/pull/431) (superseded by this)
 
 ---
 
@@ -33,11 +33,11 @@ There is no version of that plugin that supports eslint 10. So "take eslint 10" 
 
 ## Decision
 
-### 1. ESLint 9 now; eslint 10 stays open
+### 1. ESLint 9 now; eslint 10 deferred, not abandoned
 
 We take eslint 9 and the flat-config migration together. That clears the end-of-life problem, which is the actual risk, and puts the flat config in place so that reaching 10 later costs one dependency swap rather than a migration.
 
-**#367 stays open, pointing here.** It is not an ignored Renovate PR; it is blocked on a real upstream constraint and on the question in §Alternatives about `import-x`.
+**#367 was closed unmerged (2026-08-15), so this ADR is the only record of the decision.** It was never an ignored Renovate PR — it is blocked on a real upstream constraint and on the question in §Alternatives about `import-x`. Note that Renovate treats a closed PR as an instruction not to re-offer that version, so eslint 10 will not reappear in the PR list by itself; picking it up again means someone deciding to, starting from §Alternatives.
 
 ### 2. The config is `eslint.config.mjs`, not `eslint.config.js`
 
@@ -97,7 +97,7 @@ The question to answer separately: what does Codacy catch that `tsc --noEmit`, `
 
 ## Alternatives considered
 
-**Swap `eslint-plugin-import` for `eslint-plugin-import-x`.** The maintained fork supports eslint 10 and is close to a drop-in, but rules move to the `import-x/` prefix and it is a different maintainer's package. Reaching one major sooner does not justify deciding that inside a Renovate bump; it belongs to whoever picks up #367.
+**Swap `eslint-plugin-import` for `eslint-plugin-import-x`.** The maintained fork supports eslint 10 and is close to a drop-in, but rules move to the `import-x/` prefix and it is a different maintainer's package. Reaching one major sooner does not justify deciding that inside a Renovate bump; it belongs to whoever revisits eslint 10.
 
 **Drop import linting entirely.** Defensible — `import/no-unresolved` overlaps `tsc`, and this repo already carries a nine-entry ignore list to work around its false positives on type-only imports. Rejected for now because `recommended` also supplies `no-duplicates`, `named`, and `export`, which `tsc` does not replace, and because losing rules should be its own decision rather than a side effect of a version bump.
 
@@ -110,5 +110,5 @@ The question to answer separately: what does Codacy catch that `tsc --noEmit`, `
 - `npm ci` installs the eslint the lockfile names — verified from a clean tree, which is the check #367 fails.
 - Lint is silent again, matching main's baseline: 0 errors, 0 warnings.
 - Two `import` rules no longer run anywhere in the repo. Their absence is documented at the point of suppression, with reproduction commands, so re-enabling them is a decision someone can evaluate rather than a mystery.
-- eslint 10 remains unreachable until the `import-x` question is settled. #367 will keep appearing in the PR list; that is intended, and this ADR is what it points at.
+- eslint 10 remains unreachable until the `import-x` question is settled. With #367 closed, nothing will surface that question again on its own — no PR in the list, no tracking issue — so this ADR is the whole of the memory. That is a deliberate choice to keep the queue quiet rather than an oversight, and the cost is that revisiting eslint 10 requires someone to come looking.
 - The flat config is stricter about what it lints by construction: file selection is explicit, so a future "lint passes but checked nothing" regression is visible in the config rather than invisible in a flag.
