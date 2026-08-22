@@ -108,5 +108,5 @@ The **stub models** in `schema.prisma` that have no routes yet (CoverArt, Bitcoi
 ## Testing
 
 - **Unit/spec** (`*.spec.ts`): mock the DB, `npm run test`.
-- **Integration** (`src/integration/`): real DB via `.env.test`, `npm run test:integration`.
+- **Integration** (`src/integration/`): real DB via `.env.test`, `npm run test:integration`. Create that file once with `cp .env.test.example .env.test`, then point `STELLAR_PSQL_URI_TEST` at your database — the test DB itself is created automatically on first run.
 - Helpers: `src/test/apiTestHarness.ts`, `factories.ts`, `dbHelpers.ts`.

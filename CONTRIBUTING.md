@@ -117,6 +117,7 @@ npm run test              # unit/spec suite (mocked DB)
 npm run test:integration  # integration suite (requires a stellar_test database and a .env.test file)
 ```
 
+- The integration suite reads `.env.test`, which is gitignored and not created for you — run `cp .env.test.example .env.test` once and set `STELLAR_PSQL_URI_TEST`.
 - New endpoints must be accompanied by integration tests in `src/integration`.
 - Utilize the `apiTestHarness` and `dbHelpers` to cleanly stub out the database or test user context during integration tests.
 

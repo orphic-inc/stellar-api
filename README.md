@@ -55,7 +55,13 @@ If you prefer to run the API directly on your local machine for development:
 ### 1. Prerequisites
 
 - **Node.js 22** (see `.nvmrc` / the `engines` field in `package.json`) — `nvm use` picks it up.
-- **PostgreSQL 16** running and reachable.
+- **PostgreSQL 16** running and reachable. If you don't have one, this repo ships a database-only compose file:
+
+  ```bash
+  docker compose -f docker-compose.dev.yml up -d
+  ```
+
+  That publishes Postgres 16 on `localhost:5432` with the credentials the `.env` table below expects (user `stellar`, password `changeme`, database `stellar`) — the same ones CI tests against. It starts **no** API or UI container; the full stack lives in [stellar-compose](https://github.com/orphic-inc/stellar-compose). If 5432 is already taken (by an existing stellar-compose stack, say), set `STELLAR_DEV_DB_PORT` to a free port and match it in `STELLAR_PSQL_URI`.
 
 ### 2. Installation
 
@@ -75,13 +81,15 @@ cp .env.default .env
 
 `.env.default` is self-documenting (grouped, commented) and is the authoritative list. The variables you must set for a local run:
 
-| Variable                   | Description                                            | Example / default                          |
-| -------------------------- | ------------------------------------------------------ | ------------------------------------------ |
-| `STELLAR_PSQL_URI`         | **Prisma connection string** to your Postgres DB       | `postgresql://user:pass@localhost:5432/db` |
-| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs (32+ chars; set to a real one) | `changeme`                                 |
-| `STELLAR_HTTP_PORT`        | API listening port                                     | `8080`                                     |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)               | `https://stellargra.ph`                    |
-| `STELLAR_LOG_LEVEL`        | Winston log level (`debug`/`info`/`error`)             | `info`                                     |
+| Variable                   | Description                                                                                             | Example / default                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `STELLAR_PSQL_URI`         | **Prisma connection string** to your Postgres DB                                                        | `postgresql://stellar:changeme@localhost:5432/stellar` |
+| `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs — **32+ chars, or the API exits at boot**. Generate one: `openssl rand -hex 24` | _none — you must set this_                             |
+| `STELLAR_HTTP_PORT`        | API listening port                                                                                      | `8080`                                                 |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)                                                                | `https://stellargra.ph`                                |
+| `STELLAR_LOG_LEVEL`        | Winston log level (`debug`/`info`/`error`)                                                              | `info`                                                 |
+
+> **The two variables `.env.default` cannot fill in for you** are `STELLAR_PSQL_URI` and `STELLAR_AUTH_JWT_SECRET`. Neither ships with a working value on purpose: the URI is an obviously-fake placeholder, and the JWT secret is empty. The API then fails fast (`FATAL: Missing required environment variable: STELLAR_AUTH_JWT_SECRET`, or `must be at least 32 characters` if you set one too short) rather than letting an instance run on a guessable secret. Set both before `npm run dev`.
 
 Optional integrations (Sentry, SMTP invites, site identity/Golden-Rules tokens, and the korin.pink IRC sidecar) are all documented inline in `.env.default` and are **inert until their keys are set** — the app runs fine without them. The full variable reference lives in [`docs/README.md`](docs/README.md#environment-reference).
 
@@ -92,6 +100,13 @@ Apply migrations and generate the Prisma client. `prisma migrate dev` also **aut
 ```bash
 npx prisma migrate dev     # applies migrations + seeds defaults
 npx prisma generate        # regenerate the client (only needed after schema pulls)
+```
+
+`prisma migrate dev` requires an interactive terminal. Without a TTY (CI, inside a container, an agent session) use the non-interactive pair instead — and note that `migrate deploy` does **not** run the seed, so you invoke it yourself:
+
+```bash
+npx prisma migrate deploy  # applies migrations only — no seed
+npm run db:seed            # plants the defaults migrate dev would have seeded
 ```
 
 After a database reset you can re-run just the seed with `npm run db:seed`.
