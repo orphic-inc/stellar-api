@@ -1,0 +1,36 @@
+# Local development DATABASE ONLY — not a deployment artifact.
+#
+# This exists so you can run the API from source (`npm run dev`) against a
+# throwaway Postgres. It deliberately defines no API and no UI service: the
+# full stack (API + UI + DB) lives in the stellar-compose repository.
+#
+#   docker compose -f docker-compose.dev.yml up -d     # start
+#   docker compose -f docker-compose.dev.yml down      # stop, keep data
+#   docker compose -f docker-compose.dev.yml down -v   # stop, DELETE data
+#
+# The image tag and credentials match .github/workflows/publish.yml, so a local
+# run and CI agree on the database they test against. These are throwaway
+# local-only values — never reuse them anywhere real.
+#
+# Already running another Postgres on 5432 (a stellar-compose stack, say)? Set
+# STELLAR_DEV_DB_PORT to a free port and update STELLAR_PSQL_URI to match.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stellar
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: stellar
+    ports:
+      - '${STELLAR_DEV_DB_PORT:-5432}:5432'
+    volumes:
+      - stellar-dev-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U stellar -d stellar']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  stellar-dev-db-data:
