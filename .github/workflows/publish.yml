@@ -45,24 +45,43 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      # Every gate below runs even when an earlier one failed. They are
+      # independent checks, and by default the first failure cancels the rest —
+      # which hid a real type error behind a formatting nit for twelve days on
+      # the npm-non-major bump: `prettier --check` failed, so nothing after it
+      # ran. Reordering does not fix that (eslint.config.mjs applies
+      # eslint-plugin-prettier/recommended, so `lint` fails on the same
+      # unformatted tree); running them independently does. `!cancelled()` still
+      # honours a genuinely cancelled run, and the job fails if any gate failed.
+      #
+      # `npm ci` above is deliberately NOT in this set — every gate is
+      # meaningless if the install did not happen.
       - name: Format check
+        if: ${{ !cancelled() }}
         run: npx prettier --check src 'prisma/**/*.ts'
       - name: Lint
+        if: ${{ !cancelled() }}
         run: npm run lint
       - name: Type check
+        if: ${{ !cancelled() }}
         run: npx tsc --noEmit
       - name: Type check (test files)
+        if: ${{ !cancelled() }}
         run: npm run typecheck:test
       - name: Unit tests
+        if: ${{ !cancelled() }}
         run: npm test
       - name: OpenAPI freshness
+        if: ${{ !cancelled() }}
         run: npm run openapi:export && git diff --exit-code openapi.json
       - name: ERD freshness
+        if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md
       - name: Version consistency
+        if: ${{ !cancelled() }}
         run: npm run version:check
       - name: Version consistency (tag)
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
         run: git fetch --tags --force && npm run version:check -- --check-tag
 
   # Split from `test` (#306): the integration suite is DB-bound (~4.5 min) and
