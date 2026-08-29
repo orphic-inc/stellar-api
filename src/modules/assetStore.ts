@@ -73,7 +73,7 @@ export const putAsset = async (
       mime,
       size: input.data.length,
       kind: input.kind,
-      data: input.data,
+      data: new Uint8Array(input.data),
       ownerId: input.ownerId ?? null
     }
   });
