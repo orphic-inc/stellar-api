@@ -21,6 +21,12 @@ Stellar is pre-1.0 software (currently 0.8.x). Running a public instance means r
 
 - **Community Reputation Score (CRS)** — composite reputation across social, contribution, donation, and longevity signals ([PRD-01](docs/prd/01-Community-Score.md)); fed by a community-health pulse ([ADR-0002](docs/adr/0002-community-health-pulse.md)).
 
+## What's upcoming
+
+- ** Concerts, Calendar, Contests **
+- ** IRC, Interviews, Applicants **
+- ** Public API, Mobile **
+
 ## Documentation
 
 The README is the lamp-post; the developer guide is **[`docs/README.md`](docs/README.md)** (architecture, environment reference, "add a module" walkthrough), and specs and decisions live in [`docs/`](docs/):

@@ -1,6 +1,6 @@
 # Stellar API — Developer Documentation
 
-The human entry point for developing and operating the Stellar API. Start here after the root [README.md](../README.md) (install & run) and [CONTRIBUTING.md](../CONTRIBUTING.md) (workflow & gates). `CLAUDE.md` and `AGENTS.md` at the repo root carry the same material formatted for AI coding agents — this document is the human-facing source; the agent files point back here rather than duplicating it.
+The DevOps entry point for developing and operating the Stellar API. Start here after the root [README.md](../README.md) (install & run) and [CONTRIBUTING.md](../CONTRIBUTING.md) (workflow & gates). `CLAUDE.md` and `AGENTS.md` at the repo root carry the same material formatted for AI coding agents. This document is the human-facing source, agent files point back here.
 
 ## Where things live
 
