@@ -226,7 +226,7 @@ export const createApp = () => {
       const message =
         process.env.NODE_ENV === 'production' && status === 500
           ? 'Internal server error'
-          : err.message ?? 'Server Error';
+          : (err.message ?? 'Server Error');
       res.status(status).json({ msg: message });
     }
   );

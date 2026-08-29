@@ -65,10 +65,7 @@ const URL_REF = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi;
 const CONSTRUCT_MAX = 80;
 
 export type CssViolationRule =
-  | 'at-rule'
-  | 'url-scheme'
-  | 'url-protocol-relative'
-  | 'url-data';
+  'at-rule' | 'url-scheme' | 'url-protocol-relative' | 'url-data';
 
 export interface CssViolation {
   rule: CssViolationRule;

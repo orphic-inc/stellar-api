@@ -193,8 +193,7 @@ export type TopicUpdateResult =
   | { ok: false; reason: 'not_found' | 'not_authorized' };
 
 export type TopicDeleteResult =
-  | { ok: true }
-  | { ok: false; reason: 'not_found' | 'not_authorized' };
+  { ok: true } | { ok: false; reason: 'not_found' | 'not_authorized' };
 
 export type TopicTrashResult =
   | { ok: true; topic: Awaited<ReturnType<typeof forumUpdateTopic>> }

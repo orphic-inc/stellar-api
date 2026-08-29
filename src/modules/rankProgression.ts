@@ -11,8 +11,7 @@
 export const GiB = BigInt(1024 ** 3);
 
 export type RankExtraPredicate =
-  | 'DISTINCT_RELEASES_500'
-  | 'QUALITY_CONTRIB_500';
+  'DISTINCT_RELEASES_500' | 'QUALITY_CONTRIB_500';
 
 export interface Rank {
   id: number;

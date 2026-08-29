@@ -282,8 +282,8 @@ router.get(
       status === 'pending'
         ? { usedAt: null, expiresAt: { gt: now } }
         : status === 'used'
-        ? { usedAt: { not: null } }
-        : { usedAt: null, expiresAt: { lte: now } };
+          ? { usedAt: { not: null } }
+          : { usedAt: null, expiresAt: { lte: now } };
     const [records, total] = await Promise.all([
       prisma.accountRecovery.findMany({
         where,

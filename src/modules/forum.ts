@@ -8,8 +8,7 @@ import {
 } from '../lib/notifications';
 
 type DeleteForumResult =
-  | { ok: true }
-  | { ok: false; reason: 'not_found' | 'is_trash' | 'no_trash' };
+  { ok: true } | { ok: false; reason: 'not_found' | 'is_trash' | 'no_trash' };
 
 type CastVoteResult =
   | { ok: true; vote: Awaited<ReturnType<typeof prisma.forumPollVote.upsert>> }
@@ -402,7 +401,7 @@ export const castVote = async (
         }
       : userOrId;
   const vote =
-    typeof userOrId === 'number' ? maybeVote ?? 0 : userRankLevelOrVote;
+    typeof userOrId === 'number' ? (maybeVote ?? 0) : userRankLevelOrVote;
 
   const poll = await prisma.forumPoll.findUnique({
     where: { id: forumPollId },

@@ -98,9 +98,7 @@ export const getUserRankAccess = async (
 
 export const canAccessForumLevel = (
   user:
-    | { userRankLevel: number; permittedForumIds?: number[] }
-    | null
-    | undefined,
+    { userRankLevel: number; permittedForumIds?: number[] } | null | undefined,
   forumId: number,
   requiredLevel: number | null | undefined
 ): boolean =>
