@@ -266,10 +266,7 @@ export const recordContributionReport = async (
 };
 
 export type CommunityPulseStatus =
-  | 'Healthy'
-  | 'Ailing'
-  | 'Critical'
-  | 'Unknown';
+  'Healthy' | 'Ailing' | 'Critical' | 'Unknown';
 
 export interface CommunityHealthPulse {
   pass: number;
@@ -314,10 +311,10 @@ export const computePulse = (counts: {
     pulse === null || coverage === null || coverage < PULSE_MIN_COVERAGE
       ? 'Unknown'
       : pulse >= PULSE_HEALTHY
-      ? 'Healthy'
-      : pulse >= PULSE_AILING
-      ? 'Ailing'
-      : 'Critical';
+        ? 'Healthy'
+        : pulse >= PULSE_AILING
+          ? 'Ailing'
+          : 'Critical';
 
   return { ...counts, total, checked, coverage, pulse, status };
 };

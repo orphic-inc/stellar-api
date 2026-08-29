@@ -202,9 +202,7 @@ jest.mock('../middleware/auth', () => ({
       });
       permissions = normalizePermissions(
         (currentRank?.permissions as
-          | Record<string, boolean>
-          | null
-          | undefined) ?? {}
+          Record<string, boolean> | null | undefined) ?? {}
       ) as Record<string, boolean>;
     }
 

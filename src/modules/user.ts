@@ -47,11 +47,7 @@ export const updateUserSettings = async (
     paranoia?: number;
     avatar?: string;
     notificationMethod?:
-      | 'Disabled'
-      | 'Popup'
-      | 'Traditional'
-      | 'Push'
-      | 'Combined';
+      'Disabled' | 'Popup' | 'Traditional' | 'Push' | 'Combined';
     showEmail?: boolean;
     showLastSeen?: boolean;
     showContributedStats?: boolean;
@@ -554,8 +550,8 @@ export const grantDonorStatus = async (
   const computedExpiresAt = expiresAt
     ? new Date(expiresAt)
     : donorRank.expiresAfterDays != null
-    ? new Date(Date.now() + donorRank.expiresAfterDays * 86_400_000)
-    : null;
+      ? new Date(Date.now() + donorRank.expiresAfterDays * 86_400_000)
+      : null;
 
   await prisma.$transaction([
     prisma.userDonorRank.upsert({

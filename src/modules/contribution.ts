@@ -129,8 +129,8 @@ export const createContributionSubmission = async ({
       created.forEach((artist) => artistMap.set(artist.name, artist));
     }
 
-    const collaboratorRecords = collaborators.map(
-      (c) => artistMap.get(c.artist)!
+    const collaboratorRecords = collaborators.map((c) =>
+      artistMap.get(c.artist)!
     );
 
     // One ReleaseArtist credit per collaborator with its mapped role, deduped
@@ -179,10 +179,10 @@ export const createContributionSubmission = async ({
 
     const hasEditionMeta = Boolean(
       recordLabel ||
-        catalogueNumber ||
-        editionTitle ||
-        editionYear ||
-        isRemaster
+      catalogueNumber ||
+      editionTitle ||
+      editionYear ||
+      isRemaster
     );
     const edition = await tx.edition.create({
       data: {

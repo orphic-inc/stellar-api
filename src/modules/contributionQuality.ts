@@ -13,12 +13,7 @@ import { Bitrate, FileType } from '@prisma/client';
  */
 
 export type QualityTier =
-  | 'Perfect'
-  | 'Lossless'
-  | 'HighLossy'
-  | 'MidLossy'
-  | 'LowLossy'
-  | 'Unknown';
+  'Perfect' | 'Lossless' | 'HighLossy' | 'MidLossy' | 'LowLossy' | 'Unknown';
 
 export interface ContributionQuality {
   tier: QualityTier;

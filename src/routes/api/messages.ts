@@ -135,7 +135,7 @@ router.get(
     const toUserMap = Object.fromEntries(toUsers.map((u) => [u.id, u]));
     const result = drafts.map((d) => ({
       ...d,
-      toUser: d.toUserId ? toUserMap[d.toUserId] ?? null : null
+      toUser: d.toUserId ? (toUserMap[d.toUserId] ?? null) : null
     }));
     res.json(result);
   })

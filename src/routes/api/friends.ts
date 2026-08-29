@@ -54,11 +54,8 @@ router.get(
     });
 
     let status:
-      | 'none'
-      | 'pending_sent'
-      | 'pending_received'
-      | 'accepted'
-      | 'rejected' = 'none';
+      'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected' =
+      'none';
     if (rel) {
       if (rel.status === FriendStatus.accepted) status = 'accepted';
       else if (rel.status === FriendStatus.rejected) status = 'rejected';

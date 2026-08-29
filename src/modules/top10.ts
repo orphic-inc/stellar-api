@@ -365,8 +365,8 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
     type === 'numContributions'
       ? { contributions: { _count: 'desc' } }
       : type === 'consumed'
-      ? { consumed: 'desc' }
-      : { contributed: 'desc' };
+        ? { consumed: 'desc' }
+        : { contributed: 'desc' };
 
   const users = await prisma.user.findMany({
     where: {
