@@ -30,7 +30,7 @@
     "db:seed": "ts-node prisma/seed.ts",
     "db:seed-e2e": "ts-node src/scripts/seed-e2e-users.ts",
     "db:studio": "prisma studio",
-    "prepare": "husky install || true"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "*.ts": [
