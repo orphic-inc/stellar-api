@@ -49,23 +49,26 @@ export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
         return LinkHealthStatus.FAIL;
       }
 
-      // nosemgrep -- rules.lgpl.javascript.ssrf.rule-node-ssrf
+      // Semgrep's rule-node-ssrf matches "a user-controlled URL reaches an HTTP
+      // client", which is true of the next line and is the whole reason the
+      // guard above exists. The match is syntactic and cannot follow
+      // `guard.url` out of the discriminated union: that property is only in
+      // scope once `guard.ok` has been checked, so by construction it holds an
+      // address `checkPublicUrl` approved. Suppressed here rather than flagged
+      // false-positive in the Codacy console so the reasoning sits next to the
+      // code it justifies.
       //
-      // The rule matches "a user-controlled URL reaches an HTTP client", which
-      // is true of this line and is the whole reason the guard above exists. It
-      // is a syntactic match and cannot follow `guard.url` out of the
-      // discriminated union: that property is only in scope once `guard.ok` has
-      // been checked, so by construction it is an address `checkPublicUrl`
-      // approved. Suppressing it here rather than flagging it false-positive in
-      // the Codacy console keeps the reasoning next to the code it justifies.
+      // The directive is line-wide but the reasoning is not: it covers *this*
+      // fetch, whose safety rests entirely on the guard immediately above.
+      // Rewriting this block so the fetch no longer consumes a checked
+      // `guard.url` — passing `target` straight through, hoisting the call out
+      // of the loop, restoring `redirect: 'follow'` — invalidates all of the
+      // above, and the directive must go with it.
       //
-      // The suppression is deliberately narrow in intent even though the
-      // directive is line-wide: it covers *this* fetch, whose safety rests
-      // entirely on the four lines above it. Anyone rewriting this block so the
-      // fetch no longer consumes a checked `guard.url` — passing `target`
-      // straight through, hoisting the call out of the loop, restoring
-      // `redirect: 'follow'` — invalidates the reasoning and must delete this
-      // comment along with it.
+      // Placement is load-bearing: Semgrep only honours `nosemgrep` on the
+      // matched line or the one directly above it, so this stays adjacent to
+      // the call and the explanation stays above the directive.
+      // nosemgrep
       const res = await fetch(guard.url, {
         method: 'HEAD',
         signal: controller.signal,
