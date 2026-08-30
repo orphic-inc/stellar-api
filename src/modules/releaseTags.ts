@@ -54,28 +54,43 @@ export const buildReleaseTagPayload = (
   return tags
     .map((tag) => {
       const releaseTag = byTagId.get(tag.id);
-      const positiveVotes = releaseTag?.positiveVotes ?? 1;
-      const negativeVotes = releaseTag?.negativeVotes ?? 1;
 
+      // A tag on the release but with no ReleaseTag row is the unvoted case.
+      // It used to be spelled as six `?.`/`??` pairs over the same optional,
+      // which read as one expression but is two entirely different results.
+      if (!releaseTag) {
+        return {
+          id: tag.id,
+          tagId: tag.id,
+          name: tag.name,
+          occurrences: tag.occurrences,
+          score: 0,
+          positiveVotes: 0,
+          negativeVotes: 0,
+          addedBy: null,
+          createdAt: null,
+          myVotes: { up: false, down: false }
+        };
+      }
+
+      const { positiveVotes, negativeVotes } = releaseTag;
       return {
-        id: releaseTag?.id ?? tag.id,
+        id: releaseTag.id,
         tagId: tag.id,
         name: tag.name,
         occurrences: tag.occurrences,
         score: positiveVotes - negativeVotes,
         positiveVotes: Math.max(0, positiveVotes - 1),
         negativeVotes: Math.max(0, negativeVotes - 1),
-        addedBy: releaseTag?.user ?? null,
-        createdAt: releaseTag?.createdAt ?? null,
+        addedBy: releaseTag.user,
+        createdAt: releaseTag.createdAt,
         myVotes: {
-          up:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.up
-            ) ?? false,
-          down:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.down
-            ) ?? false
+          up: releaseTag.votes.some(
+            (vote) => vote.direction === ReleaseTagVoteDirection.up
+          ),
+          down: releaseTag.votes.some(
+            (vote) => vote.direction === ReleaseTagVoteDirection.down
+          )
         }
       };
     })
