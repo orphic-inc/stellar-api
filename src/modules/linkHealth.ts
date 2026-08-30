@@ -49,6 +49,23 @@ export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
         return LinkHealthStatus.FAIL;
       }
 
+      // nosemgrep -- rules.lgpl.javascript.ssrf.rule-node-ssrf
+      //
+      // The rule matches "a user-controlled URL reaches an HTTP client", which
+      // is true of this line and is the whole reason the guard above exists. It
+      // is a syntactic match and cannot follow `guard.url` out of the
+      // discriminated union: that property is only in scope once `guard.ok` has
+      // been checked, so by construction it is an address `checkPublicUrl`
+      // approved. Suppressing it here rather than flagging it false-positive in
+      // the Codacy console keeps the reasoning next to the code it justifies.
+      //
+      // The suppression is deliberately narrow in intent even though the
+      // directive is line-wide: it covers *this* fetch, whose safety rests
+      // entirely on the four lines above it. Anyone rewriting this block so the
+      // fetch no longer consumes a checked `guard.url` — passing `target`
+      // straight through, hoisting the call out of the loop, restoring
+      // `redirect: 'follow'` — invalidates the reasoning and must delete this
+      // comment along with it.
       const res = await fetch(guard.url, {
         method: 'HEAD',
         signal: controller.signal,
