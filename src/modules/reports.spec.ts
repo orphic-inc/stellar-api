@@ -160,7 +160,7 @@ describe('listReports', () => {
         take: 25
       })
     );
-    expect(result.reports[0].sourceUrl).toBe('/private/forums/3/topics/5');
+    expect(result.reports[0].sourceUrl).toBe('/forums/3/topics/5');
   });
 });
 
@@ -194,7 +194,7 @@ describe('getReport', () => {
     expect(result).toEqual({
       ok: true,
       report: expect.objectContaining({
-        sourceUrl: '/private/user/alice'
+        sourceUrl: '/user/alice'
       })
     });
   });
@@ -349,7 +349,7 @@ describe('resolveReport', () => {
     expect(toId).toBe(42);
     expect(body).toContain('Removed the offending post');
     expect(body).toContain('ContentRemoved');
-    expect(body).toContain('/private/reports/9');
+    expect(body).toContain('/reports/9');
   });
 
   it('does not fail the resolve when the System PM send throws', async () => {
@@ -413,9 +413,7 @@ describe('listMyReports', () => {
 
     const result = await listMyReports(7, 1);
 
-    expect(result.reports[0].sourceUrl).toBe(
-      '/private/communities/5/releases/123'
-    );
+    expect(result.reports[0].sourceUrl).toBe('/communities/5/releases/123');
   });
 });
 
