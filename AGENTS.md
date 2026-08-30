@@ -53,6 +53,7 @@ npm run test             # jest --forceExit (parallel: jest.config.cjs sets maxW
 npm run test:watch       # jest --watch
 npm run test:integration # integration tests (requires .env.test)
 npm run openapi:export   # generate openapi spec via ts-node src/scripts/export-openapi.ts
+npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
 npm run db:seed          # recreate default user ranks after a DB reset; then go to /install
 npm run db:reset         # prisma migrate reset
@@ -68,7 +69,8 @@ What the hook does **not** cover, run yourself before committing:
 
 1. `npm run format` — only when you've changed files the hook didn't stage (it formats **all** of `src/` and `prisma/**/*.ts`, confirming nothing else drifted)
 2. `npm run test --no-coverage` — full suite (too slow for the hook; CI is the authority, but run it locally before pushing)
-3. Commit with a descriptive message following existing log style
+3. `npm run changelog:check` — CI fails a PR that touches `src/`, `prisma/` or `.github/workflows/` without updating `CHANGELOG.md` (#386). The `release` job publishes `[Unreleased]` verbatim as the GitHub Release notes, so an omission here is permanent there. If a change genuinely warrants no entry, apply the `no-changelog` label to the PR
+4. Commit with a descriptive message following existing log style
 
 > If you do run the checks manually (e.g. before staging, or committing with `--no-verify`): order matters — format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
 

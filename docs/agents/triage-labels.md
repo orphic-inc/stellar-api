@@ -13,3 +13,13 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
+
+## PR labels
+
+Separate vocabulary, applied to pull requests rather than issues:
+
+| Label          | Meaning                                                                    |
+| -------------- | -------------------------------------------------------------------------- |
+| `no-changelog` | This PR warrants no `CHANGELOG.md` entry — skips the changelog gate (#386) |
+
+`no-changelog` is read by the `Changelog entry` step in `.github/workflows/publish.yml`. Applying or removing it re-runs the workflow, so the gate re-evaluates without a manual trigger.
