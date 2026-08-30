@@ -6,15 +6,27 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-08-30
+
 ### Added
+
+- **`Community.announceVisibility` — per-community control over announce fan-out** ([ADR-0030](docs/adr/0030-private-community-announce-delivery.md)) — slice 2 of the private-community announce work. A community now declares whether its new contributions are published to the IRC announce feed, rather than that being an all-or-nothing property of the site. The default preserves existing behaviour, so a community that never touches the setting announces exactly as it did before.
 
 - **Bulk-remove consumed release bookmarks** ([#296](https://github.com/orphic-inc/stellar-api/issues/296)) — the bookmark list is a consumption queue, but it was read-only once a member started grabbing from it: clearing the releases you had already consumed meant unbookmarking them one at a time. `DELETE /api/bookmarks/releases/consumed` now removes the caller's release bookmarks for any release they hold a live (`COMPLETED`) `DownloadAccessGrant` on, returning `{ removed: n }`. A release fans out to many contributions (editions/rips), so a single grab clears the bookmark; a reversed grant (claw-back flips the status to `REVERSED`) does not count, while a Freepass/Neutralpass grant does, since the member still downloaded it. Self-scoped and idempotent — `removed: 0` is a success, not a 404. The paired stellar-ui "Remove consumed" button is tracked downstream.
 
 ### Changed
 
+- **Toolchain and dependency refresh** — the bulk of this release. Node moves to 24 (`engines` widens from `>=22 <23` to `>=22 <25`) and the lint stack crosses two majors: **eslint 8 → 9** with the eslintrc config migrated to flat config ([ADR-0034](docs/adr/0034-eslint-9-flat-config-and-the-import-plugin-ceiling.md), which also records the two import rules suppressed and why), `@babel/eslint-parser` dropped in favour of `@eslint/js` + `globals`, and `eslint-config-prettier` 8 → 10. Flat config has no `--ext`, so `npm run lint` is now plain `eslint src prisma`. **husky 8 → 9** changes the install invocation (`husky install` → `husky`), **lint-staged 13 → 17**, `@types/node` 20 → 24, `eslint-plugin-import` 2.27 → 2.32, `eslint-import-resolver-node` 0.3 → 0.4, `eslint-plugin-prettier` 5.0 → 5.5, and **katex 0.16 → 0.18**, kept in lockstep with the copy stellar-ui bundles. Prettier 3.9 reformatted the tree. None of it changes runtime behaviour. The CI test gates were also split so one failing gate can no longer mask another.
+
+- **Community membership is the role union, and staff surface as Curators** ([ADR-0033](docs/adr/0033-community-membership-and-the-curator-role.md)) — membership was read off a single role, so a member holding both the consumer and contributor roles was classified by whichever happened to be checked first. Membership is now the union of the consumer, contributor and staff roles, evaluated through one shared access predicate instead of being re-derived at each call site, and the staff role is presented to members as **Curator**.
+
 - **`User.ratio` is computed at read time, not stored** ([#294](https://github.com/orphic-inc/stellar-api/issues/294)) — the column was a denormalization of `computeRatio(contributed, consumed)`, a pure function of two adjacent columns, and it appeared in no `WHERE` and no `ORDER BY` (the top-10 user ranking orders by contribution/consume _speed_, never ratio), so the stored copy bought no query performance and only created drift surface. Every read site now derives it — `auth.ts`, `profile.ts`, `search.ts`, and both the ORM and raw-SQL branches of `top10.ts` — and every response payload still carries `ratio`, so the API contract is unchanged. Two dead columns go with it: `ratioWatchDownload`, superseded by `RatioPolicyState` (which carries `consumedAtWatchStart` and derives the watch-period delta), and `totalEarned`, which nothing read. `canDownload` stays — it is an independent download-capability flag read as a hard gate on the grant path, documented in the schema as such rather than a projection of ratio.
 
 ### Fixed
+
+- **Site stats no longer count the reserved System user** — `totalUsers` included the internal System account that seeds built-in content, so every install reported one more member than it actually had. The System user is excluded from the total.
+
+- **Stored asset bytes convert explicitly at the Prisma boundary** — binary assets crossed the ORM boundary without an explicit conversion, leaving the byte payload dependent on driver-level coercion. The conversion is now explicit at the boundary.
 
 - **Balance claw-backs floor at zero instead of going negative** ([#294](https://github.com/orphic-inc/stellar-api/issues/294)) — the download-reversal and request-unfill/refund paths decremented `contributed`/`consumed` unclamped while computing the derived ratio from a floored value, so a balance set out-of-band below the reversed amount (as the e2e seed does, and any future staff balance-adjustment would) could be driven negative. A single tested `floorSub` helper now floors every reversal site at zero.
 
@@ -655,7 +667,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/orphic-inc/stellar-api/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/orphic-inc/stellar-api/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/orphic-inc/stellar-api/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/orphic-inc/stellar-api/compare/v0.7.0...v0.8.0
