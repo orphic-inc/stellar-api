@@ -51,6 +51,33 @@ export type ReportSummary = {
   sourceUrl: string | null;
 };
 
+// ─── UI deep-link paths ───────────────────────────────────────────────────────
+
+/**
+ * The UI routes a report's `sourceUrl` points at.
+ *
+ * Named rather than spelled inline because several repeat — the release path
+ * four times, artists, collages and forum topics twice each — so a route change
+ * is one edit per shape instead of hunting fourteen literals. Which is how the
+ * last one was missed: these all carried a `/private/` prefix that the 0.8.x
+ * flattening removed from the UI's route model, and every link had been leaning
+ * on stellar-ui's `LegacyPrivateRedirect` shim to resolve (#338).
+ *
+ * `userPath` takes a username deliberately: the UI route reads `user/:id`, but
+ * `getProfileByLookup` resolves a numeric id *or* a case-insensitive username.
+ */
+const userPath = (username: string): string => `/user/${username}`;
+const releasePath = (communityId: number, releaseId: number): string =>
+  `/communities/${communityId}/releases/${releaseId}`;
+const topicPath = (forumId: number, topicId: number): string =>
+  `/forums/${forumId}/topics/${topicId}`;
+const artistPath = (artistId: number): string => `/artists/${artistId}`;
+const collagePath = (collageId: number): string => `/collages/${collageId}`;
+const requestPath = (requestId: number): string => `/requests/${requestId}`;
+const communityPath = (communityId: number): string =>
+  `/communities/${communityId}`;
+const reportPath = (reportId: number): string => `/reports/${reportId}`;
+
 // ─── Source URL resolution ────────────────────────────────────────────────────
 
 async function resolveSourceUrls(
@@ -80,7 +107,7 @@ async function resolveSourceUrls(
         const usernameById = new Map(users.map((u) => [u.id, u.username]));
         for (const { reportId, targetId } of entries) {
           const username = usernameById.get(targetId);
-          urlMap.set(reportId, username ? `/private/user/${username}` : null);
+          urlMap.set(reportId, username ? userPath(username) : null);
         }
         break;
       }
@@ -94,9 +121,7 @@ async function resolveSourceUrls(
           const rel = byId.get(targetId);
           urlMap.set(
             reportId,
-            rel?.communityId
-              ? `/private/communities/${rel.communityId}/releases/${targetId}`
-              : null
+            rel?.communityId ? releasePath(rel.communityId, targetId) : null
           );
         }
         break;
@@ -116,7 +141,7 @@ async function resolveSourceUrls(
           urlMap.set(
             reportId,
             c?.release?.communityId
-              ? `/private/communities/${c.release.communityId}/releases/${c.releaseId}`
+              ? releasePath(c.release.communityId, c.releaseId)
               : null
           );
         }
@@ -130,10 +155,7 @@ async function resolveSourceUrls(
         const byId = new Map(topics.map((t) => [t.id, t]));
         for (const { reportId, targetId } of entries) {
           const t = byId.get(targetId);
-          urlMap.set(
-            reportId,
-            t ? `/private/forums/${t.forumId}/topics/${targetId}` : null
-          );
+          urlMap.set(reportId, t ? topicPath(t.forumId, targetId) : null);
         }
         break;
       }
@@ -151,22 +173,20 @@ async function resolveSourceUrls(
           const p = byId.get(targetId);
           urlMap.set(
             reportId,
-            p
-              ? `/private/forums/${p.forumTopic.forumId}/topics/${p.forumTopicId}`
-              : null
+            p ? topicPath(p.forumTopic.forumId, p.forumTopicId) : null
           );
         }
         break;
       }
       case 'Collage': {
         for (const { reportId, targetId } of entries) {
-          urlMap.set(reportId, `/private/collages/${targetId}`);
+          urlMap.set(reportId, collagePath(targetId));
         }
         break;
       }
       case 'Artist': {
         for (const { reportId, targetId } of entries) {
-          urlMap.set(reportId, `/private/artists/${targetId}`);
+          urlMap.set(reportId, artistPath(targetId));
         }
         break;
       }
@@ -200,25 +220,28 @@ async function resolveSourceUrls(
           }
           let url: string | null = null;
           if (c.page === 'artist' && c.artistId) {
-            url = `/private/artists/${c.artistId}`;
+            url = artistPath(c.artistId);
           } else if (
             c.page === 'release' &&
             c.releaseId &&
             c.release?.communityId
           ) {
-            url = `/private/communities/${c.release.communityId}/releases/${c.releaseId}`;
+            url = releasePath(c.release.communityId, c.releaseId);
           } else if (c.page === 'collages' && c.collageId) {
-            url = `/private/collages/${c.collageId}`;
+            url = collagePath(c.collageId);
           } else if (c.page === 'requests' && c.requestId) {
-            url = `/private/requests/${c.requestId}`;
+            url = requestPath(c.requestId);
           } else if (
             c.page === 'contributions' &&
             c.contributionId &&
             c.contribution?.release?.communityId
           ) {
-            url = `/private/communities/${c.contribution.release.communityId}/releases/${c.contribution.releaseId}`;
+            url = releasePath(
+              c.contribution.release.communityId,
+              c.contribution.releaseId
+            );
           } else if (c.page === 'communities' && c.communityId) {
-            url = `/private/communities/${c.communityId}`;
+            url = communityPath(c.communityId);
           }
           urlMap.set(reportId, url);
         }
@@ -436,7 +459,7 @@ export async function resolveReport(
         `Your report has been resolved.\n\n` +
           `Action taken: ${resolutionAction}\n` +
           `Resolution: ${resolution}\n\n` +
-          `View your report: /private/reports/${id}`
+          `View your report: ${reportPath(id)}`
       );
     }
   } catch (err) {

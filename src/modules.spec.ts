@@ -168,7 +168,7 @@ describe('reports.listMyReports', () => {
 
     const result = await listMyReports(7, 1);
 
-    expect(result.reports[0].sourceUrl).toBe('/private/forums/3/topics/5');
+    expect(result.reports[0].sourceUrl).toBe('/forums/3/topics/5');
   });
 
   it('resolves sourceUrl for Release targets', async () => {
@@ -182,9 +182,7 @@ describe('reports.listMyReports', () => {
 
     const result = await listMyReports(7, 1);
 
-    expect(result.reports[0].sourceUrl).toBe(
-      '/private/communities/5/releases/42'
-    );
+    expect(result.reports[0].sourceUrl).toBe('/communities/5/releases/42');
   });
 
   it('resolves sourceUrl as null for Release with no communityId', async () => {
@@ -212,7 +210,7 @@ describe('reports.listMyReports', () => {
 
     const result = await listMyReports(7, 1);
 
-    expect(result.reports[0].sourceUrl).toBe('/private/forums/9/topics/44');
+    expect(result.reports[0].sourceUrl).toBe('/forums/9/topics/44');
   });
 
   it('resolves sourceUrl for Collage targets', async () => {
@@ -223,7 +221,7 @@ describe('reports.listMyReports', () => {
 
     const result = await listMyReports(7, 1);
 
-    expect(result.reports[0].sourceUrl).toBe('/private/collages/7');
+    expect(result.reports[0].sourceUrl).toBe('/collages/7');
   });
 });
 
@@ -384,7 +382,7 @@ describe('reports.getReport', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.report.sourceUrl).toBe('/private/forums/3/topics/5');
+      expect(result.report.sourceUrl).toBe('/forums/3/topics/5');
     }
   });
 
