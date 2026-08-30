@@ -11,7 +11,12 @@
  */
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { GOLDEN_RULES } from './goldenRules';
+import type { PrismaClient } from '@prisma/client';
+import {
+  GOLDEN_RULES,
+  GOLDEN_RULE_CODE_PREFIX,
+  seedGoldenRules
+} from './goldenRules';
 
 interface FlatSubRule {
   number: string;
@@ -66,6 +71,15 @@ describe('Golden Rules ↔ CODE_OF_CONDUCT.md drift-guard', () => {
     expect(GOLDEN_RULES.length).toBe(6);
   });
 
+  it('keeps every rule code under the namespace its seed guard counts', () => {
+    // seedGoldenRules guards on `code startsWith GOLDEN_RULE_CODE_PREFIX`. A
+    // rule code outside that namespace would be invisible to its own guard, so
+    // the seed would re-run and collide on the unique code.
+    for (const rule of GOLDEN_RULES) {
+      expect(rule.code.startsWith(GOLDEN_RULE_CODE_PREFIX)).toBe(true);
+    }
+  });
+
   it('uses unique rule codes and unique sub-rule codes within each rule', () => {
     const ruleCodes = GOLDEN_RULES.map((r) => r.code);
     expect(new Set(ruleCodes).size).toBe(ruleCodes.length);
@@ -73,5 +87,60 @@ describe('Golden Rules ↔ CODE_OF_CONDUCT.md drift-guard', () => {
       const subCodes = rule.subRules.map((s) => s.code);
       expect(new Set(subCodes).size).toBe(subCodes.length);
     }
+  });
+});
+
+/**
+ * The seed guard itself (#388). The fake client below stores rows and honours
+ * the `startsWith` filter, so a table-wide `rule.count()` genuinely fails these
+ * rather than merely looking different — which is the point: the old guard was
+ * a no-op once *any* Rule row existed, not once the golden rows existed.
+ */
+function fakeRuleClient(existingCodes: string[] = []) {
+  const rows: { code: string }[] = existingCodes.map((code) => ({ code }));
+  const create = jest.fn(async ({ data }: { data: { code: string } }) => {
+    rows.push({ code: data.code });
+    return data;
+  });
+  const count = jest.fn(
+    async (args?: { where?: { code?: { startsWith?: string } } }) => {
+      const prefix = args?.where?.code?.startsWith;
+      if (prefix === undefined) return rows.length;
+      return rows.filter((r) => r.code.startsWith(prefix)).length;
+    }
+  );
+  const client = { rule: { count, create } } as unknown as PrismaClient;
+  return { rows, create, count, client };
+}
+
+describe('seedGoldenRules', () => {
+  it('seeds the canon on an empty rules table', async () => {
+    const { create, rows, client } = fakeRuleClient();
+    await seedGoldenRules(client);
+    expect(create).toHaveBeenCalledTimes(GOLDEN_RULES.length);
+    expect(rows.map((r) => r.code).sort()).toEqual(
+      GOLDEN_RULES.map((r) => r.code).sort()
+    );
+  });
+
+  it('still seeds the canon when an unrelated ruleset holds Rule rows', async () => {
+    // The #388 regression: PRD-05 specs irc.conduct and interview.conduct, and
+    // either one seeding first used to suppress the Golden Rules entirely.
+    const { create, rows, client } = fakeRuleClient([
+      'irc.conduct',
+      'interview.conduct'
+    ]);
+    await seedGoldenRules(client);
+    expect(create).toHaveBeenCalledTimes(GOLDEN_RULES.length);
+    for (const rule of GOLDEN_RULES) {
+      expect(rows.map((r) => r.code)).toContain(rule.code);
+    }
+  });
+
+  it('stays a no-op once the golden rules are already seeded', async () => {
+    const { create, client } = fakeRuleClient();
+    await seedGoldenRules(client);
+    await seedGoldenRules(client);
+    expect(create).toHaveBeenCalledTimes(GOLDEN_RULES.length);
   });
 });

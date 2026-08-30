@@ -216,11 +216,26 @@ export const GOLDEN_RULES: readonly GoldenRuleDef[] = [
 ];
 
 /**
- * Idempotent seed — a no-op once any `Rule` rows exist (mirrors `seedForums`).
- * Weights are left at the schema default (0); magnitudes are PRD-05 TBD.
+ * Idempotent seed — a no-op once the *golden* rules exist.
+ *
+ * The guard is namespaced to `golden.` deliberately. A table-wide `rule.count()`
+ * would make this a no-op once **any** `Rule` row exists, so a future ruleset
+ * seeder (PRD-05 specs `irc.conduct` and `interview.conduct`) running first on a
+ * fresh database would silently suppress the entire canon — the site would come
+ * up with those rules and no Golden Rules, and nothing would report it. The
+ * drift-guard in `goldenRules.spec.ts` cannot catch that: it compares the prose
+ * to this in-code table and never reads the database.
+ *
+ * Namespacing keeps the guard correct however seeders are ordered later; each
+ * ruleset guards its own codes. Weights are left at the schema default (0);
+ * magnitudes are PRD-05 TBD.
  */
+export const GOLDEN_RULE_CODE_PREFIX = 'golden.';
+
 export async function seedGoldenRules(client: PrismaClient): Promise<void> {
-  const existing = await client.rule.count();
+  const existing = await client.rule.count({
+    where: { code: { startsWith: GOLDEN_RULE_CODE_PREFIX } }
+  });
   if (existing > 0) return;
 
   for (let i = 0; i < GOLDEN_RULES.length; i++) {

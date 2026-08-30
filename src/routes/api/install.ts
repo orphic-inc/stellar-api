@@ -13,16 +13,8 @@ import { requirePermission } from '../../middleware/permissions';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
 import { getSettings, markInstalled } from '../../modules/settings';
-import {
-  seedRanks,
-  seedRankPromotionRules,
-  seedForums,
-  seedSystemUser,
-  seedDefaultCommunity
-} from '../../modules/bootstrap';
-import { seedGoldenRules } from '../../modules/goldenRules';
-import { seedStylesheetFixtures } from '../../modules/stylesheetFixtures';
-import { seedWikiFixtures } from '../../modules/wikiFixtures';
+import { seedDefaultCommunity } from '../../modules/bootstrap';
+import { seedAll } from '../../modules/seedAll';
 import { AppError } from '../../lib/errors';
 import { authUserSelect, toAuthUser } from '../../modules/auth';
 import { getDefaultStylesheetName } from '../../modules/stylesheet';
@@ -171,18 +163,20 @@ router.post(
     });
     if (existing) return res.status(400).json({ msg: 'User already exists' });
 
-    // Bootstrap ranks and forums outside the user transaction so they exist
+    // The idempotent baseline, run outside the user transaction so it exists
     // even if user creation fails, and so the transaction stays minimal.
-    await seedRanks(prisma);
-    await seedRankPromotionRules(prisma);
-    await seedForums(prisma);
-    await seedGoldenRules(prisma);
-    // System user + built-in stylesheet fixtures it owns (repoints the registry
-    // rows at the /css delivery route). Needs ranks; independent of the SysOp.
-    const systemUserId = await seedSystemUser(prisma);
-    await seedStylesheetFixtures(prisma, systemUserId);
-    // Also System-owned: the wiki pages the seeded Golden Rules link to (#126).
-    await seedWikiFixtures(prisma, systemUserId);
+    //
+    // Delegated to seedAll rather than re-listed here. The sequence carries
+    // ordering constraints that are invisible at the call site — theme assets
+    // before the stylesheets referencing them, the System user before the
+    // fixtures it owns — so a second hand-maintained copy drifts silently. It
+    // already had: this route omitted seedAssetFixtures, leaving an /install-ed
+    // site serving the asset-bearing theme with dangling /api/asset targets.
+    //
+    // Safe here precisely because seedAll creates no real users and does not
+    // stamp installedAt, which is what keeps /install available and required.
+    // seedDefaultCommunity stays below — it needs the SysOp minted first.
+    await seedAll(prisma);
 
     const sysopRank = await prisma.userRank.findFirst({
       where: { level: 1000 }

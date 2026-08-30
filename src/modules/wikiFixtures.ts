@@ -108,8 +108,8 @@ export function readWikiFixtureBody(slug: string): string {
  * Create-if-absent per slug rather than a table-wide guard: these pages are
  * editable in-app once seeded, so re-running must not clobber an operator's
  * edits — but a NEW fixture added in a later release still lands on an existing
- * install. (The table-wide shape is the trap #388 records against
- * `seedGoldenRules`, where one existing row suppresses the whole set.)
+ * install. (A table-wide guard is the trap #388 fixed in `seedGoldenRules`,
+ * where one unrelated `Rule` row suppressed the whole set.)
  *
  * Ids are pinned deterministically (#399). Explicit-id inserts don't advance the
  * autoincrement sequence, so afterwards we push it to WIKI_USER_PAGE_ID_FLOOR

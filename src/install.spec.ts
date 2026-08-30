@@ -5,6 +5,8 @@ import {
   prismaMock
 } from './test/apiTestHarness';
 import { DEFAULT_RANKS } from './modules/bootstrap';
+import { readdirSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 beforeEach(() => resetApiTestState());
 
@@ -352,6 +354,49 @@ describe('POST /api/install', () => {
 
     expect(prismaMock.userRank.create).not.toHaveBeenCalled();
     expect(prismaMock.forumCategory.create).not.toHaveBeenCalled();
+  });
+
+  it('stores the theme assets the built-in stylesheets reference', async () => {
+    // #390: /install used to re-implement the seedAll sequence inline and had
+    // drifted, omitting seedAssetFixtures — so an /install-ed site served the
+    // asset-bearing theme with permanently dangling /api/asset targets. The
+    // route now delegates to seedAll; this pins that the bytes actually land.
+    //
+    // The manifest-vs-CSS agreement is guarded separately in
+    // stylesheetFixtures.spec.ts. What this asserts is the install-path half:
+    // every hash the shipped fixture CSS points at is a hash install stored.
+    const cssDir = resolve(__dirname, '../prisma/seed-assets/stylesheets');
+    const referenced = new Set<string>();
+    for (const file of readdirSync(cssDir).filter((f) => f.endsWith('.css'))) {
+      const css = readFileSync(resolve(cssDir, file), 'utf8');
+      for (const m of css.matchAll(/\/api\/asset\/([0-9a-f]{64})/g)) {
+        referenced.add(m[1]);
+      }
+    }
+    // Guard the guard: a fixture set with no asset references would make the
+    // assertion below vacuously true.
+    expect(referenced.size).toBeGreaterThan(0);
+
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    mockPreseededBootstrap();
+    mockSysopTransaction();
+
+    const res = await request(app).post('/api/install').send({
+      username: 'sysop',
+      email: 'sysop@example.com',
+      password: 'secure-password-123'
+    });
+
+    expect(res.status).toBe(201);
+    const stored = new Set(
+      prismaMock.asset.create.mock.calls.map(
+        (call) => (call[0] as { data: { hash: string } }).data.hash
+      )
+    );
+    for (const hash of referenced) {
+      expect(stored).toContain(hash);
+    }
   });
 
   it('stamps installedAt as the install transition', async () => {
