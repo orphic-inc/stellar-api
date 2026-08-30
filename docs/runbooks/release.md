@@ -27,13 +27,15 @@ The same applies to any release-adjacent regeneration: the manifest is the sourc
 
 Since the `release` job landed, the tag's `## [x.y.z]` section **is** the published Release notes. A thin section is no longer a thin file in the repo; it is thin public notes on the surface people see first.
 
-Nothing enforces this. `npm run version:check` compares the top **dated** heading against the manifest and never inspects `[Unreleased]`, so unrecorded work accumulates silently between cuts — 20 commits did exactly that between v0.8.1 and this runbook. **Hand-diff `[Unreleased]` against `git log <last-tag>..main` as part of every cut.**
+Since #386 a CI gate covers the common case: a PR touching `src/`, `prisma/` or `.github/workflows/` fails unless it also updates `CHANGELOG.md` (escape hatch: the `no-changelog` PR label). That stops the drift that produced 20 unrecorded commits between v0.8.1 and this runbook.
+
+**It is not a substitute for reading the section before a cut.** The gate proves an entry exists; it cannot judge whether the entry is accurate, complete, or written for the person reading the Release notes. It is also `pull_request`-only, so a direct push to `main` bypasses it entirely. `npm run version:check` still never inspects `[Unreleased]` — it compares the top **dated** heading against the manifest. **Still hand-diff `[Unreleased]` against `git log <last-tag>..main` as part of every cut**, now as a review rather than a reconstruction.
 
 If the section for the tag is missing entirely, the `release` job fails rather than publishing an empty Release. That is deliberate: a missing section means the CHANGELOG was not updated, which is worth learning at release time.
 
 ## Procedure
 
-1. **Reconcile the CHANGELOG.** `git log v<last>..main --oneline`, and hand-diff against `[Unreleased]`. Verify any `docs/` links resolve — a wrong ADR filename ships as a broken link in the Release notes.
+1. **Review the CHANGELOG.** `git log v<last>..main --oneline`, and hand-diff against `[Unreleased]`. The #386 gate means entries should already be there — you are checking they read well and cover the work, not writing them from scratch. Verify any `docs/` links resolve — a wrong ADR filename ships as a broken link in the Release notes.
 2. **Rename `[Unreleased]`** to `## [x.y.z] — YYYY-MM-DD` and open a fresh empty `[Unreleased]`. Add the compare-link footer entry.
 3. **Bump the manifest** — `npm version <x.y.z> --no-git-tag-version` (updates `package.json` and `package-lock.json`).
 4. **Regenerate `openapi.json`** — `npm run openapi:export`. Order matters; see the trap above.

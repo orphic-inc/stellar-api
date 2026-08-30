@@ -8,6 +8,12 @@ on:
   pull_request:
     branches:
       - main
+    # `labeled`/`unlabeled` are here so the changelog gate's `no-changelog`
+    # escape hatch takes effect without a manual re-run (#386). Triggers are
+    # workflow-scoped, so this does re-run every job on a label change —
+    # acceptable because PR labels are rare here (the vocabulary in
+    # docs/agents/triage-labels.md is for issues).
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 env:
@@ -83,6 +89,25 @@ jobs:
       - name: Version consistency (tag)
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
         run: git fetch --tags --force && npm run version:check -- --check-tag
+      # Changelog gate (#386): a PR touching shipping code must update
+      # CHANGELOG.md, because the release job publishes `[Unreleased]` verbatim
+      # as the GitHub Release notes. A step in `test` rather than its own job, so
+      # the already-required check keeps covering it and branch protection needs
+      # no change. The file list comes from the API, not git: no job here sets
+      # `fetch-depth`, so the runner's checkout is shallow and `base...head` is
+      # not resolvable locally.
+      - name: Changelog entry
+        if: >-
+          ${{ !cancelled() && github.event_name == 'pull_request'
+          && !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # pipefail: the default shell is `bash -e` without it, so a failing
+          # `gh api` would be masked by the exit code of the script it pipes into.
+          set -o pipefail
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --paginate --jq '.[].filename' | npm run changelog:check --silent
 
   # Split from `test` (#306): the integration suite is DB-bound (~4.5 min) and
   # was the long pole of the required check. Running it in parallel cuts the
