@@ -1,6 +1,6 @@
 # ADR-0034: ESLint 9 and flat config — the `eslint-plugin-import` ceiling, and what we suppressed to get here
 
-**Status:** Accepted (2026-08-14), with one question deliberately left open — see [Open question: does Codacy still earn its place](#open-question-does-codacy-still-earn-its-place).
+**Status:** Accepted (2026-08-14). The open question was answered on 2026-08-30 — see [Amendment (2026-08-30): the open question, answered](#amendment-2026-08-30-the-open-question-answered).
 **Date:** 2026-08-14
 **Repos:** orphic-inc/stellar-api
 **Relates:** [ADR-0018 — development lifecycle & the API/UI contract gate](0018-development-lifecycle-and-contract-gate.md)
@@ -94,6 +94,52 @@ Two things from this migration are evidence for that review rather than against 
 - The finding count coincided exactly with an unrelated lint warning count — six and six — which was misread as identification and produced a fix for a problem Codacy had not raised. That is a hazard of a tool whose findings are read as a number rather than a list.
 
 The question to answer separately: what does Codacy catch that `tsc --noEmit`, `eslint`, and `prettier --check` do not? If the answer is "little", remove it and reclaim the review signal. If the answer is real, make it a required check and set a threshold worth blocking on. Either is better than the present state.
+
+## Amendment (2026-08-30): the open question, answered
+
+**Codacy keeps Trivy and Semgrep. Its ESLint tool is switched off.**
+
+The question was "what does Codacy catch that `tsc --noEmit`, `eslint`, and `prettier --check` do not?" Two weeks of data answered it, because this migration silently broke Codacy in a way that made the answer legible.
+
+### What happened
+
+Deleting `.eslintrc.cjs` in `32642d8` took Codacy's ESLint config with it. Every Codacy pattern is prefixed `ESLint8_` — Codacy runs **ESLint 8**, which cannot read `eslint.config.mjs`. It did not fail or warn; it fell back to its own default pattern set and began reporting against rules this repo never opted into.
+
+By 2026-08-30 the repo showed **5,040 open issues**. 4,615 of them — 92% — were five type-aware rules: `no-unsafe-member-access`, `-call`, `-assignment`, `-argument`, `-return`.
+
+They were not real. The tell is in the message text:
+
+```
+src/routes/api/random.ts:42
+Unsafe member access .artist on an `error` typed value.
+```
+
+Line 42 is `prisma.artist.count()`. `error` is what typescript-eslint reports when the checker could not resolve a type at all. Codacy's sandbox never runs `prisma generate`, so `@prisma/client` does not exist there, and **every** `prisma.*` access in the repo degrades to `error` and cascades into the unsafe-* family. The per-file counts sit at exactly 50 — Codacy's per-file cap — so even the total was an artifact rather than a measurement.
+
+Two independent confirmations that Codacy was not reading our config:
+
+- Core `no-unused-vars` fired on `asyncHandler.ts:6` (`req` inside a _type annotation_) and across `releaseWorkbench/types.ts` (a pure `type` declaration). That is only possible without the `@typescript-eslint/eslint-recommended` overlay this config spreads explicitly — the same overlay whose omission is already recorded above under _Issues raised and circumvented_.
+- Local `npm run lint` was, and is, clean.
+
+### Why ESLint specifically comes off
+
+Codacy's ESLint is not a second opinion on ours; it is a strictly worse-informed copy. It runs an end-of-life major, without our rule set, without our plugins, and without type information or a generated Prisma client. Every disagreement between it and our CI lint is therefore resolved in our favour by construction, which makes the tool's ESLint output pure noise no matter how the config question is settled. Restoring an eslintrc purely to feed it would re-create the duplicated config §2 of this ADR removed, and would still leave it type-blind.
+
+### Why the rest stays
+
+Stripped of the phantoms, Codacy caught exactly two things nothing else in this repo caught — both real, both outside ESLint's remit:
+
+- **Trivy — dependency CVEs.** `nodemailer@8.0.11` (High, GHSA-p6gq-j5cr-w38f: the message-level `raw` option bypasses `disableFileAccess`/`disableUrlAccess`, enabling arbitrary file read and full-response SSRF), plus `deepmerge-ts@7.1.5` via `@prisma/config` and eleven `undici@7.25.0` CVEs via `jsdom` — which is a **production** dependency here, not a dev one.
+- **Semgrep — one genuine SSRF.** `linkHealth.checkUrl` passed a user-supplied `Contribution.downloadUrl` straight to `fetch` with `redirect: 'follow'`. Fixed in this branch by `lib/ssrfGuard.ts`; see the note below.
+
+That is the answer the question was asking for. It is small, but it is not "little", and neither finding is reachable by a linter.
+
+### Consequences
+
+- The ESLint tool is disabled for this repo on Codacy's **Code patterns** page. This cannot be done from `.codacy.yml` — the configuration file can scope a tool but not enable or disable one — so it is a console action with no repo-side representation. That asymmetry is why it is recorded here.
+- With ESLint off, the "zero new issues of any severity" threshold becomes meaningful rather than absurd, because the remaining tools report findings that are worth blocking on. Making Codacy a **required** check is now defensible; it is deliberately left for whoever configures branch protection, since the required set (`["test", "integration"]`) is not owned by this ADR.
+- The failure mode this amendment documents is the one to watch for again: a tool that reads repo configuration can lose it in a migration and keep reporting confidently against defaults. Codacy's ESLint pattern IDs carry the major version (`ESLint8_*`), which is the cheapest available check that it is still reading what we think it is.
+- The 4,615 phantom issues are not "fixed" and must not be triaged. They disappear with the tool that invented them.
 
 ## Alternatives considered
 
