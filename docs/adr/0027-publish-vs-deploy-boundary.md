@@ -1,6 +1,6 @@
 # ADR-0027: The publish/deploy boundary — GHCR publish is where this repo's pipeline ends
 
-**Status:** Accepted (2026-07-09)
+**Status:** Accepted (2026-07-09). The decision stands; the pipeline it describes has since gained two jobs — see [Amendment (2026-08-30): the chain as it actually runs](#amendment-2026-08-30--the-chain-as-it-actually-runs).
 **Date:** 2026-07-09
 **Repos:** orphic-inc/stellar-api, orphic-inc/stellar-compose
 **Relates:** [ADR-0018 — development lifecycle & the API/UI contract gate](0018-development-lifecycle-and-contract-gate.md)
@@ -14,8 +14,8 @@ The stellar-api CI chain (`.github/workflows/publish.yml`) runs `test` → `smok
 
 This was named the last structural CI/CD gap before v0.7.0 (2026-06-23 backlog review: the GHCR-publish boundary versus an environment deploy step is unscoped and a real pre-0.7.0 decision) but never got recorded. Two facts constrain the answer and were settled before this ADR:
 
-- The image is **self-contained at runtime**: `docker-entrypoint.sh` runs `prisma migrate deploy` before starting the server (#276), so a booted container brings the schema forward on its own. The smoke job exists precisely to keep that property from regressing. The runtime migration question is therefore already answered — this ADR is about the *pipeline* boundary, not the runtime one.
-- The **deployment surface is a separate repository** (stellar-compose), which owns the `docker-compose.yml` that references the api image and the environment it runs in. Its open issue #10 covers migration execution *at scale* (the entrypoint-migrate strategy races across replicas; destructive expand→contract migrations, e.g. #98/#73/#74, need sequencing care) — an orchestration concern, not a pipeline one.
+- The image is **self-contained at runtime**: `docker-entrypoint.sh` runs `prisma migrate deploy` before starting the server (#276), so a booted container brings the schema forward on its own. The smoke job exists precisely to keep that property from regressing. The runtime migration question is therefore already answered — this ADR is about the _pipeline_ boundary, not the runtime one.
+- The **deployment surface is a separate repository** (stellar-compose), which owns the `docker-compose.yml` that references the api image and the environment it runs in. Its open issue #10 covers migration execution _at scale_ (the entrypoint-migrate strategy races across replicas; destructive expand→contract migrations, e.g. #98/#73/#74, need sequencing care) — an orchestration concern, not a pipeline one.
 
 The decision is where the line falls between the two repos, because that choice determines whether environment credentials and topology leak into this repo's CI, and whether "deploy" is one responsibility or two.
 
@@ -42,3 +42,27 @@ Concretely:
 - stellar-compose #10 is the sole remaining deploy-side decision (multi-replica migration safety); it is scoped, not blocked by this ADR, and this ADR gives it its boundary.
 - A future automated promotion (if wanted) is a stellar-compose concern — e.g. a compose-side workflow that watches for a new semver tag and opens a pin-bump PR — and does not reopen this boundary.
 - Because promotion is a tag pin in compose, rollback is a git revert there; the api repo needs no rollback machinery.
+
+## Amendment (2026-08-30) — the chain as it actually runs
+
+The Context above describes the chain as `test` → `smoke` → `publish`, with `test` being "the full lint/type/unit/integration gate". That was accurate on 2026-07-09 and is not any more. Two jobs have been added since, and one of the three original jobs no longer does what the Context says it does. The Context is left as written — it is the record of what was true when the decision was made — and this amendment carries the current shape.
+
+**The job graph today** (`.github/workflows/publish.yml`):
+
+```
+test  ─┬─────────────► smoke ─┐
+       │                      ├──► publish ──► release
+integration ─────────────────┘
+```
+
+- **`integration`** was split out of `test` in #306, so the DB-bound suite (~5–8 min) runs in parallel instead of being the long pole of the merge gate. Both are required checks. This is also why the Context's "full lint/type/unit/integration gate" now over-describes `test`: the integration half left.
+- **`release`** was added by #383. Tag-only (`if: startsWith(github.ref, 'refs/tags/v')`), `needs: [publish]`, and it creates the GitHub Release from the tag's `CHANGELOG.md` section.
+
+Two dependency details the arrow diagram flattens, and which matter to anyone reasoning about the gate:
+
+- **`smoke` needs only `test`**, not `integration` — so a smoke run can start while the integration suite is still going.
+- **`publish` needs all three** (`test`, `integration`, `smoke`), which is where the full gate is actually enforced. A required-checks configuration that lists only `test` would therefore not cover what this ADR assumes it covers; the workflow carries a standing comment to that effect at the `integration` split.
+
+**The decision is unaffected.** `release` does not cross the publish/deploy boundary: it publishes a _record_ of an artifact — release notes against a tag — and touches no environment, holds no environment credentials, and promotes nothing. Promotion remains a tag pin in stellar-compose, exactly as decided. Nor does `integration` change the boundary; it only redistributes work already inside the verify half.
+
+**One line in Consequences reads as a complete enumeration and no longer is:** "The v0.7.0 CI/CD picture is complete: build → verify → publish here". Read it as naming the _phases_ rather than the jobs — the boundary claim it is making ("here" ends at publish) still holds, and `release` sits on the publish side of that line, not the deploy side.
