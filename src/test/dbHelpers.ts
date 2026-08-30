@@ -47,4 +47,17 @@ export const seedDefaults = async (): Promise<void> => {
   await testPrisma.userRank.create({
     data: { level: 100, name: 'User', permissions: {} }
   });
+  // Exactly one default stylesheet, because user creation resolves a theme name
+  // from it and since #376 that throws rather than falling back to a literal.
+  // Production gets this from migration 20260524120000_stylesheets_seed, but
+  // truncateAll wipes migration-planted rows along with everything else, so the
+  // invariant has to be restored here or every registration path 500s.
+  await testPrisma.stylesheet.create({
+    data: {
+      name: 'sublime',
+      description: 'Default Stellar theme',
+      cssUrl: null,
+      isDefault: true
+    }
+  });
 };
