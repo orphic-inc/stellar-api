@@ -39,7 +39,7 @@ Contributions are hosted links. `downloads.ts` credits a contributor's `contribu
 
 ### Policy state machine (unchanged)
 
-`ratioPolicy.ts`: `OK → WATCH → LEECH_DISABLED`. `WATCH` lasts 14 days; auto-disable on 10 GiB consumed during watch or watch expiry; the disabled state is reversed by staff only.
+`ratioPolicy.ts`: `OK → WATCH → DOWNLOAD_DISABLED`. `WATCH` lasts 14 days; auto-disable on 10 GiB consumed during watch or watch expiry; the disabled state is reversed by staff only.
 
 ### Ratio-exempt contributions: Freepass & Neutralpass
 

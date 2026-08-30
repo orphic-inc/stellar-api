@@ -13,7 +13,7 @@ export interface PolicyStateView {
   status: RatioPolicyStatus;
   watchStartedAt: string | null;
   watchExpiresAt: string | null;
-  leechDisabledAt: string | null;
+  downloadDisabledAt: string | null;
   lastEvaluatedAt: string;
 }
 
@@ -21,13 +21,13 @@ const serializeState = (s: {
   status: RatioPolicyStatus;
   watchStartedAt: Date | null;
   watchExpiresAt: Date | null;
-  leechDisabledAt: Date | null;
+  downloadDisabledAt: Date | null;
   lastEvaluatedAt: Date;
 }): PolicyStateView => ({
   status: s.status,
   watchStartedAt: s.watchStartedAt?.toISOString() ?? null,
   watchExpiresAt: s.watchExpiresAt?.toISOString() ?? null,
-  leechDisabledAt: s.leechDisabledAt?.toISOString() ?? null,
+  downloadDisabledAt: s.downloadDisabledAt?.toISOString() ?? null,
   lastEvaluatedAt: s.lastEvaluatedAt.toISOString()
 });
 
@@ -109,13 +109,13 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
       const reason = exceededDownloadLimit
         ? '10 GiB downloaded during watch'
         : 'watch period expired';
-      log.warn('User leech-disabled', { userId, reason });
+      log.warn('User download-disabled', { userId, reason });
       await prisma.$transaction([
         prisma.ratioPolicyState.update({
           where: { userId },
           data: {
-            status: RatioPolicyStatus.LEECH_DISABLED,
-            leechDisabledAt: now,
+            status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+            downloadDisabledAt: now,
             lastEvaluatedAt: now
           }
         }),
@@ -133,7 +133,7 @@ export const evaluateRatioPolicy = async (userId: number): Promise<void> => {
     return;
   }
 
-  // LEECH_DISABLED: only staff can change this; just refresh the timestamp
+  // DOWNLOAD_DISABLED: only staff can change this; just refresh the timestamp
   await prisma.ratioPolicyState.update({
     where: { userId },
     data: { lastEvaluatedAt: now }
@@ -149,7 +149,7 @@ export const getPolicyState = async (
       status: RatioPolicyStatus.OK,
       watchStartedAt: null,
       watchExpiresAt: null,
-      leechDisabledAt: null,
+      downloadDisabledAt: null,
       lastEvaluatedAt: new Date().toISOString()
     };
   }
@@ -177,7 +177,8 @@ export const overridePolicyStatus = async (
         ? new Date(now.getTime() + WATCH_DURATION_MS)
         : null,
     consumedAtWatchStart: null,
-    leechDisabledAt: newStatus === RatioPolicyStatus.LEECH_DISABLED ? now : null
+    downloadDisabledAt:
+      newStatus === RatioPolicyStatus.DOWNLOAD_DISABLED ? now : null
   };
 
   const [state] = await prisma.$transaction([
@@ -188,7 +189,7 @@ export const overridePolicyStatus = async (
     }),
     prisma.user.update({
       where: { id: userId },
-      data: { canDownload: newStatus !== RatioPolicyStatus.LEECH_DISABLED }
+      data: { canDownload: newStatus !== RatioPolicyStatus.DOWNLOAD_DISABLED }
     })
   ]);
 

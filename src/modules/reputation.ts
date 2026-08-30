@@ -151,7 +151,7 @@ const longevityScorer: DimensionScorer = {
 // ratio, ratio never reads CRS (ADR-0006 / PRD-06). Rewards a net-contributor
 // ratio with diminishing returns — but only once the user has demonstrated
 // contribution (contributed > 0), so a fresh account at the default 1.0 ratio
-// earns nothing. Non-negative: ratio enforcement (WATCH/LEECH_DISABLED) is the
+// earns nothing. Non-negative: ratio enforcement (WATCH/DOWNLOAD_DISABLED) is the
 // Ratio mechanism's job, not a CRS penalty.
 const RATIO_CAP = 8;
 const RATIO_TAU = 1.5; // ratio 1.5 → ~63% of cap, 3.0 → ~86%
