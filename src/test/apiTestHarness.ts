@@ -489,6 +489,14 @@ export const resetApiTestState = (): void => {
       callback: (err: Error | null, token?: string) => void
     ) => callback(null, 'signed-jwt')
   );
+  // Every user-creation path resolves the default theme name, and since #376
+  // that throws rather than falling back to a literal. A correctly-migrated
+  // database always has exactly one default (planted by
+  // 20260524120000_stylesheets_seed, guarded by stylesheets_one_default), so
+  // the harness models that rather than leaving each spec to discover it.
+  prismaMock.stylesheet.findFirst.mockResolvedValue({
+    name: 'sublime'
+  } as never);
   prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
   prismaMock.commentSubscription.findMany.mockResolvedValue([]);
   prismaMock.collageSubscription.findMany.mockResolvedValue([]);
