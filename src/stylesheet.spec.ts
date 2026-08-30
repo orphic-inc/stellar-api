@@ -5,6 +5,7 @@ import {
   prismaMock,
   makeUserRank
 } from './test/apiTestHarness';
+import { getDefaultStylesheetName } from './modules/stylesheet';
 
 beforeEach(() => resetApiTestState());
 
@@ -416,6 +417,89 @@ describe('PUT /api/stylesheet/:id', () => {
 });
 
 // ─── DELETE /api/stylesheet/:id ───────────────────────────────────────────────
+
+describe('getDefaultStylesheetName', () => {
+  it('returns the name of the row marked default', async () => {
+    prismaMock.stylesheet.findFirst.mockResolvedValue({
+      name: 'kuro'
+    } as never);
+    await expect(getDefaultStylesheetName()).resolves.toBe('kuro');
+  });
+
+  it('throws rather than guessing when no default exists (#376)', async () => {
+    // This replaced `?? 'sublime'`. That literal handed every newly created
+    // user a siteAppearance naming a stylesheet that need not exist — a
+    // dangling theme reference, which is worse than a loud failure. With the
+    // write-path guard above the state is unreachable, so reaching it means the
+    // invariant is broken and the registry is what needs fixing.
+    prismaMock.stylesheet.findFirst.mockResolvedValue(null);
+    await expect(getDefaultStylesheetName()).rejects.toThrow(
+      /No default stylesheet is configured/
+    );
+  });
+});
+
+describe('the single-default invariant (#376)', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    mockDeliveryTargetExists();
+  });
+
+  it('refuses to unset the default, which would leave the registry with none', async () => {
+    // The reachable path this closes: PUT { isDefault: false } on the current
+    // default fell through to a plain update, after which `sublime` was no
+    // longer protected by deleteStylesheet's guard either.
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet({ isDefault: true }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/stylesheet/1')
+      .send({ isDefault: false });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/Cannot unset the default stylesheet/);
+    expect(prismaMock.stylesheet.update).not.toHaveBeenCalled();
+  });
+
+  it('still allows unsetting isDefault on a sheet that is not the default', async () => {
+    // A no-op in practice, but it must not be swept up by the guard.
+    const nonDefault = makeStylesheet({
+      id: 2,
+      name: 'kuro',
+      isDefault: false
+    });
+    prismaMock.stylesheet.findUnique.mockResolvedValue(nonDefault as never);
+    prismaMock.stylesheet.update.mockResolvedValue(nonDefault as never);
+
+    const res = await request(app)
+      .put('/api/stylesheet/2')
+      .send({ isDefault: false });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.stylesheet.update).toHaveBeenCalled();
+  });
+
+  it('promotion is unaffected — setting a new default still clears the old', async () => {
+    const promoted = makeStylesheet({ id: 2, name: 'kuro', isDefault: true });
+    prismaMock.stylesheet.findUnique.mockResolvedValue(
+      makeStylesheet({ id: 2, name: 'kuro', isDefault: false }) as never
+    );
+    prismaMock.stylesheet.update.mockResolvedValue(promoted as never);
+
+    const res = await request(app)
+      .put('/api/stylesheet/2')
+      .send({ isDefault: true });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.stylesheet.updateMany).toHaveBeenCalledWith({
+      where: { isDefault: true },
+      data: { isDefault: false }
+    });
+  });
+});
 
 describe('DELETE /api/stylesheet/:id', () => {
   beforeEach(() => {

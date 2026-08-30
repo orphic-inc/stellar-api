@@ -40,13 +40,33 @@ const assertDeliveryTargetResolves = async (
     );
 };
 
+/**
+ * The name written to `UserSettings.siteAppearance` at user creation.
+ *
+ * Exactly one `Stylesheet` is default at any time, and this depends on that:
+ * the `stylesheets_one_default` partial unique index enforces *at most* one,
+ * and `updateStylesheet`/`deleteStylesheet` below enforce *at least* one.
+ *
+ * This used to end `?? 'sublime'` (#376). That literal was not a harmless
+ * default — it silently absorbed a broken invariant. Unsetting the last default
+ * was reachable through `PUT /api/stylesheet/:id`, and once nothing was default
+ * the `sublime` row itself became deletable, after which every new user was
+ * handed a `siteAppearance` naming a stylesheet that did not exist. A dangling
+ * theme reference is worse than a loud failure, so this throws: if it ever
+ * fires, the invariant is broken and the fix is the registry, not a fallback.
+ */
 export const getDefaultStylesheetName = async (tx?: Tx): Promise<string> => {
   const db = tx ?? prisma;
   const row = await db.stylesheet.findFirst({
     where: { isDefault: true },
     select: { name: true }
   });
-  return row?.name ?? 'sublime';
+  if (!row)
+    throw new AppError(
+      500,
+      'No default stylesheet is configured — the registry must always have exactly one.'
+    );
+  return row.name;
 };
 
 export const getStylesheetStats = async () => {
@@ -100,6 +120,17 @@ export const updateStylesheet = async (
   if (!existing) throw new AppError(404, 'Stylesheet not found');
 
   await assertDeliveryTargetResolves(data.cssUrl);
+
+  // The other half of the single-default invariant. `stylesheets_one_default`
+  // enforces at most one; nothing enforced at least one, so passing
+  // `isDefault: false` for the current default fell through to a plain update
+  // and left the registry with none (#376). Mirrors `deleteStylesheet`'s
+  // refusal below — promotion is how the default moves, not demotion.
+  if (data.isDefault === false && existing.isDefault)
+    throw new AppError(
+      400,
+      'Cannot unset the default stylesheet — set another as default instead'
+    );
 
   if (data.isDefault) {
     return prisma.$transaction(async (tx) => {
