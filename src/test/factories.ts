@@ -58,6 +58,32 @@ export function makeUserRank(
   };
 }
 
+/**
+ * The `user.findUnique` payload `getUserRankQuotas` reads (#369): a member's
+ * quota columns across primary + secondary ranks. Both default to `0`, which is
+ * this pair of columns' spelling of **unlimited** — so a test states only the
+ * limit it is about.
+ */
+type QuotaSlice = {
+  personalCollageLimit?: number;
+  authorStylesheetLimit?: number;
+};
+
+export function makeRankQuotas(
+  primary: QuotaSlice = {},
+  ...secondaries: QuotaSlice[]
+) {
+  const rank = (slice: QuotaSlice) => ({
+    personalCollageLimit: 0,
+    authorStylesheetLimit: 0,
+    ...slice
+  });
+  return {
+    userRank: rank(primary),
+    secondaryRanks: secondaries.map((slice) => ({ userRank: rank(slice) }))
+  };
+}
+
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 export function makeUser(overrides: Partial<User> = {}): User {

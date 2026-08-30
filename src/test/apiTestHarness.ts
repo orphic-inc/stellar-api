@@ -312,7 +312,7 @@ const sanitize = jest.requireMock('../lib/sanitize') as {
 import * as pmModule from '../modules/pm';
 import * as staffInboxModule from '../modules/staffInbox';
 import { makeUserRank } from './factories';
-export { makeUserRank } from './factories';
+export { makeUserRank, makeRankQuotas } from './factories';
 
 // Persistent server per test file. Calling `request(app)` (supertest's default)
 // opens a fresh server via app.listen(0) on a new ephemeral port for EVERY
