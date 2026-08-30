@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import { AppError } from '../../lib/errors';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { emitNotifications } from '../../lib/notifications';
@@ -41,6 +42,35 @@ import {
   type ReorderEntriesInput
 } from '../../schemas/collage';
 import type { AuthenticatedRequest } from '../../types/auth';
+
+/**
+ * The three permissions that let someone act on a collage they do not own.
+ * Spelled out once rather than at each of the six call sites — ADR-0001 keeps
+ * these as explicit permission reads rather than a named role, so the list is
+ * the thing worth having in one place.
+ */
+const hasCollageStaffPermission = (perms: Record<string, boolean>): boolean =>
+  !!(perms['collages_moderate'] || perms['staff'] || perms['admin']);
+
+/**
+ * Load a collage that is visible to a non-staff actor, or 404.
+ *
+ * Deliberately does *not* carry the owner/staff authorization with it: the five
+ * routes that share this load each gate differently afterwards — plain
+ * "Permission denied", a locked-collage check, a personal-collage owner check,
+ * a reorder-specific message — and folding those together would either change
+ * the message a client sees or quietly widen a gate. Only the load and the
+ * not-found case are actually common, so only those move.
+ *
+ * The GET detail route is not a caller: it deliberately lets staff read a
+ * soft-deleted collage, which this rejects.
+ */
+const loadActiveCollage = async (id: number) => {
+  const collage = await prisma.collage.findUnique({ where: { id } });
+  if (!collage || collage.isDeleted)
+    throw new AppError(404, 'Collage not found');
+  return collage;
+};
 
 const router = express.Router();
 
@@ -179,11 +209,7 @@ router.get(
     if (!collage) return res.status(404).json({ msg: 'Collage not found' });
 
     const perms = await loadPermissions(authReq, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
     if (collage.isDeleted && !staff) {
       return res.status(404).json({ msg: 'Collage not found' });
@@ -303,15 +329,9 @@ router.put(
     const updates = parsedBody<UpdateCollageInput>(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    const collage = await loadActiveCollage(id);
 
     const isOwner = collage.userId === userId;
     if (!isOwner && !staff)
@@ -396,15 +416,9 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    const collage = await loadActiveCollage(id);
 
     const isOwner = collage.userId === userId;
     if (!isOwner && !staff)
@@ -472,15 +486,9 @@ router.post(
     const { releaseId } = parsedBody<AddEntryInput>(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    const collage = await loadActiveCollage(id);
 
     // Locked check
     if (collage.isLocked && !staff)
@@ -591,15 +599,9 @@ router.delete(
     );
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    const collage = await loadActiveCollage(id);
 
     if (collage.isLocked && !staff)
       return res.status(403).json({ msg: 'Collage is locked' });
@@ -640,15 +642,9 @@ router.put(
     const { entries } = parsedBody<ReorderEntriesInput>(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
-    const staff = !!(
-      perms['collages_moderate'] ||
-      perms['staff'] ||
-      perms['admin']
-    );
+    const staff = hasCollageStaffPermission(perms);
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    const collage = await loadActiveCollage(id);
 
     const isOwner = collage.userId === userId;
     if (!isOwner && !staff)
@@ -679,9 +675,8 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const userId = req.user.id;
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    // Existence/visibility check only — the collage row itself is not needed.
+    await loadActiveCollage(id);
 
     const existing = await prisma.collageSubscription.findUnique({
       where: { userId_collageId: { userId, collageId: id } }
@@ -726,9 +721,8 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const userId = req.user.id;
 
-    const collage = await prisma.collage.findUnique({ where: { id } });
-    if (!collage || collage.isDeleted)
-      return res.status(404).json({ msg: 'Collage not found' });
+    // Existence/visibility check only — the collage row itself is not needed.
+    await loadActiveCollage(id);
 
     const existing = await prisma.bookmarkCollage.findUnique({
       where: { userId_collageId: { userId, collageId: id } }

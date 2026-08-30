@@ -20,6 +20,36 @@ import type {
   CreateContributionInput
 } from '../schemas/contribution';
 
+/**
+ * The field set every contribution write returns.
+ *
+ * Both the create and the workbench-attach path built this list inline, and the
+ * two had to stay in step because they feed the same response contract — a field
+ * added to one and not the other is a contract that changes depending on which
+ * route produced the row. Named once, in the same spirit as `releaseCreditsSelect`
+ * and `authorRefSelect`.
+ */
+const contributionSelect = {
+  id: true,
+  userId: true,
+  releaseId: true,
+  contributorId: true,
+  releaseDescription: true,
+  sizeInBytes: true,
+  approvedAccountingBytes: true,
+  linkStatus: true,
+  linkCheckedAt: true,
+  type: true,
+  releaseFile: {
+    select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
+  },
+  createdAt: true,
+  updatedAt: true,
+  user: { select: { id: true, username: true } },
+  release: { select: { id: true, title: true, communityId: true } },
+  collaborators: { select: { id: true, name: true } }
+} as const;
+
 const log = getLogger('contribution');
 
 const normalizeTags = (tags?: string): string[] => [
@@ -230,26 +260,7 @@ export const createContributionSubmission = async ({
           connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
         }
       },
-      select: {
-        id: true,
-        userId: true,
-        releaseId: true,
-        contributorId: true,
-        releaseDescription: true,
-        sizeInBytes: true,
-        approvedAccountingBytes: true,
-        linkStatus: true,
-        linkCheckedAt: true,
-        type: true,
-        releaseFile: {
-          select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
-        },
-        createdAt: true,
-        updatedAt: true,
-        user: { select: { id: true, username: true } },
-        release: { select: { id: true, title: true, communityId: true } },
-        collaborators: { select: { id: true, name: true } }
-      }
+      select: contributionSelect
     });
   });
 
@@ -333,31 +344,7 @@ export const addContributionToRelease = async ({
             }
           }
         },
-        select: {
-          id: true,
-          userId: true,
-          releaseId: true,
-          contributorId: true,
-          releaseDescription: true,
-          sizeInBytes: true,
-          approvedAccountingBytes: true,
-          linkStatus: true,
-          linkCheckedAt: true,
-          type: true,
-          releaseFile: {
-            select: {
-              bitrate: true,
-              hasLog: true,
-              hasCue: true,
-              isScene: true
-            }
-          },
-          createdAt: true,
-          updatedAt: true,
-          user: { select: { id: true, username: true } },
-          release: { select: { id: true, title: true, communityId: true } },
-          collaborators: { select: { id: true, name: true } }
-        }
+        select: contributionSelect
       });
     })
     .then((contribution) => {

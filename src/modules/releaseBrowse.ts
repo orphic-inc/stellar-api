@@ -2,13 +2,7 @@ import { prisma } from '../lib/prisma';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { assertCommunityAccess } from './communityAccess';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
-
-const buildPlainTags = (
-  releaseTags: Array<{ tag: { id: number; name: string; occurrences: number } }>
-) =>
-  releaseTags
-    .map((releaseTag) => releaseTag.tag)
-    .sort((a, b) => a.name.localeCompare(b.name));
+import { buildPlainTags } from './releaseTags';
 
 export const listCommunityReleases = async (input: {
   actorId: number;

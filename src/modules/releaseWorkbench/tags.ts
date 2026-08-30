@@ -1,8 +1,4 @@
-import {
-  Prisma,
-  ReleaseHistoryAction,
-  ReleaseTagVoteDirection
-} from '@prisma/client';
+import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { resolveTagName } from '../tag';
@@ -14,93 +10,7 @@ import type {
   ReleaseWorkbenchRef,
   ReleaseWorkbenchView
 } from './types';
-
-const buildReleaseTagPayload = (
-  tags: Array<{ id: number; name: string; occurrences: number }>,
-  releaseTags: Array<{
-    id: number;
-    tagId: number;
-    positiveVotes: number;
-    negativeVotes: number;
-    createdAt: Date;
-    user: { id: number; username: string } | null;
-    votes: Array<{ direction: ReleaseTagVoteDirection }>;
-  }>
-): ReleaseTagView[] => {
-  const byTagId = new Map(
-    releaseTags.map((releaseTag) => [releaseTag.tagId, releaseTag])
-  );
-
-  return tags
-    .map((tag) => {
-      const releaseTag = byTagId.get(tag.id);
-      const positiveVotes = releaseTag?.positiveVotes ?? 1;
-      const negativeVotes = releaseTag?.negativeVotes ?? 1;
-
-      return {
-        id: releaseTag?.id ?? tag.id,
-        tagId: tag.id,
-        name: tag.name,
-        occurrences: tag.occurrences,
-        score: positiveVotes - negativeVotes,
-        positiveVotes: Math.max(0, positiveVotes - 1),
-        negativeVotes: Math.max(0, negativeVotes - 1),
-        addedBy: releaseTag?.user ?? null,
-        createdAt: releaseTag?.createdAt ?? null,
-        myVotes: {
-          up:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.up
-            ) ?? false,
-          down:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.down
-            ) ?? false
-        }
-      };
-    })
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-};
-
-const attachTagWithVotes = async (
-  tx: Prisma.TransactionClient,
-  releaseId: number,
-  actorId: number,
-  tag: { id: number; name: string },
-  writeHistory: boolean,
-  snapshot?: ReleaseSnapshot
-): Promise<void> => {
-  const releaseTag = await tx.releaseTag.create({
-    data: {
-      releaseId,
-      tagId: tag.id,
-      userId: actorId,
-      positiveVotes: 3,
-      negativeVotes: 1
-    }
-  });
-  await tx.releaseTagVote.create({
-    data: {
-      releaseTagId: releaseTag.id,
-      userId: actorId,
-      direction: ReleaseTagVoteDirection.up
-    }
-  });
-  if (writeHistory) {
-    await tx.releaseHistory.create({
-      data: {
-        releaseId,
-        actorId,
-        action: ReleaseHistoryAction.tag_added,
-        summary: `Tag "${tag.name}" added`,
-        changedFields: ['tags'],
-        before: { tagId: tag.id, name: tag.name, score: 0 } as never,
-        after: { tagId: tag.id, name: tag.name, score: 2 } as never,
-        ...(snapshot !== undefined && { snapshot: snapshot as never })
-      }
-    });
-  }
-};
+import { attachTagWithVotes, buildReleaseTagPayload } from '../releaseTags';
 
 export const addReleaseWorkbenchTag = async (
   ref: ReleaseWorkbenchRef,

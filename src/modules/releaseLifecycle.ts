@@ -1,62 +1,9 @@
-import {
-  ArtistRole,
-  ReleaseHistoryAction,
-  ReleaseTagVoteDirection
-} from '@prisma/client';
+import { ArtistRole, ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import type { CreateGroupInput } from '../schemas/community';
-import {
-  snapshotRelease,
-  type ReleaseSnapshot
-} from './releaseWorkbench/snapshot';
-
-const buildPlainTags = (
-  releaseTags: Array<{ tag: { id: number; name: string; occurrences: number } }>
-) =>
-  releaseTags
-    .map((releaseTag) => releaseTag.tag)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-const attachTagWithVotes = async (
-  tx: Pick<typeof prisma, 'releaseTag' | 'releaseTagVote' | 'releaseHistory'>,
-  releaseId: number,
-  actorId: number,
-  tag: { id: number; name: string },
-  writeHistory: boolean,
-  snapshot?: ReleaseSnapshot
-): Promise<void> => {
-  const releaseTag = await tx.releaseTag.create({
-    data: {
-      releaseId,
-      tagId: tag.id,
-      userId: actorId,
-      positiveVotes: 3,
-      negativeVotes: 1
-    }
-  });
-  await tx.releaseTagVote.create({
-    data: {
-      releaseTagId: releaseTag.id,
-      userId: actorId,
-      direction: ReleaseTagVoteDirection.up
-    }
-  });
-  if (writeHistory) {
-    await tx.releaseHistory.create({
-      data: {
-        releaseId,
-        actorId,
-        action: ReleaseHistoryAction.tag_added,
-        summary: `Tag "${tag.name}" added`,
-        changedFields: ['tags'],
-        before: { tagId: tag.id, name: tag.name, score: 0 } as never,
-        after: { tagId: tag.id, name: tag.name, score: 2 } as never,
-        ...(snapshot !== undefined && { snapshot: snapshot as never })
-      }
-    });
-  }
-};
+import { snapshotRelease } from './releaseWorkbench/snapshot';
+import { attachTagWithVotes, buildPlainTags } from './releaseTags';
 
 export const createCommunityRelease = async (input: {
   actorId: number;

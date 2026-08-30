@@ -1,13 +1,12 @@
-import { ReleaseTagVoteDirection } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import type {
   ReleaseHistoryPage,
-  ReleaseTagView,
   ReleaseWorkbenchRef,
   ReleaseWorkbenchView
 } from './types';
 import { loadReleaseWorkbenchAuthority } from './authority';
+import { buildPlainTags, buildReleaseTagPayload } from '../releaseTags';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -19,60 +18,6 @@ const normalizePage = (page?: number, limit?: number) => {
     Math.max(1, limit ?? DEFAULT_PAGE_SIZE)
   );
   return { page: safePage, limit: safeLimit, skip: (safePage - 1) * safeLimit };
-};
-
-const buildPlainTags = (
-  releaseTags: Array<{ tag: { id: number; name: string; occurrences: number } }>
-) =>
-  releaseTags
-    .map((releaseTag) => releaseTag.tag)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-const buildReleaseTagPayload = (
-  tags: Array<{ id: number; name: string; occurrences: number }>,
-  releaseTags: Array<{
-    id: number;
-    tagId: number;
-    positiveVotes: number;
-    negativeVotes: number;
-    createdAt: Date;
-    user: { id: number; username: string } | null;
-    votes: Array<{ direction: ReleaseTagVoteDirection }>;
-  }>
-): ReleaseTagView[] => {
-  const byTagId = new Map(
-    releaseTags.map((releaseTag) => [releaseTag.tagId, releaseTag])
-  );
-
-  return tags
-    .map((tag) => {
-      const releaseTag = byTagId.get(tag.id);
-      const positiveVotes = releaseTag?.positiveVotes ?? 1;
-      const negativeVotes = releaseTag?.negativeVotes ?? 1;
-
-      return {
-        id: releaseTag?.id ?? tag.id,
-        tagId: tag.id,
-        name: tag.name,
-        occurrences: tag.occurrences,
-        score: positiveVotes - negativeVotes,
-        positiveVotes: Math.max(0, positiveVotes - 1),
-        negativeVotes: Math.max(0, negativeVotes - 1),
-        addedBy: releaseTag?.user ?? null,
-        createdAt: releaseTag?.createdAt ?? null,
-        myVotes: {
-          up:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.up
-            ) ?? false,
-          down:
-            releaseTag?.votes.some(
-              (vote) => vote.direction === ReleaseTagVoteDirection.down
-            ) ?? false
-        }
-      };
-    })
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 };
 
 export const getReleaseWorkbenchView = async (
