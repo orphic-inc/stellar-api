@@ -10,9 +10,15 @@
  * assert against. The fixture usernames below are the contract the e2e relies
  * on; keep them in sync with stellar-ui/e2e/invite.spec.ts.
  *
+ * Also plants the content half of the fixture — one release in the default
+ * community, credited and carrying one contribution — because
+ * stellar-ui/e2e/release.spec.ts cannot pass without it (#339). That lives in
+ * `modules/e2eFixtures.ts`, which explains what each row is for.
+ *
  * Idempotent — re-running updates the fixtures in place (no duplicates).
- * Requires ranks to exist (run `npm run db:seed` first). Credentials come from
- * the same env vars stellar-ui's e2e uses; defaults match its .env.example.
+ * Requires ranks to exist (run `npm run db:seed` first) and the default
+ * community to exist (created by POST /api/install). Credentials come from the
+ * same env vars stellar-ui's e2e uses; defaults match its .env.example.
  *
  * Lives under src/ (not prisma/scripts/) so tsc compiles it into the image —
  * a deployed container stack can seed its own e2e fixtures without a ts-node
@@ -25,6 +31,7 @@
  */
 import { PrismaClient, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { seedE2eRelease } from '../modules/e2eFixtures';
 
 const prisma = new PrismaClient();
 
@@ -174,6 +181,10 @@ async function main(): Promise<void> {
   await setInviter(charlieId, alphaId);
   await setInviter(deltaId, testuserId);
 
+  // The content half: a browsable release with a contribution to report. Owned
+  // by e2e_alpha rather than testuser, so P-07b reports someone else's link.
+  const { releaseId, contributionId } = await seedE2eRelease(prisma, alphaId);
+
   console.log('Seeded e2e fixtures:');
   console.log(
     `  regular: ${REGULAR.username} <${REGULAR.email}> (id ${testuserId})`
@@ -183,6 +194,9 @@ async function main(): Promise<void> {
   );
   console.log(
     `  invite subtree under ${REGULAR.username}: e2e_alpha(+donor) → e2e_charlie, e2e_bravo, e2e_delta(disabled)`
+  );
+  console.log(
+    `  release: id ${releaseId} with contribution id ${contributionId} (by e2e_alpha)`
   );
 }
 
