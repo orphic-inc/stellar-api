@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
 import { sendSystemMessage } from './pm';
 import { runInBackground } from './backgroundTasks';
+import { checkPublicUrl } from '../lib/ssrfGuard';
 
 const log = getLogger('linkHealth');
 
@@ -20,18 +21,56 @@ const PULSE_AILING = 0.6;
 // enough to band — report Unknown rather than a confident Healthy/Critical.
 const PULSE_MIN_COVERAGE = 0.5;
 
+/**
+ * Redirect budget. `fetch` defaults to 20; the lower ceiling here is not about
+ * safety (every hop is re-guarded regardless) but about the timeout being shared
+ * across the whole chain — twenty sequential HEADs inside one 10s budget is a
+ * chain that has already failed in practice.
+ */
+const MAX_REDIRECTS = 5;
+
 export const checkUrl = async (url: string): Promise<LinkHealthStatus> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      redirect: 'follow'
-    });
-    if (res.ok) return LinkHealthStatus.PASS;
-    // 5xx is likely transient; 4xx is a confirmed dead link
-    return res.status >= 500 ? LinkHealthStatus.WARN : LinkHealthStatus.FAIL;
+    let target = url;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      // Re-checked every hop, not just the first. `redirect: 'follow'` would
+      // hand an allowlisted host a 302 to 169.254.169.254 and dial it under the
+      // server's network identity, so redirects are resolved by hand here.
+      const guard = await checkPublicUrl(target);
+      if (!guard.ok) {
+        log.warn('Refused to probe link', {
+          url: target,
+          reason: guard.reason
+        });
+        // FAIL, not WARN: a link the site will never follow is dead to every
+        // member, and FAIL is the status that withholds ratio relief (ADR-0006).
+        return LinkHealthStatus.FAIL;
+      }
+
+      const res = await fetch(guard.url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        redirect: 'manual'
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        // A 3xx with nowhere to go is broken, not transient.
+        if (!location) return LinkHealthStatus.FAIL;
+        // Relative Locations are legal and common; resolve against the hop that
+        // issued them so the next guard sees the real destination.
+        target = new URL(location, guard.url).toString();
+        continue;
+      }
+
+      if (res.ok) return LinkHealthStatus.PASS;
+      // 5xx is likely transient; 4xx is a confirmed dead link
+      return res.status >= 500 ? LinkHealthStatus.WARN : LinkHealthStatus.FAIL;
+    }
+    // Budget exhausted — a redirect loop is a broken link, not a slow one.
+    return LinkHealthStatus.FAIL;
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError')
       return LinkHealthStatus.WARN;
