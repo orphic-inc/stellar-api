@@ -69,7 +69,7 @@ What the hook does **not** cover, run yourself before committing:
 
 1. `npm run format` — only when you've changed files the hook didn't stage (it formats **all** of `src/` and `prisma/**/*.ts`, confirming nothing else drifted)
 2. `npm run test --no-coverage` — full suite (too slow for the hook; CI is the authority, but run it locally before pushing)
-3. `npm run changelog:check` — does this branch owe a `CHANGELOG.md` entry? CI enforces the same rule per-PR (#386). Any change under `src/`, `prisma/` or `.github/workflows/` must update the changelog. The `release` job publishes `[Unreleased]` verbatim as the Release notes, so an omission there is permanent. To opt out, apply the `no-changelog` label to the PR
+3. `npm run changelog:check` — CI runs this per-PR (#386): changes under `src/`, `prisma/` or `.github/workflows/` need a `CHANGELOG.md` entry, unless the PR carries the `no-changelog` label. The `release` job publishes `[Unreleased]` as the Release notes.
 4. Commit with a descriptive message following existing log style
 
 > If you do run the checks manually (e.g. before staging, or committing with `--no-verify`): order matters — format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
