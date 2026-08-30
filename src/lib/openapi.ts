@@ -5459,10 +5459,10 @@ registry.registerPath({
 const RatioPolicyState = registry.register(
   'RatioPolicyState',
   z.object({
-    status: z.enum(['OK', 'WATCH', 'LEECH_DISABLED']),
+    status: z.enum(['OK', 'WATCH', 'DOWNLOAD_DISABLED']),
     watchStartedAt: z.string().nullable(),
     watchExpiresAt: z.string().nullable(),
-    leechDisabledAt: z.string().nullable(),
+    downloadDisabledAt: z.string().nullable(),
     lastEvaluatedAt: z.string()
   })
 );
@@ -5490,7 +5490,7 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            status: z.enum(['OK', 'WATCH', 'LEECH_DISABLED'])
+            status: z.enum(['OK', 'WATCH', 'DOWNLOAD_DISABLED'])
           })
         }
       }
@@ -6502,7 +6502,7 @@ const RatioWatchItem = registry.register(
     status: z.string(),
     watchStartedAt: z.string().nullable(),
     watchExpiresAt: z.string().nullable(),
-    leechDisabledAt: z.string().nullable(),
+    downloadDisabledAt: z.string().nullable(),
     lastEvaluatedAt: z.string()
   })
 );

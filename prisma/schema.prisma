@@ -213,7 +213,7 @@ enum DownloadGrantStatus {
 enum RatioPolicyStatus {
   OK
   WATCH
-  LEECH_DISABLED
+  DOWNLOAD_DISABLED
 }
 
 // Ratio-exempt Contribution flags (PRD-06 #4). Read at consumption time by the
@@ -1639,7 +1639,7 @@ model RatioPolicyState {
   watchStartedAt       DateTime?
   watchExpiresAt       DateTime?
   consumedAtWatchStart BigInt?
-  leechDisabledAt      DateTime?
+  downloadDisabledAt   DateTime?
   lastEvaluatedAt      DateTime          @default(now())
 
   @@map("ratio_policy_states")

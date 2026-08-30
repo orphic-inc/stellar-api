@@ -4579,7 +4579,7 @@
             "enum": [
               "OK",
               "WATCH",
-              "LEECH_DISABLED"
+              "DOWNLOAD_DISABLED"
             ]
           },
           "watchStartedAt": {
@@ -4590,7 +4590,7 @@
             "type": "string",
             "nullable": true
           },
-          "leechDisabledAt": {
+          "downloadDisabledAt": {
             "type": "string",
             "nullable": true
           },
@@ -4602,7 +4602,7 @@
           "status",
           "watchStartedAt",
           "watchExpiresAt",
-          "leechDisabledAt",
+          "downloadDisabledAt",
           "lastEvaluatedAt"
         ]
       },
@@ -5558,7 +5558,7 @@
             "type": "string",
             "nullable": true
           },
-          "leechDisabledAt": {
+          "downloadDisabledAt": {
             "type": "string",
             "nullable": true
           },
@@ -5572,7 +5572,7 @@
           "status",
           "watchStartedAt",
           "watchExpiresAt",
-          "leechDisabledAt",
+          "downloadDisabledAt",
           "lastEvaluatedAt"
         ]
       },
@@ -16215,7 +16215,7 @@
                     "enum": [
                       "OK",
                       "WATCH",
-                      "LEECH_DISABLED"
+                      "DOWNLOAD_DISABLED"
                     ]
                   }
                 },

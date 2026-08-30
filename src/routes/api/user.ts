@@ -433,7 +433,7 @@ router.get(
   })
 );
 
-// GET /api/users/ratio-watch — users on ratio watch or leech-disabled (must be before /:id)
+// GET /api/users/ratio-watch — users on ratio watch or download-disabled (must be before /:id)
 router.get(
   '/ratio-watch',
   ...requirePermission('ratio_policy_manage'),
@@ -442,7 +442,7 @@ router.get(
     const pg = parsedPage(res);
     const where = {
       status: {
-        in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.LEECH_DISABLED]
+        in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.DOWNLOAD_DISABLED]
       }
     };
     const [entries, total] = await Promise.all([

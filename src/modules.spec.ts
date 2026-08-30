@@ -905,7 +905,7 @@ describe('ratioPolicy.getPolicyState', () => {
 
     expect(result.status).toBe('OK');
     expect(result.watchStartedAt).toBeNull();
-    expect(result.leechDisabledAt).toBeNull();
+    expect(result.downloadDisabledAt).toBeNull();
     expect(result.lastEvaluatedAt).toBeDefined();
   });
 });

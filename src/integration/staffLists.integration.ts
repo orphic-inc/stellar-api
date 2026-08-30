@@ -136,7 +136,7 @@ describe('invites list (invite pool)', () => {
 });
 
 describe('ratio watch list', () => {
-  it('returns only WATCH and LEECH_DISABLED states', async () => {
+  it('returns only WATCH and DOWNLOAD_DISABLED states', async () => {
     const u1 = await createUser('f');
     const u2 = await createUser('g');
     const u3 = await createUser('h');
@@ -144,13 +144,13 @@ describe('ratio watch list', () => {
     await testPrisma.ratioPolicyState.createMany({
       data: [
         { userId: u1.id, status: 'WATCH' },
-        { userId: u2.id, status: 'LEECH_DISABLED' },
+        { userId: u2.id, status: 'DOWNLOAD_DISABLED' },
         { userId: u3.id, status: 'OK' }
       ]
     });
 
     const rows = await testPrisma.ratioPolicyState.findMany({
-      where: { status: { in: ['WATCH', 'LEECH_DISABLED'] } },
+      where: { status: { in: ['WATCH', 'DOWNLOAD_DISABLED'] } },
       include: { user: { select: { id: true, username: true } } }
     });
 

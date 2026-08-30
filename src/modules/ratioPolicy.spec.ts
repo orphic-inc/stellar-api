@@ -59,7 +59,7 @@ const makeState = (overrides = {}) => ({
   watchStartedAt: null,
   watchExpiresAt: null,
   consumedAtWatchStart: null,
-  leechDisabledAt: null,
+  downloadDisabledAt: null,
   lastEvaluatedAt: new Date(),
   ...overrides
 });
@@ -139,7 +139,7 @@ describe('evaluateRatioPolicy', () => {
     );
   });
 
-  it('WATCH + 10 GiB downloaded during watch: immediate LEECH_DISABLED', async () => {
+  it('WATCH + 10 GiB downloaded during watch: immediate DOWNLOAD_DISABLED', async () => {
     mockGetRatioStats.mockResolvedValue(
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
@@ -162,7 +162,7 @@ describe('evaluateRatioPolicy', () => {
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: RatioPolicyStatus.LEECH_DISABLED
+          status: RatioPolicyStatus.DOWNLOAD_DISABLED
         })
       })
     );
@@ -171,7 +171,7 @@ describe('evaluateRatioPolicy', () => {
     );
   });
 
-  it('WATCH + expired watch period: transitions to LEECH_DISABLED', async () => {
+  it('WATCH + expired watch period: transitions to DOWNLOAD_DISABLED', async () => {
     mockGetRatioStats.mockResolvedValue(
       makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
     );
@@ -193,7 +193,7 @@ describe('evaluateRatioPolicy', () => {
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: RatioPolicyStatus.LEECH_DISABLED
+          status: RatioPolicyStatus.DOWNLOAD_DISABLED
         })
       })
     );
@@ -227,13 +227,13 @@ describe('evaluateRatioPolicy', () => {
     expect(mockPrismaUser.update).not.toHaveBeenCalled();
   });
 
-  it('LEECH_DISABLED: no status change, only refreshes timestamp', async () => {
+  it('DOWNLOAD_DISABLED: no status change, only refreshes timestamp', async () => {
     mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: false }));
     mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
       consumed: 50n * GiB
     });
     mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({ status: RatioPolicyStatus.LEECH_DISABLED })
+      makeState({ status: RatioPolicyStatus.DOWNLOAD_DISABLED })
     );
 
     await evaluateRatioPolicy(1);
@@ -262,17 +262,17 @@ describe('overridePolicyStatus', () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it('sets canDownload=false when overriding to LEECH_DISABLED', async () => {
+  it('sets canDownload=false when overriding to DOWNLOAD_DISABLED', async () => {
     mockPrismaUser.findUnique.mockResolvedValue({ id: 1 });
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
-        status: RatioPolicyStatus.LEECH_DISABLED,
-        leechDisabledAt: new Date()
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        downloadDisabledAt: new Date()
       })
     );
     mockPrismaUser.update.mockResolvedValue({});
 
-    await overridePolicyStatus(1, RatioPolicyStatus.LEECH_DISABLED);
+    await overridePolicyStatus(1, RatioPolicyStatus.DOWNLOAD_DISABLED);
 
     expect(mockPrismaUser.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { canDownload: false } })

@@ -28,7 +28,7 @@ const POLICY_VIEW = {
   status: 'OK' as const,
   watchStartedAt: null,
   watchExpiresAt: null,
-  leechDisabledAt: null,
+  downloadDisabledAt: null,
   lastEvaluatedAt: new Date().toISOString()
 };
 
