@@ -73,8 +73,20 @@ export async function createTicket(
   return mapTicket(ticket);
 }
 
-export async function listMyTickets(userId: number, page: number) {
-  const where = { userId };
+/**
+ * One page of tickets, newest-updated first, each carrying only its latest
+ * message.
+ *
+ * The member-facing list and the staff queue differ solely in their `where` —
+ * everything else about the read, including the "latest message only" include
+ * that shapes the list response, was written out twice. Keeping one body means
+ * the two lists cannot drift into returning different shapes for what the UI
+ * renders with the same component.
+ */
+const listTicketPage = async (
+  where: Prisma.StaffInboxConversationWhereInput,
+  page: number
+) => {
   const [total, conversations] = await Promise.all([
     prisma.staffInboxConversation.count({ where }),
     prisma.staffInboxConversation.findMany({
@@ -98,6 +110,10 @@ export async function listMyTickets(userId: number, page: number) {
     pageSize: PAGE_SIZE,
     conversations: conversations.map(mapTicket)
   };
+};
+
+export async function listMyTickets(userId: number, page: number) {
+  return listTicketPage({ userId }, page);
 }
 
 export async function listQueue(opts: {
@@ -114,29 +130,7 @@ export async function listQueue(opts: {
     ...(unassigned ? { assignedUserId: null } : {})
   };
 
-  const [total, conversations] = await Promise.all([
-    prisma.staffInboxConversation.count({ where }),
-    prisma.staffInboxConversation.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
-        ...ticketInclude,
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { sender: { select: senderSelect } }
-        }
-      }
-    })
-  ]);
-  return {
-    total,
-    page,
-    pageSize: PAGE_SIZE,
-    conversations: conversations.map(mapTicket)
-  };
+  return listTicketPage(where, page);
 }
 
 export async function getQueueCount(): Promise<number> {

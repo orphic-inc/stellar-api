@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
-import { updatePost, deletePost } from '../../../modules/forum';
+import { deletePost, updatePost } from '../../../modules/forum';
 import {
   replyToTopic,
   type TopicSessionActor
@@ -31,9 +31,12 @@ import {
   paginatedResponse,
   paginationBase
 } from '../../../lib/pagination';
-import { canAccessForumLevel } from '../../../lib/userRankAccess';
-import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 import { renderSiteBBCode } from '../../../modules/bbcodeRender';
+import {
+  publicPostInclude,
+  serializeForumPost
+} from '../../../modules/forumPostView';
+import { assertForumReadAccess } from '../../../modules/forumAccess';
 
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
@@ -48,43 +51,12 @@ const forumPostParamsSchema = z.object({
 
 const forumPostsQuerySchema = z.object({ ...paginationBase });
 
-const publicPostInclude = {
-  author: { select: authorRefSelect },
-  edits: {
-    orderBy: { editedAt: 'desc' as const },
-    take: 1,
-    select: {
-      id: true,
-      forumPostId: true,
-      editorId: true,
-      editedAt: true,
-      editor: { select: { id: true, username: true } }
-    }
-  }
-} as const;
-
-type RawPost = Awaited<
-  ReturnType<
-    typeof prisma.forumPost.findMany<{ include: typeof publicPostInclude }>
-  >
->[number];
-
 const editHistoryInclude = {
   edits: {
     orderBy: { editedAt: 'desc' as const },
     include: { editor: { select: { id: true, username: true } } }
   }
 };
-
-const serializeForumPost = async (post: RawPost) => ({
-  ...post,
-  author: toAuthorRefOrNull(post.author),
-  // Additive render-at-read: `body` is unchanged; `bodyHtml` is the
-  // server-rendered transcription display surfaces consume (#402).
-  bodyHtml: await renderSiteBBCode(post.body),
-  ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
-  edits: undefined
-});
 
 // GET /api/forums/:forumId/topics/:forumTopicId/posts
 router.get(
@@ -98,16 +70,7 @@ router.get(
       forumTopicId: number;
     }>(res);
 
-    const forum = await prisma.forum.findUnique({
-      where: { id: forumId },
-      select: { minClassRead: true }
-    });
-    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
-      return res
-        .status(403)
-        .json({ msg: 'Insufficient class to read this forum' });
-    }
+    await assertForumReadAccess(req.user, forumId);
 
     const pg = parsedPage(res);
     const [posts, total] = await Promise.all([
@@ -151,16 +114,7 @@ router.get(
       id: number;
     }>(res);
 
-    const forum = await prisma.forum.findUnique({
-      where: { id: forumId },
-      select: { minClassRead: true }
-    });
-    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
-      return res
-        .status(403)
-        .json({ msg: 'Insufficient class to read this forum' });
-    }
+    await assertForumReadAccess(req.user, forumId);
 
     const post = await prisma.forumPost.findFirst({
       where: {
@@ -188,16 +142,7 @@ router.get(
       id: number;
     }>(res);
 
-    const forum = await prisma.forum.findUnique({
-      where: { id: forumId },
-      select: { minClassRead: true }
-    });
-    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
-      return res
-        .status(403)
-        .json({ msg: 'Insufficient class to read this forum' });
-    }
+    await assertForumReadAccess(req.user, forumId);
     if (!hasPermission(await loadPermissions(req, res), 'forums_moderate')) {
       return res
         .status(403)

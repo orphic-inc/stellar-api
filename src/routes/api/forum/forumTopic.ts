@@ -38,6 +38,7 @@ import { sanitizePlain } from '../../../lib/sanitize';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 import forumPostRouter from './forumPost';
+import { assertForumReadAccess } from '../../../modules/forumAccess';
 
 const router = express.Router({ mergeParams: true });
 const forumIdParamsSchema = z.object({
@@ -79,16 +80,7 @@ router.get(
   authHandler(async (req, res) => {
     const { forumId } = parsedParams<{ forumId: number }>(res);
 
-    const forum = await prisma.forum.findUnique({
-      where: { id: forumId },
-      select: { minClassRead: true }
-    });
-    if (!forum) return res.status(404).json({ msg: 'Forum not found' });
-    if (!canAccessForumLevel(req.user, forumId, forum.minClassRead)) {
-      return res
-        .status(403)
-        .json({ msg: 'Insufficient class to read this forum' });
-    }
+    await assertForumReadAccess(req.user, forumId);
 
     const pg = parsedPage(res);
     const [topics, total] = await Promise.all([

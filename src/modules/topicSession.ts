@@ -9,8 +9,8 @@ import {
   castVote
 } from './forum';
 import { authorRefSelect, toAuthorRefOrNull } from './authorRef';
-import { renderSiteBBCode } from './bbcodeRender';
 import type { PageParams } from '../lib/pagination';
+import { publicPostInclude, serializeForumPost } from './forumPostView';
 
 // ─── Actor ───────────────────────────────────────────────────────────────────
 
@@ -34,39 +34,6 @@ type TopicSessionAffordances = {
 type TopicSessionReadState = {
   lastVisiblePostId: number | null;
 };
-
-// ─── Post serialization (mirrors forumPost.ts) ─────────────────────────────
-
-const publicPostInclude = {
-  author: { select: authorRefSelect },
-  edits: {
-    orderBy: { editedAt: 'desc' as const },
-    take: 1,
-    select: {
-      id: true,
-      forumPostId: true,
-      editorId: true,
-      editedAt: true,
-      editor: { select: { id: true, username: true } }
-    }
-  }
-} as const;
-
-type RawPost = Awaited<
-  ReturnType<
-    typeof prisma.forumPost.findMany<{ include: typeof publicPostInclude }>
-  >
->[number];
-
-const serializePost = async (post: RawPost) => ({
-  ...post,
-  author: toAuthorRefOrNull(post.author),
-  // Additive render-at-read: raw `body` is unchanged; `bodyHtml` is the
-  // server-rendered transcription display surfaces consume (#402).
-  bodyHtml: await renderSiteBBCode(post.body),
-  ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
-  edits: undefined
-});
 
 // ─── getTopicSession ──────────────────────────────────────────────────────────
 
@@ -141,7 +108,7 @@ export const getTopicSession = async (
     })
   ]);
 
-  const serializedPosts = await Promise.all(posts.map(serializePost));
+  const serializedPosts = await Promise.all(posts.map(serializeForumPost));
   const lastVisiblePostId =
     serializedPosts.length > 0
       ? serializedPosts[serializedPosts.length - 1].id

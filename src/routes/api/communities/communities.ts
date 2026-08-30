@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { RegistrationStatus, StatSnapshotPeriod } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { AppError } from '../../../lib/errors';
+import type { AuthenticatedRequest } from '../../../types/auth';
 import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { getCommunityHealthPulse } from '../../../modules/linkHealth';
@@ -36,6 +38,37 @@ import {
   paginationBase
 } from '../../../lib/pagination';
 import releaseRouter from './release';
+
+/**
+ * Load a community and assert the caller may administer its membership.
+ *
+ * The four membership routes — add/remove a consuming member, add/remove a
+ * curator — carried this verbatim. Unlike the collage guards, every copy here
+ * really was identical: same load, same 404, same permission pair, same 403
+ * message, so there is nothing per-route to preserve by leaving it in place.
+ *
+ * ADR-0001 keeps `communities_manage`/`admin` as explicit permission reads
+ * rather than a named role; a curator of *this* community passes on the
+ * membership edge instead, which is why the check needs the loaded row.
+ */
+const assertCommunityAdminOrCurator = async (
+  id: number,
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const community = await prisma.community.findUnique({
+    where: { id },
+    include: { curators: { select: { id: true } } }
+  });
+  if (!community) throw new AppError(404, 'Community not found');
+
+  const perms = await loadPermissions(req, res);
+  const isAdmin = !!(perms['communities_manage'] || perms['admin']);
+  const isCurator = community.curators.some((c) => c.id === req.user.id);
+  if (!isAdmin && !isCurator) throw new AppError(403, 'Permission denied');
+
+  return community;
+};
 
 const router = express.Router();
 const communityIdParamsSchema = z.object({
@@ -175,18 +208,7 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { userId } = parsedBody<{ userId: number }>(res);
 
-    const community = await prisma.community.findUnique({
-      where: { id },
-      include: { curators: { select: { id: true } } }
-    });
-    if (!community) return res.status(404).json({ msg: 'Community not found' });
-
-    const perms = await loadPermissions(req, res);
-    const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCurator = community.curators.some((c) => c.id === req.user.id);
-    if (!isAdmin && !isCurator) {
-      return res.status(403).json({ msg: 'Permission denied' });
-    }
+    await assertCommunityAdminOrCurator(id, req, res);
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
@@ -208,18 +230,7 @@ router.delete(
   authHandler(async (req, res) => {
     const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
 
-    const community = await prisma.community.findUnique({
-      where: { id },
-      include: { curators: { select: { id: true } } }
-    });
-    if (!community) return res.status(404).json({ msg: 'Community not found' });
-
-    const perms = await loadPermissions(req, res);
-    const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCurator = community.curators.some((c) => c.id === req.user.id);
-    if (!isAdmin && !isCurator) {
-      return res.status(403).json({ msg: 'Permission denied' });
-    }
+    const community = await assertCommunityAdminOrCurator(id, req, res);
 
     // This route operates on the Consumer link only. When the target also holds
     // a curator or leader role, refuse rather than partially removing them: no
@@ -259,18 +270,7 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { userId } = parsedBody<{ userId: number }>(res);
 
-    const community = await prisma.community.findUnique({
-      where: { id },
-      include: { curators: { select: { id: true } } }
-    });
-    if (!community) return res.status(404).json({ msg: 'Community not found' });
-
-    const perms = await loadPermissions(req, res);
-    const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCurator = community.curators.some((c) => c.id === req.user.id);
-    if (!isAdmin && !isCurator) {
-      return res.status(403).json({ msg: 'Permission denied' });
-    }
+    await assertCommunityAdminOrCurator(id, req, res);
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
@@ -291,18 +291,7 @@ router.delete(
   authHandler(async (req, res) => {
     const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
 
-    const community = await prisma.community.findUnique({
-      where: { id },
-      include: { curators: { select: { id: true } } }
-    });
-    if (!community) return res.status(404).json({ msg: 'Community not found' });
-
-    const perms = await loadPermissions(req, res);
-    const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-    const isCurator = community.curators.some((c) => c.id === req.user.id);
-    if (!isAdmin && !isCurator) {
-      return res.status(403).json({ msg: 'Permission denied' });
-    }
+    await assertCommunityAdminOrCurator(id, req, res);
 
     await prisma.community.update({
       where: { id },
