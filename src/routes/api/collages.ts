@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { AppError } from '../../lib/errors';
+import { getUserRankQuotas } from '../../lib/userRankAccess';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { emitNotifications } from '../../lib/notifications';
@@ -282,17 +283,17 @@ router.post(
     if (isPersonal(categoryId)) {
       const isSiteStaff = !!(perms['staff'] || perms['admin']);
       if (!isSiteStaff) {
-        const rank = await prisma.userRank.findUnique({
-          where: { id: req.user.userRankId },
-          select: { personalCollageLimit: true }
-        });
-        if (rank && rank.personalCollageLimit > 0) {
+        // Resolved across primary + secondary ranks, 0 meaning unlimited —
+        // the same resolver the auth payload advertises with, so the number a
+        // member is shown is the number enforced (#369, ADR-0032 §4).
+        const { personalCollageLimit } = await getUserRankQuotas(userId);
+        if (personalCollageLimit !== null) {
           const count = await prisma.collage.count({
             where: { userId, categoryId: 0, isDeleted: false }
           });
-          if (count >= rank.personalCollageLimit) {
+          if (count >= personalCollageLimit) {
             return res.status(400).json({
-              msg: `Personal collage limit reached (${rank.personalCollageLimit})`
+              msg: `Personal collage limit reached (${personalCollageLimit})`
             });
           }
         }

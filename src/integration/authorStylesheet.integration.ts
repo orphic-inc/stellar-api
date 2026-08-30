@@ -56,11 +56,11 @@ const activeSlotOf = async (userId: number): Promise<number | null> => {
 describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', () => {
   it('an author can save several stylesheets and list them all', async () => {
     const author = await createUser();
-    await createAuthorStylesheet(author.id, author.userRankId, {
+    await createAuthorStylesheet(author.id, {
       name: 'First',
       source: 'a {}'
     });
-    await createAuthorStylesheet(author.id, author.userRankId, {
+    await createAuthorStylesheet(author.id, {
       name: 'Second',
       source: 'b {}'
     });
@@ -77,7 +77,7 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
   it('pages through the list with a stable total (#146)', async () => {
     const author = await createUser();
     for (const name of ['One', 'Two', 'Three']) {
-      await createAuthorStylesheet(author.id, author.userRankId, {
+      await createAuthorStylesheet(author.id, {
         name,
         source: 'a {}'
       });
@@ -97,6 +97,67 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
     expect(total2).toBe(3);
   });
 
+  it('honours a donor secondary rank above the primary limit (#369)', async () => {
+    // PRD-03's "$tylesheets — donor-added slots" against a real rank set: the
+    // perk is a secondary rank, and enforcement used to read the primary alone.
+    const author = await createUser();
+    await testPrisma.userRank.update({
+      where: { id: author.userRankId },
+      data: { authorStylesheetLimit: 1 }
+    });
+    const donorRank = await testPrisma.userRank.create({
+      data: {
+        level: 150,
+        name: `Donor-${Date.now()}`,
+        permissions: {},
+        secondary: true,
+        authorStylesheetLimit: 3
+      }
+    });
+    await testPrisma.userSecondaryRank.create({
+      data: { userId: author.id, userRankId: donorRank.id }
+    });
+
+    for (const name of ['One', 'Two', 'Three']) {
+      await createAuthorStylesheet(author.id, { name, source: 'a {}' });
+    }
+    // The ceiling is the donor's 3, and the message quotes the number the
+    // member was actually advertised.
+    await expect(
+      createAuthorStylesheet(author.id, {
+        name: 'One too many',
+        source: 'b {}'
+      })
+    ).rejects.toThrow('Author stylesheet limit reached (3)');
+  });
+
+  it('an unlimited primary rank is not capped by a donor secondary (#369)', async () => {
+    // The Math.max inversion: a perk must never lower a ceiling. The seeded
+    // primary rank leaves authorStylesheetLimit at its 0 default = unlimited.
+    const author = await createUser();
+    const donorRank = await testPrisma.userRank.create({
+      data: {
+        level: 150,
+        name: `Donor-${Date.now()}`,
+        permissions: {},
+        secondary: true,
+        authorStylesheetLimit: 2
+      }
+    });
+    await testPrisma.userSecondaryRank.create({
+      data: { userId: author.id, userRankId: donorRank.id }
+    });
+
+    for (const name of ['One', 'Two', 'Three']) {
+      await createAuthorStylesheet(author.id, { name, source: 'a {}' });
+    }
+    expect(
+      await testPrisma.authorStylesheet.count({
+        where: { authorId: author.id }
+      })
+    ).toBe(3);
+  });
+
   it('rejects creation past the rank-configured registry-space limit (#146)', async () => {
     const author = await createUser();
     await testPrisma.userRank.update({
@@ -104,12 +165,12 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
       data: { authorStylesheetLimit: 1 }
     });
 
-    await createAuthorStylesheet(author.id, author.userRankId, {
+    await createAuthorStylesheet(author.id, {
       name: 'Allowed',
       source: 'a {}'
     });
     await expect(
-      createAuthorStylesheet(author.id, author.userRankId, {
+      createAuthorStylesheet(author.id, {
         name: 'One too many',
         source: 'b {}'
       })
@@ -127,7 +188,7 @@ describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
     // assert the @import was stripped and the sheet saved anyway; a save that
     // silently mutates the author's bytes is the posture that was retired.
     await expect(
-      createAuthorStylesheet(author.id, author.userRankId, {
+      createAuthorStylesheet(author.id, {
         name: 'Anorex',
         source:
           "@import url('http://evil.example/x.css'); body { color: #0f0; }"
@@ -161,7 +222,7 @@ describe('AuthorStylesheet CSS delivery (ADR-0024 §1)', () => {
     // selector for every adopter (#340).
     const source =
       'header .hover\\:text-white:hover { color: #111; }\nbody { color: #0f0; }';
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Verbatim',
       source
     });
@@ -180,7 +241,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('selecting Registry (pointer) clears a previously-set Personal URL', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -203,7 +264,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('selecting Personal (URL) clears a previously-set Registry pointer', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -228,7 +289,7 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
   it('rejects setting both sources in one write (400)', async () => {
     const author = await createUser();
     const member = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Reg',
       source: 'a {}'
     });
@@ -253,7 +314,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('adopt points the adopter Site slot at the sheet and credits the author', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Midnight',
       source: 'body { background: #000; }'
     });
@@ -288,11 +349,11 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('re-adopting the same author is idempotent — no second ledger row', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheetA = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheetA = await createAuthorStylesheet(author.id, {
       name: 'A',
       source: 'a {}'
     });
-    const sheetB = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheetB = await createAuthorStylesheet(author.id, {
       name: 'B',
       source: 'b {}'
     });
@@ -313,7 +374,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
   it('concurrent double-adopt credits the author exactly once (F1: partial unique index)', async () => {
     const author = await createUser();
     const adopter = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Race',
       source: 'r {}'
     });
@@ -337,7 +398,7 @@ describe('AuthorStylesheet adopt → score (PRD-03 #119/#120)', () => {
 
   it('self-adoption renders the sheet but credits nothing (anti-farm)', async () => {
     const author = await createUser();
-    const sheet = await createAuthorStylesheet(author.id, author.userRankId, {
+    const sheet = await createAuthorStylesheet(author.id, {
       name: 'Mine',
       source: 'c {}'
     });

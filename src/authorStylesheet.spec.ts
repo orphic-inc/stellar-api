@@ -4,7 +4,7 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeRankQuotas
 } from './test/apiTestHarness';
 
 beforeEach(() => resetApiTestState());
@@ -54,7 +54,7 @@ describe('POST /api/stylesheet/author', () => {
   });
 
   it('allows creation when authorStylesheetLimit is 0 (unlimited, default)', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank() as never); // authorStylesheetLimit: 0
+    prismaMock.user.findUnique.mockResolvedValue(makeRankQuotas() as never);
     prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
 
     const res = await request(app)
@@ -66,10 +66,9 @@ describe('POST /api/stylesheet/author', () => {
   });
 
   it('rejects creation at the rank-configured limit (400) — registry spaces (#146)', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      ...makeUserRank(),
-      authorStylesheetLimit: 1
-    } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ authorStylesheetLimit: 1 }) as never
+    );
     prismaMock.authorStylesheet.count.mockResolvedValue(1);
 
     const res = await request(app)
@@ -81,11 +80,67 @@ describe('POST /api/stylesheet/author', () => {
     expect(prismaMock.authorStylesheet.create).not.toHaveBeenCalled();
   });
 
+  it('honours a donor secondary rank above the primary limit (#369)', async () => {
+    // PRD-03's "$tylesheets — donor-added slots". The auth payload has always
+    // advertised max(primary, ...secondary); enforcement read the primary rank
+    // alone, so this member was shown 5 and refused at 3.
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas(
+        { authorStylesheetLimit: 3 },
+        { authorStylesheetLimit: 5 }
+      ) as never
+    );
+    prismaMock.authorStylesheet.count.mockResolvedValue(3);
+    prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Fourth Sheet', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('still refuses at the donor-raised ceiling', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas(
+        { authorStylesheetLimit: 3 },
+        { authorStylesheetLimit: 5 }
+      ) as never
+    );
+    prismaMock.authorStylesheet.count.mockResolvedValue(5);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Sixth Sheet', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(400);
+    // The quoted number is the one the member was advertised, not the primary.
+    expect(res.body.msg).toBe('Author stylesheet limit reached (5)');
+  });
+
+  it('lets an unlimited primary rank survive a capped donor rank (#369)', async () => {
+    // The Math.max inversion, from the enforcement side: a perk must never
+    // lower a ceiling.
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas(
+        { authorStylesheetLimit: 0 },
+        { authorStylesheetLimit: 5 }
+      ) as never
+    );
+    prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'Unbounded', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.authorStylesheet.count).not.toHaveBeenCalled();
+  });
+
   it('allows creation below the rank-configured limit', async () => {
-    prismaMock.userRank.findUnique.mockResolvedValue({
-      ...makeUserRank(),
-      authorStylesheetLimit: 2
-    } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ authorStylesheetLimit: 2 }) as never
+    );
     prismaMock.authorStylesheet.count.mockResolvedValue(1);
     prismaMock.authorStylesheet.create.mockResolvedValue(mockSheet as never);
 

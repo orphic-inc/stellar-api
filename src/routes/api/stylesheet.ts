@@ -57,11 +57,7 @@ router.post(
   validate(authorStylesheetSchema),
   authHandler(async (req, res) => {
     const data = parsedBody<AuthorStylesheetInput>(res);
-    const sheet = await createAuthorStylesheet(
-      req.user.id,
-      req.user.userRankId,
-      data
-    );
+    const sheet = await createAuthorStylesheet(req.user.id, data);
     res.status(201).json(sheet);
   })
 );

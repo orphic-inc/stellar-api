@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { computeRatio } from './ratio';
-import { computeUserRankAccess } from '../lib/userRankAccess';
+import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
 import { getDefaultStylesheetName } from './stylesheet';
 
 export const isPasswordBanned = async (password: string): Promise<boolean> => {
@@ -63,45 +63,52 @@ export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
   ratio: number;
 };
 
-export const toAuthUser = (raw: RawAuthUser): AuthUser => ({
-  ...raw,
-  userRank: {
-    ...raw.userRank,
-    permissions: computeUserRankAccess({
-      userRankId: raw.userRank.id,
-      userRank: {
-        id: raw.userRank.id,
-        level: raw.userRank.level,
-        permissions: raw.userRank.permissions,
-        permittedForumIds: []
-      },
-      secondaryRanks: raw.secondaryRanks.map((entry) => ({
-        userRankId: entry.userRankId,
+export const toAuthUser = (raw: RawAuthUser): AuthUser => {
+  const rankQuotaInputs = (
+    field: 'personalCollageLimit' | 'authorStylesheetLimit'
+  ): number[] => [
+    raw.userRank[field] ?? 0,
+    ...raw.secondaryRanks.map((entry) => entry.userRank[field] ?? 0)
+  ];
+
+  return {
+    ...raw,
+    userRank: {
+      ...raw.userRank,
+      permissions: computeUserRankAccess({
+        userRankId: raw.userRank.id,
         userRank: {
-          id: entry.userRank.id,
-          level: entry.userRank.level,
-          permissions: entry.userRank.permissions,
-          permittedForumIds: entry.userRank.permittedForumIds
-        }
-      }))
-    }).permissions,
-    personalCollageLimit: Math.max(
-      raw.userRank.personalCollageLimit ?? 0,
-      ...raw.secondaryRanks.map(
-        (entry) => entry.userRank.personalCollageLimit ?? 0
-      )
-    ),
-    authorStylesheetLimit: Math.max(
-      raw.userRank.authorStylesheetLimit ?? 0,
-      ...raw.secondaryRanks.map(
-        (entry) => entry.userRank.authorStylesheetLimit ?? 0
-      )
-    )
-  },
-  ratio: computeRatio(raw.contributed, raw.consumed),
-  contributed: raw.contributed.toString(),
-  consumed: raw.consumed.toString()
-});
+          id: raw.userRank.id,
+          level: raw.userRank.level,
+          permissions: raw.userRank.permissions,
+          permittedForumIds: []
+        },
+        secondaryRanks: raw.secondaryRanks.map((entry) => ({
+          userRankId: entry.userRankId,
+          userRank: {
+            id: entry.userRank.id,
+            level: entry.userRank.level,
+            permissions: entry.userRank.permissions,
+            permittedForumIds: entry.userRank.permittedForumIds
+          }
+        }))
+      }).permissions,
+      // Resolved across primary + secondary ranks, with 0 meaning unlimited.
+      // The wire keeps representing unlimited as 0, which is what it has always
+      // meant here — resolveRankQuota's null is the internal spelling only.
+      // Math.max alone inverted the semantic: an unlimited primary rank plus a
+      // donor secondary of 5 advertised 5, i.e. a perk that *lowered* a ceiling
+      // (#369). Enforcement reads the same resolver via getUserRankQuotas.
+      personalCollageLimit:
+        resolveRankQuota(rankQuotaInputs('personalCollageLimit')) ?? 0,
+      authorStylesheetLimit:
+        resolveRankQuota(rankQuotaInputs('authorStylesheetLimit')) ?? 0
+    },
+    ratio: computeRatio(raw.contributed, raw.consumed),
+    contributed: raw.contributed.toString(),
+    consumed: raw.consumed.toString()
+  };
+};
 
 type RegisterResult =
   | {

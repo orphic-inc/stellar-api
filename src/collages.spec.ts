@@ -3,7 +3,8 @@ import {
   app,
   resetApiTestState,
   prismaMock,
-  makeUserRank
+  makeUserRank,
+  makeRankQuotas
 } from './test/apiTestHarness';
 import {
   makeCollage,
@@ -124,6 +125,9 @@ describe('POST /api/collages', () => {
       ...makeUserRank(),
       personalCollageLimit: 1
     } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ personalCollageLimit: 1 }) as never
+    );
     prismaMock.collage.findFirst.mockResolvedValue(null);
     prismaMock.collage.count.mockResolvedValue(1);
 
@@ -144,6 +148,56 @@ describe('POST /api/collages', () => {
 
     const res = await request(app).post('/api/collages').send({
       name: 'Unlimited Personal',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.collage.count).not.toHaveBeenCalled();
+  });
+
+  it('honours a donor secondary rank above the primary collage limit (#369)', async () => {
+    // personalCollageLimit carried the identical bug to authorStylesheetLimit
+    // and is the precedent the stylesheet code was written to mirror.
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      personalCollageLimit: 1
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas(
+        { personalCollageLimit: 1 },
+        { personalCollageLimit: 4 }
+      ) as never
+    );
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.count.mockResolvedValue(1);
+    prismaMock.collage.create.mockResolvedValue(makeCollage({ categoryId: 0 }));
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'Donor Personal Collage',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('lets an unlimited primary rank survive a capped donor rank (#369)', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      personalCollageLimit: 0
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas(
+        { personalCollageLimit: 0 },
+        { personalCollageLimit: 2 }
+      ) as never
+    );
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.create.mockResolvedValue(makeCollage({ categoryId: 0 }));
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'Unbounded Personal Collage',
       description: 'A sufficiently long description for testing purposes.',
       categoryId: 0
     });
@@ -175,6 +229,9 @@ describe('POST /api/collages', () => {
       ...makeUserRank({ collages_moderate: true }),
       personalCollageLimit: 1
     } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ personalCollageLimit: 1 }) as never
+    );
     prismaMock.collage.findFirst.mockResolvedValue(null);
     prismaMock.collage.count.mockResolvedValue(1);
 

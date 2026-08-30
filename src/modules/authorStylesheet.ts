@@ -15,6 +15,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError, FieldError } from '../lib/errors';
+import { getUserRankQuotas } from '../lib/userRankAccess';
 import { cssValidate, formatCssViolations } from '../lib/cssValidate';
 import { scoreStylesheetSelection } from './stylesheetScore';
 import type { AuthorStylesheetInput } from '../schemas/stylesheet';
@@ -24,9 +25,14 @@ import type { PageParams } from '../lib/pagination';
  * Create a new AuthorStylesheet for the calling author (many per author),
  * gated by the author's rank-configured registry-space count (#146,
  * `UserRank.authorStylesheetLimit`, mirroring `personalCollageLimit`'s
- * 0-means-unlimited shape). `userRankId` is the caller's primary rank —
- * passed in rather than re-derived here, same scope as the collage-limit
- * precedent (secondary ranks are not consulted).
+ * 0-means-unlimited shape).
+ *
+ * The quota is resolved across the author's **primary and secondary ranks**
+ * (ADR-0032 §4). This previously read the primary rank alone while `toAuthUser`
+ * advertised the maximum across both, so PRD-03's donor-added slots — which are
+ * modelled as a secondary rank — read as granted and enforced as absent: a donor
+ * was shown 5, allowed 3, and refused with a number they had never been told
+ * (#369). `getUserRankQuotas` is now the single resolver behind both.
  *
  * `source` is validated at store-time and stored **verbatim** (ADR-0031 §5): the
  * boundary rejects an unsafe sheet rather than cleaning it, so the bytes on disk
@@ -34,21 +40,17 @@ import type { PageParams } from '../lib/pagination';
  */
 export const createAuthorStylesheet = async (
   authorId: number,
-  userRankId: number,
   input: AuthorStylesheetInput
 ) => {
-  const rank = await prisma.userRank.findUnique({
-    where: { id: userRankId },
-    select: { authorStylesheetLimit: true }
-  });
-  if (rank && rank.authorStylesheetLimit > 0) {
+  const { authorStylesheetLimit } = await getUserRankQuotas(authorId);
+  if (authorStylesheetLimit !== null) {
     const count = await prisma.authorStylesheet.count({
       where: { authorId }
     });
-    if (count >= rank.authorStylesheetLimit) {
+    if (count >= authorStylesheetLimit) {
       throw new AppError(
         400,
-        `Author stylesheet limit reached (${rank.authorStylesheetLimit})`
+        `Author stylesheet limit reached (${authorStylesheetLimit})`
       );
     }
   }
