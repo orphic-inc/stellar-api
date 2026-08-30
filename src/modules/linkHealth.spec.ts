@@ -26,6 +26,15 @@ jest.mock('./pm', () => ({
   sendSystemMessage: jest.fn().mockResolvedValue({ ok: true })
 }));
 
+// The egress guard is stubbed permissive by default so these tests keep
+// exercising link-health's own logic rather than DNS — the fixture URLs use the
+// reserved `.test` TLD, which by design never resolves. The guard's own rules
+// are covered in `lib/ssrfGuard.spec.ts`; the one case wired back through here
+// is the refusal path, which belongs to checkUrl rather than to the guard.
+jest.mock('../lib/ssrfGuard', () => ({
+  checkPublicUrl: jest.fn()
+}));
+
 import {
   sweepStaleWarnLinks,
   checkContributionLink,
@@ -34,8 +43,16 @@ import {
   applyHealthAccrual
 } from './linkHealth';
 import { sendSystemMessage } from './pm';
+import { checkPublicUrl } from '../lib/ssrfGuard';
 
 const mockSendSystemMessage = sendSystemMessage as jest.Mock;
+const mockCheckPublicUrl = checkPublicUrl as jest.Mock;
+
+/** Default the guard to "allow", echoing back the URL checkUrl handed it. */
+const allowAllUrls = () =>
+  mockCheckPublicUrl.mockImplementation((raw: string) =>
+    Promise.resolve({ ok: true, url: new URL(raw) })
+  );
 
 // ─── sweepStaleWarnLinks ──────────────────────────────────────────────────────
 
@@ -122,7 +139,10 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
   beforeAll(() => {
     (global as unknown as { fetch: jest.Mock }).fetch = fetchMock;
   });
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    allowAllUrls();
+  });
 
   it('stamps the change when status flips (WARN → PASS)', async () => {
     mockPrismaContribution.findUnique.mockResolvedValue({
@@ -191,6 +211,87 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     expect(data.healthySince).toBeNull();
     // Banked = prior 1000ms + the elapsed open segment (> 0).
     expect(data.healthyMs).toBeGreaterThan(1000n);
+  });
+
+  it('records FAIL without dialling when the guard refuses the URL', async () => {
+    mockPrismaContribution.findUnique.mockResolvedValue({
+      downloadUrl: 'http://169.254.169.254/latest/meta-data/',
+      linkStatus: 'PASS',
+      linkStatusChangedAt: new Date('2020-01-01'),
+      healthyMs: 0n,
+      healthySince: null
+    });
+    mockCheckPublicUrl.mockResolvedValue({
+      ok: false,
+      reason: "address '169.254.169.254' is not publicly routable"
+    });
+
+    await checkContributionLink(5);
+
+    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    expect(data.linkStatus).toBe('FAIL');
+    // The point of the guard: no socket is opened at all.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('re-guards each redirect hop, so a 302 into blocked space is refused', async () => {
+    mockPrismaContribution.findUnique.mockResolvedValue({
+      downloadUrl: 'http://example.test/x',
+      linkStatus: 'PASS',
+      linkStatusChangedAt: new Date('2020-01-01'),
+      healthyMs: 0n,
+      healthySince: null
+    });
+    // First hop is a public host that answers with a redirect inward.
+    mockCheckPublicUrl
+      .mockResolvedValueOnce({
+        ok: true,
+        url: new URL('http://example.test/x')
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        reason: "address '169.254.169.254' is not publicly routable"
+      });
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 302,
+      headers: { get: () => 'http://169.254.169.254/latest/meta-data/' }
+    });
+
+    await checkContributionLink(5);
+
+    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    expect(data.linkStatus).toBe('FAIL');
+    // Both hops were checked, and the second was never dialled.
+    expect(mockCheckPublicUrl).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows a redirect that stays in public space', async () => {
+    mockPrismaContribution.findUnique.mockResolvedValue({
+      downloadUrl: 'http://example.test/x',
+      linkStatus: 'WARN',
+      linkStatusChangedAt: new Date('2020-01-01'),
+      healthyMs: 0n,
+      healthySince: null
+    });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 301,
+        // Relative Location, resolved against the hop that issued it.
+        headers: { get: () => '/moved' }
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await checkContributionLink(5);
+
+    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    expect(data.linkStatus).toBe('PASS');
+    expect(mockCheckPublicUrl).toHaveBeenNthCalledWith(
+      2,
+      'http://example.test/moved'
+    );
   });
 });
 
