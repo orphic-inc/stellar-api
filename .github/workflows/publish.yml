@@ -108,13 +108,27 @@ jobs:
           && !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           # pipefail: the default shell is `bash -e` without it, so a failing
           # `gh api` would be masked by the exit code of the script it pipes into.
           set -o pipefail
+          # The base branch's CHANGELOG.md, for the preservation half of the gate
+          # (does this PR still have everyone else's [Unreleased] entries?). It
+          # comes from the API for the same reason the file list does: no job
+          # here sets `fetch-depth`, so the base commit is not in the local
+          # object store. `Accept: …raw` returns the file body directly, which
+          # avoids decoding the base64 `.content` field and its embedded
+          # newlines. Passed to the script by PATH, never a second pipe — there
+          # is one fd 0 and check-changelog.ts has broken on it twice.
+          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$BASE_SHA" \
+            -H 'Accept: application/vnd.github.raw' \
+            > "$RUNNER_TEMP/changelog-base.md"
           gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
             --paginate --jq '.[].filename' \
-            | CHANGELOG_STDIN=1 npm run changelog:check --silent
+            | CHANGELOG_STDIN=1 \
+              CHANGELOG_BASE_FILE="$RUNNER_TEMP/changelog-base.md" \
+              npm run changelog:check --silent
 
   # Split from `test` (#306): the integration suite is DB-bound (~4.5 min) and
   # was the long pole of the required check. Running it in parallel cuts the
