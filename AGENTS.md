@@ -80,14 +80,20 @@ What the hook does **not** cover, run yourself before committing:
 squash are both disabled on the repo, and `main` requires **linear history**.
 Two rules follow:
 
-- **Update a feature branch with `git rebase origin/main`, never `git merge
+- **Update a feature branch with `git rebase origin/main`, not `git merge
 main`.** A merge commit in the branch makes GitHub **refuse to
   rebase-and-merge it** ("this branch cannot be rebased"), and the admin bypass
-  only waives the _review_ requirement, not rebase feasibility. If a branch
-  already has a merge commit, rebase it onto `origin/main` (dropping the merge),
-  re-run the gate, and `git push --force-with-lease`. Note this includes
+  only waives the _review_ requirement, not rebase feasibility. This includes
   GitHub's **"Update branch"** button, which creates a merge commit by default —
-  use "Update with rebase" if you use it at all.
+  choose "Update with rebase" if you use it.
+
+  **If a branch already has a merge commit**, the way out is
+  `git rebase origin/main` (which drops it), re-run the gate, then
+  `git push --force-with-lease`. If a rebase is genuinely impractical — a
+  long-lived branch with deep repeated conflicts — say so on the PR and agree an
+  approach, rather than merging `main` in to settle the conflicts: that
+  forecloses the only merge method the repo accepts.
+
 - **Rebase right before requesting the merge** so a moving `main` doesn't
   surprise you mid-merge.
 
