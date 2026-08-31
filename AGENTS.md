@@ -104,7 +104,7 @@ src/
   app.ts                    # createApp() factory — Express setup, route mounting, error handler (testable)
   modules/
     config.ts               # Typed env config (auth, logging, http)
-    asyncHandler.ts         # Wraps async routes; catches errors, 10s timeout
+    asyncHandler.ts         # Wraps async routes; forwards rejections to next() (no timeout)
     installState.ts         # In-memory cache for isInstalled() check
     logging.ts              # Winston logger factory (JSON in prod, pretty in dev)
     bbcodeRender.ts         # renderSiteBBCode/withBodyHtml — wires the app prisma+siteUrl into lib/bbcode; the render-at-read seam every prose surface uses (#402)

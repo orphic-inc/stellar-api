@@ -45,7 +45,9 @@ export const createAuthorStylesheet = async (
   const { authorStylesheetLimit } = await getUserRankQuotas(authorId);
   if (authorStylesheetLimit !== null) {
     const count = await prisma.authorStylesheet.count({
-      where: { authorId }
+      // Withdrawn sheets do not occupy a registry space — this filter is what
+      // makes the quota reclaimable rather than a one-way ratchet (#368).
+      where: { authorId, deletedAt: null }
     });
     if (count >= authorStylesheetLimit) {
       throw new AppError(
@@ -82,6 +84,69 @@ export const assertSafeSource = (source: string): void => {
 };
 
 /**
+ * Edit a sheet in place (ADR-0032 §2, #368). Author-scoped.
+ *
+ * Edits propagate live to every adopter, which is intended rather than
+ * tolerated: sheet identity is a stable id while content varies, and #350
+ * settled that adoption tracks the author's edits. It is also why the `/css`
+ * route sets `Cache-Control: no-cache` — a comment that has claimed sheets are
+ * "mutable (authors edit in place)" since before any edit path existed.
+ *
+ * Same validator call site as create. `assertSafeSource` was written expecting
+ * this ("shared by create and any future edit path"), so an edit cannot smuggle
+ * past the ADR-0031 boundary that a create is held to.
+ */
+export const updateAuthorStylesheet = async (
+  id: number,
+  authorId: number,
+  input: AuthorStylesheetInput
+) => {
+  const existing = await prisma.authorStylesheet.findFirst({
+    where: { id, deletedAt: null },
+    select: { authorId: true }
+  });
+  if (!existing) throw new AppError(404, 'Author stylesheet not found');
+  if (existing.authorId !== authorId)
+    throw new AppError(403, 'Not your stylesheet');
+
+  assertSafeSource(input.source);
+
+  return prisma.authorStylesheet.update({
+    where: { id },
+    data: { name: input.name, source: input.source }
+  });
+};
+
+/**
+ * Withdraw a sheet (ADR-0032 §3, #368). Author-scoped, soft.
+ *
+ * Frees the author's registry space — the quota #146 enforces had no release
+ * path, making it a one-way ratchet — while leaving existing adopters' sites
+ * untouched, because `getAuthorStylesheetCss` alone ignores `deletedAt`.
+ *
+ * The CRS ledger is deliberately untouched. `CRS_STYLESHEET_ADOPTION` rows stay:
+ * those adoptions were earned, and PRD-03's marginal tier table already eases an
+ * author's score down as live counts fall rather than re-rating history.
+ *
+ * Idempotent by filter: withdrawing an already-withdrawn sheet 404s rather than
+ * moving `deletedAt`, so the timestamp records the first withdrawal.
+ */
+export const deleteAuthorStylesheet = async (id: number, authorId: number) => {
+  const existing = await prisma.authorStylesheet.findFirst({
+    where: { id, deletedAt: null },
+    select: { authorId: true }
+  });
+  if (!existing) throw new AppError(404, 'Author stylesheet not found');
+  if (existing.authorId !== authorId)
+    throw new AppError(403, 'Not your stylesheet');
+
+  await prisma.authorStylesheet.update({
+    where: { id },
+    data: { deletedAt: new Date() }
+  });
+};
+
+/**
  * List an author's stylesheets, oldest first, paginated (#146) — **metadata
  * only** (ADR-0024 §1). `source` never rides a list payload; it is delivered
  * as `text/css` through the per-id `/css` route so there is exactly one path
@@ -90,7 +155,7 @@ export const assertSafeSource = (source: string): void => {
 export const listAuthorStylesheets = (authorId: number, pg: PageParams) =>
   Promise.all([
     prisma.authorStylesheet.findMany({
-      where: { authorId },
+      where: { authorId, deletedAt: null },
       orderBy: { createdAt: 'asc' },
       skip: pg.skip,
       take: pg.limit,
@@ -102,7 +167,9 @@ export const listAuthorStylesheets = (authorId: number, pg: PageParams) =>
         updatedAt: true
       }
     }),
-    prisma.authorStylesheet.count({ where: { authorId } })
+    // Same filter on the total: the paginated envelope's `total` is what a UI
+    // renders as "n of N spaces used", so it must agree with the quota count.
+    prisma.authorStylesheet.count({ where: { authorId, deletedAt: null } })
   ]);
 
 /**
@@ -118,12 +185,18 @@ export const listAuthorStylesheets = (authorId: number, pg: PageParams) =>
  * shipped and cannot be enforced without breaking adoption.
  */
 export const getAuthorStylesheetById = (id: number) =>
-  prisma.authorStylesheet.findUnique({ where: { id } });
+  prisma.authorStylesheet.findFirst({ where: { id, deletedAt: null } });
 
 /**
  * Read just the sanitized `source` for CSS delivery (ADR-0024 §1). Kept lean —
  * the `/css` route serves the body verbatim as `text/css`, so nothing else is
  * selected. Null if the sheet does not exist.
+ *
+ * **Deliberately does NOT filter `deletedAt`** — the one read path that does not
+ * (#368, ADR-0032 §3). This asymmetry is the entire reason withdrawal is a soft
+ * delete: an author freeing a registry space must not change the site under
+ * someone who adopted their sheet. Every other path hides a withdrawn sheet;
+ * this one keeps serving its bytes to whoever already points at it.
  */
 export const getAuthorStylesheetCss = (id: number) =>
   prisma.authorStylesheet.findUnique({
@@ -159,8 +232,11 @@ export const adoptAuthorStylesheet = async (
   adopterId: number,
   stylesheetId: number
 ): Promise<AdoptionResult> => {
-  const sheet = await prisma.authorStylesheet.findUnique({
-    where: { id: stylesheetId }
+  // Withdrawn sheets cannot be newly adopted (#368) — existing adopters keep
+  // rendering via `/css`, but the sheet is gone from every discovery path, so
+  // arriving here for one means a stale id rather than a live choice.
+  const sheet = await prisma.authorStylesheet.findFirst({
+    where: { id: stylesheetId, deletedAt: null }
   });
   if (!sheet) throw new AppError(404, 'Author stylesheet not found');
 

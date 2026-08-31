@@ -168,10 +168,12 @@ describe('GET /api/stylesheet/author/:userId', () => {
     expect(res.body.data).toHaveLength(1);
     expect(res.body.meta.total).toBe(1);
     expect(prismaMock.authorStylesheet.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { authorId: 5 } })
+      expect.objectContaining({ where: { authorId: 5, deletedAt: null } })
     );
     expect(prismaMock.authorStylesheet.count).toHaveBeenCalledWith({
-      where: { authorId: 5 }
+      // Same filter as the rows: the paginated total is what a UI renders as
+      // spaces-used, so a withdrawn sheet must not inflate it (#368).
+      where: { authorId: 5, deletedAt: null }
     });
   });
 
@@ -231,24 +233,20 @@ describe('GET /api/stylesheet/author/:userId', () => {
 
 describe('GET /api/stylesheet/author-stylesheet/:id', () => {
   it('reads one authored stylesheet', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(
-      mockSheet as never
-    );
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(mockSheet as never);
     const res = await request(app).get('/api/stylesheet/author-stylesheet/1');
     expect(res.status).toBe(200);
     expect(res.body.source).toBe('body { background: #000; }');
   });
 
   it('404s when the stylesheet does not exist', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(null);
     const res = await request(app).get('/api/stylesheet/author-stylesheet/999');
     expect(res.status).toBe(404);
   });
 
   it('does not collide with GET /:id (author segment routed first)', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(
-      mockSheet as never
-    );
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(mockSheet as never);
     await request(app).get('/api/stylesheet/author-stylesheet/1');
     // The site-stylesheet /:id handler must not have run.
     expect(prismaMock.stylesheet.findUnique).not.toHaveBeenCalled();
@@ -295,6 +293,112 @@ describe('GET /api/stylesheet/author-stylesheet/:id/css', () => {
 
 // ─── POST /api/stylesheet/author-stylesheet/:id/adopt ─────────────────────────
 
+describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
+  it('edits a sheet the caller authored', async () => {
+    // The default authed user is id 7 (apiTestHarness).
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 7
+    } as never);
+    prismaMock.authorStylesheet.update.mockResolvedValue({
+      ...mockSheet,
+      name: 'Renamed'
+    } as never);
+
+    const res = await request(app)
+      .put('/api/stylesheet/author-stylesheet/1')
+      .send({ name: 'Renamed', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Renamed');
+  });
+
+  it("403s on someone else's sheet", async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 999
+    } as never);
+
+    const res = await request(app)
+      .put('/api/stylesheet/author-stylesheet/1')
+      .send({ name: 'Hijack', source: 'body {}' });
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+  });
+
+  it('holds an edit to the same store-time boundary as a create', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 7
+    } as never);
+
+    const res = await request(app)
+      .put('/api/stylesheet/author-stylesheet/1')
+      .send({
+        name: 'Sneaky',
+        source: 'a { background: url("javascript:alert(1)"); }'
+      });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+  });
+
+  it('404s on a withdrawn sheet — the edit path filters deletedAt', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/stylesheet/author-stylesheet/1')
+      .send({ name: 'Gone', source: 'body {}' });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
+  it('withdraws a sheet the caller authored, soft', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 7
+    } as never);
+    prismaMock.authorStylesheet.update.mockResolvedValue({} as never);
+
+    const res = await request(app).delete(
+      '/api/stylesheet/author-stylesheet/1'
+    );
+
+    expect(res.status).toBe(204);
+    // Soft: the row is stamped, never removed — an adopter still points at it.
+    expect(prismaMock.authorStylesheet.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 1 },
+        data: { deletedAt: expect.any(Date) }
+      })
+    );
+    expect(prismaMock.authorStylesheet.delete).not.toHaveBeenCalled();
+  });
+
+  it("403s on someone else's sheet", async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 999
+    } as never);
+
+    const res = await request(app).delete(
+      '/api/stylesheet/author-stylesheet/1'
+    );
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+  });
+
+  it('404s on an already-withdrawn sheet, leaving the first timestamp', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).delete(
+      '/api/stylesheet/author-stylesheet/1'
+    );
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
   beforeEach(() => {
     // The Site-slot pointer update and the ledger write are no longer wrapped
@@ -305,9 +409,7 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
   });
 
   it('adopts a cross-user sheet: points the Site slot + credits the author', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(
-      mockSheet as never
-    );
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(mockSheet as never);
 
     const res = await request(app).post(
       '/api/stylesheet/author-stylesheet/1/adopt'
@@ -337,9 +439,7 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
   });
 
   it('is idempotent: a duplicate (adopter, author) pair (P2002) is not a second credit', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(
-      mockSheet as never
-    );
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(mockSheet as never);
     // The partial unique index rejects the second insert; the module swallows
     // P2002 and reports scored: false rather than double-crediting the author.
     prismaMock.economyTransaction.create.mockRejectedValue(
@@ -360,7 +460,7 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
 
   it('self-adoption renders but credits nothing (anti-farm)', async () => {
     // authorId 7 === the adopter → scoreStylesheetSelection returns author: null.
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue({
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
       ...mockSheet,
       authorId: 7
     } as never);
@@ -376,7 +476,7 @@ describe('POST /api/stylesheet/author-stylesheet/:id/adopt', () => {
   });
 
   it('404s when adopting a non-existent stylesheet', async () => {
-    prismaMock.authorStylesheet.findUnique.mockResolvedValue(null);
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue(null);
     const res = await request(app).post(
       '/api/stylesheet/author-stylesheet/999/adopt'
     );

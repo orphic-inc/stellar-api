@@ -671,6 +671,13 @@ model AuthorStylesheet {
   author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
   name      String
   source    String
+  /// Soft delete (ADR-0032 §3, #368). Withdrawing a sheet must free the author's
+  /// registry space without changing the site under an existing adopter, so the
+  /// row stays and `/css` keeps serving its bytes; every *other* read path
+  /// filters it out. Hard delete was rejected because an adopter's active slot
+  /// points here, and refuse-while-adopted because it makes withdrawal a
+  /// permission other members hold over you.
+  deletedAt DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   adopters  UserSettings[]

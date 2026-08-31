@@ -34,7 +34,9 @@ import {
   listAuthorStylesheets,
   getAuthorStylesheetById,
   getAuthorStylesheetCss,
-  adoptAuthorStylesheet
+  adoptAuthorStylesheet,
+  updateAuthorStylesheet,
+  deleteAuthorStylesheet
 } from '../../modules/authorStylesheet';
 import { prisma } from '../../lib/prisma';
 
@@ -89,6 +91,34 @@ router.get(
       return;
     }
     res.json(sheet);
+  })
+);
+
+// PUT /api/stylesheet/author-stylesheet/:id — edit a sheet in place (ADR-0032
+// §2). Author-scoped; edits propagate live to every adopter (#350).
+router.put(
+  '/author-stylesheet/:id',
+  requireAuth,
+  validateParams(stylesheetIdParamsSchema),
+  validate(authorStylesheetSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const data = parsedBody<AuthorStylesheetInput>(res);
+    res.json(await updateAuthorStylesheet(id, req.user.id, data));
+  })
+);
+
+// DELETE /api/stylesheet/author-stylesheet/:id — withdraw a sheet (ADR-0032 §3).
+// Author-scoped and soft: frees the registry space, and existing adopters keep
+// rendering because only the /css route ignores deletedAt.
+router.delete(
+  '/author-stylesheet/:id',
+  requireAuth,
+  validateParams(stylesheetIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    await deleteAuthorStylesheet(id, req.user.id);
+    res.status(204).send();
   })
 );
 

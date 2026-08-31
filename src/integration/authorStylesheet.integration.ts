@@ -1,6 +1,9 @@
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import {
   createAuthorStylesheet,
+  updateAuthorStylesheet,
+  deleteAuthorStylesheet,
+  getAuthorStylesheetById,
   listAuthorStylesheets,
   getAuthorStylesheetCss,
   adoptAuthorStylesheet
@@ -307,6 +310,158 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
     await expect(
       updateProfile(member.id, { activeAuthorStylesheetId: 999999 })
     ).rejects.toBeInstanceOf(AppError);
+  });
+});
+
+describe('AuthorStylesheet lifecycle — edit + withdraw (ADR-0032 §2/§3, #368)', () => {
+  it('edits in place, and the change reaches an existing adopter', () => {
+    // #350: adoption tracks the author's edits. Sheet identity is a stable id
+    // while content varies, which is why the /css route sets no-cache.
+    return (async () => {
+      const author = await createUser();
+      const adopter = await createUser();
+      const sheet = await createAuthorStylesheet(author.id, {
+        name: 'Before',
+        source: 'a { color: red; }'
+      });
+      await adoptAuthorStylesheet(adopter.id, sheet.id);
+
+      await updateAuthorStylesheet(sheet.id, author.id, {
+        name: 'After',
+        source: 'a { color: blue; }'
+      });
+
+      const served = await getAuthorStylesheetCss(sheet.id);
+      expect(served?.source).toBe('a { color: blue; }');
+      expect(await activeSlotOf(adopter.id)).toBe(sheet.id);
+    })();
+  });
+
+  it('refuses an edit from someone who is not the author', async () => {
+    const author = await createUser();
+    const stranger = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Mine',
+      source: 'a {}'
+    });
+
+    await expect(
+      updateAuthorStylesheet(sheet.id, stranger.id, {
+        name: 'Yours now',
+        source: 'b {}'
+      })
+    ).rejects.toThrow('Not your stylesheet');
+  });
+
+  it('holds an edit to the same ADR-0031 boundary as a create', async () => {
+    const author = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Clean',
+      source: 'a {}'
+    });
+
+    // The edit path must not be a way around the store-time validator.
+    await expect(
+      updateAuthorStylesheet(sheet.id, author.id, {
+        name: 'Sneaky',
+        source: 'a { background: url("javascript:alert(1)"); }'
+      })
+    ).rejects.toThrow();
+  });
+
+  it('withdrawal frees the registry space but keeps serving existing adopters', async () => {
+    // The load-bearing asymmetry: every read path hides a withdrawn sheet
+    // except /css, which is the whole reason this is a soft delete.
+    const author = await createUser();
+    const adopter = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Withdrawn',
+      source: 'a { color: green; }'
+    });
+    await adoptAuthorStylesheet(adopter.id, sheet.id);
+
+    await deleteAuthorStylesheet(sheet.id, author.id);
+
+    // Still rendering for the adopter who already points at it.
+    const served = await getAuthorStylesheetCss(sheet.id);
+    expect(served?.source).toBe('a { color: green; }');
+    expect(await activeSlotOf(adopter.id)).toBe(sheet.id);
+
+    // Gone from the list, and from the total the quota reads.
+    const [rows, total] = await listAuthorStylesheets(author.id, page());
+    expect(rows).toHaveLength(0);
+    expect(total).toBe(0);
+
+    // Gone from the edit-path read.
+    expect(await getAuthorStylesheetById(sheet.id)).toBeNull();
+
+    // And cannot be newly adopted by anyone else.
+    const latecomer = await createUser();
+    await expect(adoptAuthorStylesheet(latecomer.id, sheet.id)).rejects.toThrow(
+      'Author stylesheet not found'
+    );
+  });
+
+  it('withdrawal releases a space the rank quota was holding', async () => {
+    // #146 enforced a ceiling with no way to free one — a one-way ratchet.
+    const author = await createUser();
+    await testPrisma.userRank.update({
+      where: { id: author.userRankId },
+      data: { authorStylesheetLimit: 1 }
+    });
+
+    const first = await createAuthorStylesheet(author.id, {
+      name: 'One',
+      source: 'a {}'
+    });
+    await expect(
+      createAuthorStylesheet(author.id, { name: 'Two', source: 'b {}' })
+    ).rejects.toThrow('Author stylesheet limit reached (1)');
+
+    await deleteAuthorStylesheet(first.id, author.id);
+
+    // The space is reclaimable now, which is the point of filtering the count.
+    const second = await createAuthorStylesheet(author.id, {
+      name: 'Two',
+      source: 'b {}'
+    });
+    expect(second.id).not.toBe(first.id);
+  });
+
+  it('leaves the CRS ledger alone when a sheet is withdrawn', async () => {
+    // Those adoptions were earned. PRD-03's marginal tier table eases an
+    // author's score down as live counts fall; it does not re-rate history.
+    const author = await createUser();
+    const adopter = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Earned',
+      source: 'a {}'
+    });
+    await adoptAuthorStylesheet(adopter.id, sheet.id);
+
+    const before = await testPrisma.economyTransaction.count({
+      where: { reason: 'CRS_STYLESHEET_ADOPTION' }
+    });
+    await deleteAuthorStylesheet(sheet.id, author.id);
+    const after = await testPrisma.economyTransaction.count({
+      where: { reason: 'CRS_STYLESHEET_ADOPTION' }
+    });
+
+    expect(before).toBe(1);
+    expect(after).toBe(1);
+  });
+
+  it('refuses a withdrawal from someone who is not the author', async () => {
+    const author = await createUser();
+    const stranger = await createUser();
+    const sheet = await createAuthorStylesheet(author.id, {
+      name: 'Mine',
+      source: 'a {}'
+    });
+
+    await expect(deleteAuthorStylesheet(sheet.id, stranger.id)).rejects.toThrow(
+      'Not your stylesheet'
+    );
   });
 });
 
