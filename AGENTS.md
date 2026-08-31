@@ -101,6 +101,34 @@ main`.** A merge commit in the branch makes GitHub **refuse to
 usually means "not yet reviewed", not "broken" — check the actual check runs
 before concluding a branch is failing.
 
+- **A stacked PR retargeted to `main` gets no CI at all**, and this is the one
+  case where `BLOCKED` means neither "unreviewed" nor "failing". `publish.yml`
+  filters `pull_request` on `branches: [main]`, and that filter reads the
+  **base** branch — so every push made while the base was still another feature
+  branch is filtered out, and `gh pr edit <n> --base main` fires an `edited`
+  event, which the workflow does not listen for. `test` and `integration` are
+  required checks, so no check run gets created for them and the PR blocks on
+  checks GitHub did not queue. This hit #466: zero Actions runs on its head SHA
+  (the hash `gh pr view --json headRefOid` reports) and a single green Codacy,
+  which reads as "mostly green" at a glance.
+
+  **A PR that targeted `main` from the outset is unaffected** — the base filter
+  passes, and every push runs CI as normal. This is specifically a hazard of
+  stacking, so it applies only when a base actually changed.
+
+  **After any base retarget, close and reopen the PR** — `reopened` _is_ in the
+  workflow's trigger types, and by then the base is `main`. Confirm the checks
+  exist rather than assuming, since "absent" and "passing" look alike in a
+  summary view:
+
+  ```bash
+  gh api repos/orphic-inc/stellar-api/commits/<head-sha>/check-runs \
+    --jq '.check_runs[].name'
+  ```
+
+  Expect `test` and `integration` in that list. If Codacy is the only name
+  returned, no workflow run exists for that commit.
+
 ## Environment
 
 Copy `.env.default` → `.env`.
