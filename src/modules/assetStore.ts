@@ -144,3 +144,15 @@ export const uploadAsset = async (
 
 /** The public serve route for a stored asset, by content address. */
 export const assetUrl = (hash: string): string => `/api/asset/${hash}`;
+
+/**
+ * The exact shape `assetUrl` produces, anchored — a whole string that is a
+ * content address and nothing else. Lives next to its producer so the two cannot
+ * drift: a validator that accepts a form `assetUrl` no longer emits would let a
+ * member store an avatar path the serve route never resolves.
+ *
+ * Distinct from `assetSweep`'s ASSET_REF, which is unanchored and global because
+ * it hunts references *inside* a larger blob of text. This one answers "is this
+ * whole string an asset address", which is the question a field validator asks.
+ */
+export const ASSET_PATH = /^\/api\/asset\/[0-9a-f]{64}$/;

@@ -927,6 +927,34 @@ describe('API auth/profile/user flows', () => {
     expect(res.body.avatar).toBe('https://example.com/avatar.png');
   });
 
+  // #396. This route is the OTHER avatar write path, and until now the laxer one:
+  // `userSettingsSchema.avatar` was a bare `z.string()`, so it accepted anything
+  // while PUT /api/profile/me at least required a URL. #361 named only the profile
+  // schema; a boundary on one of two doors is not a boundary.
+  it.each([
+    ['asset store path', `/api/asset/${'a'.repeat(64)}`],
+    ['empty (clears the slot)', '']
+  ])('accepts a %s avatar on /api/users/settings', async (_s, avatar) => {
+    updateUserSettingsMock.mockResolvedValue({ avatar } as never);
+
+    const res = await request(app).put('/api/users/settings').send({ avatar });
+
+    expect(res.status).toBe(200);
+    expect(updateUserSettingsMock).toHaveBeenCalledWith(7, { avatar });
+  });
+
+  it.each([
+    ['http', 'http://example.com/avatar.png'],
+    ['ftp', 'ftp://example.com/avatar.png'],
+    // The pre-#396 hole in its plainest form: this route took any string at all.
+    ['bare string', 'not-a-url']
+  ])('rejects a %s avatar on /api/users/settings (400)', async (_s, avatar) => {
+    const res = await request(app).put('/api/users/settings').send({ avatar });
+
+    expect(res.status).toBe(400);
+    expect(updateUserSettingsMock).not.toHaveBeenCalled();
+  });
+
   it('rejects admin user creation without users_edit permission', async () => {
     const res = await request(app).post('/api/users').send({
       username: 'new-user',

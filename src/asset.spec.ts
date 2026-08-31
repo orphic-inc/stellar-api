@@ -116,6 +116,48 @@ describe('POST /api/asset', () => {
       assetLimit
     } as never);
 
+  // #396 made `Avatar` the second uploadable kind. The param is a label on the
+  // bytes, not a permission — these pin that it reaches the stored row, that the
+  // pre-#396 caller who sends no param is unaffected, and that the enum is closed.
+  it('stores an Avatar when ?kind=Avatar is given', async () => {
+    withRank(null);
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockResolvedValue({
+      id: 6,
+      hash: HASH,
+      mime: 'image/png',
+      size: BYTES.length,
+      kind: 'Avatar'
+    } as never);
+
+    const res = await request(app)
+      .post('/api/asset?kind=Avatar')
+      .set('Content-Type', 'image/png')
+      .send(BYTES);
+
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe('Avatar');
+    expect(prismaMock.asset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: 'Avatar' })
+      })
+    );
+  });
+
+  it('rejects a kind outside the member-uploadable set', async () => {
+    withRank(null);
+
+    // ThemeFont is a real AssetKind and deliberately NOT uploadable — fonts stay
+    // seeder-only under the #343 redistribution boundary.
+    const res = await request(app)
+      .post('/api/asset?kind=ThemeFont')
+      .set('Content-Type', 'image/png')
+      .send(BYTES);
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.asset.create).not.toHaveBeenCalled();
+  });
+
   it('stores an uploaded image owned by the caller and returns its address', async () => {
     withRank(null); // unlimited
     prismaMock.asset.findUnique.mockResolvedValue(null);

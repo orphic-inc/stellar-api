@@ -2,7 +2,12 @@ import express from 'express';
 import { z } from 'zod';
 import { assets } from '../../modules/config';
 import { asyncHandler } from '../../modules/asyncHandler';
-import { validateParams, parsedParams } from '../../middleware/validate';
+import {
+  validateParams,
+  parsedParams,
+  validateQuery,
+  parsedQuery
+} from '../../middleware/validate';
 import { requireAuth } from '../../middleware/auth';
 import { AppError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
@@ -20,13 +25,22 @@ const assetHashParamsSchema = z.object({
   hash: z.string().regex(/^[0-9a-f]{64}$/)
 });
 
+// The member-uploadable kinds. `ThemeFont` is absent on purpose: fonts stay
+// seeder-only, the #343 redistribution boundary, and `uploadAsset` enforces
+// image-only bytes on top of this. Defaulting to `ThemeImage` keeps every
+// caller written against the pre-#396 route working unchanged.
+const assetUploadQuerySchema = z.object({
+  kind: z.enum(['ThemeImage', 'Avatar']).default('ThemeImage')
+});
+type AssetUploadQuery = z.infer<typeof assetUploadQuerySchema>;
+
 /**
  * POST /api/asset — store an uploaded image, returning its content address (#342).
  *
- * No `?kind=`: the only member-uploadable kind is `ThemeImage` (fonts stay
- * seeder-only — the #343 redistribution boundary — and `uploadAsset` enforces
- * image-only bytes on top of that). The param comes back the day a second kind
- * is uploadable.
+ * `?kind=` arrived with #396, which made `Avatar` the second uploadable kind —
+ * the day the original comment here said the param would come back. It is a
+ * label on the bytes, not a permission: both kinds run the same quota, the same
+ * magic-byte validation and the same image-only rule, so nothing is gated on it.
  *
  * `express.raw`, not multipart: the payload is exactly one binary that
  * `validateAsset` identifies by magic bytes, so the filename and part headers
@@ -39,8 +53,11 @@ const assetHashParamsSchema = z.object({
 router.post(
   '/',
   requireAuth,
+  validateQuery(assetUploadQuerySchema),
   express.raw({ type: ALLOWED_MIMES as string[], limit: assets.maxBytes }),
   asyncHandler(async (req, res) => {
+    const { kind } = parsedQuery<AssetUploadQuery>(res);
+
     // A Content-Type outside the allowlist leaves express.raw with nothing to
     // claim, so req.body arrives as the empty object express.json left behind.
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
@@ -59,7 +76,7 @@ router.post(
 
     const asset = await uploadAsset({
       data: req.body,
-      kind: 'ThemeImage',
+      kind,
       // The declared type is cross-checked against the payload's magic bytes,
       // never trusted — the claim validateAsset exists to catch.
       mime: req.get('content-type')?.split(';')[0]?.trim(),

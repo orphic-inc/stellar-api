@@ -141,6 +141,36 @@ describe('PUT /api/profile/me', () => {
     expect(res.status).toBe(404);
   });
 
+  // #396/#361. An avatar renders to every viewer of a member's profile and posts,
+  // and this field was a bare `.url()` — so it took `http:` and `ftp:` too. These
+  // mirror the externalStylesheet cases below, which is the boundary ADR-0024 §3
+  // already drew for the sibling field.
+  it.each([
+    ['https', 'https://cdn.example.com/me.png'],
+    ['asset store', `/api/asset/${'a'.repeat(64)}`],
+    ['empty (clears the slot)', '']
+  ])('accepts a %s avatar', async (_s, avatar) => {
+    const res = await request(app).put('/api/profile/me').send({ avatar });
+
+    expect(res.status).toBe(200);
+    expect(updateProfileMock).toHaveBeenCalledWith(7, { avatar });
+  });
+
+  it.each([
+    ['http', 'http://cdn.example.com/me.png'],
+    ['ftp', 'ftp://cdn.example.com/me.png'],
+    ['javascript', 'javascript:alert(1)'],
+    // Close, but not an address the serve route resolves — 63 hex chars. A
+    // relative path that 404s is a broken avatar, not a stored one.
+    ['short asset hash', `/api/asset/${'a'.repeat(63)}`],
+    ['arbitrary relative path', '/etc/passwd']
+  ])('rejects a %s avatar (400)', async (_s, avatar) => {
+    const res = await request(app).put('/api/profile/me').send({ avatar });
+
+    expect(res.status).toBe(400);
+    expect(updateProfileMock).not.toHaveBeenCalled();
+  });
+
   it('accepts an https external stylesheet URL', async () => {
     const res = await request(app)
       .put('/api/profile/me')

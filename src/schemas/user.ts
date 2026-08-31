@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { externalStylesheetUrl } from './stylesheet';
+import { avatarUrl } from './profile';
 
 export const adminCreateUserSchema = z.object({
   username: z.string().min(1, 'Username is required').max(32),
@@ -13,7 +14,13 @@ export const userSettingsSchema = z.object({
   externalStylesheet: externalStylesheetUrl,
   styledTooltips: z.boolean().optional(),
   paranoia: z.coerce.number().int().min(0).max(3).optional(),
-  avatar: z.string().optional(),
+  // The second avatar write path, and until #396 the laxer one: this schema had
+  // no URL validation at all, so `PUT /api/users/settings` accepted anything a
+  // string could hold while `PUT /api/profile/me` at least required a URL. #361
+  // named only the profile schema; a boundary on one of two doors is not one.
+  // Note the two write DIFFERENT columns — this one `User.avatar`, the profile
+  // one `Profile.avatar` — which is pre-existing and left alone here.
+  avatar: avatarUrl,
   notificationMethod: z
     .enum(['Disabled', 'Popup', 'Traditional', 'Push', 'Combined'])
     .optional(),
