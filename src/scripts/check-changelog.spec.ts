@@ -14,7 +14,9 @@
 // in-process. `spawn`, not `spawnSync`: spawnSync's `input:` writes and closes
 // immediately, which is exactly the passing case.
 import { spawn } from 'child_process';
-import { resolve } from 'path';
+import { mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { resolve, join } from 'path';
 
 const SCRIPT = resolve(__dirname, 'check-changelog.ts');
 const REGISTER = require.resolve('ts-node/register/transpile-only');
@@ -35,11 +37,15 @@ interface Run {
  * `npm run`, to keep npm's own argv handling — the *first* bug — out of the
  * measurement of the second.
  */
-const runWithDelayedStdin = (list: string, delayMs: number): Promise<Run> =>
+const runWithDelayedStdin = (
+  list: string,
+  delayMs: number,
+  extraEnv: Record<string, string> = {}
+): Promise<Run> =>
   new Promise((res, rej) => {
     const child = spawn(process.execPath, ['-r', REGISTER, SCRIPT], {
       cwd: resolve(__dirname, '../..'),
-      env: { ...process.env, CHANGELOG_STDIN: '1' },
+      env: { ...process.env, CHANGELOG_STDIN: '1', ...extraEnv },
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -60,7 +66,25 @@ const runWithDelayedStdin = (list: string, delayMs: number): Promise<Run> =>
     });
   });
 
+/**
+ * A base CHANGELOG with an empty `[Unreleased]`, so the preservation half of the
+ * gate has nothing to protect and these tests stay about the thing they are
+ * about — how the wrapper gets its file list. Preservation itself is covered in
+ * lib/changelogGate.spec.ts.
+ */
+const emptyBaseChangelog = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'changelog-gate-'));
+  const file = join(dir, 'base.md');
+  writeFileSync(
+    file,
+    '# Changelog\n\n## [Unreleased]\n\n## [0.8.3] — 2026-08-30\n'
+  );
+  return file;
+};
+
 describe('check-changelog CLI, stdin mode', () => {
+  const BASE = { CHANGELOG_BASE_FILE: emptyBaseChangelog() };
+
   it('honours a slowly-written file list rather than falling back to git', async () => {
     // The load-bearing case. `src/zzz.ts` obliges an entry and no CHANGELOG.md
     // accompanies it, so the only correct verdict is a failure naming that path.
@@ -85,7 +109,8 @@ describe('check-changelog CLI, stdin mode', () => {
     // The mirror, so the test above cannot be satisfied by simply failing shut.
     const { code, stdout } = await runWithDelayedStdin(
       'src/zzz.ts\nCHANGELOG.md\n',
-      WRITER_DELAY_MS
+      WRITER_DELAY_MS,
+      BASE
     );
 
     expect(code).toBe(0);
@@ -95,10 +120,27 @@ describe('check-changelog CLI, stdin mode', () => {
   it('reports the gate as not engaged for a slowly-written docs-only list', async () => {
     const { code, stdout } = await runWithDelayedStdin(
       'docs/agents/handoff.md\n',
-      WRITER_DELAY_MS
+      WRITER_DELAY_MS,
+      BASE
     );
 
     expect(code).toBe(0);
     expect(stdout).toContain('not engaged');
+  }, 20000);
+
+  it('refuses to run without a base changelog rather than skipping the check', async () => {
+    // The preservation half needs the base file, and CI is the only caller that
+    // has to supply it. Passing here would mean reporting a clean bill of health
+    // on a check that never executed — the exact failure mode this whole gate
+    // exists to prevent, one level up. Exit 2, not 1: a caller error, not a
+    // verdict about the changelog.
+    const { code, stderr } = await runWithDelayedStdin(
+      'CHANGELOG.md\n',
+      WRITER_DELAY_MS,
+      { CHANGELOG_BASE_FILE: '' }
+    );
+
+    expect(code).toBe(2);
+    expect(stderr).toContain('CHANGELOG_BASE_FILE');
   }, 20000);
 });

@@ -57,6 +57,7 @@ import { resolve } from 'path';
 import { isatty } from 'tty';
 import {
   checkChangelogGate,
+  checkUnreleasedPreserved,
   CHANGELOG_PATH,
   ENTRY_REQUIRED_PREFIXES
 } from '../lib/changelogGate';
@@ -131,6 +132,64 @@ const readGitChanges = (): string => {
 const useStdin =
   process.env.CHANGELOG_STDIN === '1' ||
   process.argv.slice(2).includes('--stdin');
+
+/**
+ * The base branch's CHANGELOG.md, for the preservation check.
+ *
+ * Same discipline as the file list: the caller states where this comes from,
+ * and a stated source is honoured or the run fails. It is a file path rather
+ * than a second pipe because there is only one fd 0 and this script has already
+ * broken twice on it — see the header. Nothing here touches stdin.
+ *
+ *   - CI writes the base file to disk and points `CHANGELOG_BASE_FILE` at it.
+ *     It has to come from the API for the same reason the file list does: the
+ *     checkout is shallow, so the base commit is not in the local object store.
+ *   - Locally, `origin/main` is right there.
+ */
+const readBaseChangelog = (): string => {
+  const fromFile = process.env.CHANGELOG_BASE_FILE;
+  if (fromFile) {
+    try {
+      return readFileSync(resolve(root, fromFile), 'utf8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? 'unknown';
+      console.error(
+        `CHANGELOG_BASE_FILE is set to ${fromFile} but reading it failed (${code}).\n` +
+          'Not skipping the preservation check: it is the whole point of this run,\n' +
+          'and a check that quietly does not run is worse than one that fails.'
+      );
+      process.exit(2);
+    }
+  }
+
+  if (useStdin) {
+    // CI mode reached here without a base file. Passing would mean reporting a
+    // clean bill of health on a check that never executed.
+    console.error(
+      'stdin mode was requested but CHANGELOG_BASE_FILE is unset, so the base\n' +
+        `${CHANGELOG_PATH} cannot be read and entry preservation cannot be checked.\n` +
+        'Fetch the base file and point the variable at it:\n' +
+        '  gh api "repos/$REPO/contents/CHANGELOG.md?ref=$BASE_SHA" \\\n' +
+        '    -H \'Accept: application/vnd.github.raw\' > "$RUNNER_TEMP/changelog-base.md"'
+    );
+    process.exit(2);
+  }
+
+  try {
+    return execFileSync('git', ['show', `origin/main:${CHANGELOG_PATH}`], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024
+    });
+  } catch {
+    console.error(
+      `Could not read ${CHANGELOG_PATH} from origin/main, so entry preservation\n` +
+        'cannot be checked. Fetch first: git fetch origin main'
+    );
+    process.exit(2);
+  }
+};
+
 // No `||` fallback between the two: the caller states its input path, and a
 // stated path is honoured or the run fails. An empty piped list is a legitimate
 // pass (checkChangelogGate([]) does not fail), not a cue to go read git.
@@ -159,8 +218,43 @@ if (result.failed) {
   process.exit(1);
 }
 
+// The second gate, and an independent one: the first asks whether an entry was
+// ADDED, this asks whether the existing ones SURVIVED. They fail for opposite
+// reasons and a PR can trip either alone, so this runs regardless of how the
+// first went — a PR that correctly added its own entry is exactly the shape
+// that dropped someone else's on #458.
+const base = readBaseChangelog();
+const head = readFileSync(resolve(root, CHANGELOG_PATH), 'utf8');
+const preserved = checkUnreleasedPreserved(base, head);
+
+if (preserved.failed) {
+  console.error(
+    `${preserved.removed.length} of ${preserved.checked} [Unreleased] entries on the base branch\n` +
+      `are missing from this branch's ${CHANGELOG_PATH}:\n`
+  );
+  for (const entry of preserved.removed) console.error(`  ✗ ${entry.excerpt}`);
+  console.error(
+    `\nThese belong to other pull requests. The release job publishes [Unreleased]\n` +
+      `verbatim as the GitHub Release notes, so an entry dropped here is dropped from\n` +
+      `the release record permanently.\n\n` +
+      `The usual cause is a merge commit from GitHub's "Update branch" button, which\n` +
+      `can resolve ${CHANGELOG_PATH} by discarding the other side. Rebase instead —\n` +
+      `this repo is rebase-only anyway — and the entries come back:\n\n` +
+      `  git rebase origin/main && git push --force-with-lease\n\n` +
+      `Moving an entry to a released section is fine; the check only looks for it\n` +
+      `somewhere in the file. If a removal is genuinely intended, apply the\n` +
+      `\`no-changelog\` label to the PR.`
+  );
+  process.exit(1);
+}
+
 console.log(
   result.triggeringPaths.length === 0
     ? 'Changelog gate not engaged (no shipping-code changes).'
     : `Changelog updated alongside ${result.triggeringPaths.length} shipping-code change(s).`
+);
+console.log(
+  preserved.checked === 0
+    ? 'No [Unreleased] entries on the base branch to preserve.'
+    : `All ${preserved.checked} [Unreleased] entries from the base branch are still present.`
 );
