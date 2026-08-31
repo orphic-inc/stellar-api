@@ -74,6 +74,27 @@ What the hook does **not** cover, run yourself before committing:
 
 > If you do run the checks manually (e.g. before staging, or committing with `--no-verify`): order matters — format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
 
+### Branch / merge discipline (rebase-only repo)
+
+`orphic-inc/stellar-api` allows **rebase-and-merge only** — merge commits and
+squash are both disabled on the repo, and `main` requires **linear history**.
+Two rules follow:
+
+- **Update a feature branch with `git rebase origin/main`, never `git merge
+main`.** A merge commit in the branch makes GitHub **refuse to
+  rebase-and-merge it** ("this branch cannot be rebased"), and the admin bypass
+  only waives the _review_ requirement, not rebase feasibility. If a branch
+  already has a merge commit, rebase it onto `origin/main` (dropping the merge),
+  re-run the gate, and `git push --force-with-lease`. Note this includes
+  GitHub's **"Update branch"** button, which creates a merge commit by default —
+  use "Update with rebase" if you use it at all.
+- **Rebase right before requesting the merge** so a moving `main` doesn't
+  surprise you mid-merge.
+
+`main` also requires **1 approving review**. So `BLOCKED` in `gh pr list`
+usually means "not yet reviewed", not "broken" — check the actual check runs
+before concluding a branch is failing.
+
 ## Environment
 
 Copy `.env.default` → `.env`.
