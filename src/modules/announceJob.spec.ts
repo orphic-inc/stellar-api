@@ -24,9 +24,16 @@ jest.mock('./logging', () => ({
 
 const mockGetNewAnnounceItems = jest.fn();
 const mockPublishAnnounceItem = jest.fn();
+const mockAnnounceTarget = jest.fn();
 jest.mock('./announce', () => ({
   getNewAnnounceItems: mockGetNewAnnounceItems,
-  publishAnnounceItem: mockPublishAnnounceItem
+  publishAnnounceItem: mockPublishAnnounceItem,
+  announceTarget: mockAnnounceTarget
+}));
+
+const mockReconcileCommunityMembership = jest.fn();
+jest.mock('./membershipProjection', () => ({
+  reconcileCommunityMembership: mockReconcileCommunityMembership
 }));
 
 import { runAnnounceCycle, startAnnounceJob } from './announceJob';
@@ -48,6 +55,11 @@ const item = (id: number): AnnounceItem => ({
 beforeEach(() => {
   mockGetNewAnnounceItems.mockReset();
   mockPublishAnnounceItem.mockReset();
+  mockAnnounceTarget.mockReset();
+  mockReconcileCommunityMembership.mockReset();
+  // Default: public items. The piggyback suite below opts into private.
+  mockAnnounceTarget.mockReturnValue(undefined);
+  mockReconcileCommunityMembership.mockResolvedValue(true);
   mockAggregate.mockReset();
 });
 
@@ -118,5 +130,81 @@ describe('startAnnounceJob — startup seed', () => {
     expect(mockAggregate).toHaveBeenCalledTimes(1);
     // The first fetch starts *after* id 100 — nothing already recorded is re-sent.
     expect(mockGetNewAnnounceItems).toHaveBeenCalledWith(100);
+  });
+});
+
+// ADR-0030 Decision 4 — the piggyback. One property dominates: it must NEVER
+// gate the announce. Projection and delivery are independent failure domains
+// sharing one ordered cursor, so holding the cursor for a membership failure
+// would let a single /irc/membership outage wedge the whole firehose, public
+// communities included.
+describe('runAnnounceCycle membership piggyback', () => {
+  const privateTarget = { visibility: 'PRIVATE' as const, community: 42 };
+
+  it('freshens the ACL before routing a private line', async () => {
+    const order: string[] = [];
+    mockGetNewAnnounceItems.mockResolvedValue([item(1)]);
+    mockAnnounceTarget.mockReturnValue(privateTarget);
+    mockReconcileCommunityMembership.mockImplementation(async () => {
+      order.push('project');
+      return true;
+    });
+    mockPublishAnnounceItem.mockImplementation(async () => {
+      order.push('publish');
+      return true;
+    });
+
+    await runAnnounceCycle(0);
+
+    // Ordering is the point: a fresh ACL before the first line that needs it.
+    expect(order).toEqual(['project', 'publish']);
+    expect(mockReconcileCommunityMembership).toHaveBeenCalledWith(42);
+  });
+
+  it('does not project for a public item', async () => {
+    mockGetNewAnnounceItems.mockResolvedValue([item(1)]);
+    mockAnnounceTarget.mockReturnValue(undefined);
+    mockPublishAnnounceItem.mockResolvedValue(true);
+
+    await runAnnounceCycle(0);
+
+    expect(mockReconcileCommunityMembership).not.toHaveBeenCalled();
+    expect(mockPublishAnnounceItem).toHaveBeenCalled();
+  });
+
+  it('still announces, and still advances the cursor, when projection FAILS', async () => {
+    mockGetNewAnnounceItems.mockResolvedValue([item(1), item(2)]);
+    mockAnnounceTarget.mockReturnValue(privateTarget);
+    mockReconcileCommunityMembership.mockResolvedValue(false);
+    mockPublishAnnounceItem.mockResolvedValue(true);
+
+    await expect(runAnnounceCycle(0)).resolves.toBe(2);
+    expect(mockPublishAnnounceItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('still announces when projection THROWS', async () => {
+    // reconcileCommunityMembership returns false for a failed push, but its DB
+    // reads can throw. An exception escaping the piggyback would abort the cycle
+    // — gating the announce by the back door.
+    mockGetNewAnnounceItems.mockResolvedValue([item(1), item(2)]);
+    mockAnnounceTarget.mockReturnValue(privateTarget);
+    mockReconcileCommunityMembership.mockRejectedValue(new Error('db down'));
+    mockPublishAnnounceItem.mockResolvedValue(true);
+
+    await expect(runAnnounceCycle(0)).resolves.toBe(2);
+    expect(mockPublishAnnounceItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('still holds the cursor when the PUBLISH fails, projection notwithstanding', async () => {
+    // The publish result alone decides the cursor; a successful projection must
+    // not paper over a failed delivery.
+    mockGetNewAnnounceItems.mockResolvedValue([item(1), item(2)]);
+    mockAnnounceTarget.mockReturnValue(privateTarget);
+    mockReconcileCommunityMembership.mockResolvedValue(true);
+    mockPublishAnnounceItem
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    await expect(runAnnounceCycle(0)).resolves.toBe(1);
   });
 });
