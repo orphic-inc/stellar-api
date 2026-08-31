@@ -2,18 +2,29 @@
 // feeds it to the pure checker in lib/changelogGate.ts, mirroring the split
 // check-version-consistency.ts uses.
 //
-// Two input paths, because the gate has two callers:
+// Two input paths, because the gate has two callers, and the caller SAYS which
+// one it is rather than the script inferring it from the state of fd 0:
 //
-//   - CI pipes the list in on stdin. It comes from the GitHub API rather than
-//     git, because no job in publish.yml sets `fetch-depth` — the runner's
-//     checkout is shallow, so `base...head` is not resolvable locally there.
-//   - Locally, with nothing on stdin, it falls back to diffing against
-//     origin/main so an author can check before pushing.
+//   - CI passes `--stdin` and pipes the list in. It comes from the GitHub API
+//     rather than git, because no job in publish.yml sets `fetch-depth` — the
+//     runner's checkout is shallow, so `base...head` is not resolvable there.
+//   - Locally, with no flag, it diffs against origin/main so an author can check
+//     before pushing. fd 0 is never touched on this path.
+//
+// The flag is not ceremony. This script used to read fd 0 unconditionally and
+// fall back when it came back empty, which cannot work: `readFileSync(0)` blocks
+// until EOF, and "nothing is on stdin" is indistinguishable from "the writer has
+// not written yet" until the writer closes. A caller that inherits an open stdin
+// it never writes to or closes — an editor task runner, a CI shell, an agent
+// harness — hung forever. One such invocation sat blocked for fifteen hours.
+// The old docstring claimed the read returned '' "when stdin is a TTY", which
+// was never true: reading a TTY blocks waiting for the user, and nothing in the
+// code checked isTTY.
 //
 // Run:
-//   git diff --name-only origin/main...HEAD | npm run changelog:check
-//   npm run changelog:check                      # same, computed for you
-//   printf 'src/x.ts\n' | npm run changelog:check --silent
+//   npm run changelog:check                                   # local, computed
+//   git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin
+//   printf 'src/x.ts\n' | npm run changelog:check --silent -- --stdin
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -25,8 +36,23 @@ import {
 
 const root = resolve(__dirname, '../..');
 
-/** Everything on stdin, or '' when stdin is a TTY or empty. */
+/**
+ * Everything on stdin, read to EOF. Only ever called under `--stdin`, because
+ * this call blocks until the writer closes and there is no sound way to ask
+ * "is anything coming?" first.
+ */
 const readStdin = (): string => {
+  if (process.stdin.isTTY) {
+    // --stdin from a terminal is a caller mistake: the read would block on
+    // keyboard input until Ctrl-D and look like a hang. Say so instead.
+    console.error(
+      '--stdin was passed but stdin is a terminal, so there is nothing to read.\n' +
+        'Pipe a file list in, or drop the flag to compute it from the working tree:\n' +
+        '  git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin\n' +
+        '  npm run changelog:check'
+    );
+    process.exit(2);
+  }
   try {
     return readFileSync(0, 'utf8');
   } catch {
@@ -54,14 +80,16 @@ const readGitChanges = (): string => {
     ].join('\n');
   } catch {
     console.error(
-      'Could not determine changed files: nothing on stdin, and reading the working tree failed.\n' +
-        'Pipe a file list in instead:  git diff --name-only origin/main...HEAD | npm run changelog:check'
+      'Could not determine changed files: reading the working tree failed.\n' +
+        'Pipe a file list in instead:\n' +
+        '  git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin'
     );
     process.exit(2);
   }
 };
 
-const raw = readStdin().trim() || readGitChanges();
+const useStdin = process.argv.slice(2).includes('--stdin');
+const raw = (useStdin ? readStdin() : '').trim() || readGitChanges();
 const changedFiles = raw.split('\n');
 
 const result = checkChangelogGate(changedFiles);
