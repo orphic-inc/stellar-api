@@ -689,6 +689,7 @@ model AuthorStylesheet {
 enum AssetKind {
   ThemeImage
   ThemeFont
+  Avatar
 }
 
 /// A binary asset a stored row references — theme imagery and web fonts today,

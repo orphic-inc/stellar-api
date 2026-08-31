@@ -17,7 +17,16 @@ import {
   GRACE_MS
 } from './modules/assetSweep';
 
-beforeEach(() => mockReset(prismaMock));
+beforeEach(() => {
+  mockReset(prismaMock);
+  // Default every referrer to "references nothing", so a test that cares about
+  // one arm states only that arm. collectReferencedHashes queries all three
+  // unconditionally, and an unstubbed deep mock resolves undefined, which the
+  // spread would throw on — a failure about the mock, not about the sweep.
+  prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+  prismaMock.user.findMany.mockResolvedValue([] as never);
+  prismaMock.profile.findMany.mockResolvedValue([] as never);
+});
 
 const H1 = 'a'.repeat(64);
 const H2 = 'b'.repeat(64);
@@ -54,11 +63,52 @@ describe('collectReferencedHashes', () => {
     // H1 appears twice across sheets — the set dedupes it.
     expect(refs).toEqual(new Set([H1, H2]));
   });
+
+  // #396: an avatar stored in the asset store is a reference. Without this the
+  // sweep collects it 24 hours after upload and the member's profile 404s — the
+  // exact failure the scan approach trades away compile-time safety for.
+  it('counts an avatar stored through either write path', async () => {
+    // PUT /api/users/settings writes User.avatar...
+    prismaMock.user.findMany.mockResolvedValue([
+      { avatar: `/api/asset/${H1}` }
+    ] as never);
+    // ...while PUT /api/profile/me writes Profile.avatar. Two columns, no code
+    // reconciling them: scanning one would delete assets stored via the other.
+    prismaMock.profile.findMany.mockResolvedValue([
+      { avatar: `/api/asset/${H2}` }
+    ] as never);
+
+    expect(await collectReferencedHashes()).toEqual(new Set([H1, H2]));
+  });
+
+  it('ignores a remote avatar, which references no asset', async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { avatar: 'https://example.com/me.png' },
+      // The dev generator's sentinel, written straight through Prisma — a stored
+      // avatar that is not a URL at all. It must not throw here.
+      { avatar: 'seeded' }
+    ] as never);
+
+    expect(await collectReferencedHashes()).toEqual(new Set());
+  });
+
+  it('unions sheets and avatars, deduping a hash used by both', async () => {
+    prismaMock.authorStylesheet.findMany.mockResolvedValue([
+      { source: `body{background:url(/api/asset/${H1})}` }
+    ] as never);
+    prismaMock.user.findMany.mockResolvedValue([
+      { avatar: `/api/asset/${H1}` },
+      { avatar: `/api/asset/${H3}` }
+    ] as never);
+
+    expect(await collectReferencedHashes()).toEqual(new Set([H1, H3]));
+  });
 });
 
 describe('sweepOrphanedAssets', () => {
-  const noReferences = () =>
-    prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
+  // The beforeEach default already means "nothing is referenced"; named here so
+  // each test says out loud which half of the predicate it is exercising.
+  const noReferences = () => {};
 
   it('deletes an owned, aged, unreferenced asset', async () => {
     noReferences();

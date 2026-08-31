@@ -46,20 +46,48 @@ export const extractAssetHashes = (text: string | null): string[] => {
 };
 
 /**
- * Every asset hash currently referenced by a stored row. The sole referrer today
- * is author stylesheet sources — `url(/api/asset/…)`, the only form ADR-0031
- * permits. A new consumer (avatars, #396) adds itself here; this function is
- * where "what references an asset" is defined, and the cost of the scan approach.
+ * Every asset hash currently referenced by a stored row. This function is where
+ * "what references an asset" is defined, and the cost of the scan approach: a
+ * consumer that forgets to add itself here does not fail loudly, it has its
+ * assets collected 24 hours later.
+ *
+ * Two referrers today:
+ *
+ * - **Author stylesheet sources** — `url(/api/asset/…)`, the only form ADR-0031
+ *   permits. Deliberately unfiltered by `deletedAt`: a withdrawn sheet still
+ *   serves via `/css` to existing adopters (ADR-0032 §3), so its assets are live
+ *   even though every other read path hides the row. This looks like an oversight
+ *   next to the filtering elsewhere in this module; it is not.
+ * - **Avatars** (#396) — both columns, because there are two. `Profile.avatar` is
+ *   what `PUT /api/profile/me` writes and `User.avatar` is what
+ *   `PUT /api/users/settings` writes, and no code reconciles them. Scanning only
+ *   the one the profile view happens to read would delete an avatar stored
+ *   through the other route.
+ *
+ * Avatars are scanned as text through the same `extractAssetHashes` as CSS rather
+ * than matched as whole values: over-counting a reference leaks an asset, while
+ * under-counting deletes a live one, and only one of those is recoverable.
  */
 export const collectReferencedHashes = async (
   client: PrismaClient = prisma
 ): Promise<Set<string>> => {
-  const sheets = await client.authorStylesheet.findMany({
-    select: { source: true }
-  });
+  const [sheets, users, profiles] = await Promise.all([
+    client.authorStylesheet.findMany({ select: { source: true } }),
+    client.user.findMany({
+      where: { avatar: { not: null } },
+      select: { avatar: true }
+    }),
+    client.profile.findMany({
+      where: { avatar: { not: null } },
+      select: { avatar: true }
+    })
+  ]);
   const referenced = new Set<string>();
   for (const sheet of sheets) {
     for (const hash of extractAssetHashes(sheet.source)) referenced.add(hash);
+  }
+  for (const row of [...users, ...profiles]) {
+    for (const hash of extractAssetHashes(row.avatar)) referenced.add(hash);
   }
   return referenced;
 };
