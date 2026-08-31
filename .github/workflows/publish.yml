@@ -107,7 +107,8 @@ jobs:
           # `gh api` would be masked by the exit code of the script it pipes into.
           set -o pipefail
           gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
-            --paginate --jq '.[].filename' | npm run changelog:check --silent -- --stdin
+            --paginate --jq '.[].filename' \
+            | CHANGELOG_STDIN=1 npm run changelog:check --silent
 
   # Split from `test` (#306): the integration suite is DB-bound (~4.5 min) and
   # was the long pole of the required check. Running it in parallel cuts the

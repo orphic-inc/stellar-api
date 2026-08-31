@@ -5,11 +5,12 @@
 // Two input paths, because the gate has two callers, and the caller SAYS which
 // one it is rather than the script inferring it from the state of fd 0:
 //
-//   - CI passes `--stdin` and pipes the list in. It comes from the GitHub API
-//     rather than git, because no job in publish.yml sets `fetch-depth` — the
-//     runner's checkout is shallow, so `base...head` is not resolvable there.
-//   - Locally, with no flag, it diffs against origin/main so an author can check
-//     before pushing. fd 0 is never touched on this path.
+//   - CI sets `CHANGELOG_STDIN=1` and pipes the list in. It comes from the
+//     GitHub API rather than git, because no job in publish.yml sets
+//     `fetch-depth` — the runner's checkout is shallow, so `base...head` is not
+//     resolvable there.
+//   - Locally, with neither set, it diffs against origin/main so an author can
+//     check before pushing. fd 0 is never touched on this path.
 //
 // The flag is not ceremony. This script used to read fd 0 unconditionally and
 // fall back when it came back empty, which cannot work: `readFileSync(0)` blocks
@@ -21,10 +22,17 @@
 // was never true: reading a TTY blocks waiting for the user, and nothing in the
 // code checked isTTY.
 //
+// The env var is the primary switch rather than the `--stdin` argv flag, because
+// argv does not survive npm reliably: `npm run x --silent -- --stdin` forwards the
+// flag under npm 10 and drops it under npm 11, and CI runs Node 24 (npm 11) while
+// a dev box may be on Node 22 (npm 10). That divergence already cost one red
+// build that passed every local check. An env var is parsed by no one.
+//
 // Run:
-//   npm run changelog:check                                   # local, computed
-//   git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin
-//   printf 'src/x.ts\n' | npm run changelog:check --silent -- --stdin
+//   npm run changelog:check                                    # local, computed
+//   git diff --name-only origin/main...HEAD \
+//     | CHANGELOG_STDIN=1 npm run changelog:check
+//   printf 'src/x.ts\n' | CHANGELOG_STDIN=1 npm run changelog:check --silent
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -46,9 +54,9 @@ const readStdin = (): string => {
     // --stdin from a terminal is a caller mistake: the read would block on
     // keyboard input until Ctrl-D and look like a hang. Say so instead.
     console.error(
-      '--stdin was passed but stdin is a terminal, so there is nothing to read.\n' +
+      'stdin mode was requested but stdin is a terminal, so there is nothing to read.\n' +
         'Pipe a file list in, or drop the flag to compute it from the working tree:\n' +
-        '  git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin\n' +
+        '  git diff --name-only origin/main...HEAD | CHANGELOG_STDIN=1 npm run changelog:check\n' +
         '  npm run changelog:check'
     );
     process.exit(2);
@@ -82,13 +90,16 @@ const readGitChanges = (): string => {
     console.error(
       'Could not determine changed files: reading the working tree failed.\n' +
         'Pipe a file list in instead:\n' +
-        '  git diff --name-only origin/main...HEAD | npm run changelog:check -- --stdin'
+        '  git diff --name-only origin/main...HEAD | CHANGELOG_STDIN=1 npm run changelog:check'
     );
     process.exit(2);
   }
 };
 
-const useStdin = process.argv.slice(2).includes('--stdin');
+// Env var first; `--stdin` stays supported for anyone whose npm forwards it.
+const useStdin =
+  process.env.CHANGELOG_STDIN === '1' ||
+  process.argv.slice(2).includes('--stdin');
 const raw = (useStdin ? readStdin() : '').trim() || readGitChanges();
 const changedFiles = raw.split('\n');
 
