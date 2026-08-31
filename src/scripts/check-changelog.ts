@@ -176,15 +176,30 @@ const readBaseChangelog = (): string => {
   }
 
   try {
-    return execFileSync('git', ['show', `origin/main:${CHANGELOG_PATH}`], {
+    // The MERGE BASE, not `origin/main` itself. Entries added to main after this
+    // branch diverged were never on the branch, so their absence is not a
+    // deletion — comparing against the tip would fail every branch that has not
+    // just been rebased, starting with the long-lived Renovate ones. The #458
+    // case is still caught: an "Update branch" merge commit makes main an
+    // ancestor of the head, so the merge base *is* the tip and the dropped entry
+    // is unambiguously a deletion.
+    const mergeBase = execFileSync(
+      'git',
+      ['merge-base', 'origin/main', 'HEAD'],
+      {
+        cwd: root,
+        encoding: 'utf8'
+      }
+    ).trim();
+    return execFileSync('git', ['show', `${mergeBase}:${CHANGELOG_PATH}`], {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024
     });
   } catch {
     console.error(
-      `Could not read ${CHANGELOG_PATH} from origin/main, so entry preservation\n` +
-        'cannot be checked. Fetch first: git fetch origin main'
+      `Could not read ${CHANGELOG_PATH} at the merge base with origin/main, so\n` +
+        'entry preservation cannot be checked. Fetch first: git fetch origin main'
     );
     process.exit(2);
   }
