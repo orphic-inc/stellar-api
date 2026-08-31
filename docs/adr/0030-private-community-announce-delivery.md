@@ -6,6 +6,7 @@
 **Revised:** 2026-07-24 — accepted after a second grill pass: delivery-leg prerequisite (korin-pink#70) landed, so Decision 0 is satisfied; the "single predicate" is narrowed to a single **role-union fragment** composed per call-site; site staff is stated out of the eligibility union; the `POST /irc/membership` wire contract is pinned; and the piggyback projection is best-effort (never gates the announce cursor). See [Revision note](#revision-note-2026-07-24).
 **Revised:** 2026-07-25 — third grill pass: the role union has **four** call-sites, not two (two of them authorization gates), so the shared unit moves to a new `communityAccess.ts` module and `isCommunityMember` is renamed `hasCommunityAccess`; the field is renamed `announceVisibility` and stated never to gate access; Consequence 3 is extracted to #419 and lands ahead of the epic. See [Revision note](#revision-note-2026-07-25).
 **Amended:** 2026-07-25 — implementing #419 found a **fifth** call-site of the role union (artist credits, expressed as an id list) carrying the same bug, and a second byte-identical duplicate around the gate; the count in Decision 2 is corrected and both are folded in. See [Amendment](#amendment-2026-07-25--implementation-of-419).
+**Amended:** 2026-09-01 — implementing #328 found §5 describing a permission model the code does not have: `PUT /api/communities/:id` gates on `communities_manage` **alone**, so a community leader cannot configure their own community. The code is correct and §5 is corrected to match — visibility config is site-staff-only. Consequence 7 is resolved: no new permission key. See [Amendment](#amendment-2026-09-01--permissions-for-announcevisibility-are-site-staff-only).
 **Repos:** orphic-inc/stellar-api (membership + emit), obrien-k/korin-pink (channel ACL enforcement)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (ownership split) · [ADR-0015 — verified IRC nick link](0015-verified-irc-nick-link.md) (§Scope names this as the deferred, unmodeled access-control feature)
 **Serves:** [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
@@ -99,6 +100,8 @@ Body:   { "community": <numeric Community.id>, "nicks": [<verified ircNick>, ...
 
 Configuring a community's `announceVisibility` rides the existing community-management authority — the community `leaderId`/`staff` for their own community, and site-staff via the existing data-driven `communities_manage` rank permission. The existing member/staff routes already gate on `communities_manage || admin || community-staff`, and an `announceVisibility` toggle rides the same gate. No new permission key is expected; if one proves warranted it is a catalog addition (auto-surfaced in the UserRanks editor), decided at implementation time — not a new gating model.
 
+> **Corrected 2026-09-01.** The first sentence overstates the gate: `PUT /api/communities/:id` has always required `communities_manage` alone, so the leader/staff arm described here does not exist. Config is site-staff-only. See the [Amendment](#amendment-2026-09-01--permissions-for-announcevisibility-are-site-staff-only) for what is true and why it stays that way.
+
 ---
 
 ## Rationale
@@ -171,6 +174,24 @@ Slice 3 shipped. Building it corrected two claims this ADR made from reading alo
 - **The gate had a duplicated wrapper, not just a duplicated predicate.** `releaseBrowse.ts` and `releaseWorkbench/authority.ts` each carried a byte-identical `getAccessibleCommunity` (load → 404 → gate → 403) around the duplicated predicate. Both fold into an exported `assertCommunityAccess(communityId, userId)`, so the gate cannot be skipped between load and use.
 
 One test this ADR specified was only half-buildable until slice 2: the `PRIVATE` + `registrationStatus: open` case (Decision 1) could not be expressed before the column existed. What shipped here was the half that could be — registration status alone opens a community — plus a structural assertion over the fragment's arms that fails if a visibility arm is ever added. **The full case is now paid** (slice 2, below): both the `PRIVATE` + `open` case and its converse — `PRIVATE` does not open a `closed` community — are asserted in `communityAccess.integration.ts`.
+
+---
+
+## Amendment (2026-09-01) — permissions for `announceVisibility` are site-staff-only
+
+Implementing #328 (slices #464/#465/#466) surfaced a divergence between §5 and the code. §5 is wrong; the code is not changing.
+
+- **The route gates on `communities_manage` alone.** `PUT /api/communities/:id` (`src/routes/api/communities/communities.ts`) is registered `...requirePermission('communities_manage')` and carries no leader or curator arm — and never has. `announceVisibility` rides that route (Consequence 2, landed), so a community leader **cannot** toggle their own community's visibility. §5's claim that config rides "the community `leaderId`/`staff` for their own community" describes a gate that was never built.
+
+- **§5's supporting claim is half-true, which is how it got written.** The member and curator routes in the same file (`POST|DELETE /:id/members`, `POST|DELETE /:id/curators`) genuinely do carry a curator arm — they resolve `communities_manage || admin || curator`. The _update_ route does not. Reading "the existing member/staff routes" and generalising to the update route is the specific step that produced the error. The two are not accidentally inconsistent: roster management is day-to-day community work, and configuration is not. Note that a leader _does_ pass the membership gate — the create and update paths connect `leaderId` into `curators`, so leadership is expressed through the curator relation rather than read separately. `leaderId` is never itself a permission check anywhere in this router.
+
+- **Site-staff-only is the right model, so the ADR moves.** `announceVisibility` decides whether a release announce fans out to `#announce` or to a gated `#c-<id>`. That is a site-level disclosure boundary, and the community whose releases are at stake is exactly the party with an incentive to widen it. Leaving it on `communities_manage` keeps the decision with the people accountable for the site's disclosure posture, and it costs the leader nothing they can't get by asking. The alternative — a leader/curator arm on the update route — would also have to be scoped to `announceVisibility` alone rather than the whole update body, since nothing else on that route is intended to be leader-writable. That is a real amount of new gating machinery to buy a capability nobody has asked for.
+
+**Consequence 7 ("permission confirmation: verify `communities_manage` + leader/staff covers visibility config; add a key only if warranted") is resolved: confirmed, and no new key.** The permission that exists is the permission that is wanted.
+
+**Consequence 6 (the stellar-ui toggle) needs no change** — it already specifies the control as `communities_manage`-gated, which is now the whole of the model rather than one arm of it.
+
+Nothing in this amendment changes behaviour, and no code ships with it. It closes a live contradiction between two artifacts, which is the actual cost being paid: the divergence was carried as an open decision on #328 for the length of the epic.
 
 ---
 
