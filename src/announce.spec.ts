@@ -20,6 +20,7 @@ import {
   renderAnnounceRss,
   publishAnnounceItem,
   getNewAnnounceItems,
+  announceTarget,
   AnnounceItem
 } from './modules/announce';
 
@@ -29,6 +30,8 @@ const item: AnnounceItem = {
   title: 'OK Computer',
   artists: ['Radiohead', 'Nigel & "friends"'],
   community: 'Music',
+  communityId: 5,
+  announceVisibility: 'PUBLIC',
   type: 'FLAC',
   createdAt: new Date('2026-06-15T00:00:00Z'),
   link: 'https://stellar.test/releases/9'
@@ -124,7 +127,10 @@ describe('getNewAnnounceItems', () => {
         releaseId: 3,
         type: 'FLAC',
         createdAt: new Date('2026-06-15T00:00:00Z'),
-        release: { title: 'Kid A', community: { name: 'Music' } },
+        release: {
+          title: 'Kid A',
+          community: { id: 5, name: 'Music', announceVisibility: 'PRIVATE' }
+        },
         collaborators: [{ name: 'Radiohead' }]
       }
     ]);
@@ -136,6 +142,8 @@ describe('getNewAnnounceItems', () => {
       title: 'Kid A',
       artists: ['Radiohead'],
       community: 'Music',
+      communityId: 5,
+      announceVisibility: 'PRIVATE',
       type: 'FLAC',
       createdAt: new Date('2026-06-15T00:00:00Z'),
       link: 'https://stellar.test/releases/3'
@@ -157,5 +165,80 @@ describe('getNewAnnounceItems', () => {
     const [out] = await getNewAnnounceItems(0);
     expect(out.community).toBeNull();
     expect(out.artists).toEqual([]);
+  });
+});
+
+// ADR-0030 Decision 3 — the routing target. Two properties matter and are
+// tested separately: that PRIVATE routes, and that everything else sends a body
+// byte-identical to the pre-ADR-0030 one. The second is what makes the contract
+// extension backward-compatible, and it is the easier of the two to break.
+describe('announceTarget (ADR-0030 Decision 3)', () => {
+  const withCommunity = (
+    communityId: number | null,
+    announceVisibility: AnnounceItem['announceVisibility']
+  ): AnnounceItem => ({ ...item, communityId, announceVisibility });
+
+  it('routes a PRIVATE community by numeric id, never by name', () => {
+    const target = announceTarget(withCommunity(5, 'PRIVATE'));
+    expect(target).toEqual({ visibility: 'PRIVATE', community: 5 });
+  });
+
+  it('omits `channel`, leaving korin to derive #c-<id>', () => {
+    // The slot stays in the wire contract for a future admin-bound channel, but
+    // stellar has no field to fill it from and must not invent one.
+    expect(announceTarget(withCommunity(5, 'PRIVATE'))).not.toHaveProperty(
+      'channel'
+    );
+  });
+
+  it('sends no target for a PUBLIC community', () => {
+    expect(announceTarget(withCommunity(5, 'PUBLIC'))).toBeUndefined();
+  });
+
+  it('sends no target for a contribution with no community', () => {
+    expect(announceTarget(withCommunity(null, null))).toBeUndefined();
+  });
+});
+
+describe('publishAnnounceItem target routing', () => {
+  const bodyOf = (): Record<string, unknown> =>
+    JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body as string
+    ) as Record<string, unknown>;
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+  });
+
+  it('carries the target on a private announce', async () => {
+    await publishAnnounceItem({
+      ...item,
+      communityId: 5,
+      announceVisibility: 'PRIVATE'
+    });
+    expect(bodyOf().target).toEqual({ visibility: 'PRIVATE', community: 5 });
+  });
+
+  it('omits the target key entirely on a public announce', async () => {
+    // Not `target: null` — omitted is the documented public path, and an
+    // explicit null is a different value on the wire.
+    await publishAnnounceItem({
+      ...item,
+      communityId: 5,
+      announceVisibility: 'PUBLIC'
+    });
+    expect(bodyOf()).not.toHaveProperty('target');
+  });
+
+  it('leaves the rest of the push body unchanged', async () => {
+    await publishAnnounceItem({
+      ...item,
+      communityId: 5,
+      announceVisibility: 'PRIVATE'
+    });
+    const body = bodyOf();
+    expect(body.templateType).toBe('minimal');
+    expect(body.environment).toEqual({ osc8: false });
+    expect(typeof body.xmlPayload).toBe('string');
   });
 });

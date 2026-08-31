@@ -38,6 +38,8 @@ const item = (id: number): AnnounceItem => ({
   title: `Release ${id}`,
   artists: ['Artist'],
   community: null,
+  communityId: null,
+  announceVisibility: null,
   type: 'FLAC',
   createdAt: new Date('2026-06-15T00:00:00Z'),
   link: `https://stellar.test/releases/${id}`
