@@ -32,7 +32,13 @@ jobs:
           POSTGRES_DB: stellar
         ports:
           - 5432:5432
+        # PGDATA on tmpfs: the CI database is disposable, so durability buys
+        # nothing here, and the integration suite's cost is dominated by
+        # TRUNCATE — relation-file work and fsync. Keeping it in RAM removes the
+        # disk-I/O sensitivity that inflated one run to 68 minutes against a
+        # 6-11 minute baseline (#458).
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1024m
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -125,7 +131,13 @@ jobs:
           POSTGRES_DB: stellar
         ports:
           - 5432:5432
+        # PGDATA on tmpfs: the CI database is disposable, so durability buys
+        # nothing here, and the integration suite's cost is dominated by
+        # TRUNCATE — relation-file work and fsync. Keeping it in RAM removes the
+        # disk-I/O sensitivity that inflated one run to 68 minutes against a
+        # 6-11 minute baseline (#458).
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1024m
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s

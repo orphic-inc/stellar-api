@@ -19,25 +19,35 @@ export const testPrisma: PrismaClient = new PrismaClient({
  * this safe: a query still in flight from the previous test holds row locks, and
  * truncating underneath it deadlocks (40P01, #424).
  *
- * The per-table loop is a leftover mitigation, kept only because it is harmless.
- * It does NOT bound the lock set, contrary to what this comment used to claim —
- * the loop runs inside one `DO $$ … $$` block, so it is a single transaction and
- * every ACCESS EXCLUSIVE lock it takes is held until the block commits, exactly
- * like the batched `TRUNCATE a, b, c` form. If anything, acquiring them one at a
- * time widens the window for a cycle, since another connection can take a
- * conflicting lock on a table the loop has not reached yet. It narrowed the odds
- * and was mistaken for a fix; the drain above is the fix.
+ * Batched into ONE `TRUNCATE a, b, c` rather than a per-table loop, because this
+ * runs in `beforeEach` for every integration test: ~126 tables x ~185 tests was
+ * ~23,000 separate TRUNCATE statements per CI run, each taking its own lock and
+ * doing its own relation-file work. That is an almost purely I/O-bound workload,
+ * which is why a contended runner inflated the whole suite 4-16x rather than
+ * uniformly a little (#458's 68-minute run; #165 was the same shape in June and
+ * was "fixed" by raising the hook timeout, which only moved which suite trips
+ * first).
+ *
+ * The loop this replaces was a leftover mitigation for the #424 deadlock, and
+ * the comment it carried already said it was not load-bearing: the loop ran
+ * inside one `DO $$ … $$` block, so it was a single transaction holding every
+ * ACCESS EXCLUSIVE lock until commit — exactly like the batched form. If
+ * anything the loop was *worse* for deadlocks, since acquiring locks one at a
+ * time widens the window for another connection to take a conflicting one on a
+ * table the loop has not reached yet. The drain above is, and remains, the fix.
  */
 export const truncateAll = async (): Promise<void> => {
   await drainBackgroundTasks();
   await testPrisma.$executeRawUnsafe(`
-    DO $$ DECLARE r RECORD; BEGIN
-      FOR r IN (
-        SELECT tablename FROM pg_tables
-        WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
-      ) LOOP
-        EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
-      END LOOP;
+    DO $$ DECLARE tables text; BEGIN
+      SELECT string_agg(quote_ident(tablename), ', ')
+        INTO tables
+        FROM pg_tables
+       WHERE schemaname = 'public' AND tablename <> '_prisma_migrations';
+      -- Null when the schema has no tables yet; EXECUTE on it would be invalid SQL.
+      IF tables IS NOT NULL THEN
+        EXECUTE 'TRUNCATE TABLE ' || tables || ' RESTART IDENTITY CASCADE';
+      END IF;
     END $$;
   `);
 };

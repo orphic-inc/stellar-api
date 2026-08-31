@@ -1,0 +1,14 @@
+# CHANGELOG.md is append-at-top and every PR touching shipping code must edit it
+# (the #386 gate), so concurrent PRs collide there by construction — and the
+# collision is always "both sides added a bullet", never a genuine disagreement.
+#
+# `merge=union` keeps BOTH sides instead of raising a conflict. That removes the
+# rebase-for-a-changelog-conflict tax on an otherwise-ready PR, and closes a
+# sharper hazard: a hand-resolved conflict can silently drop the other PR's
+# entry, which the #386 gate cannot detect (it checks that a PR *touches* the
+# file, not that it preserved someone else's bullet) and which the release job
+# would then publish as incomplete notes, permanently.
+#
+# Review the merged result — union can interleave two bullets in an order you
+# would not have chosen. It cannot lose one, which is the property that matters.
+CHANGELOG.md merge=union
