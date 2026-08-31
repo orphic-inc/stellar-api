@@ -1800,6 +1800,56 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'put',
+  path: '/stylesheet/author-stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: authorStylesheetSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Author stylesheet updated; edits propagate to adopters',
+      content: { 'application/json': { schema: AuthorStylesheet } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Not your stylesheet',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/stylesheet/author-stylesheet/{id}',
+  tags: ['Stylesheets'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Author stylesheet withdrawn (soft); adopters keep rendering'
+    },
+    403: {
+      description: 'Not your stylesheet',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'post',
   path: '/stylesheet/author-stylesheet/{id}/adopt',
   tags: ['Stylesheets'],
