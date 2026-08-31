@@ -162,6 +162,8 @@ src/
     ircJob.ts               # Background poll job — fetches korin.pink IRC metrics into the in-process cache (ADR-0013)
     announce.ts             # Release-Announce publisher — builds new-contribution RSS, pushes to korin POST /irc/announce (ADR-0013)
     announceJob.ts          # Background job — cursor over new contributions, pushes each to korin (ADR-0013)
+    membershipProjection.ts # Private-community membership → korin channel ACL (ADR-0030, #328): the full verified-nick set per PRIVATE community, projected to POST /irc/membership as a disposable materialized view
+    membershipJob.ts        # Background job — periodic full-set membership reconcile over PRIVATE communities; idempotent, holds no cursor (ADR-0030)
     goldenRules.ts            # The 6 immutable Golden Rules (PRD-05/09): GOLDEN_RULES table mirroring CODE_OF_CONDUCT.md verbatim + idempotent seedGoldenRules(); drift-guarded by goldenRules.spec.ts
     siteVariables.ts          # resolveSiteVariables() — read-time token→values map for GET /rules/tree (PRD-09, ADR-0020); config + Bugs-forum lookup, single-sourced for UI substitution
     bootstrap.ts              # Idempotent seed helpers shared by prisma/seed.ts and /install (ranks, promotion rules, forums, System user); each a no-op when rows exist
