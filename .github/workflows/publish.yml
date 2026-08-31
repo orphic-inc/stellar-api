@@ -109,19 +109,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # pipefail: the default shell is `bash -e` without it, so a failing
           # `gh api` would be masked by the exit code of the script it pipes into.
           set -o pipefail
-          # The base branch's CHANGELOG.md, for the preservation half of the gate
-          # (does this PR still have everyone else's [Unreleased] entries?). It
-          # comes from the API for the same reason the file list does: no job
-          # here sets `fetch-depth`, so the base commit is not in the local
-          # object store. `Accept: …raw` returns the file body directly, which
-          # avoids decoding the base64 `.content` field and its embedded
-          # newlines. Passed to the script by PATH, never a second pipe — there
-          # is one fd 0 and check-changelog.ts has broken on it twice.
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$BASE_SHA" \
+          # CHANGELOG.md at the MERGE BASE, for the preservation half of the gate
+          # (does this PR still have everyone else's [Unreleased] entries?).
+          #
+          # The merge base, not the base branch tip: entries added to main after
+          # this branch diverged were never on the branch, so their absence is
+          # not a deletion, and comparing against the tip would fail every branch
+          # that has not just been rebased — the long-lived Renovate ones first.
+          # The #458 case is still caught, because an "Update branch" merge
+          # commit makes main an ancestor of the head, so the merge base *is* the
+          # tip and the dropped entry is unambiguously a deletion.
+          #
+          # Both calls go to the API for the same reason the file list does: no
+          # job here sets `fetch-depth`, so neither commit is in the local object
+          # store. `Accept: …raw` returns the file body directly, avoiding the
+          # base64 `.content` field and its embedded newlines. The result is
+          # passed to the script by PATH, never a second pipe — there is one
+          # fd 0 and check-changelog.ts has broken on it twice.
+          MERGE_BASE="$(gh api \
+            "repos/${{ github.repository }}/compare/$BASE_SHA...$HEAD_SHA" \
+            --jq '.merge_base_commit.sha')"
+          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$MERGE_BASE" \
             -H 'Accept: application/vnd.github.raw' \
             > "$RUNNER_TEMP/changelog-base.md"
           gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
