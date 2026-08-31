@@ -30,6 +30,13 @@ export const avatarUrl = z
       return false;
     }
   }, 'Avatar must be an https:// URL or an /api/asset/<hash> path')
+  // Carried into openapi.json, because the constraint is no longer expressible as
+  // a format: `format: uri` came free with `.url()` and would now be a lie for the
+  // content-address arm, which is a relative reference and not a URI. A consumer
+  // reading the spec needs the rule stated somewhere.
+  .describe(
+    'An https:// URL, or an /api/asset/<sha256> path for an image stored in the asset store. Empty string clears the field.'
+  )
   .optional()
   .or(z.literal(''));
 
