@@ -98,13 +98,13 @@ describe('stylesheet registry ↔ /css delivery consistency (#286)', () => {
     });
 
     it('a null-cssUrl row is legal — Sublime is in the picker and renders nothing', async () => {
-      // truncateAll() drops the row the 2026-05-24 data migration plants, so the
-      // post-migration shape is reconstructed here rather than assumed.
+      // truncateAll() drops the row the 2026-05-24 data migration plants, and
+      // seedDefaults() restores it — the helper owns that reconstruction because
+      // since #376 every registration path resolves a default theme name and
+      // throws rather than falling back to a literal, so it is not this suite's
+      // to plant. Asserted here against the seeded row rather than a local one.
       const systemUserId = await seedSystemUser(testPrisma);
       await seedStylesheetFixtures(testPrisma, systemUserId);
-      await testPrisma.stylesheet.create({
-        data: { name: 'sublime', description: 'Default', cssUrl: null }
-      });
 
       const rows = await testPrisma.stylesheet.findMany();
       expect(rows.find((r) => r.name === 'sublime')!.cssUrl).toBeNull();
