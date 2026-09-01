@@ -4718,7 +4718,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: '/api/requests',
+  path: '/requests',
   summary: 'List requests',
   tags: ['requests'],
   responses: {
@@ -4728,7 +4728,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: '/api/requests',
+  path: '/requests',
   summary: 'Create a new request',
   tags: ['requests'],
   security: [{ bearerAuth: [] }],
@@ -4745,7 +4745,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: '/api/requests/{id}',
+  path: '/requests/{id}',
   summary: 'Get request details',
   tags: ['requests'],
   request: {
@@ -4759,7 +4759,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: '/api/requests/{id}/bounty',
+  path: '/requests/{id}/bounty',
   summary: 'Add bounty to request',
   tags: ['requests'],
   security: [{ bearerAuth: [] }],
@@ -4776,7 +4776,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: '/api/requests/{id}/fill',
+  path: '/requests/{id}/fill',
   summary: 'Fill request',
   tags: ['requests'],
   security: [{ bearerAuth: [] }],

@@ -86,6 +86,16 @@ jobs:
       - name: OpenAPI freshness
         if: ${{ !cancelled() }}
         run: npm run openapi:export && git diff --exit-code openapi.json
+      - name: OpenAPI completeness
+        if: ${{ !cancelled() }}
+        # Freshness above proves openapi.json matches the registry in
+        # lib/openapi.ts. It cannot prove the registry matches the routes that
+        # exist — the registry is manual, so an unregistered route is invisible
+        # to the spec and to stellar-ui's generated types (#474 found 91).
+        # Grandfathered gaps live in openapi-completeness-baseline.json; a NEW
+        # unregistered route fails here, and so does a baseline entry that has
+        # gone stale, so the list can only shrink.
+        run: npm run openapi:completeness
       - name: ERD freshness
         if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md
