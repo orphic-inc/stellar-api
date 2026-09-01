@@ -52,6 +52,7 @@ import {
 import {
   updateRequestSchema,
   unfillRequestSchema,
+  listRequestsQuerySchema,
   createRequestSchema,
   addBountySchema,
   fillRequestSchema
@@ -5680,6 +5681,24 @@ registry.registerPath({
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
+const RequestBountyEntry = registry.register(
+  'RequestBountyEntry',
+  z.object({
+    id: z.number().int(),
+    requestId: z.number().int(),
+    userId: z.number().int(),
+    // BigInt column — serialises as a string, not a number.
+    amount: z.string(),
+    createdAt: z.string(),
+    user: z.object({ id: z.number().int(), username: z.string() })
+  })
+);
+
+// Every request-returning route answers with `serializeRequest(...)`, NOT the
+// bare Prisma row: the BigInt bounties are summed into `totalBounty` (a string),
+// `_count.bounties` is attached, and the relations are optional depending on
+// what the caller's query included. `voteCount` is deliberately absent here —
+// only the detail route adds it (see RequestDetail).
 const Request = registry.register(
   'Request',
   z.object({
@@ -5695,23 +5714,30 @@ const Request = registry.register(
     fillerId: z.number().int().nullable(),
     filledAt: z.string().nullable(),
     filledContributionId: z.number().int().nullable(),
-    voteCount: z.number().int(),
+    // Sum of every bounty on the request. BigInt column, so a string.
+    totalBounty: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
-    deletedAt: z.string().nullable()
+    deletedAt: z.string().nullable(),
+    _count: z.object({ bounties: z.number().int() }),
+    user: z.object({ id: z.number().int(), username: z.string() }).optional(),
+    filler: z
+      .object({ id: z.number().int(), username: z.string() })
+      .nullable()
+      .optional(),
+    community: z.object({ id: z.number().int(), name: z.string() }).optional(),
+    bounties: z.array(RequestBountyEntry).optional(),
+    artists: z.array(z.unknown()).optional(),
+    filledContribution: z.unknown().optional()
   })
 );
 
-const RequestBountyEntry = registry.register(
-  'RequestBountyEntry',
-  z.object({
-    id: z.number().int(),
-    requestId: z.number().int(),
-    userId: z.number().int(),
-    // BigInt column — serialises as a string, not a number.
-    amount: z.string(),
-    createdAt: z.string(),
-    user: z.object({ id: z.number().int(), username: z.string() })
+// The detail route alone adds the vote fields on top of the serialized shape.
+const RequestDetail = registry.register(
+  'RequestDetail',
+  Request.extend({
+    voteCount: z.number().int(),
+    votes: z.array(z.object({ userId: z.number().int() }))
   })
 );
 
@@ -5884,8 +5910,16 @@ registry.registerPath({
   path: '/requests',
   summary: 'List requests',
   tags: ['Requests'],
+  request: { query: listRequestsQuerySchema },
   responses: {
-    200: { description: 'Success' }
+    200: {
+      description: 'Paginated requests',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(Request), meta: PaginationMeta })
+        }
+      }
+    }
   }
 });
 
@@ -5901,8 +5935,14 @@ registry.registerPath({
     }
   },
   responses: {
-    201: { description: 'Created' },
-    400: { description: 'Bad Request' }
+    201: {
+      description: 'Request created',
+      content: { 'application/json': { schema: Request } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
   }
 });
 
@@ -5911,12 +5951,21 @@ registry.registerPath({
   path: '/requests/{id}',
   summary: 'Get request details',
   tags: ['Requests'],
+  description:
+    'The only request response that carries `voteCount` and `votes`; the ' +
+    'other routes return the serialized request without them.',
   request: {
     params: z.object({ id: z.string() })
   },
   responses: {
-    200: { description: 'Success' },
-    404: { description: 'Not Found' }
+    200: {
+      description: 'Request detail',
+      content: { 'application/json': { schema: RequestDetail } }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -5925,6 +5974,10 @@ registry.registerPath({
   path: '/requests/{id}/bounty',
   summary: 'Add bounty to request',
   tags: ['Requests'],
+  description:
+    "The amount is deducted from the caller's contributed balance, so an " +
+    'insufficient balance answers 400 rather than 403. There is a site ' +
+    'minimum bounty; below it is also a 400.',
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
@@ -5933,7 +5986,19 @@ registry.registerPath({
     }
   },
   responses: {
-    200: { description: 'Success' }
+    200: {
+      description: 'The request, with the new bounty totalled in',
+      content: { 'application/json': { schema: Request } }
+    },
+    400: {
+      description:
+        'Below the minimum bounty, or insufficient contributed balance',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Request not found, or not open',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -5942,6 +6007,10 @@ registry.registerPath({
   path: '/requests/{id}/fill',
   summary: 'Fill request',
   tags: ['Requests'],
+  description:
+    'Nominates a contribution as the fill. The bounty is paid out and the ' +
+    'request moves to the `filled` status; POST /requests/{id}/unfill reverses ' +
+    'it.',
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
@@ -5950,7 +6019,29 @@ registry.registerPath({
     }
   },
   responses: {
-    200: { description: 'Success' }
+    200: {
+      description: 'The request, now filled',
+      content: { 'application/json': { schema: Request } }
+    },
+    400: {
+      description:
+        'The contribution is not eligible: wrong community, wrong release type, or already the active fill for another request',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'You can only fill a request with your own contribution',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description:
+        'Request or contribution not found, or the request is not open',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description:
+        'Lost a race — the request was already filled by another submission',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
