@@ -4,7 +4,7 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, RatioExempt } from '@prisma/client';
 import { appVersion } from './version';
 import {
   profileUpdateSchema,
@@ -1107,6 +1107,76 @@ registry.registerPath({
   }
 });
 
+const ProfileSummary = registry.register(
+  'ProfileSummary',
+  z.object({
+    id: z.number().int(),
+    username: z.string(),
+    avatar: z.string().nullable(),
+    profile: z.object({ profileTitle: z.string().nullable() }).nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile',
+  tags: ['Profile'],
+  summary: 'List every active profile',
+  description:
+    'Active (non-disabled) users only, as a flat array. Deliberately not ' +
+    'paginated, unlike most list endpoints.',
+  responses: {
+    200: {
+      description: 'Active profiles',
+      content: { 'application/json': { schema: z.array(ProfileSummary) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+const CrsDimension = registry.register(
+  'CrsDimension',
+  z.object({
+    name: z.string(),
+    subScore: z.number(),
+    weighted: z.number()
+  })
+);
+
+const CrsView = registry.register(
+  'CrsView',
+  z.object({
+    score: z.number(),
+    dimensions: z.array(CrsDimension),
+    suspect: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/reputation',
+  tags: ['Profile'],
+  summary: 'Community Reputation Score for the authenticated member',
+  description:
+    'Self-view (ADR-0004 section 3): snatch-derived dimensions are included, ' +
+    'moderation-only ones are not, and `suspect` is therefore always false ' +
+    'here. `score` is recomputed from the visible dimensions, so a gated ' +
+    'viewer cannot back a hidden dimension out of the total.',
+  responses: {
+    200: {
+      description: 'Reputation',
+      content: { 'application/json': { schema: CrsView } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'post',
   path: '/profile/referral/create-invite',
@@ -2082,6 +2152,64 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Notification removed'
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/notifications/unread-count',
+  tags: ['Notifications'],
+  summary: 'How many notifications the caller has not read',
+  responses: {
+    200: {
+      description: 'Unread count',
+      content: {
+        'application/json': { schema: z.object({ count: z.number().int() }) }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/notifications/read-all',
+  tags: ['Notifications'],
+  summary: 'Mark every unread notification as read',
+  responses: {
+    204: {
+      description: 'All notifications marked read'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/notifications/{id}/read',
+  tags: ['Notifications'],
+  summary: 'Mark one notification as read',
+  description:
+    'Idempotent: re-reading an already-read notification is a no-op.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Notification marked read'
+    },
+    403: {
+      description: 'Not the recipient',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -3639,6 +3767,98 @@ registry.registerPath({
     },
     404: {
       description: 'Community not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/contributions/{id}',
+  tags: ['Contributions'],
+  summary: 'One contribution, with its release, collaborators and comments',
+  description:
+    'Comments carry `bodyHtml`, rendered at read time from BBCode. ' +
+    '`sizeInBytes` is serialised as a number rather than the global ' +
+    'BigInt-to-string default.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Contribution',
+      content: { 'application/json': { schema: Contribution } }
+    },
+    404: {
+      description: 'Contribution not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/contributions/{id}/report',
+  tags: ['Contributions'],
+  summary: 'Flag a dead or misleading link on a contribution',
+  description:
+    'Files a `dead_link` report AND records the report against the ' +
+    'contribution, which is what drives the auto-warn at three reports ' +
+    '(modules/linkHealth).',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ reason: z.string().min(1).max(1000) })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Report submitted',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Contribution not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/contributions/{id}/ratio-exempt',
+  tags: ['Contributions'],
+  summary: 'Staff: set or clear a contribution ratio exemption',
+  description:
+    'Requires the `contributions_manage` permission. FREEPASS and ' +
+    'NEUTRALPASS are the Freepass/Neutralpass exemptions; NONE clears them.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ ratioExempt: z.nativeEnum(RatioExempt) })
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated contribution',
+      content: { 'application/json': { schema: Contribution } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing contributions_manage',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -5516,6 +5736,60 @@ const RatioPolicyState = registry.register(
     lastEvaluatedAt: z.string()
   })
 );
+
+// GET /profile/me/ratio is registered HERE rather than up in the Profile
+// section because its response embeds RatioPolicyState, and these consts are
+// evaluated in file order — referencing it earlier would hit the temporal dead
+// zone. Moving RatioPolicyState up instead would reorder components.schemas in
+// openapi.json (they are emitted in registration order), churning stellar-ui's
+// vendored copy for no behavioural gain.
+const RatioStats = registry.register(
+  'RatioStats',
+  z.object({
+    ratio: z.number(),
+    // Serialised from BigInt, so strings rather than numbers.
+    contributed: z.string(),
+    consumed: z.string(),
+    bracket: z.object({
+      label: z.string(),
+      maxRequired: z.number(),
+      minRequired: z.number()
+    }),
+    eligibleContributionBytes: z.string(),
+    contributionCoverage: z.number(),
+    requiredRatio: z.number(),
+    meetsRequirement: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/ratio',
+  tags: ['Profile'],
+  summary: 'Detailed ratio stats for the authenticated member',
+  description:
+    'The ratio accounting plus the current policy state, in one read. ' +
+    '`contributed`, `consumed` and `eligibleContributionBytes` are BigInt ' +
+    'columns and serialise as strings.',
+  responses: {
+    200: {
+      description: 'Ratio stats and policy state',
+      content: {
+        'application/json': {
+          schema: RatioStats.extend({ policy: RatioPolicyState })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',
