@@ -6508,6 +6508,12 @@ registry.registerPath({
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
+// `user` is OPTIONAL because the bounty relation is included two different
+// ways. Only three reads pull the pledger in — the detail route, add-bounty and
+// bounty-history (`bounties: { include: { user } }`); the list, create, update,
+// fill and unfill echoes use a bare `bounties: true` and carry no `user` at
+// all. `userId` is always there, so a client that needs a name on those five
+// resolves it itself.
 const RequestBountyEntry = registry.register(
   'RequestBountyEntry',
   z.object({
@@ -6517,7 +6523,45 @@ const RequestBountyEntry = registry.register(
     // BigInt column — serialises as a string, not a number.
     amount: z.string(),
     createdAt: z.string(),
+    user: z.object({ id: z.number().int(), username: z.string() }).optional()
+  })
+);
+
+// Where the pledger IS guaranteed: bounty-history and the detail route both
+// include it. Named separately rather than left to the optional shared shape,
+// so a client rendering a pledger list is not made to null-check a field those
+// two responses always carry.
+//
+// Spelled out rather than `RequestBountyEntry.extend({ user: ... })`: an extend
+// that only tightens a field the base already declares emits an allOf branch
+// with an EMPTY property set, and openapi-typescript renders that as
+// `Base & Record<string, never>` — the requirement is lost and the intersection
+// is hostile. Extending works when it ADDS properties (see RequestDetail); it
+// does not work for narrowing one.
+const RequestBountyEntryWithUser = registry.register(
+  'RequestBountyEntryWithUser',
+  z.object({
+    id: z.number().int(),
+    requestId: z.number().int(),
+    userId: z.number().int(),
+    amount: z.string(),
+    createdAt: z.string(),
     user: z.object({ id: z.number().int(), username: z.string() })
+  })
+);
+
+// The join row, and it too is included two ways: `POST /requests` echoes bare
+// `artists: true` rows, while the detail route pulls the artist itself
+// (`artists: { include: { artist: true } }`). A bare Artist row is exactly the
+// three required fields of the Artist component — the rest of that component is
+// relation includes this join never asks for.
+const RequestArtistRef = registry.register(
+  'RequestArtistRef',
+  z.object({
+    id: z.number().int(),
+    requestId: z.number().int(),
+    artistId: z.number().int(),
+    artist: Artist.optional()
   })
 );
 
@@ -6554,7 +6598,11 @@ const Request = registry.register(
       .optional(),
     community: z.object({ id: z.number().int(), name: z.string() }).optional(),
     bounties: z.array(RequestBountyEntry).optional(),
-    artists: z.array(z.unknown()).optional(),
+    artists: z.array(RequestArtistRef).optional(),
+    // Only the detail route includes this, and it pulls a whole Contribution
+    // plus its release and uploader. Left unknown rather than half-described:
+    // no client reads it yet, and guessing at the Contribution shape here is
+    // how the rest of this section went wrong.
     filledContribution: z.unknown().optional()
   })
 );
@@ -6563,6 +6611,9 @@ const Request = registry.register(
 const RequestDetail = registry.register(
   'RequestDetail',
   Request.extend({
+    // This route's include pulls the pledger on every bounty, so the narrower
+    // shape applies here rather than the shared optional one.
+    bounties: z.array(RequestBountyEntryWithUser).optional(),
     voteCount: z.number().int(),
     votes: z.array(z.object({ userId: z.number().int() }))
   })
@@ -6719,7 +6770,7 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            bounties: z.array(RequestBountyEntry),
+            bounties: z.array(RequestBountyEntryWithUser),
             actions: z.array(RequestActionEntry)
           })
         }
