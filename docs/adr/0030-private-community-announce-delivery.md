@@ -6,7 +6,7 @@
 **Revised:** 2026-07-24 — accepted after a second grill pass: delivery-leg prerequisite (korin-pink#70) landed, so Decision 0 is satisfied; the "single predicate" is narrowed to a single **role-union fragment** composed per call-site; site staff is stated out of the eligibility union; the `POST /irc/membership` wire contract is pinned; and the piggyback projection is best-effort (never gates the announce cursor). See [Revision note](#revision-note-2026-07-24).
 **Revised:** 2026-07-25 — third grill pass: the role union has **four** call-sites, not two (two of them authorization gates), so the shared unit moves to a new `communityAccess.ts` module and `isCommunityMember` is renamed `hasCommunityAccess`; the field is renamed `announceVisibility` and stated never to gate access; Consequence 3 is extracted to #419 and lands ahead of the epic. See [Revision note](#revision-note-2026-07-25).
 **Amended:** 2026-07-25 — implementing #419 found a **fifth** call-site of the role union (artist credits, expressed as an id list) carrying the same bug, and a second byte-identical duplicate around the gate; the count in Decision 2 is corrected and both are folded in. See [Amendment](#amendment-2026-07-25--implementation-of-419).
-**Amended:** 2026-09-01 — implementing #328 found §5 describing a permission model the code does not have: `PUT /api/communities/:id` gates on `communities_manage` **alone**, so a community leader cannot configure their own community. The code is correct and §5 is corrected to match — visibility config is site-staff-only. Consequence 7 is resolved: no new permission key. See [Amendment](#amendment-2026-09-01--permissions-for-announcevisibility-are-site-staff-only).
+**Amended:** 2026-08-31 — implementing #328 found §5 describing a permission model the code does not have: `PUT /api/communities/:id` gates on `communities_manage` **alone**, so a community leader cannot configure their own community. The code is correct and §5 is corrected to match — visibility config is site-staff-only. Consequence 7 is resolved: no new permission key. See [Amendment](#amendment-2026-08-31--permissions-for-announcevisibility-are-site-staff-only).
 **Repos:** orphic-inc/stellar-api (membership + emit), obrien-k/korin-pink (channel ACL enforcement)
 **Extends:** [ADR-0013 — korin.pink IRC integration](0013-korin-pink-irc-integration.md) (ownership split) · [ADR-0015 — verified IRC nick link](0015-verified-irc-nick-link.md) (§Scope names this as the deferred, unmodeled access-control feature)
 **Serves:** [PRD-02 IRC & Announce](../prd/02-irc-and-announce.md)
@@ -100,7 +100,7 @@ Body:   { "community": <numeric Community.id>, "nicks": [<verified ircNick>, ...
 
 Configuring a community's `announceVisibility` rides the existing community-management authority — the community `leaderId`/`staff` for their own community, and site-staff via the existing data-driven `communities_manage` rank permission. The existing member/staff routes already gate on `communities_manage || admin || community-staff`, and an `announceVisibility` toggle rides the same gate. No new permission key is expected; if one proves warranted it is a catalog addition (auto-surfaced in the UserRanks editor), decided at implementation time — not a new gating model.
 
-> **Corrected 2026-09-01.** The first sentence overstates the gate: `PUT /api/communities/:id` has always required `communities_manage` alone, so the leader/staff arm described here does not exist. Config is site-staff-only. See the [Amendment](#amendment-2026-09-01--permissions-for-announcevisibility-are-site-staff-only) for what is true and why it stays that way.
+> **Corrected 2026-08-31.** The first sentence overstates the gate: `PUT /api/communities/:id` has always required `communities_manage` alone, so the leader/staff arm described here does not exist. Config is site-staff-only. See the [Amendment](#amendment-2026-08-31--permissions-for-announcevisibility-are-site-staff-only) for what is true and why it stays that way.
 
 ---
 
@@ -177,7 +177,7 @@ One test this ADR specified was only half-buildable until slice 2: the `PRIVATE`
 
 ---
 
-## Amendment (2026-09-01) — permissions for `announceVisibility` are site-staff-only
+## Amendment (2026-08-31) — permissions for `announceVisibility` are site-staff-only
 
 Implementing #328 (slices #464/#465/#466) surfaced a divergence between §5 and the code. §5 is wrong; the code is not changing.
 
