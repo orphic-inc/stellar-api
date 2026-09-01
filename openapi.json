@@ -6797,6 +6797,7 @@
           "id",
           "name",
           "description",
+          "descriptionHtml",
           "userId",
           "categoryId",
           "tags",
@@ -6849,15 +6850,13 @@
                 "nullable": true
               },
               "year": {
-                "type": "integer",
-                "nullable": true
+                "type": "integer"
+              },
+              "releaseType": {
+                "type": "string"
               },
               "communityId": {
                 "type": "integer",
-                "nullable": true
-              },
-              "releaseType": {
-                "type": "string",
                 "nullable": true
               },
               "artist": {
@@ -6882,7 +6881,6 @@
               "title",
               "image",
               "year",
-              "communityId",
               "releaseType",
               "artist"
             ]

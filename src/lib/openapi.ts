@@ -9054,14 +9054,17 @@ const DeletedCollageItem = registry.register(
 
 // `descriptionHtml` recurs on every collage response that returns a body: the
 // description is stored as BBCode and transcribed at read time (#402), so the
-// rendered form is derived, never persisted.
+// rendered form is derived, never persisted. It is REQUIRED, not optional —
+// list, detail, create, update and recover each add it explicitly, and there is
+// no Collage-returning route that omits it. (`/collages/deleted` is the one
+// collage read without it, and that has its own DeletedCollageItem.)
 const Collage = registry.register(
   'Collage',
   z.object({
     id: z.number().int(),
     name: z.string().max(100),
     description: z.string(),
-    descriptionHtml: z.string().optional(),
+    descriptionHtml: z.string(),
     userId: z.number().int(),
     categoryId: z.number().int(),
     tags: z.array(z.string()),
@@ -9101,12 +9104,17 @@ const CollageEntry = registry.register(
       id: z.number().int(),
       title: z.string(),
       image: z.string().nullable(),
-      year: z.number().int().nullable(),
-      communityId: z.number().int().nullable(),
-      releaseType: z.string().nullable(),
+      // Both non-nullable columns: `year Int` and `releaseType ReleaseCategory`.
+      year: z.number().int(),
+      releaseType: z.string(),
+      // OPTIONAL, and this is the one field where the two selects differ: the
+      // detail route selects `communityId`, the add-entry 201 does not. Nullable
+      // when it IS selected, because the column itself is `Int?`.
+      communityId: z.number().int().nullable().optional(),
       // The stored `credits` array is replaced by this derived display field
       // (modules/releaseCredits withPrimaryArtist) — the Main credit, or the
-      // first credit when there is no Main.
+      // first credit when there is no Main, and genuinely null when a release
+      // has no credits at all.
       artist: z.object({ id: z.number().int(), name: z.string() }).nullable()
     }),
     user: z.object({ id: z.number().int(), username: z.string() })
