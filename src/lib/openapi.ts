@@ -31,6 +31,13 @@ import {
   reorderEntriesSchema
 } from '../schemas/collage';
 import {
+  createWikiPageSchema,
+  updateWikiPageSchema,
+  addAliasSchema,
+  wikiSearchQuerySchema,
+  wikiCompareQuerySchema
+} from '../schemas/wiki';
+import {
   logCheckRequestSchema,
   logCheckResultSchema
 } from '../schemas/logCheck';
@@ -7869,6 +7876,399 @@ registry.registerPath({
     },
     404: {
       description: 'Collage not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+// ─── Wiki ─────────────────────────────────────────────────────────────────────
+//
+// Two access levels gate this router, and they answer DIFFERENTLY on purpose:
+//
+//   minReadLevel  failed -> 404 "Page not found"   (deliberate non-confirmation)
+//   minEditLevel  failed -> 403 with a specific message
+//
+// So a page you may not read is indistinguishable from one that does not exist,
+// while a page you may read but not edit tells you plainly that history,
+// revision bodies and comparison are closed to you. Revision history, revision
+// CONTENT and compare all require the EDIT level, not the read level.
+
+const WikiPage = registry.register(
+  'WikiPage',
+  z.object({
+    id: z.number().int(),
+    title: z.string().max(100),
+    // Raw BBCode. `bodyHtml` is the read-time transcription (#398/#402).
+    body: z.string(),
+    bodyHtml: z.string().optional(),
+    slug: z.string().max(50),
+    revision: z.number().int(),
+    minReadLevel: z.number().int(),
+    minEditLevel: z.number().int(),
+    authorId: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    deletedAt: z.string().nullable()
+  })
+);
+
+const WikiRevisionSummary = registry.register(
+  'WikiRevisionSummary',
+  z.object({
+    id: z.number().int(),
+    revision: z.number().int(),
+    title: z.string(),
+    authorId: z.number().int(),
+    author: z.object({ id: z.number().int(), username: z.string() }),
+    createdAt: z.string()
+  })
+);
+
+const WikiRevisionContent = registry.register(
+  'WikiRevisionContent',
+  z.object({
+    revision: z.number().int(),
+    title: z.string(),
+    body: z.string(),
+    authorId: z.number().int(),
+    author: z.object({ id: z.number().int(), username: z.string() }),
+    // When `rev` is the CURRENT revision the live page is returned shaped like
+    // a revision, and this carries the page's `updatedAt` rather than a
+    // revision row's `createdAt`.
+    createdAt: z.string()
+  })
+);
+
+const WikiCompare = registry.register(
+  'WikiCompare',
+  z.object({
+    pageId: z.number().int(),
+    title: z.string(),
+    old: z.object({
+      revision: z.number().int(),
+      body: z.string().nullable()
+    }),
+    new: z.object({
+      revision: z.number().int(),
+      body: z.string().nullable()
+    })
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki',
+  tags: ['Wiki'],
+  summary: 'Search and list wiki pages',
+  request: { query: wikiSearchQuerySchema },
+  responses: {
+    200: {
+      description: 'Paginated pages',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(WikiPage), meta: PaginationMeta })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/wiki',
+  tags: ['Wiki'],
+  summary: 'Create a wiki page',
+  description:
+    'Requires `wiki_edit`, or one of `wiki_manage`/`admin`/`staff`. ' +
+    '**`minReadLevel` and `minEditLevel` are forced to 0 unless the caller can ' +
+    'MANAGE the wiki** — a plain `wiki_edit` author cannot create a restricted ' +
+    'page, and the values they send are ignored rather than rejected.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: createWikiPageSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Page created',
+      content: { 'application/json': { schema: WikiPage } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Neither wiki_edit nor a managing permission',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki/by-alias/{alias}',
+  tags: ['Wiki'],
+  summary: 'Resolve an alias to its page',
+  description:
+    'The alias is a SLUG, not an id, and is normalised (lowercased, ' +
+    'non-alphanumerics collapsed to hyphens) before lookup.',
+  request: { params: z.object({ alias: z.string() }) },
+  responses: {
+    200: {
+      description: 'The aliased page',
+      content: { 'application/json': { schema: WikiPage } }
+    },
+    404: {
+      description: 'No such alias',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki/{id}',
+  tags: ['Wiki'],
+  summary: 'One wiki page',
+  description:
+    "A page above the caller's read level answers 404, not 403, so the " +
+    'endpoint does not confirm it exists.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Page',
+      content: { 'application/json': { schema: WikiPage } }
+    },
+    404: {
+      description: 'Not found, or above the caller read level',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/wiki/{id}',
+  tags: ['Wiki'],
+  summary: 'Update a wiki page',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateWikiPageSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated page',
+      content: { 'application/json': { schema: WikiPage } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Insufficient permission to edit this page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found, or above the caller read level',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/wiki/{id}',
+  tags: ['Wiki'],
+  summary: 'Delete a wiki page',
+  description:
+    'Gated at the middleware by `wiki_manage` or `admin` — the per-page edit ' +
+    'level does not grant deletion.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Page deleted'
+    },
+    403: {
+      description: 'Missing wiki_manage/admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Page not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki/{id}/revisions',
+  tags: ['Wiki'],
+  summary: 'Revision history for a page',
+  description:
+    'Requires the page EDIT level, not the read level — being able to read a ' +
+    'page does not entitle you to its history.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'History, newest revision first',
+      content: {
+        'application/json': {
+          schema: z.object({
+            currentRevision: z.number().int(),
+            revisions: z.array(WikiRevisionSummary)
+          })
+        }
+      }
+    },
+    403: {
+      description: 'Insufficient permission to view revision history',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found, or above the caller read level',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki/{id}/revisions/{rev}',
+  tags: ['Wiki'],
+  summary: 'The full body of one revision',
+  description:
+    'Requires the page EDIT level. Asking for the CURRENT revision returns the ' +
+    "live page shaped like a revision, in which case `createdAt` is the page's " +
+    "`updatedAt` rather than a revision row's own timestamp.",
+  request: {
+    params: z.object({ id: z.string(), rev: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Revision content',
+      content: { 'application/json': { schema: WikiRevisionContent } }
+    },
+    403: {
+      description: 'Insufficient permission to view revision content',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Page or revision not found, or above the caller read level',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/wiki/{id}/compare',
+  tags: ['Wiki'],
+  summary: 'Compare two revisions of a page',
+  description:
+    'Requires the page EDIT level. `old` must be strictly less than `new`. ' +
+    'Either body comes back null if that revision has no stored body.',
+  request: {
+    params: z.object({ id: z.string() }),
+    query: wikiCompareQuerySchema
+  },
+  responses: {
+    200: {
+      description: 'Both revision bodies',
+      content: { 'application/json': { schema: WikiCompare } }
+    },
+    400: {
+      description: '`old` must be less than `new`',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Insufficient permission to compare revisions',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description:
+        'Page or either revision not found, or above the caller read level',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/wiki/{id}/rollback/{rev}',
+  tags: ['Wiki'],
+  summary: 'Roll a page back to an earlier revision',
+  description:
+    'Requires the page EDIT level. The rollback is written as a NEW revision ' +
+    'rather than by rewinding, so history is never discarded.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), rev: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'The page after rollback',
+      content: { 'application/json': { schema: WikiPage } }
+    },
+    403: {
+      description: 'Insufficient permission to edit this page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Page or revision not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/wiki/{id}/aliases',
+  tags: ['Wiki'],
+  summary: 'Add an alias to a page',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: addAliasSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Alias created',
+      content: {
+        'application/json': { schema: z.object({ alias: z.string() }) }
+      }
+    },
+    400: {
+      description: 'The alias normalised to nothing usable',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Page not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'That alias is already in use',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/wiki/{id}/aliases/{alias}',
+  tags: ['Wiki'],
+  summary: 'Remove an alias from a page',
+  description: 'The alias is addressed by its slug, which is its primary key.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), alias: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Alias removed'
+    },
+    404: {
+      description: 'Page not found, or that alias is not on this page',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
