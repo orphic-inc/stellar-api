@@ -20,6 +20,8 @@ import {
 import {
   adminCreateUserSchema,
   userSettingsSchema,
+  warnUserSchema,
+  moderationNoteSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
   pmDraftSchema,
   massPmSchema
@@ -909,6 +911,266 @@ const AdminCreatedUser = registry.register(
     email: z.string().email()
   })
 );
+
+// Moderation reads include the acting staff member; the CREATE responses return
+// the freshly-made row without that relation, so `warnedBy`/`author` are
+// optional rather than required.
+const UserWarning = registry.register(
+  'UserWarning',
+  z.object({
+    id: z.number().int(),
+    userId: z.number().int(),
+    warnedById: z.number().int(),
+    reason: z.string(),
+    expiresAt: z.string().nullable(),
+    createdAt: z.string(),
+    warnedBy: z
+      .object({ id: z.number().int(), username: z.string() })
+      .optional()
+  })
+);
+
+const UserModerationNote = registry.register(
+  'UserModerationNote',
+  z.object({
+    id: z.number().int(),
+    userId: z.number().int(),
+    authorId: z.number().int(),
+    body: z.string(),
+    createdAt: z.string(),
+    author: z.object({ id: z.number().int(), username: z.string() }).optional()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/warnings',
+  tags: ['Users'],
+  summary: 'Warnings on a user',
+  description:
+    'Requires `users_warn`. Newest first, each carrying the staff member who ' +
+    'issued it.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Warnings',
+      content: { 'application/json': { schema: z.array(UserWarning) } }
+    },
+    403: {
+      description: 'Missing users_warn',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/warn',
+  tags: ['Users'],
+  summary: 'Warn a user',
+  description:
+    'Requires `users_warn`. Beyond creating the row this **increments the ' +
+    "user's `warnedTimes` and stamps `warned`**, which is what the Standing " +
+    'tier (PRD-05/ADR-0004) reads — so a warning is a reputation event, not ' +
+    'just a note. Omit `expiresAt` for a warning that does not lapse. The ' +
+    'response wraps the new row as `{ warning }` and does not include ' +
+    '`warnedBy`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: warnUserSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Warning issued',
+      content: {
+        'application/json': { schema: z.object({ warning: UserWarning }) }
+      }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing users_warn',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/users/{id}/warnings/{warnId}',
+  tags: ['Users'],
+  summary: 'Rescind a warning',
+  description: 'Requires `users_warn`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), warnId: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Warning removed'
+    },
+    403: {
+      description: 'Missing users_warn',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Warning not found on that user',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/notes',
+  tags: ['Users'],
+  summary: 'Staff moderation notes on a user',
+  description:
+    'Requires `users_edit` — a DIFFERENT permission from the warnings above, ' +
+    'so a moderator who can warn cannot necessarily read notes. Newest first, ' +
+    'each carrying its author.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Moderation notes',
+      content: {
+        'application/json': { schema: z.array(UserModerationNote) }
+      }
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/notes',
+  tags: ['Users'],
+  summary: 'Add a moderation note to a user',
+  description:
+    'Requires `users_edit`. Unlike a warning this is staff-internal and has ' +
+    "no effect on the member's standing. The response wraps the new row as " +
+    '`{ note }` and does not include `author`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: moderationNoteSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Note added',
+      content: {
+        'application/json': {
+          schema: z.object({ note: UserModerationNote })
+        }
+      }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/users/{id}/notes/{noteId}',
+  tags: ['Users'],
+  summary: 'Delete a moderation note',
+  description: 'Requires `users_edit`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), noteId: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Note deleted'
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'That note does not exist on that user',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/disable',
+  tags: ['Users'],
+  summary: 'Disable a user account',
+  description:
+    'Requires `users_disable` — a third permission, distinct from both ' +
+    '`users_warn` and `users_edit`. This is the SOFT delete: it sets ' +
+    '`disabled: true`, it does not remove the row, and the action is written ' +
+    'to the audit log. Answers **200 with a message, not 204**.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'User disabled',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing users_disable',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/enable',
+  tags: ['Users'],
+  summary: 'Re-enable a disabled user account',
+  description:
+    'Requires `users_disable`, the same permission that disables. Audited. ' +
+    'Answers **200 with a message, not 204**.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'User enabled',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing users_disable',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',
@@ -6533,18 +6795,38 @@ registry.registerPath({
   }
 });
 
+// The message rows embedded in StaffInboxTicket, named so the reply route can
+// declare what it returns.
+const StaffInboxMessage = registry.register(
+  'StaffInboxMessage',
+  z.object({
+    id: z.number(),
+    body: z.string(),
+    createdAt: z.string(),
+    sender: AuthorRef.nullable()
+  })
+);
+
 registry.registerPath({
   method: 'post',
   path: '/staff-inbox/tickets/{id}/reply',
   tags: ['StaffInbox'],
+  summary: 'Reply to a staff-inbox ticket',
+  description:
+    'Returns the created message. A ticket belonging to someone else is ' +
+    'masked as **404, never 403** — the route deliberately does not confirm ' +
+    "that another member's ticket exists.",
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: staffReplySchema } } }
   },
   responses: {
-    201: { description: 'Reply sent' },
-    403: {
-      description: 'Forbidden',
+    201: {
+      description: 'Reply sent',
+      content: { 'application/json': { schema: StaffInboxMessage } }
+    },
+    404: {
+      description: "No such ticket, or it is not the caller's",
       content: { 'application/json': { schema: MsgResponse } }
     },
     422: {

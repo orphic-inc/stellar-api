@@ -1466,6 +1466,95 @@
           "email"
         ]
       },
+      "UserWarning": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "warnedById": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "warnedBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "warnedById",
+          "reason",
+          "expiresAt",
+          "createdAt"
+        ]
+      },
+      "UserModerationNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "authorId": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "authorId",
+          "body",
+          "createdAt"
+        ]
+      },
       "IrcNickLinkResult": {
         "type": "object",
         "properties": {
@@ -5077,6 +5166,36 @@
           "conversations"
         ]
       },
+      "StaffInboxMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "sender": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuthorRef"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "createdAt",
+          "sender"
+        ]
+      },
       "StaffInboxResponse": {
         "type": "object",
         "properties": {
@@ -7614,6 +7733,516 @@
           },
           "403": {
             "description": "Missing the staff permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/warnings": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Warnings on a user",
+        "description": "Requires `users_warn`. Newest first, each carrying the staff member who issued it.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Warnings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserWarning"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_warn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/warn": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Warn a user",
+        "description": "Requires `users_warn`. Beyond creating the row this **increments the user's `warnedTimes` and stamps `warned`**, which is what the Standing tier (PRD-05/ADR-0004) reads — so a warning is a reputation event, not just a note. Omit `expiresAt` for a warning that does not lapse. The response wraps the new row as `{ warning }` and does not include `warnedBy`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Warning issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "warning": {
+                      "$ref": "#/components/schemas/UserWarning"
+                    }
+                  },
+                  "required": [
+                    "warning"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_warn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/warnings/{warnId}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Rescind a warning",
+        "description": "Requires `users_warn`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "warnId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Warning removed"
+          },
+          "403": {
+            "description": "Missing users_warn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Warning not found on that user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/notes": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff moderation notes on a user",
+        "description": "Requires `users_edit` — a DIFFERENT permission from the warnings above, so a moderator who can warn cannot necessarily read notes. Newest first, each carrying its author.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Moderation notes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserModerationNote"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Add a moderation note to a user",
+        "description": "Requires `users_edit`. Unlike a warning this is staff-internal and has no effect on the member's standing. The response wraps the new row as `{ note }` and does not include `author`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Note added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "$ref": "#/components/schemas/UserModerationNote"
+                    }
+                  },
+                  "required": [
+                    "note"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/notes/{noteId}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Delete a moderation note",
+        "description": "Requires `users_edit`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "noteId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Note deleted"
+          },
+          "403": {
+            "description": "Missing users_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That note does not exist on that user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/disable": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Disable a user account",
+        "description": "Requires `users_disable` — a third permission, distinct from both `users_warn` and `users_edit`. This is the SOFT delete: it sets `disabled: true`, it does not remove the row, and the action is written to the audit log. Answers **200 with a message, not 204**.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_disable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/enable": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Re-enable a disabled user account",
+        "description": "Requires `users_disable`, the same permission that disables. Audited. Answers **200 with a message, not 204**.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_disable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -18779,6 +19408,8 @@
         "tags": [
           "StaffInbox"
         ],
+        "summary": "Reply to a staff-inbox ticket",
+        "description": "Returns the created message. A ticket belonging to someone else is masked as **404, never 403** — the route deliberately does not confirm that another member's ticket exists.",
         "parameters": [
           {
             "schema": {
@@ -18809,10 +19440,17 @@
         },
         "responses": {
           "201": {
-            "description": "Reply sent"
+            "description": "Reply sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffInboxMessage"
+                }
+              }
+            }
           },
-          "403": {
-            "description": "Forbidden",
+          "404": {
+            "description": "No such ticket, or it is not the caller's",
             "content": {
               "application/json": {
                 "schema": {
