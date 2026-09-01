@@ -53,6 +53,7 @@ npm run test             # jest --forceExit (parallel: jest.config.cjs sets maxW
 npm run test:watch       # jest --watch
 npm run test:integration # integration tests (requires .env.test)
 npm run openapi:export   # generate openapi spec via ts-node src/scripts/export-openapi.ts
+npm run openapi:completeness # are all mounted routes registered in lib/openapi.ts? (#474; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
 npm run db:seed          # recreate default user ranks after a DB reset; then go to /install
@@ -238,6 +239,8 @@ src/
     errors.ts               # AppError class (extends Error with statusCode)
     mailer.ts               # SMTP email utility (sendInviteEmail)
     openapi.ts              # Zod→OpenAPI registry (@asteasolutions/zod-to-openapi) — the contract source of truth. Registration is manual: a route absent from it is invisible to openapi.json and to stellar-ui
+    openapiCompleteness.ts  # Pure checker (#474): mounted routes vs registered operations, with a shrink-only baseline. CLI wrapper in scripts/
+    expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
     pagination.ts           # parsePage(req) → { skip, limit, page }
                             # paginatedResponse(res, data, total, pg)
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)

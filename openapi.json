@@ -14008,7 +14008,7 @@
         }
       }
     },
-    "/api/requests": {
+    "/requests": {
       "get": {
         "summary": "List requests",
         "tags": [
@@ -14115,7 +14115,7 @@
         }
       }
     },
-    "/api/requests/{id}": {
+    "/requests/{id}": {
       "get": {
         "summary": "Get request details",
         "tags": [
@@ -14141,7 +14141,7 @@
         }
       }
     },
-    "/api/requests/{id}/bounty": {
+    "/requests/{id}/bounty": {
       "post": {
         "summary": "Add bounty to request",
         "tags": [
@@ -14187,7 +14187,7 @@
         }
       }
     },
-    "/api/requests/{id}/fill": {
+    "/requests/{id}/fill": {
       "post": {
         "summary": "Fill request",
         "tags": [
