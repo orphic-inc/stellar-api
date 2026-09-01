@@ -9424,16 +9424,22 @@ registry.registerPath({
 // revision bodies and comparison are closed to you. Revision history, revision
 // CONTENT and compare all require the EDIT level, not the read level.
 
-// Mirrors PAGE_SELECT / PAGE_WITH_BODY_SELECT in routes/api/wiki.ts, which is
-// what these routes actually project — NOT the bare Prisma model.
-const WikiPage = registry.register(
-  'WikiPage',
+// Three shapes, because routes/api/wiki.ts projects three — NOT the bare Prisma
+// model, and not one shape for all six reads:
+//
+//   PAGE_SELECT            -> WikiPageSummary   the list rows; NO body
+//   PAGE_WITH_BODY_SELECT  -> WikiPage          create/update/rollback echoes
+//   ... + withBodyHtml()   -> WikiPageRendered  the two direct page reads
+//
+// The split is load-bearing: `GET /wiki` genuinely cannot serve `body`, and the
+// two direct reads always carry `bodyHtml` because they pass the row through
+// withBodyHtml() (#398/#402). A single optional-everything schema told the UI
+// both of those were maybes.
+const WikiPageSummary = registry.register(
+  'WikiPageSummary',
   z.object({
     id: z.number().int(),
     title: z.string().max(100),
-    // Raw BBCode. `bodyHtml` is the read-time transcription (#398/#402).
-    body: z.string(),
-    bodyHtml: z.string().optional(),
     slug: z.string().max(50),
     revision: z.number().int(),
     minReadLevel: z.number().int(),
@@ -9448,10 +9454,31 @@ const WikiPage = registry.register(
         userId: z.number().int(),
         createdAt: z.string()
       })
-    ),
+    )
+  })
+);
+
+// PAGE_WITH_BODY_SELECT — the summary plus the raw BBCode. Returned by the
+// three WRITE routes, which respond with the select directly and so carry no
+// `bodyHtml`.
+const WikiPage = registry.register(
+  'WikiPage',
+  WikiPageSummary.extend({
+    // Raw BBCode. `bodyHtml` is the read-time transcription (#398/#402).
+    body: z.string()
+  })
+);
+
+// What the two DIRECT page reads return: the row put through withBodyHtml(), so
+// `bodyHtml` is always present here and never present on WikiPage.
+const WikiPageRendered = registry.register(
+  'WikiPageRendered',
+  WikiPage.extend({
+    bodyHtml: z.string(),
     // Only the by-alias route projects this — it selects `deletedAt` to reject
-    // a deleted page and then returns the row whole. The other reads never
-    // include it, so it is optional rather than always present.
+    // a deleted page and then returns the row whole. /wiki/{id} does not, so it
+    // is optional rather than always present. It is always null when returned:
+    // a deleted page answers 404 before this point.
     deletedAt: z.string().nullable().optional()
   })
 );
@@ -9488,14 +9515,10 @@ const WikiCompare = registry.register(
   z.object({
     pageId: z.number().int(),
     title: z.string(),
-    old: z.object({
-      revision: z.number().int(),
-      body: z.string().nullable()
-    }),
-    new: z.object({
-      revision: z.number().int(),
-      body: z.string().nullable()
-    })
+    // Never null in a 200: a revision whose body cannot be resolved answers
+    // 404 `Revision N not found` before the response is built.
+    old: z.object({ revision: z.number().int(), body: z.string() }),
+    new: z.object({ revision: z.number().int(), body: z.string() })
   })
 );
 
@@ -9510,7 +9533,10 @@ registry.registerPath({
       description: 'Paginated pages',
       content: {
         'application/json': {
-          schema: z.object({ data: z.array(WikiPage), meta: PaginationMeta })
+          schema: z.object({
+            data: z.array(WikiPageSummary),
+            meta: PaginationMeta
+          })
         }
       }
     }
@@ -9559,7 +9585,7 @@ registry.registerPath({
   responses: {
     200: {
       description: 'The aliased page',
-      content: { 'application/json': { schema: WikiPage } }
+      content: { 'application/json': { schema: WikiPageRendered } }
     },
     403: {
       description: 'Insufficient rank to view this page',
@@ -9587,7 +9613,7 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Page',
-      content: { 'application/json': { schema: WikiPage } }
+      content: { 'application/json': { schema: WikiPageRendered } }
     },
     403: {
       description: 'Insufficient rank to view this page',
