@@ -2,10 +2,7 @@
   "$comment": "Grandfathered gaps for the OpenAPI completeness gate (#474). This list only ever SHRINKS: register a route, then delete its line. A stale entry (now registered, or no longer routed) fails the check, so the list cannot rot into a permanent mute. Regenerate with `npm run openapi:completeness -- --write-baseline`.",
   "generated": "2026-09-01",
   "unregistered": [
-    "DELETE /users/donor-ranks/{rankId}",
-    "DELETE /users/{id}/donor",
     "GET /users/by-irc-nick/{nick}",
-    "GET /users/donor-ranks",
     "GET /users/duplicate-ips",
     "GET /users/me/snatch-list",
     "GET /users/registration-log",
@@ -14,10 +11,7 @@
     "GET /users/{id}/rank",
     "GET /users/{id}/reputation",
     "GET /users/{id}/snatch-list",
-    "POST /users/donor-ranks",
     "POST /users/irc-nick/verify",
-    "POST /users/{id}/donor",
-    "PUT /users/donor-ranks/{rankId}",
     "PUT /users/{id}/rank"
   ],
   "paramMismatches": [
