@@ -267,6 +267,204 @@ registry.registerPath({
   }
 });
 
+const ChangePasswordBody = registry.register(
+  'ChangePasswordBody',
+  z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8)
+  })
+);
+
+const ChangeEmailBody = registry.register(
+  'ChangeEmailBody',
+  z.object({
+    newEmail: z.string().email(),
+    password: z.string().min(1)
+  })
+);
+
+const RecoveryRequestBody = registry.register(
+  'RecoveryRequestBody',
+  z.object({ email: z.string().email() })
+);
+
+const RecoveryResetBody = registry.register(
+  'RecoveryResetBody',
+  z.object({
+    token: z.string().min(1),
+    newPassword: z.string().min(8)
+  })
+);
+
+const UserSession = registry.register(
+  'UserSession',
+  z.object({
+    // cuid, not an integer id.
+    id: z.string(),
+    userId: z.number().int(),
+    ipAddress: z.string(),
+    userAgent: z.string().nullable(),
+    createdAt: z.string(),
+    lastActiveAt: z.string(),
+    // Always null on the list route, which returns active sessions only.
+    revokedAt: z.string().nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/password',
+  tags: ['Auth'],
+  summary: 'Change the password of the authenticated member',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: ChangePasswordBody } } }
+  },
+  responses: {
+    204: {
+      description: 'Password changed'
+    },
+    400: {
+      description: 'Current password incorrect, or the new one is disallowed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/auth/email',
+  tags: ['Auth'],
+  summary: 'Change the email of the authenticated member',
+  description:
+    'Requires the current password. The originating IP is recorded with the ' +
+    'change.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: ChangeEmailBody } } }
+  },
+  responses: {
+    200: {
+      description: 'Email updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Password incorrect, or the email is already in use',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/recovery/request',
+  tags: ['Auth'],
+  summary: 'Request an account-recovery email',
+  description:
+    'Always answers 200 with the same generic message, whether or not the ' +
+    'address belongs to an account. That is deliberate: a distinguishable ' +
+    'response would make this an account-enumeration oracle. There is no 404 ' +
+    'here by design. Rate-limited by authLimiter.',
+  request: {
+    body: { content: { 'application/json': { schema: RecoveryRequestBody } } }
+  },
+  responses: {
+    200: {
+      description:
+        'Generic acknowledgement — identical for a known and an unknown address',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    429: {
+      description: 'Rate limited',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/recovery/reset',
+  tags: ['Auth'],
+  summary: 'Reset a password using a recovery token',
+  description: 'Rate-limited by authLimiter.',
+  request: {
+    body: { content: { 'application/json': { schema: RecoveryResetBody } } }
+  },
+  responses: {
+    200: {
+      description: 'Password reset',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description:
+        'Invalid or expired token, or the new password is disallowed',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    429: {
+      description: 'Rate limited',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/auth/sessions',
+  tags: ['Auth'],
+  summary: 'Active sessions for the authenticated member',
+  description:
+    'Revoked sessions are excluded, so `revokedAt` is always null here. ' +
+    'Ordered by `lastActiveAt`, most recent first.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Active sessions',
+      content: { 'application/json': { schema: z.array(UserSession) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/auth/sessions/{id}',
+  tags: ['Auth'],
+  summary: 'Revoke one of your own sessions',
+  description:
+    "Scoped to the caller: another member's session id answers 404 rather " +
+    'than 403, so the endpoint does not confirm that the id exists.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Session revoked'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'No such session belonging to the caller',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Install ──────────────────────────────────────────────────────────────────
 
 registry.registerPath({
@@ -325,6 +523,27 @@ registry.registerPath({
     },
     400: {
       description: 'Already installed or validation error',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/install/checklist/{id}/dismiss',
+  tags: ['Install'],
+  summary: 'Staff: dismiss one launch-checklist item',
+  description:
+    'Idempotent — the dismissed ids are held as a set, so re-dismissing the ' +
+    'same item changes nothing. Requires the `staff` permission.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Checklist item dismissed'
+    },
+    403: {
+      description: 'Missing the staff permission',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
