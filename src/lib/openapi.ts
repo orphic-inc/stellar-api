@@ -22,6 +22,8 @@ import {
   userSettingsSchema,
   warnUserSchema,
   moderationNoteSchema,
+  donorRankSchema,
+  grantDonorSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
   pmDraftSchema,
   massPmSchema
@@ -911,6 +913,188 @@ const AdminCreatedUser = registry.register(
     email: z.string().email()
   })
 );
+
+const DonorRank = registry.register(
+  'DonorRank',
+  z.object({
+    id: z.number().int(),
+    name: z.string(),
+    minDonation: z.number(),
+    expiresAfterDays: z.number().int().nullable(),
+    // Json column: a flat map of perk key to whether the rank grants it.
+    perks: z.record(z.string(), z.boolean()),
+    // Both default at the DB rather than being nullable — `badge` to a heart
+    // glyph, `color` to an empty string.
+    color: z.string(),
+    badge: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/donor-ranks',
+  tags: ['Users'],
+  summary: 'The donor rank ladder',
+  description:
+    'Readable by any authenticated member — this is the only donor route ' +
+    'that does NOT require `donor_ranks_manage`, because the perks are ' +
+    'member-facing. Ordered by `minDonation`, cheapest first.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Donor ranks',
+      content: { 'application/json': { schema: z.array(DonorRank) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/donor-ranks',
+  tags: ['Users'],
+  summary: 'Create a donor rank',
+  description: 'Requires `donor_ranks_manage`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: donorRankSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Donor rank created',
+      content: { 'application/json': { schema: DonorRank } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing donor_ranks_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/donor-ranks/{rankId}',
+  tags: ['Users'],
+  summary: 'Replace a donor rank',
+  description:
+    'Requires `donor_ranks_manage`. **A full replace, not a partial patch** — ' +
+    'it validates against the same schema as create, so any optional field ' +
+    'you omit is written as its default rather than left as it was.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ rankId: z.string() }),
+    body: { content: { 'application/json': { schema: donorRankSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated donor rank',
+      content: { 'application/json': { schema: DonorRank } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing donor_ranks_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Donor rank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/users/donor-ranks/{rankId}',
+  tags: ['Users'],
+  summary: 'Delete a donor rank',
+  description: 'Requires `donor_ranks_manage`.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ rankId: z.string() }) },
+  responses: {
+    204: {
+      description: 'Donor rank deleted'
+    },
+    403: {
+      description: 'Missing donor_ranks_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Donor rank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/donor',
+  tags: ['Users'],
+  summary: 'Grant donor status to a user',
+  description:
+    'Requires `donor_ranks_manage`. Omit `expiresAt` for a grant that does ' +
+    'not lapse. `donorExpiryJob` sweeps expired grants hourly and is ' +
+    'condition-based, so a later staff re-grant survives the sweep. Answers ' +
+    '**201 with a message rather than the granted row** — unusual for a 201, ' +
+    'but that is what ships.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: grantDonorSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Donor status granted',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing donor_ranks_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User or donor rank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/users/{id}/donor',
+  tags: ['Users'],
+  summary: 'Revoke a user donor status',
+  description:
+    'Requires `donor_ranks_manage`. Removes **every** donor-rank grant on ' +
+    'that user, not just the most recent, and clears the `isDonor` flag.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Donor status revoked'
+    },
+    403: {
+      description: 'Missing donor_ranks_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 // Moderation reads include the acting staff member; the CREATE responses return
 // the freshly-made row without that relation, so `warnedBy`/`author` are
