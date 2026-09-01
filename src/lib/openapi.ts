@@ -38,6 +38,13 @@ import {
   wikiCompareQuerySchema
 } from '../schemas/wiki';
 import {
+  createCommunitySchema,
+  updateCommunitySchema,
+  createGroupSchema,
+  updateGroupSchema,
+  releaseVoteSchema
+} from '../schemas/community';
+import {
   logCheckRequestSchema,
   logCheckResultSchema
 } from '../schemas/logCheck';
@@ -3828,6 +3835,386 @@ registry.registerPath({
           })
         }
       }
+    }
+  }
+});
+
+const CommunityVoteState = registry.register(
+  'CommunityVoteState',
+  z.object({
+    myVote: z.number().int().nullable(),
+    voteAggregate: z.number().int()
+  })
+);
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities',
+  tags: ['Communities'],
+  summary: 'Create a community',
+  description:
+    'Requires `communities_manage`. `leaderId` is mandatory unless ' +
+    '`registrationStatus` is `open`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: { 'application/json': { schema: createCommunitySchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Community created',
+      content: { 'application/json': { schema: Community } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Leader user not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/communities/{id}',
+  tags: ['Communities'],
+  summary: 'Update a community',
+  description:
+    'Gated on `communities_manage` ALONE — a community leader or curator ' +
+    'cannot configure their own community, so everything here including ' +
+    '`announceVisibility` is site-staff-only. That is the settled position, ' +
+    'not an oversight: ADR-0030 section 5 was amended to match the code ' +
+    '(PR #469).',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateCommunitySchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated community',
+      content: { 'application/json': { schema: Community } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Community, or the named leader user, not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{id}',
+  tags: ['Communities'],
+  summary: 'Delete a community',
+  description: 'Requires `communities_manage`.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Community deleted'
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Community not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{id}/members',
+  tags: ['Communities'],
+  summary: 'Add a member (consumer) to a community',
+  description: 'Community admin or curator only.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ userId: z.number().int().positive() })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Member added',
+      content: { 'application/json': { schema: CommunityMember } }
+    },
+    403: {
+      description: 'Not a community admin or curator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{id}/members/{userId}',
+  tags: ['Communities'],
+  summary: 'Remove a member from a community',
+  description:
+    'Answers 409 when the target is the community LEADER or a CURATOR: that ' +
+    'role has to be removed first. The leader is checked before the curator ' +
+    'because a leader is always also a curator, so the message names the ' +
+    'role that actually has to be reassigned.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), userId: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Member removed'
+    },
+    403: {
+      description: 'Not a community admin or curator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description:
+        'The target is the community leader or a curator; remove that role first',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{id}/curators',
+  tags: ['Communities'],
+  summary: 'Promote a user to community curator',
+  description:
+    'Answers **204, not 201**, unlike POST /communities/{id}/members which ' +
+    'answers 201. The asymmetry is existing behaviour and is documented ' +
+    'rather than changed.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.object({ userId: z.number().int().positive() })
+        }
+      }
+    }
+  },
+  responses: {
+    204: {
+      description: 'Curator added'
+    },
+    403: {
+      description: 'Not a community admin or curator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{id}/curators/{userId}',
+  tags: ['Communities'],
+  summary: 'Demote a community curator',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), userId: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Curator removed'
+    },
+    403: {
+      description: 'Not a community admin or curator',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases',
+  tags: ['Communities'],
+  summary: 'Create a release in a community',
+  description:
+    'Requires `communities_manage`. At least one artist credit is required.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ communityId: z.string() }),
+    body: { content: { 'application/json': { schema: createGroupSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Release created',
+      content: { 'application/json': { schema: Release } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/communities/{communityId}/releases/{releaseId}',
+  tags: ['Communities'],
+  summary: 'Update release metadata',
+  description:
+    'Returns the release workbench view, not the bare release. **`tagIds` is ' +
+    'accepted by the schema and then ignored** — tags are managed through the ' +
+    '/tags routes, so sending them here succeeds and changes nothing. ' +
+    '`editSummary` is recorded on the resulting history entry.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    }),
+    body: { content: { 'application/json': { schema: updateGroupSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated release, as the workbench view',
+      content: { 'application/json': { schema: Release } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Not permitted to edit this release',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Release not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{communityId}/releases/{releaseId}',
+  tags: ['Communities'],
+  summary: 'Delete a release',
+  description: 'Requires `communities_manage`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    })
+  },
+  responses: {
+    204: {
+      description: 'Release deleted'
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Release not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/vote',
+  tags: ['Communities'],
+  summary: 'Cast or change your vote on a release',
+  description: '`positive: true` is an up-vote, `false` a down-vote.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    }),
+    body: { content: { 'application/json': { schema: releaseVoteSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Your vote and the new aggregate',
+      content: { 'application/json': { schema: CommunityVoteState } }
+    },
+    403: {
+      description: 'Not permitted to vote in this community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Release not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{communityId}/releases/{releaseId}/vote',
+  tags: ['Communities'],
+  summary: 'Clear your vote on a release',
+  description:
+    'Answers **200 with the new state**, not 204 — it clears a vote rather ' +
+    'than deleting a resource, and the caller needs the updated aggregate.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      communityId: z.string(),
+      releaseId: z.string()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Your (now cleared) vote and the new aggregate',
+      content: { 'application/json': { schema: CommunityVoteState } }
+    },
+    403: {
+      description: 'Not permitted to vote in this community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Release not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
