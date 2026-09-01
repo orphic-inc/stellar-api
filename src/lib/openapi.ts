@@ -24,6 +24,8 @@ import {
   moderationNoteSchema,
   donorRankSchema,
   grantDonorSchema,
+  ircNickVerifySchema,
+  setRankSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
   pmDraftSchema,
   massPmSchema
@@ -913,6 +915,352 @@ const AdminCreatedUser = registry.register(
     email: z.string().email()
   })
 );
+
+// ─── korin.pink inbound (ADR-0013 / ADR-0015) ────────────────────────────────
+//
+// Three routes in this file are gated by `requireServiceKey` — a Bearer service
+// key that fails closed — and NOT by a member session. They exist for the IRC
+// bridge to call; no browser client should ever reach them. They deliberately
+// carry no `bearerAuth` security block, because that would describe the wrong
+// credential.
+
+const IrcNickAccount = registry.register(
+  'IrcNickAccount',
+  z.object({
+    id: z.number().int(),
+    username: z.string(),
+    ircNick: z.string().nullable()
+  })
+);
+
+const IrcNickVerifyResult = registry.register(
+  'IrcNickVerifyResult',
+  z.object({
+    verified: z.boolean(),
+    // Present on failure only; the bot relays it back to the member over IRC.
+    reason: z.string().optional()
+  })
+);
+
+const SnatchItem = registry.register(
+  'SnatchItem',
+  z.object({
+    id: z.number().int(),
+    release: z.object({
+      id: z.number().int(),
+      title: z.string(),
+      communityId: z.number().int().nullable()
+    }),
+    artist: z.object({ name: z.string() }).nullable(),
+    downloadedAt: z.string()
+  })
+);
+
+const DuplicateIpGroup = registry.register(
+  'DuplicateIpGroup',
+  z.object({
+    ip: z.string(),
+    count: z.number().int(),
+    users: z.array(
+      z.object({
+        id: z.number().int(),
+        username: z.string(),
+        dateRegistered: z.string(),
+        disabled: z.boolean(),
+        lastLogin: z.string().nullable()
+      })
+    )
+  })
+);
+
+const RegistrationLogEntry = registry.register(
+  'RegistrationLogEntry',
+  z.object({
+    id: z.number().int(),
+    username: z.string(),
+    email: z.string(),
+    dateRegistered: z.string(),
+    disabled: z.boolean(),
+    lastIp: z.string().nullable(),
+    userRank: z.object({ id: z.number().int(), name: z.string() })
+  })
+);
+
+const UserRankState = registry.register(
+  'UserRankState',
+  z.object({
+    userRankId: z.number().int(),
+    secondaryRankIds: z.array(z.number().int()),
+    rankLocked: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/by-irc-nick/{nick}',
+  tags: ['Users'],
+  summary: 'korin: resolve a verified IRC nick to its account',
+  description:
+    'Service-key route (ADR-0013), not a member route — authenticate with the ' +
+    'korin service key, not a session. A disabled account answers 404 exactly ' +
+    'as an unknown nick does, so the endpoint does not reveal that a ' +
+    'suspended member exists.',
+  request: { params: z.object({ nick: z.string() }) },
+  responses: {
+    200: {
+      description: 'The linked account',
+      content: { 'application/json': { schema: IrcNickAccount } }
+    },
+    401: {
+      description: 'Missing or wrong service key',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'No account linked to that nick, or the account is disabled',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/irc-nick/verify',
+  tags: ['Users'],
+  summary: 'korin: complete an IRC nick verification',
+  description:
+    'Service-key route (ADR-0015). korin relays the authenticated IRC sender ' +
+    'nick and the code it received over a private query. **Always answers ' +
+    '200** — a failed verification is a `{ verified: false, reason }` RESULT ' +
+    'the bot relays back over IRC, not an HTTP error, so do not treat a ' +
+    'non-2xx as the failure path here.',
+  request: {
+    body: { content: { 'application/json': { schema: ircNickVerifySchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Verification result, successful or not',
+      content: { 'application/json': { schema: IrcNickVerifyResult } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Missing or wrong service key',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/duplicate-ips',
+  tags: ['Users'],
+  summary: 'Staff: accounts sharing a last-seen IP',
+  description:
+    'Requires `duplicate_ips_view`. Groups only IPs seen on more than one ' +
+    'account, busiest first.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Shared-IP groups',
+      content: {
+        'application/json': { schema: z.array(DuplicateIpGroup) }
+      }
+    },
+    403: {
+      description: 'Missing duplicate_ips_view',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/registration-log',
+  tags: ['Users'],
+  summary: 'Staff: accounts by registration date',
+  description:
+    'Requires `registration_log_view` — its own permission, separate from ' +
+    '`duplicate_ips_view`. Newest first. Includes email and last IP, so it is ' +
+    'a more sensitive read than the ordinary user list.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Paginated registrations',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(RegistrationLogEntry),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    403: {
+      description: 'Missing registration_log_view',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/email-history',
+  tags: ['Users'],
+  summary: 'Staff: a user past email addresses',
+  description:
+    'Requires `users_view_email`. The stored column is `newEmail`; it is ' +
+    'returned as `email`. Newest change first.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Email history',
+      content: {
+        'application/json': {
+          schema: z.array(
+            z.object({ email: z.string(), changedAt: z.string() })
+          )
+        }
+      }
+    },
+    403: {
+      description: 'Missing users_view_email',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/ip-history',
+  tags: ['Users'],
+  summary: 'Staff: a user IP history',
+  description:
+    'Requires `users_view_ips` — a different permission from ' +
+    '`users_view_email`, so the two histories are separately grantable.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'IP history',
+      content: {
+        'application/json': {
+          schema: z.array(z.object({ ip: z.string(), seenAt: z.string() }))
+        }
+      }
+    },
+    403: {
+      description: 'Missing users_view_ips',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/rank',
+  tags: ['Users'],
+  summary: 'Staff: a user rank, secondary ranks and lock state',
+  description:
+    'Requires `users_edit`. The canonical staff read of `rankLocked` — the ' +
+    'admin rank panel initialises its toggle from here.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Rank state',
+      content: { 'application/json': { schema: UserRankState } }
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/{id}/rank',
+  tags: ['Users'],
+  summary: 'Staff: set a user rank',
+  description:
+    'Requires `users_edit`. **`secondaryRankIds` REPLACES the whole secondary ' +
+    'set** — send the full list, not a delta, or you will strip a Donor/VIP ' +
+    'secondary. That is exactly why rank-lock is its own route ' +
+    '(PUT /users/{id}/rank-lock) rather than a field here. Answers 200 with a ' +
+    'message rather than the new rank state; re-read GET /users/{id}/rank for ' +
+    'that.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: setRankSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Rank updated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'User or rank not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/snatch-list',
+  tags: ['Users'],
+  summary: 'Staff: what a user has downloaded',
+  description: 'Requires `staff`.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Snatch list',
+      content: { 'application/json': { schema: z.array(SnatchItem) } }
+    },
+    403: {
+      description: 'Missing staff',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/me/snatch-list',
+  tags: ['Users'],
+  summary: 'What you have downloaded',
+  description:
+    'Self only, and needs no permission — the same shape the staff route ' +
+    'returns for someone else.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Your snatch list',
+      content: { 'application/json': { schema: z.array(SnatchItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 const DonorRank = registry.register(
   'DonorRank',
@@ -1854,6 +2202,39 @@ const CrsView = registry.register(
     suspect: z.boolean()
   })
 );
+
+// GET /users/{id}/reputation is registered HERE rather than up in the Users
+// block because it returns CrsView, and these consts evaluate in file order.
+// Kept adjacent to the member-facing /profile/me/reputation on purpose: the two
+// share a shape and differ only in exposure, and seeing them together is the
+// point.
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/reputation',
+  tags: ['Users'],
+  summary: 'korin: the full, unfiltered Community Reputation Score',
+  description:
+    'Service-key route, and **the unfiltered view** — unlike ' +
+    'GET /profile/me/reputation, which strips the moderation-only dimensions ' +
+    'and therefore always reports `suspect: false`. The two share a JSON ' +
+    'shape and differ in exposure: this one carries the invite-tree Contagion ' +
+    'signal and a MEANINGFUL `suspect` flag, which ADR-0004 section 3 requires ' +
+    'be kept from members so a sockpuppet ring is not tipped off. Do not bind ' +
+    'a member-facing UI to this route. Whether CRS is member-facing at all is ' +
+    'still open (#429); registering this documents what ships and settles ' +
+    'nothing.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Unfiltered reputation, including the moderation signal',
+      content: { 'application/json': { schema: CrsView } }
+    },
+    401: {
+      description: 'Missing or wrong service key',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',

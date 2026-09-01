@@ -1466,6 +1466,206 @@
           "email"
         ]
       },
+      "IrcNickAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "ircNick": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "ircNick"
+        ]
+      },
+      "IrcNickVerifyResult": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "verified"
+        ]
+      },
+      "SnatchItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "release": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              },
+              "communityId": {
+                "type": "integer",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "communityId"
+            ]
+          },
+          "artist": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "downloadedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "release",
+          "artist",
+          "downloadedAt"
+        ]
+      },
+      "DuplicateIpGroup": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "dateRegistered": {
+                  "type": "string"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "lastLogin": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "username",
+                "dateRegistered",
+                "disabled",
+                "lastLogin"
+              ]
+            }
+          }
+        },
+        "required": [
+          "ip",
+          "count",
+          "users"
+        ]
+      },
+      "RegistrationLogEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "dateRegistered": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "lastIp": {
+            "type": "string",
+            "nullable": true
+          },
+          "userRank": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email",
+          "dateRegistered",
+          "disabled",
+          "lastIp",
+          "userRank"
+        ]
+      },
+      "UserRankState": {
+        "type": "object",
+        "properties": {
+          "userRankId": {
+            "type": "integer"
+          },
+          "secondaryRankIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "rankLocked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "userRankId",
+          "secondaryRankIds",
+          "rankLocked"
+        ]
+      },
       "DonorRank": {
         "type": "object",
         "properties": {
@@ -7783,6 +7983,571 @@
         }
       }
     },
+    "/users/by-irc-nick/{nick}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "korin: resolve a verified IRC nick to its account",
+        "description": "Service-key route (ADR-0013), not a member route — authenticate with the korin service key, not a session. A disabled account answers 404 exactly as an unknown nick does, so the endpoint does not reveal that a suspended member exists.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "nick",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The linked account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IrcNickAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong service key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No account linked to that nick, or the account is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/irc-nick/verify": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "korin: complete an IRC nick verification",
+        "description": "Service-key route (ADR-0015). korin relays the authenticated IRC sender nick and the code it received over a private query. **Always answers 200** — a failed verification is a `{ verified: false, reason }` RESULT the bot relays back over IRC, not an HTTP error, so do not treat a non-2xx as the failure path here.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nick": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  }
+                },
+                "required": [
+                  "nick",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result, successful or not",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IrcNickVerifyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong service key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/duplicate-ips": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: accounts sharing a last-seen IP",
+        "description": "Requires `duplicate_ips_view`. Groups only IPs seen on more than one account, busiest first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared-IP groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicateIpGroup"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing duplicate_ips_view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/registration-log": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: accounts by registration date",
+        "description": "Requires `registration_log_view` — its own permission, separate from `duplicate_ips_view`. Newest first. Includes email and last IP, so it is a more sensitive read than the ordinary user list.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated registrations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegistrationLogEntry"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing registration_log_view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/email-history": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: a user past email addresses",
+        "description": "Requires `users_view_email`. The stored column is `newEmail`; it is returned as `email`. Newest change first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": "string"
+                      },
+                      "changedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "email",
+                      "changedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_view_email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/ip-history": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: a user IP history",
+        "description": "Requires `users_view_ips` — a different permission from `users_view_email`, so the two histories are separately grantable.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ip": {
+                        "type": "string"
+                      },
+                      "seenAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ip",
+                      "seenAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_view_ips",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/rank": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: a user rank, secondary ranks and lock state",
+        "description": "Requires `users_edit`. The canonical staff read of `rankLocked` — the admin rank panel initialises its toggle from here.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rank state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRankState"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: set a user rank",
+        "description": "Requires `users_edit`. **`secondaryRankIds` REPLACES the whole secondary set** — send the full list, not a delta, or you will strip a Donor/VIP secondary. That is exactly why rank-lock is its own route (PUT /users/{id}/rank-lock) rather than a field here. Answers 200 with a message rather than the new rank state; re-read GET /users/{id}/rank for that.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userRankId": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "secondaryRankIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "userRankId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rank updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing users_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User or rank not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/snatch-list": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: what a user has downloaded",
+        "description": "Requires `staff`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snatch list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SnatchItem"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing staff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/snatch-list": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "What you have downloaded",
+        "description": "Self only, and needs no permission — the same shape the staff route returns for someone else.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your snatch list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SnatchItem"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/donor-ranks": {
       "get": {
         "tags": [
@@ -9675,6 +10440,47 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/reputation": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "korin: the full, unfiltered Community Reputation Score",
+        "description": "Service-key route, and **the unfiltered view** — unlike GET /profile/me/reputation, which strips the moderation-only dimensions and therefore always reports `suspect: false`. The two share a JSON shape and differ in exposure: this one carries the invite-tree Contagion signal and a MEANINGFUL `suspect` flag, which ADR-0004 section 3 requires be kept from members so a sockpuppet ring is not tipped off. Do not bind a member-facing UI to this route. Whether CRS is member-facing at all is still open (#429); registering this documents what ships and settles nothing.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unfiltered reputation, including the moderation signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong service key",
             "content": {
               "application/json": {
                 "schema": {
