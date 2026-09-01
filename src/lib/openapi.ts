@@ -24,6 +24,13 @@ import {
   addContributionToReleaseSchema
 } from '../schemas/contribution';
 import {
+  createCollageSchema,
+  updateCollageSchema,
+  collageQuerySchema,
+  addEntrySchema,
+  reorderEntriesSchema
+} from '../schemas/collage';
+import {
   logCheckRequestSchema,
   logCheckResultSchema
 } from '../schemas/logCheck';
@@ -7455,6 +7462,417 @@ const DeletedCollageItem = registry.register(
     createdAt: z.string()
   })
 );
+
+// `descriptionHtml` recurs on every collage response that returns a body: the
+// description is stored as BBCode and transcribed at read time (#402), so the
+// rendered form is derived, never persisted.
+const Collage = registry.register(
+  'Collage',
+  z.object({
+    id: z.number().int(),
+    name: z.string().max(100),
+    description: z.string(),
+    descriptionHtml: z.string().optional(),
+    userId: z.number().int(),
+    categoryId: z.number().int(),
+    tags: z.array(z.string()),
+    isLocked: z.boolean(),
+    isDeleted: z.boolean(),
+    maxEntries: z.number().int(),
+    maxEntriesPerUser: z.number().int(),
+    isFeatured: z.boolean(),
+    numEntries: z.number().int(),
+    numSubscribers: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    deletedAt: z.string().nullable(),
+    user: z.object({
+      id: z.number().int(),
+      username: z.string(),
+      avatar: z.string().nullable()
+    }),
+    _count: z.object({
+      entries: z.number().int(),
+      subscriptions: z.number().int(),
+      bookmarks: z.number().int()
+    })
+  })
+);
+
+const CollageEntry = registry.register(
+  'CollageEntry',
+  z.object({
+    id: z.number().int(),
+    collageId: z.number().int(),
+    releaseId: z.number().int(),
+    userId: z.number().int(),
+    sort: z.number().int(),
+    addedAt: z.string(),
+    release: z.object({
+      id: z.number().int(),
+      title: z.string(),
+      image: z.string().nullable(),
+      year: z.number().int().nullable(),
+      communityId: z.number().int().nullable(),
+      releaseType: z.string().nullable(),
+      // The stored `credits` array is replaced by this derived display field
+      // (modules/releaseCredits withPrimaryArtist) — the Main credit, or the
+      // first credit when there is no Main.
+      artist: z.object({ id: z.number().int(), name: z.string() }).nullable()
+    }),
+    user: z.object({ id: z.number().int(), username: z.string() })
+  })
+);
+
+const CollageDetail = registry.register(
+  'CollageDetail',
+  Collage.extend({
+    entries: z.array(CollageEntry),
+    isSubscribed: z.boolean(),
+    isBookmarked: z.boolean()
+  })
+);
+
+const CollageSubscriber = registry.register(
+  'CollageSubscriber',
+  z.object({
+    userId: z.number().int(),
+    collageId: z.number().int(),
+    lastVisit: z.string().nullable(),
+    user: z.object({ id: z.number().int(), username: z.string() })
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/collages',
+  tags: ['Collages'],
+  summary: 'Browse collages',
+  description:
+    'Personal collages (categoryId 0) are excluded from general browse unless ' +
+    'you filter by `userId` or ask for `categoryId=0` explicitly. Deleted ' +
+    'collages are never listed here — see GET /collages/deleted.',
+  request: { query: collageQuerySchema },
+  responses: {
+    200: {
+      description: 'Paginated collages',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(Collage), meta: PaginationMeta })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/collages',
+  tags: ['Collages'],
+  summary: 'Create a collage',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: createCollageSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Collage created',
+      content: { 'application/json': { schema: Collage } }
+    },
+    400: {
+      description: 'Validation error, or a creation rule rejected the request',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Not permitted to create collages',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/collages/{id}',
+  tags: ['Collages'],
+  summary: 'One collage with its entries and your subscription context',
+  description:
+    'Entries are ordered by `sort`. `isSubscribed`/`isBookmarked` describe the ' +
+    'CALLER, so this response is per-viewer and not cacheable across members. ' +
+    'Visiting while subscribed updates your `lastVisit`. Two access rules are ' +
+    'worth noting: a DELETED collage answers 404 to non-staff rather than 403, ' +
+    'and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner ' +
+    'or staff.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Collage detail',
+      content: { 'application/json': { schema: CollageDetail } }
+    },
+    403: {
+      description: 'Personal collage belonging to someone else',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found, or deleted and the caller is not staff',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/collages/{id}',
+  tags: ['Collages'],
+  summary: 'Update a collage',
+  description:
+    '`isLocked` and the two entry limits are STAFF-ONLY fields: an owner ' +
+    'sending them gets 403, distinct from the 403 for editing a collage that ' +
+    'is not theirs.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: updateCollageSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated collage',
+      content: { 'application/json': { schema: Collage } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description:
+        'Not the owner, or a staff-only field (isLocked, maxEntries, maxEntriesPerUser) was sent',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Collage name already taken',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/collages/{id}',
+  tags: ['Collages'],
+  summary: 'Delete a collage',
+  description:
+    'The deletion is NOT uniform. A PERSONAL collage (categoryId 0) is HARD ' +
+    'deleted by its owner or staff and cannot be recovered. A PUBLIC collage ' +
+    'is soft-deleted (sets `isDeleted`) and only staff may do it, so an owner ' +
+    'who can delete their personal collage gets 403 on a public one; use ' +
+    'POST /collages/{id}/recover to restore that case.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Collage deleted — hard if personal, soft if public'
+    },
+    403: {
+      description:
+        'Neither owner nor staff, or a public collage and the caller is not staff',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/collages/{id}/recover',
+  tags: ['Collages'],
+  summary: 'Staff: restore a soft-deleted collage',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Collage restored',
+      content: { 'application/json': { schema: Collage } }
+    },
+    400: {
+      description: 'The collage is not deleted',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/collages/{id}/entries',
+  tags: ['Collages'],
+  summary: 'Add a release to a collage',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: addEntrySchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Entry added',
+      content: { 'application/json': { schema: CollageEntry } }
+    },
+    400: {
+      description:
+        'An entry limit was reached — either the collage maximum or your per-user limit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description:
+        'The collage is locked, or it is personal and not yours to add to',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Collage or release not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'That release is already in the collage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/collages/{id}/entries',
+  tags: ['Collages'],
+  summary: 'Reorder the entries of a collage',
+  description: 'Send every entry id with its new `sort`.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: reorderEntriesSchema } }
+    }
+  },
+  responses: {
+    204: {
+      description: 'Entries reordered'
+    },
+    403: {
+      description: 'Only the collage owner or staff may reorder entries',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Collage not found, or deleted',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/collages/{id}/entries/{releaseId}',
+  tags: ['Collages'],
+  summary: 'Remove a release from a collage',
+  description:
+    'Addressed by RELEASE id, not entry id — the pair is unique per collage.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string(), releaseId: z.string() })
+  },
+  responses: {
+    204: {
+      description: 'Entry removed'
+    },
+    403: {
+      description: "The collage is locked, or the entry is not the caller's",
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Collage or entry not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/collages/{id}/subscribe',
+  tags: ['Collages'],
+  summary: 'Toggle your subscription to a collage',
+  description:
+    'A TOGGLE despite the name: posting when already subscribed unsubscribes ' +
+    'you. The response says which state you ended in.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Resulting subscription state',
+      content: {
+        'application/json': {
+          schema: z.object({ subscribed: z.boolean() })
+        }
+      }
+    },
+    404: {
+      description: 'Collage not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/collages/{id}/bookmark',
+  tags: ['Collages'],
+  summary: 'Toggle your bookmark on a collage',
+  description: 'A toggle, like /subscribe.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Resulting bookmark state',
+      content: {
+        'application/json': {
+          schema: z.object({ bookmarked: z.boolean() })
+        }
+      }
+    },
+    404: {
+      description: 'Collage not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/collages/{id}/subscriptions',
+  tags: ['Collages'],
+  summary: 'Staff: who is subscribed to a collage',
+  description:
+    'Requires `collages_moderate`. Ordered by `lastVisit`, most recent first.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Subscribers',
+      content: {
+        'application/json': { schema: z.array(CollageSubscriber) }
+      }
+    },
+    403: {
+      description: 'Missing collages_moderate',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Collage not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
 
 registry.registerPath({
   method: 'get',
