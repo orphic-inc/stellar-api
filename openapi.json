@@ -5976,6 +5976,291 @@
           "createdAt"
         ]
       },
+      "Collage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string"
+          },
+          "descriptionHtml": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "categoryId": {
+            "type": "integer"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "maxEntries": {
+            "type": "integer"
+          },
+          "maxEntriesPerUser": {
+            "type": "integer"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "numEntries": {
+            "type": "integer"
+          },
+          "numSubscribers": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              },
+              "avatar": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "avatar"
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "entries": {
+                "type": "integer"
+              },
+              "subscriptions": {
+                "type": "integer"
+              },
+              "bookmarks": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "entries",
+              "subscriptions",
+              "bookmarks"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "userId",
+          "categoryId",
+          "tags",
+          "isLocked",
+          "isDeleted",
+          "maxEntries",
+          "maxEntriesPerUser",
+          "isFeatured",
+          "numEntries",
+          "numSubscribers",
+          "createdAt",
+          "updatedAt",
+          "deletedAt",
+          "user",
+          "_count"
+        ]
+      },
+      "CollageEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "collageId": {
+            "type": "integer"
+          },
+          "releaseId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "sort": {
+            "type": "integer"
+          },
+          "addedAt": {
+            "type": "string"
+          },
+          "release": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string",
+                "nullable": true
+              },
+              "year": {
+                "type": "integer",
+                "nullable": true
+              },
+              "communityId": {
+                "type": "integer",
+                "nullable": true
+              },
+              "releaseType": {
+                "type": "string",
+                "nullable": true
+              },
+              "artist": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "image",
+              "year",
+              "communityId",
+              "releaseType",
+              "artist"
+            ]
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "collageId",
+          "releaseId",
+          "userId",
+          "sort",
+          "addedAt",
+          "release",
+          "user"
+        ]
+      },
+      "CollageDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Collage"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entries": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CollageEntry"
+                }
+              },
+              "isSubscribed": {
+                "type": "boolean"
+              },
+              "isBookmarked": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "entries",
+              "isSubscribed",
+              "isBookmarked"
+            ]
+          }
+        ]
+      },
+      "CollageSubscriber": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer"
+          },
+          "collageId": {
+            "type": "integer"
+          },
+          "lastVisit": {
+            "type": "string",
+            "nullable": true
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "collageId",
+          "lastVisit",
+          "user"
+        ]
+      },
       "EconomyGroupedItem": {
         "type": "object",
         "properties": {
@@ -19770,6 +20055,886 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages": {
+      "get": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Browse collages",
+        "description": "Personal collages (categoryId 0) are excluded from general browse unless you filter by `userId` or ask for `categoryId=0` explicitly. Deleted collages are never listed here — see GET /collages/deleted.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 6
+            },
+            "required": false,
+            "name": "categoryId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "userId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "bookmarked",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "name",
+                "numEntries",
+                "numSubscribers"
+              ]
+            },
+            "required": false,
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "required": false,
+            "name": "order",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated collages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Collage"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Create a collage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 65535
+                  },
+                  "categoryId": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6,
+                    "default": 1
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    },
+                    "maxItems": 20,
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name",
+                  "description"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Collage created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error, or a creation rule rejected the request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted to create collages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}": {
+      "get": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "One collage with its entries and your subscription context",
+        "description": "Entries are ordered by `sort`. `isSubscribed`/`isBookmarked` describe the CALLER, so this response is per-viewer and not cacheable across members. Visiting while subscribed updates your `lastVisit`. Two access rules are worth noting: a DELETED collage answers 404 to non-staff rather than 403, and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner or staff.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collage detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollageDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Personal collage belonging to someone else",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or deleted and the caller is not staff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Update a collage",
+        "description": "`isLocked` and the two entry limits are STAFF-ONLY fields: an owner sending them gets 403, distinct from the 403 for editing a collage that is not theirs.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 65535
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50
+                    },
+                    "maxItems": 20
+                  },
+                  "isFeatured": {
+                    "type": "boolean"
+                  },
+                  "isLocked": {
+                    "type": "boolean"
+                  },
+                  "maxEntries": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "maxEntriesPerUser": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated collage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the owner, or a staff-only field (isLocked, maxEntries, maxEntriesPerUser) was sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Collage name already taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Delete a collage",
+        "description": "The deletion is NOT uniform. A PERSONAL collage (categoryId 0) is HARD deleted by its owner or staff and cannot be recovered. A PUBLIC collage is soft-deleted (sets `isDeleted`) and only staff may do it, so an owner who can delete their personal collage gets 403 on a public one; use POST /collages/{id}/recover to restore that case.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Collage deleted — hard if personal, soft if public"
+          },
+          "403": {
+            "description": "Neither owner nor staff, or a public collage and the caller is not staff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/recover": {
+      "post": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Staff: restore a soft-deleted collage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collage restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The collage is not deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/entries": {
+      "post": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Add a release to a collage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "releaseId": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  }
+                },
+                "required": [
+                  "releaseId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Entry added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollageEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An entry limit was reached — either the collage maximum or your per-user limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The collage is locked, or it is personal and not yours to add to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage or release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That release is already in the collage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Reorder the entries of a collage",
+        "description": "Send every entry id with its new `sort`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        },
+                        "sort": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sort"
+                      ]
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Entries reordered"
+          },
+          "403": {
+            "description": "Only the collage owner or staff may reorder entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage not found, or deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/entries/{releaseId}": {
+      "delete": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Remove a release from a collage",
+        "description": "Addressed by RELEASE id, not entry id — the pair is unique per collage.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "releaseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry removed"
+          },
+          "403": {
+            "description": "The collage is locked, or the entry is not the caller's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage or entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/subscribe": {
+      "post": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Toggle your subscription to a collage",
+        "description": "A TOGGLE despite the name: posting when already subscribed unsubscribes you. The response says which state you ended in.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resulting subscription state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscribed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "subscribed"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/bookmark": {
+      "post": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Toggle your bookmark on a collage",
+        "description": "A toggle, like /subscribe.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resulting bookmark state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bookmarked": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "bookmarked"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collages/{id}/subscriptions": {
+      "get": {
+        "tags": [
+          "Collages"
+        ],
+        "summary": "Staff: who is subscribed to a collage",
+        "description": "Requires `collages_moderate`. Ordered by `lastVisit`, most recent first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscribers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CollageSubscriber"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing collages_moderate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage not found",
             "content": {
               "application/json": {
                 "schema": {
