@@ -6909,7 +6909,7 @@
           "user"
         ]
       },
-      "WikiPage": {
+      "WikiPageSummary": {
         "type": "object",
         "properties": {
           "id": {
@@ -6918,12 +6918,6 @@
           "title": {
             "type": "string",
             "maxLength": 100
-          },
-          "body": {
-            "type": "string"
-          },
-          "bodyHtml": {
-            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -6983,16 +6977,11 @@
                 "createdAt"
               ]
             }
-          },
-          "deletedAt": {
-            "type": "string",
-            "nullable": true
           }
         },
         "required": [
           "id",
           "title",
-          "body",
           "slug",
           "revision",
           "minReadLevel",
@@ -7002,6 +6991,46 @@
           "createdAt",
           "updatedAt",
           "aliases"
+        ]
+      },
+      "WikiPage": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WikiPageSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "body": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "body"
+            ]
+          }
+        ]
+      },
+      "WikiPageRendered": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WikiPage"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "bodyHtml": {
+                "type": "string"
+              },
+              "deletedAt": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "bodyHtml"
+            ]
+          }
         ]
       },
       "WikiRevisionSummary": {
@@ -7106,8 +7135,7 @@
                 "type": "integer"
               },
               "body": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               }
             },
             "required": [
@@ -7122,8 +7150,7 @@
                 "type": "integer"
               },
               "body": {
-                "type": "string",
-                "nullable": true
+                "type": "string"
               }
             },
             "required": [
@@ -25080,7 +25107,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/WikiPage"
+                        "$ref": "#/components/schemas/WikiPageSummary"
                       }
                     },
                     "meta": {
@@ -25206,7 +25233,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WikiPage"
+                  "$ref": "#/components/schemas/WikiPageRendered"
                 }
               }
             }
@@ -25257,7 +25284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WikiPage"
+                  "$ref": "#/components/schemas/WikiPageRendered"
                 }
               }
             }
