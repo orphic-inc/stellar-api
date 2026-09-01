@@ -4480,6 +4480,174 @@
           "updatedAt"
         ]
       },
+      "Request": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "filled",
+              "deleted"
+            ]
+          },
+          "fillerId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "filledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "filledContributionId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "voteCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "userId",
+          "title",
+          "description",
+          "type",
+          "year",
+          "image",
+          "status",
+          "fillerId",
+          "filledAt",
+          "filledContributionId",
+          "voteCount",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "RequestBountyEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "userId",
+          "amount",
+          "createdAt",
+          "user"
+        ]
+      },
+      "RequestActionEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "integer"
+          },
+          "actorId": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CREATE",
+              "ADD_BOUNTY",
+              "FILL",
+              "UNFILL",
+              "DELETE",
+              "RESTORE"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "actorId",
+          "action",
+          "metadata",
+          "createdAt"
+        ]
+      },
       "PrivateMessage": {
         "type": "object",
         "properties": {
@@ -16740,11 +16908,404 @@
         }
       }
     },
+    "/requests/{id}": {
+      "put": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Edit a request",
+        "description": "The owner, or a holder of `requests_moderate`. Only requests in the `open` status may be edited — editing a filled or deleted one answers **422**, which this router uses for STATE violations as distinct from the 400 it uses for validation.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Music",
+                      "Applications",
+                      "EBooks",
+                      "ELearningVideos",
+                      "Audiobooks",
+                      "Comedy",
+                      "Comics"
+                    ]
+                  },
+                  "year": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 1900,
+                    "maximum": 2100
+                  },
+                  "image": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          ""
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Neither the owner nor a request moderator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Only open requests can be edited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Delete a request",
+        "description": "The owner, or a holder of `requests_moderate`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request deleted"
+          },
+          "403": {
+            "description": "Neither the owner nor a request moderator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get request details",
+        "tags": [
+          "Requests"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/requests/{id}/vote": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Toggle your vote on a request",
+        "description": "A TOGGLE despite the name: posting when you have already voted removes the vote. The response says which state you ended in. Takes no body.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resulting vote state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "voted"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/unfill": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Reverse a fill on a request",
+        "description": "The owner, the filler, or a holder of `requests_moderate`. A request that is not currently filled answers **422**.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request, back in the open status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Neither owner, filler, nor a request moderator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is not filled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/bounty-history": {
+      "get": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Every bounty and lifecycle action on a request",
+        "description": "Two parallel lists, each newest first: the bounties pledged, and the lifecycle actions (create, add bounty, fill, unfill, delete, restore). Bounty `amount` is a BigInt column and serialises as a string.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounties and actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bounties": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequestBountyEntry"
+                      }
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequestActionEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "bounties",
+                    "actions"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/requests": {
       "get": {
         "summary": "List requests",
         "tags": [
-          "requests"
+          "Requests"
         ],
         "responses": {
           "200": {
@@ -16755,7 +17316,7 @@
       "post": {
         "summary": "Create a new request",
         "tags": [
-          "requests"
+          "Requests"
         ],
         "security": [
           {
@@ -16847,37 +17408,11 @@
         }
       }
     },
-    "/requests/{id}": {
-      "get": {
-        "summary": "Get request details",
-        "tags": [
-          "requests"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
-    },
     "/requests/{id}/bounty": {
       "post": {
         "summary": "Add bounty to request",
         "tags": [
-          "requests"
+          "Requests"
         ],
         "security": [
           {
@@ -16923,7 +17458,7 @@
       "post": {
         "summary": "Fill request",
         "tags": [
-          "requests"
+          "Requests"
         ],
         "security": [
           {
