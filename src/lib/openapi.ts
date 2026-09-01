@@ -4,7 +4,12 @@ import {
   extendZodWithOpenApi
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { NotificationType, RatioExempt } from '@prisma/client';
+import {
+  NotificationType,
+  RatioExempt,
+  RequestStatus,
+  RequestActionType
+} from '@prisma/client';
 import { appVersion } from './version';
 import {
   profileUpdateSchema,
@@ -44,6 +49,13 @@ import {
   updateGroupSchema,
   releaseVoteSchema
 } from '../schemas/community';
+import {
+  updateRequestSchema,
+  unfillRequestSchema,
+  createRequestSchema,
+  addBountySchema,
+  fillRequestSchema
+} from '../schemas/requests';
 import {
   logCheckRequestSchema,
   logCheckResultSchema
@@ -100,11 +112,6 @@ import {
   createCommentSchema,
   updateCommentSchema
 } from '../schemas/comment';
-import {
-  createRequestSchema,
-  addBountySchema,
-  fillRequestSchema
-} from '../schemas/requests';
 import {
   searchReleasesQuerySchema,
   searchArtistsQuerySchema,
@@ -5673,11 +5680,210 @@ registry.registerPath({
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
+const Request = registry.register(
+  'Request',
+  z.object({
+    id: z.number().int(),
+    communityId: z.number().int(),
+    userId: z.number().int(),
+    title: z.string(),
+    description: z.string(),
+    type: z.string(),
+    year: z.number().int().nullable(),
+    image: z.string().nullable(),
+    status: z.nativeEnum(RequestStatus),
+    fillerId: z.number().int().nullable(),
+    filledAt: z.string().nullable(),
+    filledContributionId: z.number().int().nullable(),
+    voteCount: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    deletedAt: z.string().nullable()
+  })
+);
+
+const RequestBountyEntry = registry.register(
+  'RequestBountyEntry',
+  z.object({
+    id: z.number().int(),
+    requestId: z.number().int(),
+    userId: z.number().int(),
+    // BigInt column — serialises as a string, not a number.
+    amount: z.string(),
+    createdAt: z.string(),
+    user: z.object({ id: z.number().int(), username: z.string() })
+  })
+);
+
+const RequestActionEntry = registry.register(
+  'RequestActionEntry',
+  z.object({
+    id: z.number().int(),
+    requestId: z.number().int(),
+    actorId: z.number().int(),
+    action: z.nativeEnum(RequestActionType),
+    metadata: z.record(z.string(), z.unknown()).nullable(),
+    createdAt: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'put',
+  path: '/requests/{id}',
+  tags: ['Requests'],
+  summary: 'Edit a request',
+  description:
+    'The owner, or a holder of `requests_moderate`. Only requests in the ' +
+    '`open` status may be edited — editing a filled or deleted one answers ' +
+    '**422**, which this router uses for STATE violations as distinct from ' +
+    'the 400 it uses for validation.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateRequestSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated request',
+      content: { 'application/json': { schema: Request } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Neither the owner nor a request moderator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Only open requests can be edited',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/requests/{id}',
+  tags: ['Requests'],
+  summary: 'Delete a request',
+  description: 'The owner, or a holder of `requests_moderate`.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Request deleted'
+    },
+    403: {
+      description: 'Neither the owner nor a request moderator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/requests/{id}/vote',
+  tags: ['Requests'],
+  summary: 'Toggle your vote on a request',
+  description:
+    'A TOGGLE despite the name: posting when you have already voted removes ' +
+    'the vote. The response says which state you ended in. Takes no body.',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Resulting vote state',
+      content: {
+        'application/json': { schema: z.object({ voted: z.boolean() }) }
+      }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/requests/{id}/unfill',
+  tags: ['Requests'],
+  summary: 'Reverse a fill on a request',
+  description:
+    'The owner, the filler, or a holder of `requests_moderate`. A request ' +
+    'that is not currently filled answers **422**.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: unfillRequestSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The request, back in the open status',
+      content: { 'application/json': { schema: Request } }
+    },
+    403: {
+      description: 'Neither owner, filler, nor a request moderator',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Request is not filled',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/requests/{id}/bounty-history',
+  tags: ['Requests'],
+  summary: 'Every bounty and lifecycle action on a request',
+  description:
+    'Two parallel lists, each newest first: the bounties pledged, and the ' +
+    'lifecycle actions (create, add bounty, fill, unfill, delete, restore). ' +
+    'Bounty `amount` is a BigInt column and serialises as a string.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Bounties and actions',
+      content: {
+        'application/json': {
+          schema: z.object({
+            bounties: z.array(RequestBountyEntry),
+            actions: z.array(RequestActionEntry)
+          })
+        }
+      }
+    },
+    404: {
+      description: 'Request not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/requests',
   summary: 'List requests',
-  tags: ['requests'],
+  tags: ['Requests'],
   responses: {
     200: { description: 'Success' }
   }
@@ -5687,7 +5893,7 @@ registry.registerPath({
   method: 'post',
   path: '/requests',
   summary: 'Create a new request',
-  tags: ['requests'],
+  tags: ['Requests'],
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -5704,7 +5910,7 @@ registry.registerPath({
   method: 'get',
   path: '/requests/{id}',
   summary: 'Get request details',
-  tags: ['requests'],
+  tags: ['Requests'],
   request: {
     params: z.object({ id: z.string() })
   },
@@ -5718,7 +5924,7 @@ registry.registerPath({
   method: 'post',
   path: '/requests/{id}/bounty',
   summary: 'Add bounty to request',
-  tags: ['requests'],
+  tags: ['Requests'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
@@ -5735,7 +5941,7 @@ registry.registerPath({
   method: 'post',
   path: '/requests/{id}/fill',
   summary: 'Fill request',
-  tags: ['requests'],
+  tags: ['Requests'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
