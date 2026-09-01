@@ -4480,6 +4480,49 @@
           "updatedAt"
         ]
       },
+      "RequestBountyEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "userId",
+          "amount",
+          "createdAt",
+          "user"
+        ]
+      },
       "Request": {
         "type": "object",
         "properties": {
@@ -4529,8 +4572,8 @@
             "type": "integer",
             "nullable": true
           },
-          "voteCount": {
-            "type": "integer"
+          "totalBounty": {
+            "type": "string"
           },
           "createdAt": {
             "type": "string"
@@ -4540,6 +4583,78 @@
           },
           "deletedAt": {
             "type": "string",
+            "nullable": true
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "bounties": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "bounties"
+            ]
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "filler": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "community": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "bounties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestBountyEntry"
+            }
+          },
+          "artists": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            }
+          },
+          "filledContribution": {
             "nullable": true
           }
         },
@@ -4556,53 +4671,44 @@
           "fillerId",
           "filledAt",
           "filledContributionId",
-          "voteCount",
+          "totalBounty",
           "createdAt",
           "updatedAt",
-          "deletedAt"
+          "deletedAt",
+          "_count"
         ]
       },
-      "RequestBountyEntry": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
+      "RequestDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Request"
           },
-          "requestId": {
-            "type": "integer"
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "amount": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "user": {
+          {
             "type": "object",
             "properties": {
-              "id": {
+              "voteCount": {
                 "type": "integer"
               },
-              "username": {
-                "type": "string"
+              "votes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "userId"
+                  ]
+                }
               }
             },
             "required": [
-              "id",
-              "username"
+              "voteCount",
+              "votes"
             ]
           }
-        },
-        "required": [
-          "id",
-          "requestId",
-          "userId",
-          "amount",
-          "createdAt",
-          "user"
         ]
       },
       "RequestActionEntry": {
@@ -17087,6 +17193,7 @@
         "tags": [
           "Requests"
         ],
+        "description": "The only request response that carries `voteCount` and `votes`; the other routes return the serialized request without them.",
         "parameters": [
           {
             "schema": {
@@ -17099,10 +17206,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Request detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -17307,9 +17428,144 @@
         "tags": [
           "Requests"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "artist",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Music",
+                "Applications",
+                "EBooks",
+                "ELearningVideos",
+                "Audiobooks",
+                "Comedy",
+                "Comics"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            },
+            "required": false,
+            "name": "year",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "communityId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "filled",
+                "deleted"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "voteCount",
+                "random"
+              ]
+            },
+            "required": false,
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "required": false,
+            "name": "order",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Paginated requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Request"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -17400,10 +17656,24 @@
         },
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Bad Request"
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -17414,6 +17684,7 @@
         "tags": [
           "Requests"
         ],
+        "description": "The amount is deducted from the caller's contributed balance, so an insufficient balance answers 400 rather than 403. There is a site minimum bounty; below it is also a 400.",
         "security": [
           {
             "bearerAuth": []
@@ -17449,7 +17720,34 @@
         },
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "The request, with the new bounty totalled in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Below the minimum bounty, or insufficient contributed balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found, or not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -17460,6 +17758,7 @@
         "tags": [
           "Requests"
         ],
+        "description": "Nominates a contribution as the fill. The bounty is paid out and the request moves to the `filled` status; POST /requests/{id}/unfill reverses it.",
         "security": [
           {
             "bearerAuth": []
@@ -17496,7 +17795,54 @@
         },
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "The request, now filled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The contribution is not eligible: wrong community, wrong release type, or already the active fill for another request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You can only fill a request with your own contribution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request or contribution not found, or the request is not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Lost a race — the request was already filled by another submission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
