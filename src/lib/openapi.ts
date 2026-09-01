@@ -9424,6 +9424,8 @@ registry.registerPath({
 // revision bodies and comparison are closed to you. Revision history, revision
 // CONTENT and compare all require the EDIT level, not the read level.
 
+// Mirrors PAGE_SELECT / PAGE_WITH_BODY_SELECT in routes/api/wiki.ts, which is
+// what these routes actually project — NOT the bare Prisma model.
 const WikiPage = registry.register(
   'WikiPage',
   z.object({
@@ -9437,9 +9439,20 @@ const WikiPage = registry.register(
     minReadLevel: z.number().int(),
     minEditLevel: z.number().int(),
     authorId: z.number().int(),
+    author: z.object({ id: z.number().int(), username: z.string() }),
     createdAt: z.string(),
     updatedAt: z.string(),
-    deletedAt: z.string().nullable()
+    aliases: z.array(
+      z.object({
+        alias: z.string(),
+        userId: z.number().int(),
+        createdAt: z.string()
+      })
+    ),
+    // Only the by-alias route projects this — it selects `deletedAt` to reject
+    // a deleted page and then returns the row whole. The other reads never
+    // include it, so it is optional rather than always present.
+    deletedAt: z.string().nullable().optional()
   })
 );
 
@@ -9548,8 +9561,12 @@ registry.registerPath({
       description: 'The aliased page',
       content: { 'application/json': { schema: WikiPage } }
     },
+    403: {
+      description: 'Insufficient rank to view this page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
-      description: 'No such alias',
+      description: 'No such alias, or the page behind it is deleted',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -9561,16 +9578,23 @@ registry.registerPath({
   tags: ['Wiki'],
   summary: 'One wiki page',
   description:
-    "A page above the caller's read level answers 404, not 403, so the " +
-    'endpoint does not confirm it exists.',
+    'The DIRECT page reads (this and /wiki/by-alias) answer **403** when the ' +
+    'page is above the caller read level — they confirm the page exists and ' +
+    'say the rank is insufficient. The HISTORY reads (revisions, revision ' +
+    'content, compare) answer 404 for the same condition instead. The router ' +
+    'is not uniform here; do not infer one from the other.',
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
       description: 'Page',
       content: { 'application/json': { schema: WikiPage } }
     },
+    403: {
+      description: 'Insufficient rank to view this page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
-      description: 'Not found, or above the caller read level',
+      description: 'Page not found',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
