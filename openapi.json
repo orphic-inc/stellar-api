@@ -4847,8 +4847,72 @@
           "requestId",
           "userId",
           "amount",
+          "createdAt"
+        ]
+      },
+      "RequestBountyEntryWithUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "userId",
+          "amount",
           "createdAt",
           "user"
+        ]
+      },
+      "RequestArtistRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "integer"
+          },
+          "artistId": {
+            "type": "integer"
+          },
+          "artist": {
+            "$ref": "#/components/schemas/Artist"
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "artistId"
         ]
       },
       "Request": {
@@ -4979,7 +5043,7 @@
           "artists": {
             "type": "array",
             "items": {
-              "nullable": true
+              "$ref": "#/components/schemas/RequestArtistRef"
             }
           },
           "filledContribution": {
@@ -5014,6 +5078,12 @@
           {
             "type": "object",
             "properties": {
+              "bounties": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RequestBountyEntryWithUser"
+                }
+              },
               "voteCount": {
                 "type": "integer"
               },
@@ -19343,7 +19413,7 @@
                     "bounties": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/RequestBountyEntry"
+                        "$ref": "#/components/schemas/RequestBountyEntryWithUser"
                       }
                     },
                     "actions": {
