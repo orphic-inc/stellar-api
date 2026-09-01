@@ -6261,6 +6261,198 @@
           "user"
         ]
       },
+      "WikiPage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyHtml": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "minReadLevel": {
+            "type": "integer"
+          },
+          "minEditLevel": {
+            "type": "integer"
+          },
+          "authorId": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "slug",
+          "revision",
+          "minReadLevel",
+          "minEditLevel",
+          "authorId",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "WikiRevisionSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "integer"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "authorId",
+          "author",
+          "createdAt"
+        ]
+      },
+      "WikiRevisionContent": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "integer"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "title",
+          "body",
+          "authorId",
+          "author",
+          "createdAt"
+        ]
+      },
+      "WikiCompare": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "old": {
+            "type": "object",
+            "properties": {
+              "revision": {
+                "type": "integer"
+              },
+              "body": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "revision",
+              "body"
+            ]
+          },
+          "new": {
+            "type": "object",
+            "properties": {
+              "revision": {
+                "type": "integer"
+              },
+              "body": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "revision",
+              "body"
+            ]
+          }
+        },
+        "required": [
+          "pageId",
+          "title",
+          "old",
+          "new"
+        ]
+      },
       "EconomyGroupedItem": {
         "type": "object",
         "properties": {
@@ -20935,6 +21127,831 @@
           },
           "404": {
             "description": "Collage not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Search and list wiki pages",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "body",
+                "all"
+              ],
+              "default": "all"
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "created",
+                "edited"
+              ],
+              "default": "title"
+            },
+            "required": false,
+            "name": "order",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            },
+            "required": false,
+            "name": "way",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WikiPage"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Create a wiki page",
+        "description": "Requires `wiki_edit`, or one of `wiki_manage`/`admin`/`staff`. **`minReadLevel` and `minEditLevel` are forced to 0 unless the caller can MANAGE the wiki** — a plain `wiki_edit` author cannot create a restricted page, and the values they send are ignored rather than rejected.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "slug": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "pattern": "^[a-z0-9-]+$"
+                  },
+                  "minReadLevel": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "minEditLevel": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 0
+                  }
+                },
+                "required": [
+                  "title",
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Page created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Neither wiki_edit nor a managing permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/by-alias/{alias}": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Resolve an alias to its page",
+        "description": "The alias is a SLUG, not an id, and is normalised (lowercased, non-alphanumerics collapsed to hyphens) before lookup.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "alias",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The aliased page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such alias",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "One wiki page",
+        "description": "A page above the caller's read level answers 404, not 403, so the endpoint does not confirm it exists.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or above the caller read level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Update a wiki page",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minReadLevel": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "minEditLevel": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission to edit this page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or above the caller read level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Delete a wiki page",
+        "description": "Gated at the middleware by `wiki_manage` or `admin` — the per-page edit level does not grant deletion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Page deleted"
+          },
+          "403": {
+            "description": "Missing wiki_manage/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Page not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/revisions": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Revision history for a page",
+        "description": "Requires the page EDIT level, not the read level — being able to read a page does not entitle you to its history.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "History, newest revision first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currentRevision": {
+                      "type": "integer"
+                    },
+                    "revisions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WikiRevisionSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "currentRevision",
+                    "revisions"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission to view revision history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or above the caller read level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/revisions/{rev}": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "The full body of one revision",
+        "description": "Requires the page EDIT level. Asking for the CURRENT revision returns the live page shaped like a revision, in which case `createdAt` is the page's `updatedAt` rather than a revision row's own timestamp.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "rev",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revision content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiRevisionContent"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission to view revision content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Page or revision not found, or above the caller read level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/compare": {
+      "get": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Compare two revisions of a page",
+        "description": "Requires the page EDIT level. `old` must be strictly less than `new`. Either body comes back null if that revision has no stored body.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "old",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "new",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Both revision bodies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiCompare"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`old` must be less than `new`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission to compare revisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Page or either revision not found, or above the caller read level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/rollback/{rev}": {
+      "post": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Roll a page back to an earlier revision",
+        "description": "Requires the page EDIT level. The rollback is written as a NEW revision rather than by rewinding, so history is never discarded.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "rev",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page after rollback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission to edit this page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Page or revision not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/aliases": {
+      "post": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Add an alias to a page",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "alias": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "pattern": "^[a-z0-9-]+$"
+                  }
+                },
+                "required": [
+                  "alias"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Alias created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alias": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "alias"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The alias normalised to nothing usable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Page not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That alias is already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wiki/{id}/aliases/{alias}": {
+      "delete": {
+        "tags": [
+          "Wiki"
+        ],
+        "summary": "Remove an alias from a page",
+        "description": "The alias is addressed by its slug, which is its primary key.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "alias",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Alias removed"
+          },
+          "404": {
+            "description": "Page not found, or that alias is not on this page",
             "content": {
               "application/json": {
                 "schema": {
