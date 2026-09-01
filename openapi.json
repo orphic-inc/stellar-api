@@ -1500,6 +1500,81 @@
           "warnedBy"
         ]
       },
+      "ProfileSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "profileTitle": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "profileTitle"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "avatar",
+          "profile"
+        ]
+      },
+      "CrsDimension": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "subScore": {
+            "type": "number"
+          },
+          "weighted": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "subScore",
+          "weighted"
+        ]
+      },
+      "CrsView": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrsDimension"
+            }
+          },
+          "suspect": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "score",
+          "dimensions",
+          "suspect"
+        ]
+      },
       "DonorRewards": {
         "type": "object",
         "properties": {
@@ -4606,6 +4681,61 @@
           "lastEvaluatedAt"
         ]
       },
+      "RatioStats": {
+        "type": "object",
+        "properties": {
+          "ratio": {
+            "type": "number"
+          },
+          "contributed": {
+            "type": "string"
+          },
+          "consumed": {
+            "type": "string"
+          },
+          "bracket": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "maxRequired": {
+                "type": "number"
+              },
+              "minRequired": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "label",
+              "maxRequired",
+              "minRequired"
+            ]
+          },
+          "eligibleContributionBytes": {
+            "type": "string"
+          },
+          "contributionCoverage": {
+            "type": "number"
+          },
+          "requiredRatio": {
+            "type": "number"
+          },
+          "meetsRequirement": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ratio",
+          "contributed",
+          "consumed",
+          "bracket",
+          "eligibleContributionBytes",
+          "contributionCoverage",
+          "requiredRatio",
+          "meetsRequirement"
+        ]
+      },
       "SiteSettings": {
         "type": "object",
         "properties": {
@@ -7177,6 +7307,69 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "List every active profile",
+        "description": "Active (non-disabled) users only, as a flat array. Deliberately not paginated, unlike most list endpoints.",
+        "responses": {
+          "200": {
+            "description": "Active profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/me/reputation": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Community Reputation Score for the authenticated member",
+        "description": "Self-view (ADR-0004 section 3): snatch-derived dimensions are included, moderation-only ones are not, and `suspect` is therefore always false here. `score` is recomputed from the visible dimensions, so a gated viewer cannot back a hidden dimension out of the total.",
+        "responses": {
+          "200": {
+            "description": "Reputation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/profile/referral/create-invite": {
@@ -8785,6 +8978,111 @@
         "responses": {
           "204": {
             "description": "Notification removed"
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "How many notifications the caller has not read",
+        "responses": {
+          "200": {
+            "description": "Unread count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "count"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark every unread notification as read",
+        "responses": {
+          "204": {
+            "description": "All notifications marked read"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark one notification as read",
+        "description": "Idempotent: re-reading an already-read notification is a no-op.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Notification marked read"
+          },
+          "403": {
+            "description": "Not the recipient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found",
@@ -11506,6 +11804,195 @@
           },
           "404": {
             "description": "Community not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contributions/{id}": {
+      "get": {
+        "tags": [
+          "Contributions"
+        ],
+        "summary": "One contribution, with its release, collaborators and comments",
+        "description": "Comments carry `bodyHtml`, rendered at read time from BBCode. `sizeInBytes` is serialised as a number rather than the global BigInt-to-string default.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contribution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contribution"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contribution not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contributions/{id}/report": {
+      "post": {
+        "tags": [
+          "Contributions"
+        ],
+        "summary": "Flag a dead or misleading link on a contribution",
+        "description": "Files a `dead_link` report AND records the report against the contribution, which is what drives the auto-warn at three reports (modules/linkHealth).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contribution not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contributions/{id}/ratio-exempt": {
+      "put": {
+        "tags": [
+          "Contributions"
+        ],
+        "summary": "Staff: set or clear a contribution ratio exemption",
+        "description": "Requires the `contributions_manage` permission. FREEPASS and NEUTRALPASS are the Freepass/Neutralpass exemptions; NONE clears them.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ratioExempt": {
+                    "type": "string",
+                    "enum": [
+                      "NONE",
+                      "FREEPASS",
+                      "NEUTRALPASS"
+                    ]
+                  }
+                },
+                "required": [
+                  "ratioExempt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated contribution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contribution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing contributions_manage",
             "content": {
               "application/json": {
                 "schema": {
@@ -16286,6 +16773,62 @@
                     "body",
                     "createdAt"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/me/ratio": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Detailed ratio stats for the authenticated member",
+        "description": "The ratio accounting plus the current policy state, in one read. `contributed`, `consumed` and `eligibleContributionBytes` are BigInt columns and serialise as strings.",
+        "responses": {
+          "200": {
+            "description": "Ratio stats and policy state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/RatioStats"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "$ref": "#/components/schemas/RatioPolicyState"
+                        }
+                      },
+                      "required": [
+                        "policy"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
