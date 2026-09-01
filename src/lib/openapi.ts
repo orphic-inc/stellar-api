@@ -12,7 +12,13 @@ import {
   donorRewardUpdateSchema,
   donorForumTitleUpdateSchema
 } from '../schemas/profile';
-import { adminCreateUserSchema, userSettingsSchema } from '../schemas/user';
+import {
+  adminCreateUserSchema,
+  userSettingsSchema,
+  // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
+  pmDraftSchema,
+  massPmSchema
+} from '../schemas/user';
 import {
   createContributionSchema,
   addContributionToReleaseSchema
@@ -1847,6 +1853,41 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'put',
+  path: '/announcements/{id}',
+  tags: ['Announcements'],
+  summary: 'Staff: update a news item',
+  description:
+    'Requires the `news_manage` permission. Title and body are passed through ' +
+    '`sanitizePlain`, so markup in either is stripped rather than stored.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: announcementSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated news item',
+      content: { 'application/json': { schema: Announcement } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'delete',
   path: '/announcements/{id}',
   tags: ['Announcements'],
@@ -2706,6 +2747,61 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/forums/categories/{id}',
+  tags: ['Forums'],
+  summary: 'One forum category with its forums',
+  description:
+    'Forums are ordered by `sort` and carry `lastTopic`. The list is filtered ' +
+    'to what the caller may read (`minClassRead`), so two members can get ' +
+    'different forums back for the same category.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Category with its readable forums',
+      content: { 'application/json': { schema: ForumCategory } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Category not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/forums/{id}/catchup',
+  tags: ['Forums'],
+  summary: 'Mark every topic in a forum as read',
+  description:
+    'Returns how many topics were marked. Only topics with a last post are ' +
+    'counted, so `markedRead` can legitimately be 0 for an empty forum.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Topics marked read',
+      content: {
+        'application/json': {
+          schema: z.object({ markedRead: z.number().int() })
+        }
+      }
+    },
+    403: {
+      description: 'Insufficient class for this forum',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Forum not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4556,6 +4652,27 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: '/comments/{id}',
+  tags: ['Comments'],
+  summary: 'One comment, with its author',
+  description:
+    'Deliberately unauthenticated — this route carries no auth middleware, ' +
+    'unlike the PUT and DELETE beside it.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Comment',
+      content: { 'application/json': { schema: Comment } }
+    },
+    404: {
+      description: 'Comment not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
   method: 'put',
   path: '/comments/{id}',
   tags: ['Comments'],
@@ -5301,6 +5418,151 @@ registry.registerPath({
     200: {
       description: 'Inbox conversations',
       content: { 'application/json': { schema: PaginatedConversations } }
+    }
+  }
+});
+
+const PmDraft = registry.register(
+  'PmDraft',
+  z.object({
+    id: z.number().int(),
+    userId: z.number().int(),
+    toUserId: z.number().int().nullable(),
+    subject: z.string().max(255),
+    body: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+// The list route resolves each draft's recipient separately and decorates the
+// row, so what comes back is a PmDraft PLUS `toUser` — not the bare model.
+const PmDraftWithRecipient = registry.register(
+  'PmDraftWithRecipient',
+  PmDraft.extend({
+    toUser: z.object({ id: z.number().int(), username: z.string() }).nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/messages/drafts',
+  tags: ['Messages'],
+  summary: 'Draft private messages belonging to the caller',
+  description: 'Newest `updatedAt` first.',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Drafts',
+      content: {
+        'application/json': { schema: z.array(PmDraftWithRecipient) }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/messages/drafts',
+  tags: ['Messages'],
+  summary: 'Create a draft private message',
+  description:
+    'The recipient may be given as `toUserId` or `toUsername`; either is ' +
+    'optional, so a draft can be saved before a recipient is chosen.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: pmDraftSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Draft created',
+      content: { 'application/json': { schema: PmDraft } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/messages/drafts/{id}',
+  tags: ['Messages'],
+  summary: 'Update one of your drafts',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: pmDraftSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Draft updated',
+      content: { 'application/json': { schema: PmDraft } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'No such draft belonging to the caller',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/messages/drafts/{id}',
+  tags: ['Messages'],
+  summary: 'Delete one of your drafts',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: {
+      description: 'Draft deleted'
+    },
+    404: {
+      description: 'No such draft belonging to the caller',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/messages/mass',
+  tags: ['Messages'],
+  summary: 'Staff: send one message to every active member, or one rank',
+  description:
+    'Requires the `messages_mass_pm` permission. **Capped at 1000 recipients** ' +
+    '(`take: 1000`), so a larger site silently reaches only the first 1000; ' +
+    'the sender is skipped. Omit `targetRankId` to target every active member. ' +
+    'The send is also recorded as a MassMessage row.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: massPmSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'How many conversations were created',
+      content: {
+        'application/json': {
+          schema: z.object({ sentCount: z.number().int() })
+        }
+      }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    403: {
+      description: 'Missing messages_mass_pm',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
