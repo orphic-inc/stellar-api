@@ -351,6 +351,9 @@
           "revokedAt": {
             "type": "string",
             "nullable": true
+          },
+          "isCurrent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -360,7 +363,8 @@
           "userAgent",
           "createdAt",
           "lastActiveAt",
-          "revokedAt"
+          "revokedAt",
+          "isCurrent"
         ]
       },
       "PublicUser": {

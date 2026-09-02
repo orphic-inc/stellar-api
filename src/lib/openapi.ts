@@ -367,7 +367,11 @@ const UserSession = registry.register(
     createdAt: z.string(),
     lastActiveAt: z.string(),
     // Always null on the list route, which returns active sessions only.
-    revokedAt: z.string().nullable()
+    revokedAt: z.string().nullable(),
+    // Computed per request, not a column: true for the session whose id the
+    // caller's token carries. The client cannot derive this — the id lives in
+    // an HttpOnly cookie — so the server has to say.
+    isCurrent: z.boolean()
   })
 );
 

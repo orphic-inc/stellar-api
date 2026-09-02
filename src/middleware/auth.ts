@@ -89,6 +89,7 @@ export const requireAuth = async (
       id: user.id,
       userRankId: user.userRankId,
       userRankLevel: rankAccess.effectiveLevel,
+      sessionId,
       secondaryRankIds: rankAccess.secondaryRankIds,
       permittedForumIds: rankAccess.permittedForumIds,
       permissions: rankAccess.permissions as Record<string, boolean>

@@ -241,7 +241,14 @@ router.get(
       where: { userId: req.user.id, revokedAt: null },
       orderBy: { lastActiveAt: 'desc' }
     });
-    res.json(sessions);
+    // The client cannot work this out for itself — the session id lives in the
+    // HttpOnly token, so only the server can say which row is the caller's own.
+    res.json(
+      sessions.map((session) => ({
+        ...session,
+        isCurrent: session.id === req.user.sessionId
+      }))
+    );
   })
 );
 
