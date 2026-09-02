@@ -94,7 +94,7 @@
     "nodemon": "^3.0.1",
     "pg": "^8.20.0",
     "prettier": "^3.0.0",
-    "prisma-erd-generator": "^2.4.3",
+    "prisma-erd-generator": "^3.0.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.1",
