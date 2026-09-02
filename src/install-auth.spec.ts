@@ -12,7 +12,8 @@ import {
   getUserSettingsMock,
   updateUserSettingsMock,
   createUserMock,
-  resetApiTestState
+  resetApiTestState,
+  CURRENT_SESSION_ID
 } from './test/apiTestHarness';
 import { makeUser, asUserMock } from './test/factories';
 import { updateProfile } from './modules/profile';
@@ -548,6 +549,41 @@ describe('API auth/profile/user flows', () => {
       where: { id: 'sess-1' },
       data: { revokedAt: expect.any(Date) }
     });
+  });
+
+  // Regression: the route returned raw rows, so `isCurrent` was never sent and
+  // stellar-ui's session list could not mark the caller's own session — it hid
+  // the "(this session)" badge and offered Revoke on every row, including the
+  // one the user was browsing with. The client cannot compute this itself: the
+  // session id lives in the HttpOnly token.
+  it("marks the caller's own session as current", async () => {
+    prismaMock.userSession.findMany.mockResolvedValue([
+      {
+        id: CURRENT_SESSION_ID,
+        userId: 7,
+        ipAddress: '203.0.113.10',
+        userAgent: 'Jest',
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+        revokedAt: null
+      },
+      {
+        id: 'sess-other',
+        userId: 7,
+        ipAddress: '198.51.100.4',
+        userAgent: 'Other',
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+        revokedAt: null
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/auth/sessions');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].isCurrent).toBe(true);
+    expect(res.body[1].isCurrent).toBe(false);
   });
 
   it('maps profile invite exhaustion to a msg response', async () => {

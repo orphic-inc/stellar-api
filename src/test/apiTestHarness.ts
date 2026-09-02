@@ -181,6 +181,9 @@ let currentUserPermissions: Record<string, boolean> = {};
 let currentPermittedForumIds: number[] = [];
 let hasExplicitCurrentUserPermissions = false;
 
+/** The session id the mocked requireAuth authenticates as. */
+export const CURRENT_SESSION_ID = 'sess-current';
+
 jest.mock('../middleware/auth', () => ({
   requireAuth: async (
     req: {
@@ -188,6 +191,7 @@ jest.mock('../middleware/auth', () => ({
         id: number;
         userRankLevel: number;
         userRankId: number;
+        sessionId?: string;
         permissions?: Record<string, boolean>;
         permittedForumIds?: number[];
       };
@@ -210,6 +214,9 @@ jest.mock('../middleware/auth', () => ({
       id: 7,
       userRankLevel: currentUserRankLevel,
       userRankId: 1,
+      // Fixed like id/userRankId above. GET /auth/sessions compares each row
+      // against this to mark the caller's own session.
+      sessionId: CURRENT_SESSION_ID,
       permissions,
       permittedForumIds: currentPermittedForumIds
     };
