@@ -4711,8 +4711,23 @@ registry.registerPath({
 const CommunityVoteState = registry.register(
   'CommunityVoteState',
   z.object({
-    myVote: z.number().int().nullable(),
-    voteAggregate: z.number().int()
+    // Not an integer: the workbench returns the direction it just applied —
+    // `positive ? 'up' : 'down'` on POST, and null on DELETE (direction
+    // 'clear'). stellar-ui's hand-written type had this right.
+    myVote: z.enum(['up', 'down']).nullable(),
+    // Also not an integer: this is the whole ReleaseVoteAggregate row, read
+    // back with findUnique after recompute — so it is null when the release
+    // has no aggregate row yet.
+    voteAggregate: z
+      .object({
+        id: z.number(),
+        releaseId: z.number(),
+        ups: z.number(),
+        total: z.number(),
+        score: z.number(),
+        updatedAt: z.string()
+      })
+      .nullable()
   })
 );
 
