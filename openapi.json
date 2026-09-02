@@ -4357,7 +4357,18 @@
             "type": "number"
           },
           "page": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "artist",
+              "collages",
+              "contributions",
+              "requests",
+              "communities",
+              "release"
+            ]
+          },
+          "authorId": {
+            "type": "number"
           },
           "body": {
             "type": "string"
@@ -4365,11 +4376,44 @@
           "bodyHtml": {
             "type": "string"
           },
-          "authorId": {
-            "type": "number"
+          "editedUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "editedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "artistId": {
+            "type": "number",
+            "nullable": true
+          },
+          "communityId": {
+            "type": "number",
+            "nullable": true
+          },
+          "contributionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true
+          },
+          "releaseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "collageId": {
+            "type": "number",
+            "nullable": true
           },
           "createdAt": {
             "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
           },
           "author": {
             "$ref": "#/components/schemas/AuthorRef"
@@ -4378,9 +4422,209 @@
         "required": [
           "id",
           "page",
-          "body",
           "authorId",
-          "createdAt"
+          "body",
+          "bodyHtml",
+          "editedUserId",
+          "editedAt",
+          "artistId",
+          "communityId",
+          "contributionId",
+          "requestId",
+          "releaseId",
+          "collageId",
+          "createdAt",
+          "deletedAt",
+          "author"
+        ]
+      },
+      "CommentWithEditor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "artist",
+              "collages",
+              "contributions",
+              "requests",
+              "communities",
+              "release"
+            ]
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyHtml": {
+            "type": "string"
+          },
+          "editedUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "editedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "artistId": {
+            "type": "number",
+            "nullable": true
+          },
+          "communityId": {
+            "type": "number",
+            "nullable": true
+          },
+          "contributionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true
+          },
+          "releaseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "collageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "author": {
+            "$ref": "#/components/schemas/AuthorRef"
+          },
+          "editedUser": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "page",
+          "authorId",
+          "body",
+          "bodyHtml",
+          "editedUserId",
+          "editedAt",
+          "artistId",
+          "communityId",
+          "contributionId",
+          "requestId",
+          "releaseId",
+          "collageId",
+          "createdAt",
+          "deletedAt",
+          "author",
+          "editedUser"
+        ]
+      },
+      "CommentUpdated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "artist",
+              "collages",
+              "contributions",
+              "requests",
+              "communities",
+              "release"
+            ]
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyHtml": {
+            "type": "string"
+          },
+          "editedUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "editedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "artistId": {
+            "type": "number",
+            "nullable": true
+          },
+          "communityId": {
+            "type": "number",
+            "nullable": true
+          },
+          "contributionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "requestId": {
+            "type": "number",
+            "nullable": true
+          },
+          "releaseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "collageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "page",
+          "authorId",
+          "body",
+          "bodyHtml",
+          "editedUserId",
+          "editedAt",
+          "artistId",
+          "communityId",
+          "contributionId",
+          "requestId",
+          "releaseId",
+          "collageId",
+          "createdAt",
+          "deletedAt"
         ]
       },
       "PaginatedComments": {
@@ -4389,7 +4633,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Comment"
+              "$ref": "#/components/schemas/CommentWithEditor"
             }
           },
           "meta": {
@@ -4672,24 +4916,113 @@
       "SimilarArtist": {
         "type": "object",
         "properties": {
-          "similarArtist": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name"
-            ]
+          "id": {
+            "type": "number"
+          },
+          "artistId": {
+            "type": "number"
+          },
+          "similarArtistId": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          },
+          "votes": {
+            "nullable": true
           }
         },
         "required": [
-          "similarArtist"
+          "id",
+          "artistId",
+          "similarArtistId",
+          "score"
+        ]
+      },
+      "SimilarArtistEntry": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SimilarArtist"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "similarArtist": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "similarArtist"
+            ]
+          }
+        ]
+      },
+      "ArtistAlias": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "artistId": {
+            "type": "number"
+          },
+          "redirectId": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "artistId",
+          "redirectId",
+          "userId"
+        ]
+      },
+      "ArtistTag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "artistId": {
+            "type": "number"
+          },
+          "tagId": {
+            "type": "number"
+          },
+          "positiveVotes": {
+            "type": "number"
+          },
+          "negativeVotes": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "artistId",
+          "tagId",
+          "positiveVotes",
+          "negativeVotes",
+          "userId"
         ]
       },
       "PostComment": {
@@ -17918,7 +18251,7 @@
           "Comments"
         ],
         "summary": "One comment, with its author",
-        "description": "Deliberately unauthenticated — this route carries no auth middleware, unlike the PUT and DELETE beside it.",
+        "description": "Deliberately unauthenticated — this route carries no auth middleware, unlike the PUT and DELETE beside it. It also does NOT filter `deletedAt`, so unlike GET /comments it can serve a soft-deleted comment; `deletedAt` is non-null in that case.",
         "parameters": [
           {
             "schema": {
@@ -17986,11 +18319,11 @@
         },
         "responses": {
           "200": {
-            "description": "Comment updated",
+            "description": "Comment updated — scalars only, no author/editor relation",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Comment"
+                  "$ref": "#/components/schemas/CommentUpdated"
                 }
               }
             }
@@ -18490,7 +18823,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SimilarArtist"
+                    "$ref": "#/components/schemas/SimilarArtistEntry"
                   }
                 }
               }
@@ -18535,10 +18868,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/SimilarArtist"
                 }
               }
             }
@@ -18582,10 +18912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/ArtistAlias"
                 }
               }
             }
@@ -18629,10 +18956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/ArtistTag"
                 }
               }
             }
