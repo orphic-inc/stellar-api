@@ -8964,6 +8964,9 @@ const InviteTreeItem = registry.register(
   z.object({
     id: z.number(),
     userId: z.number(),
+    // getInviteTree() returns the whole InviteTree row plus two relations, so
+    // this column is on the wire and was missing.
+    createdAt: z.string(),
     user: StaffUserRef,
     inviterId: z.number().nullable(),
     inviter: StaffUserRef.nullable()
@@ -9150,6 +9153,9 @@ const FeaturedAlbumItem = registry.register(
     groupId: z.number(),
     threadId: z.number(),
     title: z.string(),
+    // The list and the create echo both return the whole row, and `image` is a
+    // column on it (String @default("")) — it was simply missing here.
+    image: z.string(),
     started: z.string(),
     ended: z.string()
   })
