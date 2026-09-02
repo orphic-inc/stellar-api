@@ -2587,6 +2587,9 @@ const Notification = registry.register(
   'Notification',
   z.object({
     id: z.number(),
+    // The handler returns `{ ...n, source }` off a findMany with no `select`,
+    // so every column is on the wire — userId included, and it was missing.
+    userId: z.number(),
     type: z.nativeEnum(NotificationType),
     actorId: z.number().nullable().optional(),
     actor: z
