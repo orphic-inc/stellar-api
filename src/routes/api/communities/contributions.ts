@@ -27,6 +27,8 @@ import {
 } from '../../../lib/pagination';
 import {
   createContributionSchema,
+  contributionReportSchema,
+  ratioExemptSchema,
   type CreateContributionInput
 } from '../../../schemas/contribution';
 import { getSettings } from '../../../modules/settings';
@@ -38,12 +40,6 @@ const contributionIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-const reportSchema = z.object({
-  reason: z.string().min(1).max(1000)
-});
-const ratioExemptSchema = z.object({
-  ratioExempt: z.nativeEnum(RatioExempt)
-});
 const contributionsQuerySchema = z.object({ ...paginationBase });
 
 // GET /api/contributions
@@ -212,7 +208,7 @@ router.post(
   '/:id/report',
   requireAuth,
   validateParams(contributionIdParamsSchema),
-  validate(reportSchema),
+  validate(contributionReportSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { reason } = parsedBody<{ reason: string }>(res);

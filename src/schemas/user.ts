@@ -93,6 +93,10 @@ export const dncSchema = z.object({
   comment: z.string().optional().default('')
 });
 
+export const staffBioSchema = z.object({
+  staffBio: z.string().max(500).nullable()
+});
+
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
 export type UserSettingsInput = z.infer<typeof userSettingsSchema>;
 export type WarnUserInput = z.infer<typeof warnUserSchema>;
@@ -106,3 +110,4 @@ export type PmDraftInput = z.infer<typeof pmDraftSchema>;
 export type MassPmInput = z.infer<typeof massPmSchema>;
 export type SiteHistoryInput = z.infer<typeof siteHistorySchema>;
 export type DncInput = z.infer<typeof dncSchema>;
+export type StaffBioInput = z.infer<typeof staffBioSchema>;

@@ -29,6 +29,7 @@ import {
 import {
   createCommunitySchema,
   updateCommunitySchema,
+  addMemberSchema,
   type CreateCommunityInput,
   type UpdateCommunityInput
 } from '../../../schemas/community';
@@ -78,10 +79,6 @@ const memberParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   userId: z.coerce.number().int().positive()
 });
-const addMemberSchema = z.object({
-  userId: z.number().int().positive()
-});
-
 router.use('/:communityId/releases', releaseRouter);
 
 const communitiesQuerySchema = z.object({ ...paginationBase });

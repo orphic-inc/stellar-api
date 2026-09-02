@@ -28,8 +28,11 @@ export const artistTagSchema = z.object({
   tagId: z.number().int().positive()
 });
 
+export const vanityHouseSchema = z.object({ vanityHouse: z.boolean() });
+
 export type ArtistInput = z.infer<typeof artistSchema>;
 export type UpdateArtistInput = z.infer<typeof updateArtistSchema>;
 export type SimilarArtistInput = z.infer<typeof similarArtistSchema>;
 export type ArtistAliasInput = z.infer<typeof artistAliasSchema>;
 export type ArtistTagInput = z.infer<typeof artistTagSchema>;
+export type VanityHouseInput = z.infer<typeof vanityHouseSchema>;

@@ -49,6 +49,7 @@ import {
   donorRankSchema,
   grantDonorSchema,
   ircNickVerifySchema,
+  staffBioSchema,
   type AdminCreateUserInput,
   type UserSettingsInput,
   type WarnUserInput,
@@ -600,10 +601,6 @@ router.post(
 );
 
 // ─── User moderation routes (after /:id) ─────────────────────────────────────
-
-const staffBioSchema = z.object({
-  staffBio: z.string().max(500).nullable()
-});
 
 // PUT /api/users/:id/staff-bio — set staff page bio
 // Allows admins to edit any user, and staff-displayed users to edit their own.

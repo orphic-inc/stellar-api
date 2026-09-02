@@ -13,15 +13,12 @@ import {
   getPolicyState,
   overridePolicyStatus
 } from '../../modules/ratioPolicy';
+import { ratioPolicyOverrideSchema } from '../../schemas/ratioPolicy';
 
 const router = Router();
 
 const userIdParamsSchema = z.object({
   userId: z.coerce.number().int().positive()
-});
-
-const overrideSchema = z.object({
-  status: z.nativeEnum(RatioPolicyStatus)
 });
 
 // GET /api/ratio-policy/:userId — staff: view a user's policy state
@@ -41,7 +38,7 @@ router.post(
   '/:userId/override',
   ...requirePermission('ratio_policy_manage'),
   validateParams(userIdParamsSchema),
-  validate(overrideSchema),
+  validate(ratioPolicyOverrideSchema),
   asyncHandler(async (_req, res) => {
     const { userId } = parsedParams<{ userId: number }>(res);
     const { status } = parsedBody<{ status: RatioPolicyStatus }>(res);

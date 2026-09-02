@@ -111,6 +111,12 @@ export const releaseTagVoteSchema = z.object({
   direction: z.enum(['up', 'down'])
 });
 
+// Shared by POST /communities/:id/members and POST /communities/:id/curators —
+// both routes validate with this same schema.
+export const addMemberSchema = z.object({
+  userId: z.number().int().positive()
+});
+
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
@@ -118,3 +124,4 @@ export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
 export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;
 export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;
+export type AddMemberInput = z.infer<typeof addMemberSchema>;
