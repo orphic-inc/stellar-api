@@ -6747,6 +6747,9 @@
           "userId": {
             "type": "number"
           },
+          "createdAt": {
+            "type": "string"
+          },
           "user": {
             "type": "object",
             "properties": {
@@ -6786,6 +6789,7 @@
         "required": [
           "id",
           "userId",
+          "createdAt",
           "user",
           "inviterId",
           "inviter"
@@ -7036,6 +7040,9 @@
           "title": {
             "type": "string"
           },
+          "image": {
+            "type": "string"
+          },
           "started": {
             "type": "string"
           },
@@ -7048,6 +7055,7 @@
           "groupId",
           "threadId",
           "title",
+          "image",
           "started",
           "ended"
         ]
