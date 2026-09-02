@@ -2605,12 +2605,17 @@ const Notification = registry.register(
     postId: z.number().nullable().optional(),
     readAt: z.string().nullable().optional(),
     createdAt: z.string(),
+    // One shape per `page` branch of the enrichment loop, flattened: `title` is
+    // the only field every branch sets. `forumId` comes from the forums branch,
+    // `releaseId`/`communityId` from contributions and release, and `url` from
+    // global_notices — which was missing, and is read by the UI's notice banner.
     source: z
       .object({
         title: z.string(),
         forumId: z.number().optional(),
         releaseId: z.number().optional(),
-        communityId: z.number().optional()
+        communityId: z.number().optional(),
+        url: z.string().optional()
       })
       .nullable()
       .optional()
