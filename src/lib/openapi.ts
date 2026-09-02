@@ -5555,24 +5555,76 @@ registry.registerPath({
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
+// routes/api/comments.ts projects THREE shapes off this model, and every one of
+// them returns the row by spread — so all fourteen scalar columns are on the
+// wire, not the six that used to be declared. What differs between the three is
+// which RELATIONS are included:
+//
+//   GET /comments        include author + editedUser  -> CommentWithEditor
+//   GET /comments/{id}   include author               -> Comment
+//   POST /comments  201  include author               -> Comment
+//   PUT  /comments/{id}  no include at all            -> CommentUpdated
+//
+// Spelled out from a shared scalar base rather than chained `.extend()`, because
+// CommentUpdated REMOVES a field the others carry and an extend cannot narrow —
+// see the api#488 note on `Base & Record<string, never>`.
+const commentScalars = {
+  id: z.number(),
+  page: z.enum([
+    'artist',
+    'collages',
+    'contributions',
+    'requests',
+    'communities',
+    'release'
+  ]),
+  authorId: z.number(),
+  // Raw BBCode; `bodyHtml` is the render-time transcription (#402). Every one of
+  // the four responses adds it, so it is required rather than optional.
+  body: z.string(),
+  bodyHtml: z.string(),
+  editedUserId: z.number().nullable(),
+  editedAt: z.string().nullable(),
+  artistId: z.number().nullable(),
+  communityId: z.number().nullable(),
+  contributionId: z.number().nullable(),
+  requestId: z.number().nullable(),
+  releaseId: z.number().nullable(),
+  collageId: z.number().nullable(),
+  createdAt: z.string(),
+  // The list filters `deletedAt: null`, but GET /comments/{id} does NOT — it can
+  // serve a soft-deleted comment, so this is not always null.
+  deletedAt: z.string().nullable()
+};
+
+// `author` is guaranteed, not optional: `authorId` is a non-nullable FK and the
+// include is unconditional, so the three routes that include it always send it.
 const Comment = registry.register(
   'Comment',
+  z.object({ ...commentScalars, author: AuthorRef })
+);
+
+const CommentWithEditor = registry.register(
+  'CommentWithEditor',
   z.object({
-    id: z.number(),
-    page: z.string(),
-    // Raw BBCode; `bodyHtml` is the render-time transcription (#402).
-    body: z.string(),
-    bodyHtml: z.string().optional(),
-    authorId: z.number(),
-    createdAt: z.string(),
-    author: AuthorRef.optional()
+    ...commentScalars,
+    author: AuthorRef,
+    // Only the list includes the editor; null when the comment was never edited.
+    editedUser: z.object({ id: z.number(), username: z.string() }).nullable()
   })
+);
+
+// PUT echoes a bare `tx.comment.update()` — no include — so it carries neither
+// relation. Clients cannot read `author` off an update response.
+const CommentUpdated = registry.register(
+  'CommentUpdated',
+  z.object({ ...commentScalars })
 );
 
 const PaginatedComments = registry.register(
   'PaginatedComments',
   z.object({
-    data: z.array(Comment),
+    data: z.array(CommentWithEditor),
     meta: PaginationMeta
   })
 );
@@ -5916,7 +5968,9 @@ registry.registerPath({
   summary: 'One comment, with its author',
   description:
     'Deliberately unauthenticated — this route carries no auth middleware, ' +
-    'unlike the PUT and DELETE beside it.',
+    'unlike the PUT and DELETE beside it. It also does NOT filter ' +
+    '`deletedAt`, so unlike GET /comments it can serve a soft-deleted ' +
+    'comment; `deletedAt` is non-null in that case.',
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -5942,8 +5996,10 @@ registry.registerPath({
   },
   responses: {
     200: {
-      description: 'Comment updated',
-      content: { 'application/json': { schema: Comment } }
+      // NOT `Comment`: the handler echoes a bare `tx.comment.update()` with no
+      // include, so this response carries neither `author` nor `editedUser`.
+      description: 'Comment updated — scalars only, no author/editor relation',
+      content: { 'application/json': { schema: CommentUpdated } }
     },
     403: {
       description: 'Not authorized',
@@ -6059,13 +6115,29 @@ const ArtistHistory = registry.register(
   })
 );
 
+// Two shapes, one model. `POST /artists/similar` echoes the bare join row from
+// an `upsert` with no `select`; `GET /artists/{id}/similar` returns the same row
+// with the referenced artist included. The component used to declare ONLY the
+// nested artist — so it described neither route: it omitted every scalar the
+// list carries, and named a relation the create echo does not have.
 const SimilarArtist = registry.register(
   'SimilarArtist',
   z.object({
-    similarArtist: z.object({
-      id: z.number(),
-      name: z.string()
-    })
+    id: z.number(),
+    artistId: z.number(),
+    similarArtistId: z.number(),
+    score: z.number(),
+    // Json column defaulted to []; the vote ledger, shape not pinned here.
+    votes: z.unknown()
+  })
+);
+
+// Extends by ADDING a property, which is the direction that generates correctly
+// (see the api#488 note on narrowing extends).
+const SimilarArtistEntry = registry.register(
+  'SimilarArtistEntry',
+  SimilarArtist.extend({
+    similarArtist: z.object({ id: z.number(), name: z.string() })
   })
 );
 
@@ -6260,10 +6332,37 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Similar artists',
-      content: { 'application/json': { schema: z.array(SimilarArtist) } }
+      content: { 'application/json': { schema: z.array(SimilarArtistEntry) } }
     }
   }
 });
+
+// These three routes return the raw join row from an `upsert`/`create` with no
+// `select`, so the shape is exactly the Prisma model. They were registered as
+// `z.record(z.unknown())` — an admission that the shape was unknown, which gave
+// every consumer `{ [key: string]: unknown }` and no reason to prefer the
+// contract over a hand-written guess.
+const ArtistAlias = registry.register(
+  'ArtistAlias',
+  z.object({
+    id: z.number(),
+    artistId: z.number(),
+    redirectId: z.number(),
+    userId: z.number().nullable()
+  })
+);
+
+const ArtistTag = registry.register(
+  'ArtistTag',
+  z.object({
+    id: z.number(),
+    artistId: z.number(),
+    tagId: z.number(),
+    positiveVotes: z.number(),
+    negativeVotes: z.number(),
+    userId: z.number().nullable()
+  })
+);
 
 registry.registerPath({
   method: 'post',
@@ -6278,7 +6377,7 @@ registry.registerPath({
     200: {
       description: 'Similar artist link created',
       content: {
-        'application/json': { schema: z.record(z.string(), z.unknown()) }
+        'application/json': { schema: SimilarArtist }
       }
     }
   }
@@ -6295,7 +6394,7 @@ registry.registerPath({
     201: {
       description: 'Artist alias created',
       content: {
-        'application/json': { schema: z.record(z.string(), z.unknown()) }
+        'application/json': { schema: ArtistAlias }
       }
     }
   }
@@ -6312,7 +6411,7 @@ registry.registerPath({
     200: {
       description: 'Artist tagged',
       content: {
-        'application/json': { schema: z.record(z.string(), z.unknown()) }
+        'application/json': { schema: ArtistTag }
       }
     }
   }
