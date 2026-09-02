@@ -4349,11 +4349,45 @@
         "type": "object",
         "properties": {
           "myVote": {
-            "type": "integer",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "up",
+              "down",
+              null
+            ]
           },
           "voteAggregate": {
-            "type": "integer"
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "releaseId": {
+                "type": "number"
+              },
+              "ups": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "score": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "releaseId",
+              "ups",
+              "total",
+              "score",
+              "updatedAt"
+            ]
           }
         },
         "required": [
