@@ -6,7 +6,6 @@ import {
 import { z } from 'zod';
 import {
   NotificationType,
-  RatioExempt,
   RequestStatus,
   RequestActionType
 } from '@prisma/client';
@@ -26,13 +25,18 @@ import {
   grantDonorSchema,
   ircNickVerifySchema,
   setRankSchema,
+  rankLockSchema,
+  staffBioSchema,
+  dncSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
   pmDraftSchema,
   massPmSchema
 } from '../schemas/user';
 import {
   createContributionSchema,
-  addContributionToReleaseSchema
+  addContributionToReleaseSchema,
+  contributionReportSchema,
+  ratioExemptSchema
 } from '../schemas/contribution';
 import {
   createCollageSchema,
@@ -53,7 +57,10 @@ import {
   updateCommunitySchema,
   createGroupSchema,
   updateGroupSchema,
-  releaseVoteSchema
+  releaseVoteSchema,
+  releaseTagSchema,
+  releaseTagVoteSchema,
+  addMemberSchema
 } from '../schemas/community';
 import {
   updateRequestSchema,
@@ -86,7 +93,8 @@ import {
   artistSchema,
   similarArtistSchema,
   artistAliasSchema,
-  artistTagSchema
+  artistTagSchema,
+  vanityHouseSchema
 } from '../schemas/artist';
 import {
   stylesheetSchema,
@@ -119,6 +127,17 @@ import {
   createCommentSchema,
   updateCommentSchema
 } from '../schemas/comment';
+import { installSchema } from '../schemas/install';
+import { updateSettingsSchema } from '../schemas/settings';
+import { friendCommentSchema } from '../schemas/friends';
+import { ratioPolicyOverrideSchema } from '../schemas/ratioPolicy';
+import { createDonationSchema } from '../schemas/donations';
+import { grantAccessSchema, reverseGrantSchema } from '../schemas/downloads';
+import {
+  fileReportSchema,
+  resolveReportSchema,
+  addNoteSchema
+} from '../schemas/reports';
 import {
   searchReleasesQuerySchema,
   searchArtistsQuerySchema,
@@ -544,11 +563,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            username: z.string().min(1).max(30),
-            email: z.string().email(),
-            password: z.string().min(8)
-          })
+          schema: installSchema
         }
       }
     }
@@ -1787,7 +1802,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ rankLocked: z.boolean() })
+          schema: rankLockSchema
         }
       }
     }
@@ -4789,7 +4804,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ userId: z.number().int().positive() })
+          schema: addMemberSchema
         }
       }
     }
@@ -4859,7 +4874,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ userId: z.number().int().positive() })
+          schema: addMemberSchema
         }
       }
     }
@@ -5141,7 +5156,7 @@ registry.registerPath({
     params: z.object({ communityId: z.string(), releaseId: z.string() }),
     body: {
       content: {
-        'application/json': { schema: z.object({ name: z.string() }) }
+        'application/json': { schema: releaseTagSchema }
       }
     }
   },
@@ -5190,7 +5205,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ direction: z.enum(['up', 'down']) })
+          schema: releaseTagVoteSchema
         }
       }
     }
@@ -5359,7 +5374,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ reason: z.string().min(1).max(1000) })
+          schema: contributionReportSchema
         }
       }
     }
@@ -5394,7 +5409,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ ratioExempt: z.nativeEnum(RatioExempt) })
+          schema: ratioExemptSchema
         }
       }
     }
@@ -5832,7 +5847,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ staffBio: z.string().max(500).nullable() })
+          schema: staffBioSchema
         }
       }
     }
@@ -7712,14 +7727,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            targetType: z.string(),
-            targetId: z.number(),
-            category: z.string().optional(),
-            releaseCategory: z.string().optional(),
-            reason: z.string(),
-            evidence: z.string().optional()
-          })
+          schema: fileReportSchema
         }
       }
     }
@@ -7770,10 +7778,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            resolution: z.string(),
-            resolutionAction: z.string()
-          })
+          schema: resolveReportSchema
         }
       }
     }
@@ -7789,7 +7794,7 @@ registry.registerPath({
     params: z.object({ id: z.string() }),
     body: {
       content: {
-        'application/json': { schema: z.object({ body: z.string() }) }
+        'application/json': { schema: addNoteSchema }
       }
     }
   },
@@ -7890,9 +7895,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            status: z.enum(['OK', 'WATCH', 'DOWNLOAD_DISABLED'])
-          })
+          schema: ratioPolicyOverrideSchema
         }
       }
     }
@@ -7942,11 +7945,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            approvedDomains: z.array(z.string()).optional(),
-            registrationStatus: z.enum(['open', 'invite', 'closed']).optional(),
-            maxUsers: z.number().optional()
-          })
+          schema: updateSettingsSchema
         }
       }
     }
@@ -8188,6 +8187,14 @@ registry.registerPath({
   }
 });
 
+// The ONE request body in this file that is deliberately hand-written rather
+// than a reference to the schema that validates the route: there is no such
+// schema. routes/api/top10.ts reads `req.body?.type` directly and coerces
+// anything that is not exactly 'Weekly' into 'Daily', so the route accepts any
+// body at all — a live exception to AGENTS.md's "always run validate(schema)
+// before the handler". This registration describes what ships. Adding a
+// validator here would be a behaviour change, so it is tracked separately
+// rather than folded into a contract-accuracy pass.
 registry.registerPath({
   method: 'post',
   path: '/top10/snapshot',
@@ -8610,7 +8617,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ comment: z.string().max(500) })
+          schema: friendCommentSchema
         }
       }
     }
@@ -8968,7 +8975,7 @@ registry.registerPath({
     params: z.object({ id: z.string() }),
     body: {
       content: {
-        'application/json': { schema: z.object({ vanityHouse: z.boolean() }) }
+        'application/json': { schema: vanityHouseSchema }
       }
     }
   },
@@ -10133,7 +10140,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ name: z.string(), comment: z.string() })
+          schema: dncSchema
         }
       }
     }
@@ -10573,7 +10580,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ idempotencyKey: z.string().optional() })
+          schema: grantAccessSchema
         }
       }
     }
@@ -10614,7 +10621,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({ reason: z.string() })
+          schema: reverseGrantSchema
         }
       }
     }
@@ -10668,15 +10675,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            userId: z.number(),
-            amount: z.number(),
-            email: z.string(),
-            donatedAt: z.string(),
-            currency: z.string().optional(),
-            source: z.string().optional(),
-            reason: z.string()
-          })
+          schema: createDonationSchema
         }
       }
     }

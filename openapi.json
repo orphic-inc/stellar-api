@@ -15662,7 +15662,9 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
                   }
                 },
                 "required": [
@@ -21543,31 +21545,116 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "targetType": {
-                    "type": "string"
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "targetType": {
+                        "type": "string",
+                        "enum": [
+                          "Release"
+                        ]
+                      },
+                      "targetId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                      },
+                      "releaseCategory": {
+                        "type": "string",
+                        "enum": [
+                          "Dupe",
+                          "Trump",
+                          "BadFileNamesTrump",
+                          "BadFolderNameTrump",
+                          "TagTrump",
+                          "VinylTrump",
+                          "AudienceRecording",
+                          "BadFileNames",
+                          "BadFolderNames",
+                          "BadTagNoTag",
+                          "BonusTracksOnly",
+                          "DisallowedFormat",
+                          "DiscsMissing",
+                          "Discography",
+                          "MqaBanned",
+                          "EditedLog",
+                          "InaccurateBitrate",
+                          "LogRescoreRequest",
+                          "LossyMasterApprovalRequest",
+                          "ContributionContestApprovalRequest",
+                          "LowBitrate",
+                          "MuttRip",
+                          "NoLineageInfo",
+                          "Other",
+                          "RadioTvFmWebRip",
+                          "SkipsEncodeErrors",
+                          "SpecificallyBanned",
+                          "TracksMissing",
+                          "Transcode",
+                          "UnsplitAlbumRip",
+                          "Urgent",
+                          "UserCompilation",
+                          "WrongSpecifiedFormat",
+                          "WrongSpecifiedMedia"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "targetType",
+                      "targetId",
+                      "releaseCategory",
+                      "reason"
+                    ]
                   },
-                  "targetId": {
-                    "type": "number"
-                  },
-                  "category": {
-                    "type": "string"
-                  },
-                  "releaseCategory": {
-                    "type": "string"
-                  },
-                  "reason": {
-                    "type": "string"
-                  },
-                  "evidence": {
-                    "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "targetType": {
+                        "type": "string",
+                        "enum": [
+                          "User",
+                          "Artist",
+                          "Contribution",
+                          "ForumTopic",
+                          "ForumPost",
+                          "Comment",
+                          "Collage",
+                          "Post"
+                        ]
+                      },
+                      "targetId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                      },
+                      "category": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "targetType",
+                      "targetId",
+                      "category",
+                      "reason"
+                    ]
                   }
-                },
-                "required": [
-                  "targetType",
-                  "targetId",
-                  "reason"
                 ]
               }
             }
@@ -22128,10 +22215,20 @@
                 "type": "object",
                 "properties": {
                   "resolution": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "resolutionAction": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                      "Dismissed",
+                      "ContentRemoved",
+                      "UserWarned",
+                      "UserDisabled",
+                      "MetadataFixed",
+                      "MarkedDuplicate",
+                      "Other"
+                    ]
                   }
                 },
                 "required": [
@@ -22171,7 +22268,8 @@
                 "type": "object",
                 "properties": {
                   "body": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -22417,7 +22515,8 @@
                   "approvedDomains": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "registrationStatus": {
@@ -22429,7 +22528,15 @@
                     ]
                   },
                   "maxUsers": {
-                    "type": "number"
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "dismissedLaunchChecklist": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 }
               }
@@ -26313,15 +26420,16 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "comment": {
-                    "type": "string"
+                    "type": "string",
+                    "default": ""
                   }
                 },
                 "required": [
-                  "name",
-                  "comment"
+                  "name"
                 ]
               }
             }
@@ -28795,7 +28903,8 @@
                 "type": "object",
                 "properties": {
                   "idempotencyKey": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128
                   }
                 }
               }
@@ -28935,12 +29044,10 @@
                 "type": "object",
                 "properties": {
                   "reason": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 500
                   }
-                },
-                "required": [
-                  "reason"
-                ]
+                }
               }
             }
           }
@@ -29087,25 +29194,34 @@
                 "type": "object",
                 "properties": {
                   "userId": {
-                    "type": "number"
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
                   },
                   "amount": {
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email"
                   },
                   "donatedAt": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "currency": {
-                    "type": "string"
+                    "type": "string",
+                    "default": "USD"
                   },
                   "source": {
-                    "type": "string"
+                    "type": "string",
+                    "default": ""
                   },
                   "reason": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
