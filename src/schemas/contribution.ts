@@ -1,6 +1,7 @@
 import {
   Bitrate,
   FileType,
+  RatioExempt,
   ReleaseCategory,
   ReleaseMedia,
   ReleaseType
@@ -110,6 +111,16 @@ export const addContributionToReleaseSchema = z.object({
   isScene: z.boolean().optional().default(false)
 });
 
+export const contributionReportSchema = z.object({
+  reason: z.string().min(1).max(1000)
+});
+
+export const ratioExemptSchema = z.object({
+  ratioExempt: z.nativeEnum(RatioExempt)
+});
+
 export type AddContributionToReleaseInput = z.infer<
   typeof addContributionToReleaseSchema
 >;
+export type ContributionReportInput = z.infer<typeof contributionReportSchema>;
+export type RatioExemptInput = z.infer<typeof ratioExemptSchema>;

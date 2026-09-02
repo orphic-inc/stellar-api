@@ -18,6 +18,7 @@ import {
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
+import { friendCommentSchema } from '../../schemas/friends';
 
 const router = express.Router();
 
@@ -25,10 +26,6 @@ const friendsQuerySchema = z.object({ ...paginationBase });
 
 const userIdParams = z.object({
   userId: z.coerce.number().int().positive()
-});
-
-const commentSchema = z.object({
-  comment: z.string().max(500)
 });
 
 const userSummary = { id: true, username: true, avatar: true } as const;
@@ -295,7 +292,7 @@ router.put(
   '/:userId/comment',
   requireAuth,
   validateParams(userIdParams),
-  validate(commentSchema),
+  validate(friendCommentSchema),
   authHandler(async (req, res) => {
     const { userId: otherId } = parsedParams<{ userId: number }>(res);
     const { comment } = parsedBody<{ comment: string }>(res);

@@ -17,6 +17,10 @@ import {
   paginatedResponse,
   paginationBase
 } from '../../lib/pagination';
+import {
+  createDonationSchema,
+  type CreateDonationInput
+} from '../../schemas/donations';
 
 const router = express.Router();
 
@@ -28,18 +32,6 @@ const donationsQuerySchema = z.object({
 });
 
 type DonationsQuery = z.infer<typeof donationsQuerySchema>;
-
-const createDonationSchema = z.object({
-  userId: z.number().int().positive(),
-  amount: z.number().positive(),
-  email: z.string().email(),
-  donatedAt: z.string().datetime(),
-  currency: z.string().default('USD'),
-  source: z.string().default(''),
-  reason: z.string().min(1, 'Reason is required')
-});
-
-type CreateDonationInput = z.infer<typeof createDonationSchema>;
 
 // GET /api/donations
 router.get(
