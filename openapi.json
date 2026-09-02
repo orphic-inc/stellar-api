@@ -2275,6 +2275,9 @@
       "SiteStats": {
         "type": "object",
         "properties": {
+          "maxUsers": {
+            "type": "number"
+          },
           "totalUsers": {
             "type": "number"
           },
@@ -2316,6 +2319,7 @@
           }
         },
         "required": [
+          "maxUsers",
           "totalUsers",
           "enabledUsers",
           "activeToday",
@@ -2336,6 +2340,9 @@
         "properties": {
           "id": {
             "type": "number"
+          },
+          "bucketAt": {
+            "type": "string"
           },
           "capturedAt": {
             "type": "string"
@@ -2385,6 +2392,7 @@
         },
         "required": [
           "id",
+          "bucketAt",
           "capturedAt",
           "maxUsers",
           "totalUsers",
@@ -5645,6 +5653,16 @@
           "maxUsers": {
             "type": "number"
           },
+          "dismissedLaunchChecklist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "installedAt": {
+            "type": "string",
+            "nullable": true
+          },
           "updatedAt": {
             "type": "string"
           }
@@ -5654,6 +5672,8 @@
           "approvedDomains",
           "registrationStatus",
           "maxUsers",
+          "dismissedLaunchChecklist",
+          "installedAt",
           "updatedAt"
         ]
       },

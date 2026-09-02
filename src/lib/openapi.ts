@@ -2521,6 +2521,9 @@ const AnnouncementsResponse = registry.register(
 const SiteStats = registry.register(
   'SiteStats',
   z.object({
+    // getSystemStats() reads the SiteSettings row and returns maxUsers first —
+    // it is a capacity figure alongside the counts, not part of them.
+    maxUsers: z.number(),
     totalUsers: z.number(),
     enabledUsers: z.number(),
     activeToday: z.number(),
@@ -2541,6 +2544,10 @@ const SiteStatSnapshot = registry.register(
   'SiteStatSnapshot',
   z.object({
     id: z.number(),
+    // getSiteStatHistory() returns raw rows, so the bucket key is on every one.
+    // It is the `@unique` column the hourly/daily capture upserts against —
+    // distinct from capturedAt, which is when the row was written.
+    bucketAt: z.string(),
     capturedAt: z.string(),
     maxUsers: z.number(),
     totalUsers: z.number(),
@@ -7921,6 +7928,12 @@ const SiteSettings = registry.register(
     approvedDomains: z.array(z.string()),
     registrationStatus: z.enum(['open', 'invite', 'closed']),
     maxUsers: z.number(),
+    // getSettings() and updateSettings() both `upsert` with no `select`, so
+    // BOTH routes return the whole SiteSettings row. These two columns are on
+    // it and have always been sent; the component simply did not say so.
+    // installedAt is `DateTime?` — null until POST /install stamps it.
+    dismissedLaunchChecklist: z.array(z.string()),
+    installedAt: z.string().nullable(),
     updatedAt: z.string()
   })
 );
