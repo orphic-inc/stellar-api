@@ -2462,6 +2462,9 @@
           "id": {
             "type": "number"
           },
+          "userId": {
+            "type": "number"
+          },
           "type": {
             "type": "string",
             "enum": [
@@ -2542,6 +2545,7 @@
         },
         "required": [
           "id",
+          "userId",
           "type",
           "page",
           "pageId",
