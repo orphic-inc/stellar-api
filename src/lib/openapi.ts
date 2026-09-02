@@ -8375,8 +8375,19 @@ registry.registerPath({
       description: 'Page updated',
       content: { 'application/json': { schema: RulesPage } }
     },
+    400: {
+      description: 'Validation failed',
+      content: { 'application/json': { schema: ValidationError } }
+    },
     404: {
       description: 'Not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    // Same conflict POST answers: promoting a page to isMain while another
+    // main page exists. The update path checks it too (routes/api/rules.ts),
+    // so both routes can answer 409 and only one said so.
+    409: {
+      description: 'A main rules page already exists',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
