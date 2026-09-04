@@ -294,4 +294,40 @@ describe('POST /api/top10/snapshot', () => {
     expect(res.status).toBe(200);
     expect(top10Mock.createSnapshot).toHaveBeenCalledWith('Weekly');
   });
+
+  // #491: the route had no validator at all. `req.body?.type` was read directly
+  // and anything that was not exactly 'Weekly' became 'Daily', so each of the
+  // cases below used to answer 200 and quietly build the wrong snapshot.
+  // These assert on the WHOLE surface the missing validator left open — the
+  // near-miss casing, a value outside the enum, and a wrong-typed value.
+  it.each([['weekly'], ['WEEKLY'], ['Monthly'], [42]])(
+    'rejects %p rather than silently making it Daily',
+    async (type) => {
+      prismaMock.userRank.findUnique.mockResolvedValue(
+        makeUserRank({ admin: true })
+      );
+      top10Mock.createSnapshot.mockResolvedValue(undefined);
+
+      const res = await request(app).post('/api/top10/snapshot').send({ type });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors).toHaveProperty('type');
+      expect(top10Mock.createSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  // The one permissive case that is deliberately KEPT: an absent body is the
+  // cron's daily call, and express.json() makes that `{}`, which the schema
+  // defaults to Daily. Adding the validator must not break it.
+  it('still defaults to Daily when no body is sent at all', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    top10Mock.createSnapshot.mockResolvedValue(undefined);
+
+    const res = await request(app).post('/api/top10/snapshot');
+
+    expect(res.status).toBe(200);
+    expect(top10Mock.createSnapshot).toHaveBeenCalledWith('Daily');
+  });
 });

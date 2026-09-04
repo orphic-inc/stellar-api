@@ -1,0 +1,29 @@
+-- #491: every Top10Snapshot row labelled `Weekly` holds DAILY data. Delete them.
+--
+-- createSnapshot() hardcoded `getTopReleases({ type: 'day' })` and wrote the
+-- caller's `type` to the column as a label only, so the argument never reached
+-- the query. `GET /top10/history` filters on that column (`where: { type }`),
+-- which means every consumer asking for the weekly leaderboard has been served
+-- the daily one under a Weekly heading. The rows are not merely stale, they are
+-- mislabelled: nothing distinguishes them from a correct Weekly row, so leaving
+-- them would mix wrong history in with right history permanently.
+--
+-- NO DATE BOUND, DELIBERATELY. The fix ships in this same deploy, so at the
+-- moment this migration runs every Weekly row in the table predates it by
+-- construction — there is no such thing as a correct Weekly row yet. A
+-- `createdAt <` cutoff would only invite the question of which clock it meant.
+--
+-- `Daily` rows are untouched: the hardcoded window was 'day', so they were
+-- always right and are the reason this is a targeted delete rather than a
+-- truncate.
+--
+-- top10_snapshot_entries cascades (Top10SnapshotEntry.snapshot has
+-- onDelete: Cascade), so the child rows go with the parents and no orphan is
+-- left behind. Releases are untouched — the entry side of that relation is
+-- SetNull and points AT releases, not the other way round.
+--
+-- This is history, not source data: nothing is recomputed from these rows and
+-- nothing else references a snapshot, so the delete is not recoverable and does
+-- not need to be. The next cron tick writes a correct Weekly row.
+
+DELETE FROM "top10_snapshots" WHERE "type" = 'Weekly';

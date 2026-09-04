@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Top10SnapshotType } from '@prisma/client';
 
 const RELEASE_LIMITS = [10, 100, 250] as const;
 const VOTE_LIMITS = [25, 100, 250] as const;
@@ -104,8 +105,19 @@ export const historyQuerySchema = z.object({
     .optional()
 });
 
+// POST /top10/snapshot. Sourced from the Prisma enum rather than a literal
+// `z.enum(['Daily', 'Weekly'])` — unlike historyQuerySchema above, which only
+// READS the column, this schema decides what gets WRITTEN to it, so it should
+// not be able to drift from Top10SnapshotType. `Daily` is the default because
+// that is what the route coerced every unrecognised body to before it had a
+// validator, so a caller sending no body at all keeps its old behaviour.
+export const snapshotSchema = z.object({
+  type: z.nativeEnum(Top10SnapshotType).default(Top10SnapshotType.Daily)
+});
+
 export type ReleasesQuery = z.infer<typeof releasesQuerySchema>;
 export type UsersQuery = z.infer<typeof usersQuerySchema>;
 export type TagsQuery = z.infer<typeof tagsQuerySchema>;
 export type VotesQuery = z.infer<typeof votesQuerySchema>;
 export type HistoryQuery = z.infer<typeof historyQuerySchema>;
+export type SnapshotInput = z.infer<typeof snapshotSchema>;

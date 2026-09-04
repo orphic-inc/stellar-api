@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, Top10SnapshotType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
 import type {
@@ -597,8 +597,18 @@ export async function getHistorySnapshot(
   };
 }
 
-export async function createSnapshot(type: 'Daily' | 'Weekly'): Promise<void> {
-  const top = await getTopReleases({ type: 'day', limit: 10 });
+// Which leaderboard WINDOW each snapshot type captures. This map is the whole
+// point of the type: a Weekly snapshot is the week's top 10, not a weekly
+// capture of the daily one. Before #491 the window was hardcoded to 'day' and
+// `type` was written to the column as a label only, so every row labelled
+// Weekly held daily data and GET /top10/history served it as if it did not.
+const SNAPSHOT_WINDOW = {
+  Daily: 'day',
+  Weekly: 'week'
+} as const satisfies Record<Top10SnapshotType, ReleasesQuery['type']>;
+
+export async function createSnapshot(type: Top10SnapshotType): Promise<void> {
+  const top = await getTopReleases({ type: SNAPSHOT_WINDOW[type], limit: 10 });
 
   await prisma.top10Snapshot.create({
     data: {
