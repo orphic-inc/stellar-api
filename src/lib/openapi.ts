@@ -6,6 +6,7 @@ import {
 import { z } from 'zod';
 import {
   NotificationType,
+  ReleaseCategory,
   RequestStatus,
   RequestActionType
 } from '@prisma/client';
@@ -4461,6 +4462,17 @@ const ReleaseHistoryEntry = registry.register(
   })
 );
 
+// `Release.releaseType` is a `ReleaseCategory` column, not free text, and every
+// projection that returns a release selects it — so it is a required, non-null
+// enum everywhere it appears. It had been `z.string()` at five sites with THREE
+// different nullabilities between them (nullable+optional, optional, required),
+// which told clients the field might be absent, might be null, and could hold
+// any string. All three were wrong: the column is `ReleaseCategory` NOT NULL.
+//
+// Sourced from the Prisma enum rather than a literal `z.enum([...])` so it
+// cannot drift from the fourteen values the database actually accepts.
+const ReleaseCategoryEnum = z.nativeEnum(ReleaseCategory);
+
 const Release = registry.register(
   'Release',
   z.object({
@@ -4469,7 +4481,7 @@ const Release = registry.register(
     communityId: z.number().nullable(),
     year: z.number().nullable().optional(),
     type: z.string().nullable().optional(),
-    releaseType: z.string().nullable().optional(),
+    releaseType: ReleaseCategoryEnum,
     image: z.string().nullable().optional(),
     // Raw BBCode; `descriptionHtml` is the render-time transcription (#402).
     description: z.string().nullable().optional(),
@@ -6129,7 +6141,7 @@ const Artist = registry.register(
           title: z.string(),
           year: z.number().nullable().optional(),
           type: z.string().optional(),
-          releaseType: z.string().optional(),
+          releaseType: ReleaseCategoryEnum,
           communityId: z.number().nullable().optional(),
           community: z
             .object({
@@ -8133,7 +8145,7 @@ const Top10ReleaseItem = registry.register(
     artistId: z.number(),
     artistName: z.string(),
     type: z.string(),
-    releaseType: z.string(),
+    releaseType: ReleaseCategoryEnum,
     tags: z.array(Top10Tag),
     consumerCount: z.number(),
     totalBytesConsumed: z.string(),
@@ -9291,7 +9303,7 @@ const CollageEntry = registry.register(
       image: z.string().nullable(),
       // Both non-nullable columns: `year Int` and `releaseType ReleaseCategory`.
       year: z.number().int(),
-      releaseType: z.string(),
+      releaseType: ReleaseCategoryEnum,
       // OPTIONAL, and this is the one field where the two selects differ: the
       // detail route selects `communityId`, the add-entry 201 does not. Nullable
       // when it IS selected, because the column itself is `Int?`.
@@ -10505,7 +10517,7 @@ const releaseSearchItem = z.object({
   title: z.string(),
   year: z.number().nullable(),
   type: z.string(),
-  releaseType: z.string(),
+  releaseType: ReleaseCategoryEnum,
   communityId: z.number().nullable(),
   description: z.string(),
   createdAt: z.string(),
