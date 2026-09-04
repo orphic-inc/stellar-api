@@ -2,18 +2,25 @@ import express, { Request, Response } from 'express';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import { validateQuery, parsedQuery } from '../../middleware/validate';
+import {
+  validate,
+  validateQuery,
+  parsedBody,
+  parsedQuery
+} from '../../middleware/validate';
 import {
   releasesQuerySchema,
   usersQuerySchema,
   tagsQuerySchema,
   votesQuerySchema,
   historyQuerySchema,
+  snapshotSchema,
   type ReleasesQuery,
   type UsersQuery,
   type TagsQuery,
   type VotesQuery,
-  type HistoryQuery
+  type HistoryQuery,
+  type SnapshotInput
 } from '../../schemas/top10';
 import {
   getTopReleases,
@@ -124,12 +131,19 @@ router.get(
 );
 
 // POST /api/top10/snapshot  (admin only — cron trigger)
+//
+// `type` selects the WINDOW the snapshot captures, not just the label it is
+// filed under — Daily is the last 24h, Weekly the last 7 days. It used to be
+// read straight off `req.body?.type` with anything that was not exactly
+// 'Weekly' silently coerced to 'Daily', so a caller sending 'weekly' got a
+// daily snapshot and a 200. It now validates like every other mutating route:
+// a bad value is a 400, and an absent body still defaults to Daily.
 router.post(
   '/snapshot',
   ...requirePermission('admin'),
-  asyncHandler(async (req: Request, res: Response) => {
-    const type =
-      req.body?.type === 'Weekly' ? ('Weekly' as const) : ('Daily' as const);
+  validate(snapshotSchema),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const { type } = parsedBody<SnapshotInput>(res);
     await createSnapshot(type);
     res.json({ msg: 'Snapshot created' });
   })

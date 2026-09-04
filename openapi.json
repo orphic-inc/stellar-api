@@ -23290,6 +23290,7 @@
     "/top10/snapshot": {
       "post": {
         "summary": "Trigger a history snapshot (admin/cron)",
+        "description": "`type` selects the WINDOW the snapshot captures, not merely the label it is filed under: **Daily is the last 24 hours, Weekly the last 7 days**. Omit the body entirely for a Daily snapshot. Before #491 the window was hardcoded to daily and `type` was stored as a label only, so rows labelled Weekly held daily data.",
         "tags": [
           "Top10"
         ],
@@ -23304,7 +23305,8 @@
                     "enum": [
                       "Daily",
                       "Weekly"
-                    ]
+                    ],
+                    "default": "Daily"
                   }
                 }
               }
@@ -23326,6 +23328,16 @@
                   "required": [
                     "msg"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "type is not one of Daily | Weekly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }

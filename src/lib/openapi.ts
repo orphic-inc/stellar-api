@@ -133,6 +133,7 @@ import { friendCommentSchema } from '../schemas/friends';
 import { ratioPolicyOverrideSchema } from '../schemas/ratioPolicy';
 import { createDonationSchema } from '../schemas/donations';
 import { grantAccessSchema, reverseGrantSchema } from '../schemas/downloads';
+import { snapshotSchema } from '../schemas/top10';
 import {
   fileReportSchema,
   resolveReportSchema,
@@ -8340,32 +8341,35 @@ registry.registerPath({
   }
 });
 
-// The ONE request body in this file that is deliberately hand-written rather
-// than a reference to the schema that validates the route: there is no such
-// schema. routes/api/top10.ts reads `req.body?.type` directly and coerces
-// anything that is not exactly 'Weekly' into 'Daily', so the route accepts any
-// body at all — a live exception to AGENTS.md's "always run validate(schema)
-// before the handler". This registration describes what ships. Adding a
-// validator here would be a behaviour change, so it is tracked separately
-// rather than folded into a contract-accuracy pass.
+// #491 closed the last hand-written request body in this file. This route had
+// no validator to reference — it read `req.body?.type` directly — so #490 had
+// to transcribe its body by hand. It now runs validate(snapshotSchema) like
+// every other mutating route, and this registration references that schema.
+// All 21 request bodies are now projections of the validator that enforces them.
 registry.registerPath({
   method: 'post',
   path: '/top10/snapshot',
   summary: 'Trigger a history snapshot (admin/cron)',
+  description:
+    '`type` selects the WINDOW the snapshot captures, not merely the label it ' +
+    'is filed under: **Daily is the last 24 hours, Weekly the last 7 days**. ' +
+    'Omit the body entirely for a Daily snapshot. Before #491 the window was ' +
+    'hardcoded to daily and `type` was stored as a label only, so rows ' +
+    'labelled Weekly held daily data.',
   tags: ['Top10'],
   request: {
     body: {
-      content: {
-        'application/json': {
-          schema: z.object({ type: z.enum(['Daily', 'Weekly']).optional() })
-        }
-      }
+      content: { 'application/json': { schema: snapshotSchema } }
     }
   },
   responses: {
     200: {
       description: 'Snapshot created',
       content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
+    },
+    400: {
+      description: 'type is not one of Daily | Weekly',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
