@@ -46,10 +46,10 @@ const forumIdParamsSchema = z.object({
 });
 const forumTopicParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
-  forumTopicId: z.coerce.number().int().positive()
+  topicId: z.coerce.number().int().positive()
 });
 
-router.use('/:forumTopicId/posts', forumPostRouter);
+router.use('/:topicId/posts', forumPostRouter);
 
 const forumTopicsQuerySchema = z.object({ ...paginationBase });
 
@@ -112,19 +112,19 @@ router.get(
   })
 );
 
-// ─── GET /api/forums/:forumId/topics/:forumTopicId/session ───────────────────
-// Registered before /:forumTopicId so the static "/session" segment takes
+// ─── GET /api/forums/:forumId/topics/:topicId/session ───────────────────
+// Registered before /:topicId so the static "/session" segment takes
 // priority over the parameterized single-topic route.
 
 router.get(
-  '/:forumTopicId/session',
+  '/:topicId/session',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   validateQuery(forumTopicsQuerySchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: topicId } = parsedParams<{
+    const { forumId, topicId } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const pg = parsedPage(res);
     const actor = await buildActor(req, res);
@@ -134,16 +134,16 @@ router.get(
   })
 );
 
-// ─── GET /api/forums/:forumId/topics/:forumTopicId ───────────────────────────
+// ─── GET /api/forums/:forumId/topics/:topicId ───────────────────────────
 
 router.get(
-  '/:forumTopicId',
+  '/:topicId',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = parsedParams<{
+    const { forumId, topicId: id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({
@@ -204,17 +204,17 @@ router.post(
   })
 );
 
-// ─── PUT /api/forums/:forumId/topics/:forumTopicId ───────────────────────────
+// ─── PUT /api/forums/:forumId/topics/:topicId ───────────────────────────
 
 router.put(
-  '/:forumTopicId',
+  '/:topicId',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   validate(updateTopicSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = parsedParams<{
+    const { forumId, topicId: id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
     const actor = await buildActor(req, res);
@@ -233,16 +233,16 @@ router.put(
   })
 );
 
-// ─── DELETE /api/forums/:forumId/topics/:forumTopicId ────────────────────────
+// ─── DELETE /api/forums/:forumId/topics/:topicId ────────────────────────
 
 router.delete(
-  '/:forumTopicId',
+  '/:topicId',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = parsedParams<{
+    const { forumId, topicId: id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const actor = await buildActor(req, res);
 
@@ -256,16 +256,16 @@ router.delete(
   })
 );
 
-// ─── POST /api/forums/:forumId/topics/:forumTopicId/trash ────────────────────
+// ─── POST /api/forums/:forumId/topics/:topicId/trash ────────────────────
 
 router.post(
-  '/:forumTopicId/trash',
+  '/:topicId/trash',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId: id } = parsedParams<{
+    const { forumId, topicId: id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const actor = await buildActor(req, res);
 

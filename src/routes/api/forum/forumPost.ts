@@ -41,11 +41,11 @@ import { assertForumReadAccess } from '../../../modules/forumAccess';
 const router = express.Router({ mergeParams: true });
 const forumTopicParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
-  forumTopicId: z.coerce.number().int().positive()
+  topicId: z.coerce.number().int().positive()
 });
 const forumPostParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
-  forumTopicId: z.coerce.number().int().positive(),
+  topicId: z.coerce.number().int().positive(),
   id: z.coerce.number().int().positive()
 });
 
@@ -58,16 +58,16 @@ const editHistoryInclude = {
   }
 };
 
-// GET /api/forums/:forumId/topics/:forumTopicId/posts
+// GET /api/forums/:forumId/topics/:topicId/posts
 router.get(
   '/',
   requireAuth,
   validateParams(forumTopicParamsSchema),
   validateQuery(forumPostsQuerySchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId } = parsedParams<{
+    const { forumId, topicId } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
 
     await assertForumReadAccess(req.user, forumId);
@@ -76,7 +76,7 @@ router.get(
     const [posts, total] = await Promise.all([
       prisma.forumPost.findMany({
         where: {
-          forumTopicId,
+          forumTopicId: topicId,
           deletedAt: null,
           forumTopic: { forumId, deletedAt: null }
         },
@@ -87,7 +87,7 @@ router.get(
       }),
       prisma.forumPost.count({
         where: {
-          forumTopicId,
+          forumTopicId: topicId,
           deletedAt: null,
           forumTopic: { forumId, deletedAt: null }
         }
@@ -102,15 +102,15 @@ router.get(
   })
 );
 
-// GET /api/forums/:forumId/topics/:forumTopicId/posts/:id
+// GET /api/forums/:forumId/topics/:topicId/posts/:id
 router.get(
   '/:id',
   requireAuth,
   validateParams(forumPostParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId, id } = parsedParams<{
+    const { forumId, topicId, id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
       id: number;
     }>(res);
 
@@ -119,7 +119,7 @@ router.get(
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
-        forumTopicId,
+        forumTopicId: topicId,
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       },
@@ -130,15 +130,15 @@ router.get(
   })
 );
 
-// GET /api/forums/:forumId/topics/:forumTopicId/posts/:id/edits — moderator only
+// GET /api/forums/:forumId/topics/:topicId/posts/:id/edits — moderator only
 router.get(
   '/:id/edits',
   requireAuth,
   validateParams(forumPostParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId, id } = parsedParams<{
+    const { forumId, topicId, id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
       id: number;
     }>(res);
 
@@ -152,7 +152,7 @@ router.get(
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
-        forumTopicId,
+        forumTopicId: topicId,
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       },
@@ -163,7 +163,7 @@ router.get(
   })
 );
 
-// POST /api/forums/:forumId/topics/:forumTopicId/posts
+// POST /api/forums/:forumId/topics/:topicId/posts
 router.post(
   '/',
   requireAuth,
@@ -171,9 +171,9 @@ router.post(
   validateParams(forumTopicParamsSchema),
   validate(createPostSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId } = parsedParams<{
+    const { forumId, topicId } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
     }>(res);
     const { body } = parsedBody<CreatePostInput>(res);
 
@@ -187,23 +187,23 @@ router.post(
       )
     };
 
-    const post = await replyToTopic(forumId, forumTopicId, actor, body);
+    const post = await replyToTopic(forumId, topicId, actor, body);
     res
       .status(201)
       .json({ ...post, bodyHtml: await renderSiteBBCode(post.body) });
   })
 );
 
-// PUT /api/forums/:forumId/topics/:forumTopicId/posts/:id — author or moderator
+// PUT /api/forums/:forumId/topics/:topicId/posts/:id — author or moderator
 router.put(
   '/:id',
   requireAuth,
   validateParams(forumPostParamsSchema),
   validate(updatePostSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId, id } = parsedParams<{
+    const { forumId, topicId, id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
       id: number;
     }>(res);
     const { body } = parsedBody<UpdatePostInput>(res);
@@ -211,7 +211,7 @@ router.put(
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
-        forumTopicId,
+        forumTopicId: topicId,
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       }
@@ -224,12 +224,12 @@ router.put(
     )
       return res.status(403).json({ msg: 'Not authorized' });
 
-    await updatePost(id, req.user.id, post.body, body, forumTopicId);
+    await updatePost(id, req.user.id, post.body, body, topicId);
 
     const updated = await prisma.forumPost.findFirst({
       where: {
         id,
-        forumTopicId,
+        forumTopicId: topicId,
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       },
@@ -240,21 +240,21 @@ router.put(
   })
 );
 
-// DELETE /api/forums/:forumId/topics/:forumTopicId/posts/:id — author or moderator
+// DELETE /api/forums/:forumId/topics/:topicId/posts/:id — author or moderator
 router.delete(
   '/:id',
   requireAuth,
   validateParams(forumPostParamsSchema),
   authHandler(async (req, res) => {
-    const { forumId, forumTopicId, id } = parsedParams<{
+    const { forumId, topicId, id } = parsedParams<{
       forumId: number;
-      forumTopicId: number;
+      topicId: number;
       id: number;
     }>(res);
     const post = await prisma.forumPost.findFirst({
       where: {
         id,
-        forumTopicId,
+        forumTopicId: topicId,
         deletedAt: null,
         forumTopic: { forumId, deletedAt: null }
       }
@@ -269,7 +269,7 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    await deletePost(id, forumTopicId, forumId, req.user.id, !isOwner);
+    await deletePost(id, topicId, forumId, req.user.id, !isOwner);
     res.status(204).send();
   })
 );
