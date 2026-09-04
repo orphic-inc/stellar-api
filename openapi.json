@@ -4227,6 +4227,15 @@
               "type": "boolean"
             }
           },
+          "secondary": {
+            "type": "boolean"
+          },
+          "permittedForumIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
           "color": {
             "type": "string"
           },
@@ -4250,6 +4259,12 @@
             "type": "integer",
             "nullable": true
           },
+          "primaryUserCount": {
+            "type": "integer"
+          },
+          "secondaryUserCount": {
+            "type": "integer"
+          },
           "userCount": {
             "type": "number"
           }
@@ -4257,7 +4272,20 @@
         "required": [
           "id",
           "name",
-          "level"
+          "level",
+          "permissions",
+          "secondary",
+          "permittedForumIds",
+          "color",
+          "badge",
+          "personalCollageLimit",
+          "authorStylesheetLimit",
+          "assetLimit",
+          "displayStaff",
+          "staffGroupId",
+          "primaryUserCount",
+          "secondaryUserCount",
+          "userCount"
         ]
       },
       "StaffGroup": {

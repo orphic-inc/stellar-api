@@ -4518,21 +4518,35 @@ registry.register(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// All four /tools/user-ranks routes project `formatRank` (routes/api/tools.ts),
+// which builds the object field by field and always emits every one of them —
+// so nothing here is optional, and the four that used to be absent entirely
+// (`secondary`, `permittedForumIds`, and the two per-relation user counts) are
+// on the wire like the rest. `secondary` and `permittedForumIds` are live reads
+// in stellar-ui's rank manager, rank form and profile rank pickers.
+//
+// Only `assetLimit` and `staffGroupId` are nullable, and both because the
+// column is (`Int?`) — for assetLimit null means UNCAPPED, not absent (#342).
 const UserRank = registry.register(
   'UserRank',
   z.object({
     id: z.number(),
     name: z.string(),
     level: z.number(),
-    permissions: z.record(z.string(), z.boolean()).optional(),
-    color: z.string().optional(),
-    badge: z.string().optional(),
-    personalCollageLimit: z.number().int().optional(),
-    authorStylesheetLimit: z.number().int().optional(),
-    assetLimit: z.number().int().nullable().optional(),
-    displayStaff: z.boolean().optional(),
-    staffGroupId: z.number().int().nullable().optional(),
-    userCount: z.number().optional()
+    // normalizePermissions() always returns a map, empty at worst — never null.
+    permissions: z.record(z.string(), z.boolean()),
+    secondary: z.boolean(),
+    permittedForumIds: z.array(z.number().int()),
+    color: z.string(),
+    badge: z.string(),
+    personalCollageLimit: z.number().int(),
+    authorStylesheetLimit: z.number().int(),
+    assetLimit: z.number().int().nullable(),
+    displayStaff: z.boolean(),
+    staffGroupId: z.number().int().nullable(),
+    primaryUserCount: z.number().int(),
+    secondaryUserCount: z.number().int(),
+    userCount: z.number()
   })
 );
 
