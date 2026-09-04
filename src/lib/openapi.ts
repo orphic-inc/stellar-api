@@ -5,9 +5,17 @@ import {
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
+  AssetKind,
+  CommunityType,
+  DownloadGrantStatus,
+  FileType,
+  InviteStatus,
   NotificationType,
+  RatioPolicyStatus,
   ReleaseCategory,
   ReleaseType,
+  ReportStatus,
+  ReportTargetType,
   RequestStatus,
   RequestActionType
 } from '@prisma/client';
@@ -3144,7 +3152,7 @@ const AssetUploadResponse = registry.register(
     url: z.string(),
     mime: z.string(),
     size: z.number(),
-    kind: z.string()
+    kind: z.nativeEnum(AssetKind)
   })
 );
 
@@ -4245,7 +4253,7 @@ const Community = registry.register(
     id: z.number(),
     name: z.string(),
     description: z.string().nullable().optional(),
-    type: z.string().nullable().optional(),
+    type: z.nativeEnum(CommunityType),
     registrationStatus: z.string().nullable().optional(),
     // Announce routing only — never an access gate (ADR-0030, ADR-0015).
     announceVisibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
@@ -4289,7 +4297,7 @@ const ReleaseContribution = registry.register(
       id: z.number(),
       username: z.string()
     }),
-    type: z.string(),
+    type: z.nativeEnum(FileType),
     downloadUrl: z.string(),
     sizeInBytes: z.number().nullable().optional(),
     collaborators: z.array(
@@ -4316,7 +4324,7 @@ const Contribution = registry.register(
       title: z.string(),
       communityId: z.number().nullable().optional()
     }),
-    type: z.string(),
+    type: z.nativeEnum(FileType),
     downloadUrl: z.string(),
     sizeInBytes: z.number().nullable().optional(),
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']),
@@ -4401,7 +4409,7 @@ const ReleaseContributionDetail = registry.register(
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']).nullable(),
     linkCheckedAt: z.string().nullable(),
     ratioExempt: z.enum(['NONE', 'FREEPASS', 'NEUTRALPASS']),
-    type: z.string(),
+    type: z.nativeEnum(FileType),
     createdAt: z.string(),
     updatedAt: z.string(),
     user: z.object({ id: z.number(), username: z.string() }).nullable(),
@@ -4472,6 +4480,12 @@ const ReleaseHistoryEntry = registry.register(
 //
 // Sourced from the Prisma enum rather than a literal `z.enum([...])` so it
 // cannot drift from the fourteen values the database actually accepts.
+// The community health pulse band. NOT a Prisma enum — computePulse()
+// (modules/linkHealth.ts) derives it, and its return type is the closed union
+// spelled out here. `Unknown` is the deliberate low-confidence answer, not a
+// missing value: too few checked links to band honestly.
+const HealthPulseStatus = z.enum(['Healthy', 'Ailing', 'Critical', 'Unknown']);
+
 const ReleaseCategoryEnum = z.nativeEnum(ReleaseCategory);
 
 // `Release.type` and `Request.type` are the SAME `ReleaseType` column — the
@@ -4699,7 +4713,7 @@ const CommunityHealthSnapshot = z
     checked: z.number(),
     coverage: z.number().nullable(),
     pulse: z.number().nullable(),
-    status: z.string()
+    status: HealthPulseStatus
   })
   .openapi('CommunityHealthSnapshot');
 
@@ -7803,10 +7817,10 @@ const ReportObj = z.object({
 
 const ReportSummary = z.object({
   id: z.number(),
-  targetType: z.string(),
+  targetType: z.nativeEnum(ReportTargetType),
   targetId: z.number(),
   category: z.string(),
-  status: z.string(),
+  status: z.nativeEnum(ReportStatus),
   createdAt: z.string(),
   resolvedAt: z.string().nullable(),
   resolution: z.string().nullable(),
@@ -8981,7 +8995,7 @@ const InviteItem = registry.register(
     email: z.string(),
     expires: z.string(),
     reason: z.string(),
-    status: z.string()
+    status: z.nativeEnum(InviteStatus)
   })
 );
 
@@ -8992,7 +9006,7 @@ registry.registerPath({
   request: {
     query: z.object({
       page: z.string().optional(),
-      status: z.string().optional()
+      status: z.nativeEnum(InviteStatus).optional()
     })
   },
   responses: {
@@ -9110,7 +9124,7 @@ const RatioWatchItem = registry.register(
   z.object({
     userId: z.number(),
     user: StaffUserRef,
-    status: z.string(),
+    status: z.nativeEnum(RatioPolicyStatus),
     watchStartedAt: z.string().nullable(),
     watchExpiresAt: z.string().nullable(),
     downloadDisabledAt: z.string().nullable(),
@@ -10561,7 +10575,7 @@ const requestSearchItem = z.object({
   description: z.string(),
   type: ReleaseTypeEnum,
   year: z.number().nullable(),
-  status: z.string(),
+  status: z.nativeEnum(RequestStatus),
   voteCount: z.number(),
   communityId: z.number(),
   createdAt: z.string(),
@@ -10772,7 +10786,7 @@ const grantResult = z.object({
   grantId: z.number(),
   downloadUrl: z.string(),
   amountBytes: z.string(),
-  status: z.string(),
+  status: z.nativeEnum(DownloadGrantStatus),
   createdAt: z.string()
 });
 
