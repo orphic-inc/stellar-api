@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   NotificationType,
   ReleaseCategory,
+  ReleaseType,
   RequestStatus,
   RequestActionType
 } from '@prisma/client';
@@ -4473,6 +4474,21 @@ const ReleaseHistoryEntry = registry.register(
 // cannot drift from the fourteen values the database actually accepts.
 const ReleaseCategoryEnum = z.nativeEnum(ReleaseCategory);
 
+// `Release.type` and `Request.type` are the SAME `ReleaseType` column — the
+// medium a release is (Music, EBooks, Comics, …), distinct from
+// `releaseType`/`ReleaseCategory` above, which is the edition kind (Album,
+// Single, Live, …). The two sit next to each other on every release-shaped
+// response and both had been `z.string()`, which is a large part of why they
+// are easy to confuse.
+//
+// Same story as ReleaseCategory: six sites, three different nullabilities, a
+// NOT NULL column that every projection selects.
+//
+// NOT applied to `Contribution.type` (a `FileType` — mp3/flac/…) or
+// `Community.type` (a `CommunityType`). Those are different enums with the
+// identical stringly-typed bug, and want their own change.
+const ReleaseTypeEnum = z.nativeEnum(ReleaseType);
+
 const Release = registry.register(
   'Release',
   z.object({
@@ -4480,7 +4496,7 @@ const Release = registry.register(
     title: z.string(),
     communityId: z.number().nullable(),
     year: z.number().nullable().optional(),
-    type: z.string().nullable().optional(),
+    type: ReleaseTypeEnum,
     releaseType: ReleaseCategoryEnum,
     image: z.string().nullable().optional(),
     // Raw BBCode; `descriptionHtml` is the render-time transcription (#402).
@@ -6140,7 +6156,7 @@ const Artist = registry.register(
           id: z.number(),
           title: z.string(),
           year: z.number().nullable().optional(),
-          type: z.string().optional(),
+          type: ReleaseTypeEnum,
           releaseType: ReleaseCategoryEnum,
           communityId: z.number().nullable().optional(),
           community: z
@@ -6757,7 +6773,7 @@ const Request = registry.register(
     userId: z.number().int(),
     title: z.string(),
     description: z.string(),
-    type: z.string(),
+    type: ReleaseTypeEnum,
     year: z.number().int().nullable(),
     image: z.string().nullable(),
     status: z.nativeEnum(RequestStatus),
@@ -8144,7 +8160,7 @@ const Top10ReleaseItem = registry.register(
     year: z.number(),
     artistId: z.number(),
     artistName: z.string(),
-    type: z.string(),
+    type: ReleaseTypeEnum,
     releaseType: ReleaseCategoryEnum,
     tags: z.array(Top10Tag),
     consumerCount: z.number(),
@@ -10516,7 +10532,7 @@ const releaseSearchItem = z.object({
   id: z.number(),
   title: z.string(),
   year: z.number().nullable(),
-  type: z.string(),
+  type: ReleaseTypeEnum,
   releaseType: ReleaseCategoryEnum,
   communityId: z.number().nullable(),
   description: z.string(),
@@ -10543,7 +10559,7 @@ const requestSearchItem = z.object({
   id: z.number(),
   title: z.string(),
   description: z.string(),
-  type: z.string(),
+  type: ReleaseTypeEnum,
   year: z.number().nullable(),
   status: z.string(),
   voteCount: z.number(),

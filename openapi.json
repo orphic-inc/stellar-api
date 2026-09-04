@@ -4034,7 +4034,15 @@
           },
           "type": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "Music",
+              "Applications",
+              "EBooks",
+              "ELearningVideos",
+              "Audiobooks",
+              "Comedy",
+              "Comics"
+            ]
           },
           "releaseType": {
             "type": "string",
@@ -4134,6 +4142,7 @@
           "id",
           "title",
           "communityId",
+          "type",
           "releaseType"
         ]
       },
@@ -4922,7 +4931,16 @@
                   "nullable": true
                 },
                 "type": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "Music",
+                    "Applications",
+                    "EBooks",
+                    "ELearningVideos",
+                    "Audiobooks",
+                    "Comedy",
+                    "Comics"
+                  ]
                 },
                 "releaseType": {
                   "type": "string",
@@ -4967,6 +4985,7 @@
               "required": [
                 "id",
                 "title",
+                "type",
                 "releaseType"
               ]
             }
@@ -5381,7 +5400,16 @@
             "type": "string"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "Music",
+              "Applications",
+              "EBooks",
+              "ELearningVideos",
+              "Audiobooks",
+              "Comedy",
+              "Comics"
+            ]
           },
           "year": {
             "type": "integer",
@@ -6153,7 +6181,16 @@
             "type": "string"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "Music",
+              "Applications",
+              "EBooks",
+              "ELearningVideos",
+              "Audiobooks",
+              "Comedy",
+              "Comics"
+            ]
           },
           "releaseType": {
             "type": "string",
@@ -28057,7 +28094,16 @@
                             "nullable": true
                           },
                           "type": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "Music",
+                              "Applications",
+                              "EBooks",
+                              "ELearningVideos",
+                              "Audiobooks",
+                              "Comedy",
+                              "Comics"
+                            ]
                           },
                           "releaseType": {
                             "type": "string",
@@ -28504,7 +28550,16 @@
                             "type": "string"
                           },
                           "type": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "Music",
+                              "Applications",
+                              "EBooks",
+                              "ELearningVideos",
+                              "Audiobooks",
+                              "Comedy",
+                              "Comics"
+                            ]
                           },
                           "year": {
                             "type": "number",
