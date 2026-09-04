@@ -4038,7 +4038,22 @@
           },
           "releaseType": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "Album",
+              "Single",
+              "EP",
+              "Anthology",
+              "Compilation",
+              "DJMix",
+              "Live",
+              "Remix",
+              "Bootleg",
+              "Interview",
+              "Mixtape",
+              "Demo",
+              "ConcertRecording",
+              "Unknown"
+            ]
           },
           "image": {
             "type": "string",
@@ -4118,7 +4133,8 @@
         "required": [
           "id",
           "title",
-          "communityId"
+          "communityId",
+          "releaseType"
         ]
       },
       "PermissionKey": {
@@ -4909,7 +4925,23 @@
                   "type": "string"
                 },
                 "releaseType": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "Album",
+                    "Single",
+                    "EP",
+                    "Anthology",
+                    "Compilation",
+                    "DJMix",
+                    "Live",
+                    "Remix",
+                    "Bootleg",
+                    "Interview",
+                    "Mixtape",
+                    "Demo",
+                    "ConcertRecording",
+                    "Unknown"
+                  ]
                 },
                 "communityId": {
                   "type": "number",
@@ -4934,7 +4966,8 @@
               },
               "required": [
                 "id",
-                "title"
+                "title",
+                "releaseType"
               ]
             }
           },
@@ -6123,7 +6156,23 @@
             "type": "string"
           },
           "releaseType": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "Album",
+              "Single",
+              "EP",
+              "Anthology",
+              "Compilation",
+              "DJMix",
+              "Live",
+              "Remix",
+              "Bootleg",
+              "Interview",
+              "Mixtape",
+              "Demo",
+              "ConcertRecording",
+              "Unknown"
+            ]
           },
           "tags": {
             "type": "array",
@@ -7287,7 +7336,23 @@
                 "type": "integer"
               },
               "releaseType": {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "Album",
+                  "Single",
+                  "EP",
+                  "Anthology",
+                  "Compilation",
+                  "DJMix",
+                  "Live",
+                  "Remix",
+                  "Bootleg",
+                  "Interview",
+                  "Mixtape",
+                  "Demo",
+                  "ConcertRecording",
+                  "Unknown"
+                ]
               },
               "communityId": {
                 "type": "integer",
@@ -27995,7 +28060,23 @@
                             "type": "string"
                           },
                           "releaseType": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "Album",
+                              "Single",
+                              "EP",
+                              "Anthology",
+                              "Compilation",
+                              "DJMix",
+                              "Live",
+                              "Remix",
+                              "Bootleg",
+                              "Interview",
+                              "Mixtape",
+                              "Demo",
+                              "ConcertRecording",
+                              "Unknown"
+                            ]
                           },
                           "communityId": {
                             "type": "number",
