@@ -5,7 +5,12 @@ import {
   RegistrationStatus,
   RatioExempt
 } from '@prisma/client';
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  uniqueName
+} from '../test/dbHelpers';
 import {
   createContributionSubmission,
   addContributionToRelease,
@@ -35,8 +40,8 @@ const createUser = async (tag: string) => {
   const profile = await testPrisma.profile.create({ data: {} });
   return testPrisma.user.create({
     data: {
-      username: `contrib-${tag}-${Date.now()}`,
-      email: `contrib-${tag}-${Date.now()}@example.com`,
+      username: uniqueName(`contrib-${tag}`),
+      email: `${uniqueName(`contrib-${tag}`)}@example.com`,
       password: 'x',
       avatar: '',
       userRankId: rank.id,
@@ -49,7 +54,7 @@ const createUser = async (tag: string) => {
 const createCommunity = () =>
   testPrisma.community.create({
     data: {
-      name: `Community-${Date.now()}`,
+      name: uniqueName('Community'),
       image: '',
       registrationStatus: RegistrationStatus.open,
       type: CommunityType.Music
