@@ -2766,7 +2766,12 @@
             "type": "number"
           },
           "kind": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "ThemeImage",
+              "ThemeFont",
+              "Avatar"
+            ]
           }
         },
         "required": [
@@ -3347,7 +3352,15 @@
           },
           "type": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "Music",
+              "Applications",
+              "EBooks",
+              "ELearningVideos",
+              "Audiobooks",
+              "Comedy",
+              "Comics"
+            ]
           },
           "registrationStatus": {
             "type": "string",
@@ -3406,6 +3419,7 @@
         "required": [
           "id",
           "name",
+          "type",
           "allowDuplicateFormats"
         ]
       },
@@ -3461,7 +3475,33 @@
             ]
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "mp3",
+              "flac",
+              "wav",
+              "ogg",
+              "aac",
+              "m4a",
+              "m4b",
+              "mp4",
+              "mkv",
+              "avi",
+              "mov",
+              "zip",
+              "exe",
+              "dmg",
+              "apk",
+              "pdf",
+              "epub",
+              "mobi",
+              "cbz",
+              "cbr",
+              "jpg",
+              "png",
+              "gif",
+              "txt"
+            ]
           },
           "downloadUrl": {
             "type": "string"
@@ -3545,7 +3585,33 @@
             ]
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "mp3",
+              "flac",
+              "wav",
+              "ogg",
+              "aac",
+              "m4a",
+              "m4b",
+              "mp4",
+              "mkv",
+              "avi",
+              "mov",
+              "zip",
+              "exe",
+              "dmg",
+              "apk",
+              "pdf",
+              "epub",
+              "mobi",
+              "cbz",
+              "cbr",
+              "jpg",
+              "png",
+              "gif",
+              "txt"
+            ]
           },
           "downloadUrl": {
             "type": "string"
@@ -3755,7 +3821,33 @@
             ]
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "mp3",
+              "flac",
+              "wav",
+              "ogg",
+              "aac",
+              "m4a",
+              "m4b",
+              "mp4",
+              "mkv",
+              "avi",
+              "mov",
+              "zip",
+              "exe",
+              "dmg",
+              "apk",
+              "pdf",
+              "epub",
+              "mobi",
+              "cbz",
+              "cbr",
+              "jpg",
+              "png",
+              "gif",
+              "txt"
+            ]
           },
           "createdAt": {
             "type": "string"
@@ -6840,7 +6932,12 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
           }
         },
         "required": [
@@ -7080,7 +7177,12 @@
             ]
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "OK",
+              "WATCH",
+              "DOWNLOAD_DISABLED"
+            ]
           },
           "watchStartedAt": {
             "type": "string",
@@ -8032,7 +8134,13 @@
             "nullable": true
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "Healthy",
+              "Ailing",
+              "Critical",
+              "Unknown"
+            ]
           }
         },
         "required": [
@@ -21744,7 +21852,18 @@
                             "type": "number"
                           },
                           "targetType": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "User",
+                              "Release",
+                              "Artist",
+                              "Contribution",
+                              "ForumTopic",
+                              "ForumPost",
+                              "Comment",
+                              "Collage",
+                              "Post"
+                            ]
                           },
                           "targetId": {
                             "type": "number"
@@ -21753,7 +21872,12 @@
                             "type": "string"
                           },
                           "status": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "Open",
+                              "Claimed",
+                              "Resolved"
+                            ]
                           },
                           "createdAt": {
                             "type": "string"
@@ -24474,7 +24598,12 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "rejected"
+              ]
             },
             "required": false,
             "name": "status",
@@ -28566,7 +28695,12 @@
                             "nullable": true
                           },
                           "status": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "open",
+                              "filled",
+                              "deleted"
+                            ]
                           },
                           "voteCount": {
                             "type": "number"
@@ -29520,7 +29654,11 @@
                       "type": "string"
                     },
                     "status": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "COMPLETED",
+                        "REVERSED"
+                      ]
                     },
                     "createdAt": {
                       "type": "string"
@@ -29578,7 +29716,11 @@
                       "type": "string"
                     },
                     "status": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "COMPLETED",
+                        "REVERSED"
+                      ]
                     },
                     "createdAt": {
                       "type": "string"

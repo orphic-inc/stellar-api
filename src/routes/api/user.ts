@@ -38,7 +38,12 @@ import {
   parsedParams,
   parsedQuery
 } from '../../middleware/validate';
-import { Prisma, StatSnapshotPeriod, RatioPolicyStatus } from '@prisma/client';
+import {
+  Prisma,
+  InviteStatus,
+  StatSnapshotPeriod,
+  RatioPolicyStatus
+} from '@prisma/client';
 import {
   adminCreateUserSchema,
   userSettingsSchema,
@@ -370,9 +375,15 @@ router.get(
   })
 );
 
+// `status` filters an `InviteStatus` COLUMN, so it has to be validated as one.
+// It used to be `z.string().optional()` and was passed to Prisma with a
+// `status as never` cast — which meant `?status=bogus` reached the query as an
+// invalid enum value, threw PrismaClientValidationError, and surfaced as a
+// **500** (the global handler's `err.statusCode ?? 500`). It is now a 400 like
+// any other bad query value, and the cast is gone.
 const invitesQuerySchema = z.object({
   ...paginationBase,
-  status: z.string().optional()
+  status: z.nativeEnum(InviteStatus).optional()
 });
 type InvitesQuery = z.infer<typeof invitesQuerySchema>;
 
@@ -384,7 +395,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsedPage(res);
     const { status } = parsedQuery<InvitesQuery>(res);
-    const where = status ? { status: status as never } : {};
+    const where = status ? { status } : {};
     const [invites, total] = await Promise.all([
       prisma.invite.findMany({
         where,
