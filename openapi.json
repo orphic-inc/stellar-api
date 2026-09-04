@@ -15109,7 +15109,7 @@
         }
       }
     },
-    "/communities/{id}/releases": {
+    "/communities/{communityId}/releases": {
       "get": {
         "tags": [
           "Communities"
@@ -15120,7 +15120,7 @@
               "type": "string"
             },
             "required": true,
-            "name": "id",
+            "name": "communityId",
             "in": "path"
           }
         ],
@@ -15146,6 +15146,166 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "Create a release in a community",
+        "description": "Requires `communities_manage`. At least one artist credit is required.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "communityId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "credits": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "artistId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "Main",
+                            "Guest",
+                            "Composer",
+                            "Conductor",
+                            "DJ",
+                            "Remixer",
+                            "Producer",
+                            "Arranger"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "artistId"
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Music",
+                      "Applications",
+                      "EBooks",
+                      "ELearningVideos",
+                      "Audiobooks",
+                      "Comedy",
+                      "Comics"
+                    ]
+                  },
+                  "releaseType": {
+                    "type": "string",
+                    "enum": [
+                      "Album",
+                      "Single",
+                      "EP",
+                      "Anthology",
+                      "Compilation",
+                      "DJMix",
+                      "Live",
+                      "Remix",
+                      "Bootleg",
+                      "Interview",
+                      "Mixtape",
+                      "Demo",
+                      "ConcertRecording",
+                      "Unknown"
+                    ]
+                  },
+                  "year": {
+                    "type": "integer",
+                    "minimum": 1900,
+                    "maximum": 2100
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "tagIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  }
+                },
+                "required": [
+                  "credits",
+                  "title",
+                  "description",
+                  "type",
+                  "releaseType",
+                  "year"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Release created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing communities_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -15398,168 +15558,6 @@
           },
           "403": {
             "description": "Not a community admin or curator",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MsgResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/releases": {
-      "post": {
-        "tags": [
-          "Communities"
-        ],
-        "summary": "Create a release in a community",
-        "description": "Requires `communities_manage`. At least one artist credit is required.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "communityId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "credits": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "artistId": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "exclusiveMinimum": true
-                        },
-                        "role": {
-                          "type": "string",
-                          "enum": [
-                            "Main",
-                            "Guest",
-                            "Composer",
-                            "Conductor",
-                            "DJ",
-                            "Remixer",
-                            "Producer",
-                            "Arranger"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "artistId"
-                      ]
-                    },
-                    "minItems": 1
-                  },
-                  "title": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "description": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "Music",
-                      "Applications",
-                      "EBooks",
-                      "ELearningVideos",
-                      "Audiobooks",
-                      "Comedy",
-                      "Comics"
-                    ]
-                  },
-                  "releaseType": {
-                    "type": "string",
-                    "enum": [
-                      "Album",
-                      "Single",
-                      "EP",
-                      "Anthology",
-                      "Compilation",
-                      "DJMix",
-                      "Live",
-                      "Remix",
-                      "Bootleg",
-                      "Interview",
-                      "Mixtape",
-                      "Demo",
-                      "ConcertRecording",
-                      "Unknown"
-                    ]
-                  },
-                  "year": {
-                    "type": "integer",
-                    "minimum": 1900,
-                    "maximum": 2100
-                  },
-                  "image": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "tagIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "exclusiveMinimum": true
-                    }
-                  }
-                },
-                "required": [
-                  "credits",
-                  "title",
-                  "description",
-                  "type",
-                  "releaseType",
-                  "year"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Release created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Release"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing communities_manage",
             "content": {
               "application/json": {
                 "schema": {

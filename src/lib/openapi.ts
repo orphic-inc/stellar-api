@@ -4703,11 +4703,15 @@ registry.registerPath({
   }
 });
 
+// `{communityId}`, not `{id}`: the route mounts this router at
+// `/:communityId/releases`, and the sibling POST on this very path was already
+// registered as `{communityId}`. The `{id}` spelling made one operation of a
+// two-operation path disagree with both the code and its own sibling.
 registry.registerPath({
   method: 'get',
-  path: '/communities/{id}/releases',
+  path: '/communities/{communityId}/releases',
   tags: ['Communities'],
-  request: { params: z.object({ id: z.string() }) },
+  request: { params: z.object({ communityId: z.string() }) },
   responses: {
     200: {
       description: 'Releases for community',

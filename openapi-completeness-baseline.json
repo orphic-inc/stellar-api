@@ -2,18 +2,5 @@
   "$comment": "Grandfathered gaps for the OpenAPI completeness gate (#474). This list only ever SHRINKS: register a route, then delete its line. A stale entry (now registered, or no longer routed) fails the check, so the list cannot rot into a permanent mute. Regenerate with `npm run openapi:completeness -- --write-baseline`.",
   "generated": "2026-09-01",
   "unregistered": [],
-  "paramMismatches": [
-    "DELETE /forums/{forumId}/topics/{forumTopicId}",
-    "DELETE /forums/{forumId}/topics/{forumTopicId}/posts/{id}",
-    "GET /communities/{communityId}/releases",
-    "GET /forums/{forumId}/topics/{forumTopicId}",
-    "GET /forums/{forumId}/topics/{forumTopicId}/posts",
-    "GET /forums/{forumId}/topics/{forumTopicId}/posts/{id}",
-    "GET /forums/{forumId}/topics/{forumTopicId}/posts/{id}/edits",
-    "GET /forums/{forumId}/topics/{forumTopicId}/session",
-    "POST /forums/{forumId}/topics/{forumTopicId}/posts",
-    "POST /forums/{forumId}/topics/{forumTopicId}/trash",
-    "PUT /forums/{forumId}/topics/{forumTopicId}",
-    "PUT /forums/{forumId}/topics/{forumTopicId}/posts/{id}"
-  ]
+  "paramMismatches": []
 }
