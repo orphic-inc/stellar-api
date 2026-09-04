@@ -52,6 +52,31 @@ export const truncateAll = async (): Promise<void> => {
   `);
 };
 
+/**
+ * A process-unique name for a row whose column is `@unique`.
+ *
+ * Integration factories used to build these inline, and twenty files arrived at
+ * about four different schemes. Two of them settled on a bare
+ * `` `Community-${Date.now()}` ``, which is **not unique**: `Date.now()` has
+ * millisecond resolution, so a test calling the same factory twice in a row
+ * collides whenever both inserts land inside one millisecond. That is not
+ * theoretical — a local INSERT measures ~0.2 ms and CI's Postgres has run on
+ * tmpfs since #467, so the fix that made the suite fast is what made the latent
+ * bug start firing. It took down `contributions.integration.ts` on api#498.
+ *
+ * The counter is what provides uniqueness and it cannot collide within a
+ * process, which is the only scope that matters: `truncateAll()` runs in
+ * `beforeEach`, so rows never outlive the test that made them. `Date.now()` is
+ * kept only so a name is recognisable in failure output — it is decoration
+ * here, not the uniqueness mechanism, which is exactly the mix-up that caused
+ * this.
+ */
+let nameSeq = 0;
+export const uniqueName = (prefix: string): string => {
+  nameSeq += 1;
+  return `${prefix}-${nameSeq}-${Date.now()}`;
+};
+
 /** Inserts the minimum seed data required by most business logic. */
 export const seedDefaults = async (): Promise<void> => {
   await testPrisma.userRank.create({

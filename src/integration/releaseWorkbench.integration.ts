@@ -6,7 +6,12 @@ import {
   Bitrate,
   ReleaseMedia
 } from '@prisma/client';
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  uniqueName
+} from '../test/dbHelpers';
 import { createContributionSubmission } from '../modules/contribution';
 import { listReleaseContributions } from '../modules/releaseWorkbench/contributions';
 import type { CreateContributionInput } from '../schemas/contribution';
@@ -33,8 +38,8 @@ const createUser = async (tag: string) => {
   const profile = await testPrisma.profile.create({ data: {} });
   return testPrisma.user.create({
     data: {
-      username: `rw-${tag}-${Date.now()}`,
-      email: `rw-${tag}-${Date.now()}@example.com`,
+      username: uniqueName(`rw-${tag}`),
+      email: `${uniqueName(`rw-${tag}`)}@example.com`,
       password: 'x',
       avatar: '',
       userRankId: rank.id,
@@ -47,7 +52,7 @@ const createUser = async (tag: string) => {
 const createCommunity = () =>
   testPrisma.community.create({
     data: {
-      name: `Community-${Date.now()}`,
+      name: uniqueName('Community'),
       image: '',
       registrationStatus: RegistrationStatus.open,
       type: CommunityType.Music
