@@ -62,6 +62,14 @@ All notable changes to stellar-api are documented here.
 
   **Purely additive, blast radius proved per operation**: exactly thirty changed, all under `/forums`, none losing anything, `components` byte-identical, path count unmoved at 267.
 
+- **`Communities` now documents the 401 and 403 its middleware answers — the seventh slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 235 gaps to 203.** Twenty-eight operations across four router files. Twenty-four took **401 only**; four needed both, using three keys — `dnc_manage` (twice), `communities_manage`, and one **any-of pair**. Fully-documented operations went 159 to 187.
+
+  **`POST …/history/{historyId}/revert` is the first any-of gate in the contract**, and getting it right meant reading `requirePermission` rather than assuming. It is declared `...requirePermission('communities_manage', 'admin')`, and the middleware evaluates `permissions.some(...)` — so the two keys are **alternatives, not both required**. Registered as `Missing communities_manage or admin`; describing it as `Missing communities_manage` would have told clients an `admin`-only caller gets a 403 when they do not.
+
+  **Purely additive, blast radius proved per operation**: exactly twenty-eight changed, all under `/communities`, none losing anything, `components` byte-identical, path count unmoved at 267. One registration used the one-line `responses` form and was expanded first; Prettier reports the result unchanged.
+
+  **Eight `requireAuth`-only operations here still declare no 403, and this slice does not close that** — the same structural blind spot recorded for `/forums`. Community reads go through `assertCommunityAccess`, which throws `AppError(403, 'Not a member of this community')` from `modules/communityAccess.ts`, so several of the eight very likely do answer 403. As on `/forums`, they are **candidates needing a handler read each**, not eight known omissions: the neighbouring `GET …/releases/{releaseId}/contributions` and `…/history` already declare their 403s, which is what a correctly-documented one looks like.
+
 ### Fixed
 
 - **Four more enum columns registered as free text, and a whole-row read missing four columns** — surfaced while binding `top10Api`/`adminApi` for [stellar-ui #293](https://github.com/orphic-inc/stellar-ui/issues/293). **The earlier sweep's claim that no enum column was left described as a string was wrong.** That pass matched on field NAMES (`type`, `status`, `kind`, `targetType`, `category`), which misses any enum whose column is called something else — so this pass enumerated **every enum-typed column in `schema.prisma`** and checked each against the registry instead.
