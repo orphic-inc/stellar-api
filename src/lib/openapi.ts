@@ -3806,6 +3806,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(ForumCategory) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3827,6 +3831,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3875,6 +3887,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Insufficient class for this forum',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3901,6 +3917,14 @@ registry.registerPath({
       description: 'Category updated',
       content: { 'application/json': { schema: ForumCategory } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3915,6 +3939,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Category deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3930,6 +3962,10 @@ registry.registerPath({
     200: {
       description: 'Forums',
       content: { 'application/json': { schema: z.array(Forum) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3943,6 +3979,10 @@ registry.registerPath({
     200: {
       description: 'Forum',
       content: { 'application/json': { schema: Forum } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -3966,6 +4006,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3983,6 +4031,14 @@ registry.registerPath({
       description: 'Forum updated',
       content: { 'application/json': { schema: Forum } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3997,6 +4053,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Forum deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing forums_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4016,6 +4080,10 @@ registry.registerPath({
     200: {
       description: 'Paginated topics',
       content: { 'application/json': { schema: PaginatedForumTopics } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4033,6 +4101,10 @@ registry.registerPath({
       description:
         'Topic session view model (forum + topic + posts + poll + subscription + affordances)',
       content: { 'application/json': { schema: ForumTopicSession } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient class',
@@ -4056,6 +4128,10 @@ registry.registerPath({
     200: {
       description: 'Topic',
       content: { 'application/json': { schema: ForumTopic } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4103,6 +4179,10 @@ registry.registerPath({
       description: 'Topic updated',
       content: { 'application/json': { schema: ForumTopic } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4120,6 +4200,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Topic removed'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4139,6 +4223,10 @@ registry.registerPath({
     200: {
       description: 'Topic moved to the trash board',
       content: { 'application/json': { schema: ForumTopic } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not authorized',
@@ -4170,6 +4258,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4189,6 +4281,10 @@ registry.registerPath({
     200: {
       description: 'Post',
       content: { 'application/json': { schema: ForumPost } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4218,6 +4314,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient permission',
@@ -4271,6 +4371,10 @@ registry.registerPath({
       description: 'Post updated',
       content: { 'application/json': { schema: ForumPost } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4293,6 +4397,10 @@ registry.registerPath({
     204: {
       description: 'Post removed'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4309,6 +4417,10 @@ registry.registerPath({
     200: {
       description: 'Poll',
       content: { 'application/json': { schema: ForumPoll } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4332,6 +4444,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4345,6 +4461,10 @@ registry.registerPath({
     200: {
       description: 'Poll closed',
       content: { 'application/json': { schema: ForumPoll } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4365,6 +4485,10 @@ registry.registerPath({
       description: 'Vote recorded',
       content: { 'application/json': { schema: ForumPollVote } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -4382,6 +4506,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(ForumLastReadTopic) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4401,6 +4529,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7034,6 +7166,10 @@ registry.registerPath({
       description: 'Topic notes (moderators only)',
       content: { 'application/json': { schema: z.array(ForumTopicNote) } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not authorized',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7057,6 +7193,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not authorized',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7071,6 +7211,10 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Note deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not authorized',
       content: { 'application/json': { schema: MsgResponse } }
