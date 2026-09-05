@@ -5536,6 +5536,14 @@ registry.registerPath({
     200: {
       description: 'User ranks',
       content: { 'application/json': { schema: z.array(UserRank) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -5564,6 +5572,14 @@ registry.registerPath({
           )
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -5577,6 +5593,14 @@ registry.registerPath({
     200: {
       description: 'User rank',
       content: { 'application/json': { schema: UserRank } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5603,6 +5627,14 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     409: {
       description: 'Duplicate rank name or level',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5628,6 +5660,14 @@ registry.registerPath({
     200: {
       description: 'User rank updated',
       content: { 'application/json': { schema: UserRank } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5729,6 +5769,14 @@ registry.registerPath({
     204: {
       description: 'User rank deleted'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5787,6 +5835,14 @@ registry.registerPath({
     200: {
       description: 'Promotion rules',
       content: { 'application/json': { schema: z.array(PromotionRule) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -5800,6 +5856,14 @@ registry.registerPath({
     200: {
       description: 'Promotion rule',
       content: { 'application/json': { schema: PromotionRule } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5825,6 +5889,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     409: {
       description: 'Duplicate rank pair',
@@ -5852,6 +5924,14 @@ registry.registerPath({
       description: 'Promotion rule updated',
       content: { 'application/json': { schema: PromotionRule } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5874,6 +5954,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Promotion rule deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rank_permissions_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5891,6 +5979,14 @@ registry.registerPath({
     200: {
       description: 'Staff groups',
       content: { 'application/json': { schema: z.array(StaffGroup) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_groups_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -5912,6 +6008,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_groups_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     409: {
       description: 'Duplicate name',
@@ -5935,6 +6039,14 @@ registry.registerPath({
       description: 'Staff group updated',
       content: { 'application/json': { schema: StaffGroup } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_groups_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5953,6 +6065,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Staff group deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_groups_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
