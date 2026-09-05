@@ -7645,6 +7645,10 @@ registry.registerPath({
     200: {
       description: 'My support tickets',
       content: { 'application/json': { schema: PaginatedTickets } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7660,6 +7664,10 @@ registry.registerPath({
     201: {
       description: 'Ticket created',
       content: { 'application/json': { schema: StaffInboxTicket } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7674,6 +7682,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.object({ count: z.number() }) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7687,6 +7699,14 @@ registry.registerPath({
     200: {
       description: 'Staff ticket queue',
       content: { 'application/json': { schema: PaginatedTickets } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7701,6 +7721,14 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.object({ count: z.number() }) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7722,6 +7750,14 @@ registry.registerPath({
           schema: z.object({ ok: z.boolean(), resolved: z.number() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7735,6 +7771,10 @@ registry.registerPath({
     200: {
       description: 'Ticket with messages',
       content: { 'application/json': { schema: StaffInboxTicket } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -7773,6 +7813,10 @@ registry.registerPath({
       description: 'Reply sent',
       content: { 'application/json': { schema: StaffInboxMessage } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: "No such ticket, or it is not the caller's",
       content: { 'application/json': { schema: MsgResponse } }
@@ -7789,7 +7833,13 @@ registry.registerPath({
   path: '/staff-inbox/tickets/{id}/resolve',
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Resolved' } }
+  responses: {
+    204: { description: 'Resolved' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -7797,7 +7847,17 @@ registry.registerPath({
   path: '/staff-inbox/tickets/{id}/unresolve',
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Unresolved' } }
+  responses: {
+    204: { description: 'Unresolved' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -7808,7 +7868,17 @@ registry.registerPath({
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: assignSchema } } }
   },
-  responses: { 204: { description: 'Assigned' } }
+  responses: {
+    204: { description: 'Assigned' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 const StaffInboxResponse = registry.register(
@@ -7830,6 +7900,14 @@ registry.registerPath({
     200: {
       description: 'Canned responses',
       content: { 'application/json': { schema: z.array(StaffInboxResponse) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7845,6 +7923,14 @@ registry.registerPath({
     201: {
       description: 'Response created',
       content: { 'application/json': { schema: StaffInboxResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7862,6 +7948,14 @@ registry.registerPath({
       description: 'Response updated',
       content: { 'application/json': { schema: StaffInboxResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7874,7 +7968,17 @@ registry.registerPath({
   path: '/staff-inbox/responses/{id}',
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Response deleted' } }
+  responses: {
+    204: { description: 'Response deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff_inbox_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
