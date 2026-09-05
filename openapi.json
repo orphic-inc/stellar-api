@@ -15701,6 +15701,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -15808,6 +15818,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Missing communities_manage",
             "content": {
@@ -15853,6 +15873,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Community"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -15966,6 +15996,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Missing communities_manage",
             "content": {
@@ -16013,6 +16053,16 @@
           "204": {
             "description": "Community deleted"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Missing communities_manage",
             "content": {
@@ -16058,6 +16108,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CommunityHealthPulse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -16127,6 +16187,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not a member of this community",
             "content": {
@@ -16187,6 +16257,16 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -16341,6 +16421,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Missing communities_manage",
             "content": {
@@ -16406,6 +16496,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not a community admin or curator",
             "content": {
@@ -16462,6 +16562,16 @@
         "responses": {
           "204": {
             "description": "Member removed"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Not a community admin or curator",
@@ -16541,6 +16651,16 @@
           "204": {
             "description": "Curator added"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not a community admin or curator",
             "content": {
@@ -16596,6 +16716,16 @@
         "responses": {
           "204": {
             "description": "Curator removed"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Not a community admin or curator",
@@ -16702,6 +16832,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not permitted to edit this release",
             "content": {
@@ -16757,6 +16897,16 @@
           "204": {
             "description": "Release deleted"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Missing communities_manage",
             "content": {
@@ -16808,6 +16958,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -16883,6 +17043,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not permitted to vote in this community",
             "content": {
@@ -16941,6 +17111,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CommunityVoteState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -17017,6 +17197,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not a community member",
             "content": {
@@ -17078,6 +17268,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing communities_manage or admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -17158,6 +17368,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Release already has this tag",
             "content": {
@@ -17205,6 +17425,26 @@
         "responses": {
           "204": {
             "description": "Tag removed"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing communities_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found",
@@ -17282,6 +17522,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -17328,6 +17578,16 @@
                   "items": {
                     "$ref": "#/components/schemas/ReleaseContributionDetail"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -17491,6 +17751,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -28848,6 +29118,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -28902,6 +29182,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing dnc_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -28937,6 +29237,26 @@
         "responses": {
           "204": {
             "description": "Deleted"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing dnc_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }

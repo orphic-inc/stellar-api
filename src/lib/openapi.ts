@@ -4953,6 +4953,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -4966,6 +4970,10 @@ registry.registerPath({
     200: {
       description: 'Community',
       content: { 'application/json': { schema: Community } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -4997,6 +5005,10 @@ registry.registerPath({
     200: {
       description: 'Community link-health pulse',
       content: { 'application/json': { schema: CommunityHealthPulse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not a member of this community',
@@ -5045,6 +5057,10 @@ registry.registerPath({
         'application/json': { schema: z.array(CommunityHealthSnapshot) }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not a member of this community',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5076,6 +5092,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -5126,6 +5146,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing communities_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5164,6 +5188,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing communities_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5186,6 +5214,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Community deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing communities_manage',
@@ -5220,6 +5252,10 @@ registry.registerPath({
       description: 'Member added',
       content: { 'application/json': { schema: CommunityMember } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not a community admin or curator',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5248,6 +5284,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Member removed'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not a community admin or curator',
@@ -5289,6 +5329,10 @@ registry.registerPath({
     204: {
       description: 'Curator added'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not a community admin or curator',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5312,6 +5356,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Curator removed'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not a community admin or curator',
@@ -5340,6 +5388,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing communities_manage',
@@ -5375,6 +5427,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not permitted to edit this release',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5402,6 +5458,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Release deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing communities_manage',
@@ -5432,6 +5492,10 @@ registry.registerPath({
     200: {
       description: 'Your vote and the new aggregate',
       content: { 'application/json': { schema: CommunityVoteState } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not permitted to vote in this community',
@@ -5464,6 +5528,10 @@ registry.registerPath({
       description: 'Your (now cleared) vote and the new aggregate',
       content: { 'application/json': { schema: CommunityVoteState } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not permitted to vote in this community',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5489,6 +5557,10 @@ registry.registerPath({
     200: {
       description: 'Release',
       content: { 'application/json': { schema: Release } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5516,6 +5588,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not a community member',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5542,6 +5618,14 @@ registry.registerPath({
     200: {
       description: 'Release after revert',
       content: { 'application/json': { schema: Release } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing communities_manage or admin',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -5571,6 +5655,10 @@ registry.registerPath({
       description: 'Tag added',
       content: { 'application/json': { schema: ReleaseTag } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     409: {
       description: 'Release already has this tag',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5591,6 +5679,14 @@ registry.registerPath({
   },
   responses: {
     204: { description: 'Tag removed' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5621,6 +5717,10 @@ registry.registerPath({
       description: 'Updated tag with vote counts',
       content: { 'application/json': { schema: ReleaseTagEnriched } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -5647,6 +5747,10 @@ registry.registerPath({
           schema: z.array(ReleaseContributionDetail)
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not a member of this community',
@@ -5684,6 +5788,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Release not found',
@@ -11051,6 +11159,10 @@ registry.registerPath({
     200: {
       description: 'DNC list for the community',
       content: { 'application/json': { schema: z.array(DncEntrySchema) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11081,6 +11193,14 @@ registry.registerPath({
     201: {
       description: 'Created DNC entry',
       content: { 'application/json': { schema: DncEntrySchema } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing dnc_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11099,7 +11219,17 @@ registry.registerPath({
     },
     { name: 'dncId', in: 'path', required: true, schema: { type: 'integer' } }
   ],
-  responses: { 204: { description: 'Deleted' } }
+  responses: {
+    204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing dnc_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 // ─── Bookmarks ────────────────────────────────────────────────────────────────
