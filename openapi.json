@@ -2505,7 +2505,18 @@
             ]
           },
           "page": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "forums",
+              "artist",
+              "collages",
+              "requests",
+              "communities",
+              "contributions",
+              "release",
+              "news",
+              "global_notices"
+            ]
           },
           "pageId": {
             "type": "number"
@@ -3364,7 +3375,11 @@
           },
           "registrationStatus": {
             "type": "string",
-            "nullable": true
+            "enum": [
+              "open",
+              "invite",
+              "closed"
+            ]
           },
           "announceVisibility": {
             "type": "string",
@@ -3420,6 +3435,7 @@
           "id",
           "name",
           "type",
+          "registrationStatus",
           "allowDuplicateFormats"
         ]
       },
@@ -7876,7 +7892,20 @@
         "type": "object",
         "properties": {
           "reason": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "REQUEST_CREATE",
+              "REQUEST_VOTE",
+              "REQUEST_FILL",
+              "REQUEST_UNFILL",
+              "REQUEST_REFUND",
+              "DOWNLOAD_DEBIT",
+              "DOWNLOAD_CREDIT",
+              "STAFF_REVERSAL",
+              "CRS_STYLESHEET_ADOPTION",
+              "FREEPASS_GRANT",
+              "NEUTRALPASS_GRANT"
+            ]
           },
           "_sum": {
             "type": "object",
@@ -7906,6 +7935,9 @@
           "id": {
             "type": "number"
           },
+          "userId": {
+            "type": "number"
+          },
           "user": {
             "type": "object",
             "properties": {
@@ -7925,7 +7957,32 @@
             "type": "string"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "REQUEST_CREATE",
+              "REQUEST_VOTE",
+              "REQUEST_FILL",
+              "REQUEST_UNFILL",
+              "REQUEST_REFUND",
+              "DOWNLOAD_DEBIT",
+              "DOWNLOAD_CREDIT",
+              "STAFF_REVERSAL",
+              "CRS_STYLESHEET_ADOPTION",
+              "FREEPASS_GRANT",
+              "NEUTRALPASS_GRANT"
+            ]
+          },
+          "contextId": {
+            "type": "number",
+            "nullable": true
+          },
+          "contextType": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "number",
+            "nullable": true
           },
           "createdAt": {
             "type": "string"
@@ -7933,9 +7990,13 @@
         },
         "required": [
           "id",
+          "userId",
           "user",
           "amount",
           "reason",
+          "contextId",
+          "contextType",
+          "actorUserId",
           "createdAt"
         ]
       },

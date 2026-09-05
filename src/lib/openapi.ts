@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   AssetKind,
   CommunityType,
+  EconomyTransactionReason,
   DownloadGrantStatus,
   FileType,
   InviteStatus,
@@ -14,8 +15,10 @@ import {
   RatioPolicyStatus,
   ReleaseCategory,
   ReleaseType,
+  RegistrationStatus,
   ReportStatus,
   ReportTargetType,
+  SubscriptionPage,
   RequestStatus,
   RequestActionType
 } from '@prisma/client';
@@ -2611,7 +2614,7 @@ const Notification = registry.register(
       })
       .nullable()
       .optional(),
-    page: z.string(),
+    page: z.nativeEnum(SubscriptionPage),
     pageId: z.number(),
     postId: z.number().nullable().optional(),
     readAt: z.string().nullable().optional(),
@@ -4254,7 +4257,7 @@ const Community = registry.register(
     name: z.string(),
     description: z.string().nullable().optional(),
     type: z.nativeEnum(CommunityType),
-    registrationStatus: z.string().nullable().optional(),
+    registrationStatus: z.nativeEnum(RegistrationStatus),
     // Announce routing only — never an access gate (ADR-0030, ADR-0015).
     announceVisibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
     image: z.string().nullable().optional(),
@@ -10166,19 +10169,36 @@ registry.registerPath({
 const EconomyGroupedItem = registry.register(
   'EconomyGroupedItem',
   z.object({
-    reason: z.string(),
+    // `reason` is the grouping key of a `groupBy({ by: ['reason'] })` over an
+    // `EconomyTransactionReason` COLUMN, so it is the enum, not free text. The
+    // earlier enum sweep missed it: that pass matched on field NAMES
+    // (type/status/kind/…) and `reason` is free text on six other components,
+    // which is exactly why name-matching is not a substitute for reading the
+    // column.
+    reason: z.nativeEnum(EconomyTransactionReason),
+    // BigInt sum, serialized as a string; null when the group is empty.
     _sum: z.object({ amount: z.string().nullable() }),
     _count: z.number()
   })
 );
 
+// `recent` is a `findMany` with `include: { user }` and NO `select`, so the
+// whole EconomyTransaction row is on the wire — the four context/actor columns
+// below were omitted, the same under-description as the siteApi four and
+// Notification.userId. `contextId`/`contextType`/`actorUserId` are all nullable
+// columns; `userId` is not.
 const EconomyTransactionItem = registry.register(
   'EconomyTransactionItem',
   z.object({
     id: z.number(),
+    userId: z.number(),
     user: StaffUserRef,
+    // BigInt column, serialized as a string.
     amount: z.string(),
-    reason: z.string(),
+    reason: z.nativeEnum(EconomyTransactionReason),
+    contextId: z.number().nullable(),
+    contextType: z.string().nullable(),
+    actorUserId: z.number().nullable(),
     createdAt: z.string()
   })
 );
