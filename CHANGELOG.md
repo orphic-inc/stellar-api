@@ -54,6 +54,14 @@ All notable changes to stellar-api are documented here.
 
   **Purely additive, blast radius proved per operation**: exactly thirty-three changed, all under `/users`, none losing anything, `components` byte-identical, path count unmoved at 267.
 
+- **`Forums` now documents the 401 and 403 its middleware answers — the sixth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 271 gaps to 235.** Thirty operations across seven router files, and the middleware picture is simple: **twenty-four are `requireAuth` alone and took 401 only; six are `requirePermission('forums_manage')`** — a single key, despite the surface being the most fragmented in the codebase. Fully-documented operations went 129 to 159.
+
+  **But this surface is where the gate's blind spot is widest, and the slice deliberately does not close it.** Forum access is governed by per-forum rank (`minClassRead`/`minClassWrite`), which is checked **inside handlers**, not by middleware — `src/routes/api/forum/` and `modules/topicSession.ts` hold roughly nineteen `403` sites between them. **Eighteen `requireAuth`-only forum operations still declare no 403 after this PR**, and the gate reports the whole surface fully documented regardless, because it derives expected codes from the middleware chain alone.
+
+  **Those eighteen are candidates, NOT eighteen omissions**, and the two sampled prove both cases exist: `GET /forums` **filters** the list through `canAccessForumLevel()` and never answers 403, so declaring none is correct; `GET /forums/{id}` **does** answer `403 'Insufficient class to read this forum'` and omits it. **List filters, detail rejects** — the same asymmetry that made `GET /comments/{id}` serve soft-deleted rows while its list read does not. Separating them needs a handler read each, which is its own change rather than a rider on this one.
+
+  **Purely additive, blast radius proved per operation**: exactly thirty changed, all under `/forums`, none losing anything, `components` byte-identical, path count unmoved at 267.
+
 ### Fixed
 
 - **Four more enum columns registered as free text, and a whole-row read missing four columns** — surfaced while binding `top10Api`/`adminApi` for [stellar-ui #293](https://github.com/orphic-inc/stellar-ui/issues/293). **The earlier sweep's claim that no enum column was left described as a string was wrong.** That pass matched on field NAMES (`type`, `status`, `kind`, `targetType`, `category`), which misses any enum whose column is called something else — so this pass enumerated **every enum-typed column in `schema.prisma`** and checked each against the registry instead.
