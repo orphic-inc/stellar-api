@@ -38,6 +38,12 @@ All notable changes to stellar-api are documented here.
 
   **Purely additive, blast radius proved per operation**: exactly eleven changed — ten `+401 +403`, one `+401` — none losing anything, `components` byte-identical, path count unmoved at 267. The insertion script now takes the surface prefix and permission key as arguments and **filters by the baseline rather than the path prefix**, which is what keeps `GET /announcements` out of it: a prefix can cover registrations with no gap at all, and the baseline is the authority on which those are.
 
+- **`Artists` now documents the 401 and 403 its middleware answers — the fourth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 329 gaps to 310.** Thirteen of the sixteen operations are `requireAuth` alone and took **401 only**; three are permission-gated and took both. Fully-documented operations went 80 to 96.
+
+  **This is the first surface using MORE THAN ONE permission key, and assuming otherwise would have mislabelled every 403 on it.** The three gated operations use three _different_ keys: `GET /artists/vanity-house` is `admin`, `PUT /artists/{id}/vanity-house` is `news_manage`, and `POST /artists/revert/{historyId}` is `communities_manage`. The insertion helper now takes either a single key or a `"METHOD /path" -> key` map, and when given a map it asserts the map and the set of operations needing a 403 are **exactly** equal in both directions — an unmapped operation and a mapped one that needs no 403 are both errors, so a stale map fails loudly instead of quietly writing the wrong permission name into the contract.
+
+  **Purely additive, blast radius proved per operation**: exactly sixteen changed — thirteen `+401`, three `+401 +403` — none losing anything, `components` byte-identical, path count unmoved at 267. Each emitted `403` description was read back from the spec to confirm it names the right key, rather than trusting the map went in correctly.
+
 ### Fixed
 
 - **Four more enum columns registered as free text, and a whole-row read missing four columns** — surfaced while binding `top10Api`/`adminApi` for [stellar-ui #293](https://github.com/orphic-inc/stellar-ui/issues/293). **The earlier sweep's claim that no enum column was left described as a string was wrong.** That pass matched on field NAMES (`type`, `status`, `kind`, `targetType`, `category`), which misses any enum whose column is called something else — so this pass enumerated **every enum-typed column in `schema.prisma`** and checked each against the registry instead.

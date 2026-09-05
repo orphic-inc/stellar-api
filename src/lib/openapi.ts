@@ -6427,6 +6427,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6446,6 +6450,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6459,6 +6467,10 @@ registry.registerPath({
     200: {
       description: 'Artist with releases and tags',
       content: { 'application/json': { schema: Artist } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -6480,6 +6492,10 @@ registry.registerPath({
       description: 'Artist updated',
       content: { 'application/json': { schema: Artist } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -6495,6 +6511,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Artist deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -6516,6 +6536,10 @@ registry.registerPath({
           schema: z.object({ subscribed: z.boolean() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6533,6 +6557,10 @@ registry.registerPath({
           schema: z.object({ subscribed: z.boolean() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Artist not found',
@@ -6554,6 +6582,10 @@ registry.registerPath({
           schema: z.object({ subscribed: z.boolean() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6567,6 +6599,10 @@ registry.registerPath({
     200: {
       description: 'Artist history',
       content: { 'application/json': { schema: z.array(ArtistHistory) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6588,6 +6624,14 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -6604,6 +6648,10 @@ registry.registerPath({
     200: {
       description: 'Similar artists',
       content: { 'application/json': { schema: z.array(SimilarArtistEntry) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6650,6 +6698,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: SimilarArtist }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6667,6 +6719,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: ArtistAlias }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -6684,6 +6740,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: ArtistTag }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9467,6 +9527,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9487,6 +9555,14 @@ registry.registerPath({
     200: {
       description: 'Artist updated',
       content: { 'application/json': { schema: VanityHouseArtist } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
