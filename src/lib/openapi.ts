@@ -1101,6 +1101,10 @@ registry.registerPath({
         'application/json': { schema: z.array(DuplicateIpGroup) }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing duplicate_ips_view',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1130,6 +1134,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing registration_log_view',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1158,6 +1166,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_view_email',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1184,6 +1196,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_view_ips',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1205,6 +1221,10 @@ registry.registerPath({
     200: {
       description: 'Rank state',
       content: { 'application/json': { schema: UserRankState } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing users_edit',
@@ -1243,6 +1263,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_edit',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1266,6 +1290,10 @@ registry.registerPath({
     200: {
       description: 'Snatch list',
       content: { 'application/json': { schema: z.array(SnatchItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing staff',
@@ -1352,6 +1380,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing donor_ranks_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1382,6 +1414,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing donor_ranks_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1404,6 +1440,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Donor rank deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing donor_ranks_manage',
@@ -1441,6 +1481,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing donor_ranks_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1465,6 +1509,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Donor status revoked'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing donor_ranks_manage',
@@ -1522,6 +1570,10 @@ registry.registerPath({
       description: 'Warnings',
       content: { 'application/json': { schema: z.array(UserWarning) } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_warn',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1557,6 +1609,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_warn',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1581,6 +1637,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Warning removed'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing users_warn',
@@ -1610,6 +1670,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(UserModerationNote) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing users_edit',
@@ -1647,6 +1711,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_edit',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1671,6 +1739,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Note deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing users_edit',
@@ -1700,6 +1772,10 @@ registry.registerPath({
       description: 'User disabled',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_disable',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1724,6 +1800,10 @@ registry.registerPath({
   responses: {
     200: {
       description: 'User enabled',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
@@ -1835,6 +1915,10 @@ registry.registerPath({
       description: 'Validation failed',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing users_edit permission',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1926,6 +2010,14 @@ registry.registerPath({
     400: {
       description: 'User already exists',
       content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing users_edit',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -1969,6 +2061,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Forbidden',
       content: { 'application/json': { schema: MsgResponse } }
@@ -1984,6 +2080,10 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Recovery request revoked',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
@@ -2035,6 +2135,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2047,6 +2155,10 @@ registry.registerPath({
   responses: {
     200: {
       description: 'Recovery email sent',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
@@ -3017,6 +3129,10 @@ registry.registerPath({
     200: {
       description: 'Historical user stat snapshots (ascending by capturedAt)',
       content: { 'application/json': { schema: z.array(UserStatSnapshot) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Stats are private',
@@ -6187,6 +6303,14 @@ registry.registerPath({
       description: 'Staff bio updated',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Not the subject and missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'User not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -9328,6 +9452,14 @@ registry.registerPath({
           schema: z.object({ data: z.array(SessionItem), meta: PaginationMeta })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing login_watch_view',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9364,6 +9496,14 @@ registry.registerPath({
           schema: z.object({ data: z.array(InviteItem), meta: PaginationMeta })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing invites_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9400,6 +9540,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing invites_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9460,6 +9608,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Not the owner and missing invites_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9495,6 +9651,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ratio_policy_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
