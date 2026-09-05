@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { markGate } from '../lib/routeGate';
 import { timingSafeEqual } from 'crypto';
 import { korin } from '../modules/config';
 
@@ -31,3 +32,8 @@ export const requireServiceKey = (
   }
   next();
 };
+
+// Labelled for the auth-coverage gate (#494). The key is presented as a Bearer
+// header, so a bad or missing one is a 401 — authentication, not authorization.
+// Stamped in place, for the reason auth.ts records.
+markGate(requireServiceKey, 'service');

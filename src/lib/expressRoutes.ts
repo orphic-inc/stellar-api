@@ -17,11 +17,14 @@
 import type { Express } from 'express';
 
 import type { Operation } from './openapiCompleteness';
+import { readGate, type GateKind } from './routeGate';
 
 interface RouteLayer {
   route?: {
     path: string | string[];
     methods: Record<string, boolean>;
+    /** The per-route handler chain: middleware first, then the handler. */
+    stack?: { handle?: unknown }[];
   };
   handle?: { stack?: RouteLayer[] };
   regexp?: RegExp & { fast_slash?: boolean };
@@ -66,13 +69,35 @@ const toOpenApiPath = (path: string): string =>
   path.replace(/:([A-Za-z0-9_]+)/g, '{$1}').replace(/(.)\/$/, '$1');
 
 /**
+ * The gates a route's own handler chain carries, plus any inherited from the
+ * routers it is mounted under (`router.use(requireAuth, sub)` is common), read
+ * off the marks `lib/routeGate.ts` stamps.
+ */
+const gatesOf = (
+  layer: RouteLayer,
+  inherited: readonly GateKind[]
+): GateKind[] => {
+  const own = (layer.route?.stack ?? [])
+    .map((h) => readGate(h.handle))
+    .filter((g): g is GateKind => g !== undefined);
+  return [...inherited, ...own];
+};
+
+/**
  * Every operation the app serves, as `{ method, path }` with `{param}`
- * placeholders. Methods are upper-cased; Express's internal `_all` is dropped.
+ * placeholders, each carrying the auth `gates` its chain enforces (#494).
+ * Methods are upper-cased; Express's internal `_all` is dropped.
  */
 export const collectRoutes = (app: Express): Operation[] => {
   const found: Operation[] = [];
 
-  const walk = (stack: RouteLayer[], base: string): void => {
+  const walk = (
+    stack: RouteLayer[],
+    base: string,
+    inherited: readonly GateKind[]
+  ): void => {
+    // Gates applied to the router itself, ahead of any route in it.
+    const mounted = [...inherited];
     for (const layer of stack) {
       if (layer.route) {
         const paths = Array.isArray(layer.route.path)
@@ -83,12 +108,18 @@ export const collectRoutes = (app: Express): Operation[] => {
             if (!enabled || method === '_all') continue;
             found.push({
               method: method.toUpperCase(),
-              path: toOpenApiPath(base + p)
+              path: toOpenApiPath(base + p),
+              gates: gatesOf(layer, mounted)
             });
           }
         }
       } else if (layer.handle?.stack) {
-        walk(layer.handle.stack, base + mountPrefix(layer));
+        walk(layer.handle.stack, base + mountPrefix(layer), mounted);
+      } else {
+        // A bare `router.use(gate)` — applies to every route registered after
+        // it in this router, which is why it accumulates rather than replaces.
+        const g = readGate(layer.handle);
+        if (g) mounted.push(g);
       }
     }
   };
@@ -102,6 +133,6 @@ export const collectRoutes = (app: Express): Operation[] => {
     );
   }
 
-  walk(router.stack, '');
+  walk(router.stack, '', []);
   return found;
 };

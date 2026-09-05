@@ -15,28 +15,14 @@ import { buildOpenApiDocument } from '../lib/openapi';
 import {
   checkOpenapiCompleteness,
   formatCompletenessReport,
+  isContractRoute,
+  stripApi,
   type Baseline,
   type Operation
 } from '../lib/openapiCompleteness';
 
 const ROOT = resolve(__dirname, '../..');
 const BASELINE_PATH = resolve(ROOT, 'openapi-completeness-baseline.json');
-
-// Routes deliberately outside the contract:
-//   /api/dev/*   dev-only tooling, never shipped to a member-facing UI
-//   /api/docs/*  the Swagger UI and the spec document itself
-//   /health, /   liveness and root, outside /api entirely
-const isContractRoute = (op: Operation): boolean =>
-  op.path.startsWith('/api/') &&
-  !op.path.startsWith('/api/dev/') &&
-  !op.path.startsWith('/api/docs');
-
-// openapi.json writes paths WITHOUT the /api prefix, because the served spec
-// declares `/api` as the server base. Strip it so both sides speak one dialect.
-const stripApi = (op: Operation): Operation => ({
-  method: op.method,
-  path: op.path.replace(/^\/api/, '') || '/'
-});
 
 const emptyBaseline: Baseline = { unregistered: [], paramMismatches: [] };
 

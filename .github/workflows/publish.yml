@@ -96,6 +96,17 @@ jobs:
         # unregistered route fails here, and so does a baseline entry that has
         # gone stale, so the list can only shrink.
         run: npm run openapi:completeness
+      - name: OpenAPI auth coverage
+        if: ${{ !cancelled() }}
+        # Completeness above proves every route is REGISTERED. It says nothing
+        # about whether a registration is complete, and auth failure modes were
+        # the largest gap left: of 361 operations only 39 documented a 401 and
+        # 88 a 403, and the three axes (401/403/security) did not correlate
+        # (#494). The authority is the middleware chain, which lib/routeGate.ts
+        # labels so it can be read off the built app. Grandfathered gaps live in
+        # openapi-auth-coverage-baseline.json and, as with completeness, a NEW
+        # gap fails here and so does a stale entry — the list only shrinks.
+        run: npm run openapi:auth-coverage
       - name: ERD freshness
         if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md

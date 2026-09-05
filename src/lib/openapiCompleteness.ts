@@ -25,7 +25,37 @@
 export interface Operation {
   method: string;
   path: string;
+  /** Auth gates the route's middleware chain enforces (#494). Optional: the
+   *  registered side of a comparison has no middleware to read. */
+  gates?: string[];
 }
+
+/**
+ * Routes deliberately outside the contract:
+ *   /api/dev/*   dev-only tooling, never shipped to a member-facing UI
+ *   /api/docs/*  the Swagger UI and the spec document itself
+ *   /health, /   liveness and root, outside /api entirely
+ *
+ * Lives here rather than in a CLI so the completeness gate and the auth-coverage
+ * gate (#494) share ONE definition of what is in the contract. Two copies of
+ * this predicate would be the same duplicate-description problem both gates
+ * exist to catch.
+ */
+export const isContractRoute = (op: Operation): boolean =>
+  op.path.startsWith('/api/') &&
+  !op.path.startsWith('/api/dev/') &&
+  !op.path.startsWith('/api/docs');
+
+/**
+ * openapi.json writes paths WITHOUT the `/api` prefix, because the served spec
+ * declares `/api` as the server base. Strip it so both sides speak one dialect.
+ * `gates` are carried through — they are the whole input to the auth gate.
+ */
+export const stripApi = (op: Operation): Operation => ({
+  method: op.method,
+  path: op.path.replace(/^\/api/, '') || '/',
+  ...(op.gates ? { gates: op.gates } : {})
+});
 
 export interface CompletenessInput {
   /** Every operation the mounted Express app actually serves. */
