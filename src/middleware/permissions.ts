@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { requireAuth } from './auth';
+import { markGate } from '../lib/routeGate';
 import type { AuthenticatedRequest } from '../types/auth';
 import {
   type Permission,
@@ -35,7 +36,7 @@ export const loadPermissions = async (
 // Use for routes that must be restricted to full admins only.
 export const requireAdminOnly = (): RequestHandler[] => [
   requireAuth,
-  async (req: Request, res: Response, next: NextFunction) => {
+  markGate(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const perms = await loadPermissions(req as AuthenticatedRequest, res);
       if (perms['admin']) return next();
@@ -49,7 +50,7 @@ export const requireAdminOnly = (): RequestHandler[] => [
     } catch (err) {
       next(err);
     }
-  }
+  }, 'permission')
 ];
 
 // Returns [requireAuth, permissionCheck] — spread into route definitions:
@@ -58,7 +59,7 @@ export const requirePermission = (
   ...permissions: Permission[]
 ): RequestHandler[] => [
   requireAuth,
-  async (req: Request, res: Response, next: NextFunction) => {
+  markGate(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const perms = await loadPermissions(req as AuthenticatedRequest, res);
       const granted = permissions.some((p) => hasPermission(perms, p));
@@ -73,14 +74,14 @@ export const requirePermission = (
     } catch (err) {
       next(err);
     }
-  }
+  }, 'permission')
 ];
 
 // Returns [requireAuth, permissionCheck] — admits only users with the literal 'admin' permission.
 // Staff alone does not pass (unlike requirePermission('admin') which treats staff ≡ admin).
 export const requireStrictAdmin = (): RequestHandler[] => [
   requireAuth,
-  async (req: Request, res: Response, next: NextFunction) => {
+  markGate(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const perms = await loadPermissions(req as AuthenticatedRequest, res);
       if (perms['admin']) return next();
@@ -88,7 +89,7 @@ export const requireStrictAdmin = (): RequestHandler[] => [
     } catch (err) {
       next(err);
     }
-  }
+  }, 'permission')
 ];
 
 // Passes if req.user owns the resource OR has the given permission.
@@ -98,7 +99,7 @@ export const requireOwnerOrPermission = (
   permission: Permission
 ): RequestHandler[] => [
   requireAuth,
-  async (req: Request, res: Response, next: NextFunction) => {
+  markGate(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const authReq = req as AuthenticatedRequest;
       const ownerId = getOwnerId(req);
@@ -109,5 +110,5 @@ export const requireOwnerOrPermission = (
     } catch (err) {
       next(err);
     }
-  }
+  }, 'permission')
 ];

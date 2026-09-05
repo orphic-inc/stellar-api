@@ -1,6 +1,7 @@
 import express, { Router, type Express } from 'express';
 
 import { collectRoutes } from './expressRoutes';
+import { markGate } from './routeGate';
 
 // These tests exist because collectRoutes reads Express 4 internals (`_router`,
 // `layer.regexp`, `layer.keys`), which are not public API. An Express upgrade
@@ -115,6 +116,72 @@ describe('collectRoutes', () => {
     app.use('/api/stats', r);
 
     expect(paths(app)).toEqual(['GET /api/stats']);
+  });
+
+  // ── auth gates (#494) ──────────────────────────────────────────────────────
+  // The gate marks have to survive the same walk the paths do. The inherited
+  // case is the subtle one: `router.use(gate)` applies to routes registered
+  // AFTER it in that router, so gates accumulate down the tree rather than
+  // being read off the route's own chain alone.
+
+  const gatesFor = (app: Express, key: string) =>
+    collectRoutes(app).find((r) => `${r.method} ${r.path}` === key)?.gates;
+
+  it('reads a gate off the route own handler chain', () => {
+    const app = express();
+    app.get(
+      '/x',
+      markGate((_req, _res, next) => next(), 'auth'),
+      (_req, res) => res.json({})
+    );
+
+    expect(gatesFor(app, 'GET /x')).toEqual(['auth']);
+  });
+
+  it('reports no gates for an unguarded route rather than guessing', () => {
+    const app = express();
+    app.get('/open', (_req, res) => res.json({}));
+
+    expect(gatesFor(app, 'GET /open')).toEqual([]);
+  });
+
+  it('inherits a gate applied to the router with `use`', () => {
+    const app = express();
+    const r = Router();
+    r.use(markGate((_req, _res, next) => next(), 'auth'));
+    r.get('/inner', (_req, res) => res.json({}));
+    app.use('/api', r);
+
+    expect(gatesFor(app, 'GET /api/inner')).toEqual(['auth']);
+  });
+
+  it('accumulates an inherited gate with the route own', () => {
+    const app = express();
+    const r = Router();
+    r.use(markGate((_req, _res, next) => next(), 'auth'));
+    r.post(
+      '/inner',
+      markGate((_req, _res, next) => next(), 'permission'),
+      (_req, res) => res.json({})
+    );
+    app.use('/api', r);
+
+    expect(gatesFor(app, 'POST /api/inner')).toEqual(['auth', 'permission']);
+  });
+
+  // A gate registered AFTER a route does not protect it, and must not be
+  // reported as if it did — that would be the dangerous direction, claiming
+  // coverage the app does not have.
+  it('does not apply a `use` gate to a route registered before it', () => {
+    const app = express();
+    const r = Router();
+    r.get('/early', (_req, res) => res.json({}));
+    r.use(markGate((_req, _res, next) => next(), 'auth'));
+    r.get('/late', (_req, res) => res.json({}));
+    app.use('/api', r);
+
+    expect(gatesFor(app, 'GET /api/early')).toEqual([]);
+    expect(gatesFor(app, 'GET /api/late')).toEqual(['auth']);
   });
 
   it('throws rather than reporting nothing when the internals move', () => {

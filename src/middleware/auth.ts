@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { markGate } from '../lib/routeGate';
 import * as Sentry from '@sentry/node';
 import jwt from 'jsonwebtoken';
 import { auth as authConfig } from '../modules/config';
@@ -101,3 +102,11 @@ export const requireAuth = async (
     res.status(401).json({ msg: 'Token is not valid' });
   }
 };
+
+// Labelled so the auth-coverage gate (#494) can read this route's failure mode
+// off the built app rather than guess it from a function name. Stamped in place
+// rather than via `export const requireAuth = markGate(fn, 'auth')`, because
+// that form renames the declaration and Codacy's Lizard then reports the
+// function's pre-existing complexity as NEW under the new symbol. markGate
+// returns the same object either way; this keeps the declaration untouched.
+markGate(requireAuth, 'auth');
