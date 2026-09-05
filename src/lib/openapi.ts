@@ -3162,6 +3162,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3188,6 +3192,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3201,6 +3209,10 @@ registry.registerPath({
     200: {
       description: 'Author stylesheet',
       content: { 'application/json': { schema: AuthorStylesheet } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -3228,6 +3240,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not your stylesheet',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3247,6 +3263,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Author stylesheet withdrawn (soft); adopters keep rendering'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not your stylesheet',
@@ -3269,6 +3289,10 @@ registry.registerPath({
       description: 'Stylesheet adopted into the Site Stylesheet slot',
       content: { 'application/json': { schema: AdoptionResult } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3287,6 +3311,10 @@ registry.registerPath({
     200: {
       description: 'The stored, sanitized stylesheet source as CSS',
       content: { 'text/css': { schema: z.string() } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -3372,6 +3400,10 @@ registry.registerPath({
     200: {
       description: 'Available stylesheets',
       content: { 'application/json': { schema: z.array(Stylesheet) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3384,6 +3416,14 @@ registry.registerPath({
     200: {
       description: 'Stylesheet user counts (admin only)',
       content: { 'application/json': { schema: z.array(StylesheetStat) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3397,6 +3437,10 @@ registry.registerPath({
     200: {
       description: 'Stylesheet',
       content: { 'application/json': { schema: Stylesheet } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -3420,6 +3464,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3443,6 +3495,14 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -3461,6 +3521,14 @@ registry.registerPath({
     },
     400: {
       description: 'Cannot delete the default stylesheet',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
