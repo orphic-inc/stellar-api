@@ -2752,6 +2752,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2780,6 +2788,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing news_manage',
       content: { 'application/json': { schema: MsgResponse } }
@@ -2799,6 +2811,14 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Announcement deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -2824,6 +2844,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2836,6 +2864,14 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Blog post deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -2866,6 +2902,14 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(GlobalNotice) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2887,6 +2931,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -2898,6 +2950,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Notice deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -9460,6 +9520,14 @@ registry.registerPath({
     200: {
       description: 'Featured album list',
       content: { 'application/json': { schema: z.array(FeaturedAlbumItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9475,6 +9543,14 @@ registry.registerPath({
     201: {
       description: 'Created',
       content: { 'application/json': { schema: FeaturedAlbumItem } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9486,6 +9562,14 @@ registry.registerPath({
   request: { params: z.object({ albumId: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing news_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
