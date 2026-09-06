@@ -37,9 +37,10 @@ router.get(
   '/artist',
   requireAuth,
   asyncHandler(async (_req, res) => {
-    const count = await prisma.artist.count();
+    const count = await prisma.artist.count({ where: { deletedAt: null } });
     if (!count) return res.status(404).json({ msg: 'No artists found' });
     const artist = await prisma.artist.findFirst({
+      where: { deletedAt: null },
       skip: Math.floor(Math.random() * count),
       select: { id: true, name: true }
     });

@@ -45,7 +45,7 @@ export const getSystemStats = async () => {
     prisma.user.count({ where: { lastLogin: { gte: startOfMonth } } }),
     prisma.community.count(),
     prisma.release.count(),
-    prisma.artist.count(),
+    prisma.artist.count({ where: { deletedAt: null } }),
     prisma.blog.count(),
     prisma.news.count(),
     prisma.comment.count({ where: { deletedAt: null } }),

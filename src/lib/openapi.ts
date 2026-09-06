@@ -7012,6 +7012,10 @@ registry.registerPath({
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    403: {
+      description: 'Missing communities_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7030,6 +7034,10 @@ registry.registerPath({
     },
     401: {
       description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {

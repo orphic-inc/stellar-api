@@ -332,7 +332,8 @@ router.get(
 
     const tagPredicate = buildArtistTagWhere(q.tags, q.tagMode);
 
-    const where: Record<string, unknown> = {};
+    // A withdrawn artist is not a search result (#509 F3 soft delete).
+    const where: Record<string, unknown> = { deletedAt: null };
     if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
     if (q.vanityHouse !== undefined) where.vanityHouse = q.vanityHouse;
     if (tagPredicate) Object.assign(where, tagPredicate);
