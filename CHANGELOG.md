@@ -8,6 +8,14 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Rules` now documents the 401 and 403 its middleware answers — the fifteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 103 gaps to 94.** Six operations in one router file; three needed both codes under a uniform `rules_manage`, three took **401 only**. Fully-documented operations went 269 to 275.
+
+  **The cleanest surface in the burn-down.** The three reads are `requireAuth` and the three writes are `...requirePermission('rules_manage')`, single-key throughout — no any-of, no second key, no per-route variation. Searched with the corrected pattern from #523 (`\.status(4\|\.status(5\|AppError(`, which catches the prettier-wrapped chains the old `res\.status(` missed): this router has **no handler-level 403 at all**, only `404`, `409` and one `400`. So `Missing rules_manage` is the whole story for every 403 here.
+
+  **Purely additive, blast radius proved per operation**: exactly six changed, all under `/rules`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
+  Left for [#517](https://github.com/orphic-inc/stellar-api/issues/517): the `409`s on create and update (duplicate slug, second main rules page) and the `400` on deleting the main rules page are all undeclared. Different axis; no gate measures it.
+
 - **`Wiki` now documents the 401 its middleware answers, plus two 403s nothing had noticed — the fourteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 115 gaps to 103.** Twelve operations in one router file. Fully-documented operations went 257 to 269.
 
   **The two undeclared 403s were found by fixing the grep, not by reading harder.** `POST /wiki/{id}/aliases` and `DELETE /wiki/{id}/aliases/{alias}` are `requireAuth`-only — invisible to #494's gate — and both call `canEdit()`, answering `403 Insufficient permission to edit this page`. Neither declared it. **The documented search pattern is what hid them:** `grep "res\.status(4"` matches only a single-line chain, and this file writes nine of its ten 403s as `return res` on one line and `.status(403)` on the next. On `/wiki` that pattern finds **1 of 10 sites**. Searching for `\.status(403)` instead finds all ten.
