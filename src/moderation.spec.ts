@@ -780,8 +780,10 @@ describe('PUT /api/users/settings', () => {
 // ─── Public user profile ──────────────────────────────────────────────────────
 
 describe('GET /api/users/:id', () => {
-  it('returns a public user profile', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(
+  it('returns a member profile', async () => {
+    // findFirst, not findUnique: the route now filters `disabled: false`
+    // alongside the id, which findUnique cannot express (#547).
+    prismaMock.user.findFirst.mockResolvedValue(
       makeUser({ id: 9, username: 'alice' }) as never
     );
 

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
+import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
@@ -28,8 +29,14 @@ const idParamsSchema = z.object({
 });
 
 // GET /api/announcements
+//
+// Gated as of #547. News and blog posts are site content on a private site, and
+// this served them with no session. Only `PrivateHomepage.tsx` consumes it —
+// stellar-ui's public pages call `GET /install` and nothing else — so the gate
+// costs nothing downstream.
 router.get(
   '/',
+  requireAuth,
   asyncHandler(async (_req: Request, res: Response) => {
     const [news, blogs] = await Promise.all([
       prisma.news.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),

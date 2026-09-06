@@ -8,6 +8,26 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Five read endpoints served content with no session, and `/requests` ignored community membership** ([#547](https://github.com/orphic-inc/stellar-api/issues/547)) — found while enumerating the ungated routes for [#520](https://github.com/orphic-inc/stellar-api/issues/520): deriving `security` from the gates is only correct if "ungated" is _true_, so all 13 were read against their handlers. Five were gaps rather than intent.
+
+  **`GET /requests` and `GET /requests/{id}` are the authorization defect.** Neither required a session, and `communityId` was a caller-supplied **filter, never a restriction** — while the projection carries the community's **name**. This is exactly what [#509](https://github.com/orphic-inc/stellar-api/issues/509) F2 fixed for `GET /search/requests`, left live on the browse path. #509's own writeup named the shape — _"the same rows were gated on one path and open on the other"_ — and this was the mirror image. Both now scope with `communityReadableWhere`, the same helper the search path uses.
+
+  The list **filters** rather than refusing, for #509's reason: a 403 when the caller names a community would make `?communityId=N` an existence oracle. The detail read answers **404** rather than 403, so an unreachable request is indistinguishable from one that does not exist. It moved to `findFirst` because the scope is a relation filter, which `findUnique` cannot express.
+
+  Unlike the release scope #509 built, there is **no `communityId: null` arm** here: `Request.communityId` is non-nullable, so there is no community-less set to preserve, and carrying the arm would be dead weight that reads as though it protected something.
+
+  **`GET /comments` was the other half of #509 F4.** That fix gated `/comments/{id}` because a body "was readable with no session at all by guessing an integer id" — while the list beside it returned the same bodies, plus rendered `bodyHtml` and author refs, **paginated**. The detail route was gated and the bulk route was not, so no guessing was ever needed.
+
+  **`GET /users/{id}` also served soft-deleted accounts.** "Public profile" described the projection, not the audience; it exposed member existence, registration date, donor status and profile text with no session. `disabled: false` was missing too, so a withdrawn account stayed readable by id, against the documented soft-delete convention.
+
+  **`GET /announcements`** served site news and blog posts unauthenticated.
+
+  **Gating all five cost nothing downstream** — stellar-ui's public surface calls `GET /install` and nothing else; announcements are consumed by `PrivateHomepage`. The same argument #509 used for the comment detail route.
+
+  All five now declare the **401** they can answer: `openapi:auth-coverage` moved to **356 gated, 356 documented, 0 gaps**, and their `security` blocks appeared automatically from #520's derivation.
+
+### Fixed
+
 - **The contract defined no security schemes at all, and 309 of 364 operations disagreed with their own middleware** ([#520](https://github.com/orphic-inc/stellar-api/issues/520)) — `components.securitySchemes` was **absent entirely** while 112 operations referenced schemes by name, so every one of those references was dangling. The issue reported that as "109 operations declare `cookieAuth`"; measured, it was 70 `bearerAuth` and 42 `cookieAuth`, and the shape of the problem was different again.
 
   **The references were inverted.** `requireAuth` reads `req.cookies?.token` and has no `Authorization` path, yet **70 operations gated by it declared `bearerAuth`** — telling a client to send a header the API never reads. Meanwhile the only three routes that genuinely take a bearer token (`requireServiceKey`, korin's inbound calls under ADR-0013) declared **nothing**. The registry even carried a comment explaining why: declaring `bearerAuth` there "would describe the wrong credential". That reasoning was right; the fix was to name the scheme properly rather than to say nothing.

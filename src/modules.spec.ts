@@ -1094,7 +1094,7 @@ describe('requests.listRequests', () => {
     ] as never);
     prismaMock.request.count.mockResolvedValueOnce(1);
 
-    const result = await listRequests();
+    const result = await listRequests({ viewerId: 7 });
 
     expect(result.meta.total).toBe(1);
     expect(result.data).toHaveLength(1);

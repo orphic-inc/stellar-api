@@ -1805,6 +1805,10 @@ registry.registerPath({
   tags: ['Users'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     200: {
       description: 'User profile',
       content: { 'application/json': { schema: PublicUser } }
@@ -2828,6 +2832,10 @@ registry.registerPath({
   path: '/announcements',
   tags: ['Announcements'],
   responses: {
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     200: {
       description: 'News and blog posts',
       content: {
@@ -6678,6 +6686,10 @@ registry.registerPath({
     query: commentQuerySchema
   },
   responses: {
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     200: {
       description: 'Comments',
       content: { 'application/json': { schema: PaginatedComments } }
@@ -7792,6 +7804,10 @@ registry.registerPath({
   tags: ['Requests'],
   request: { query: listRequestsQuerySchema },
   responses: {
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     200: {
       description: 'Paginated requests',
       content: {
@@ -7845,6 +7861,10 @@ registry.registerPath({
     params: z.object({ id: z.string() })
   },
   responses: {
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     200: {
       description: 'Request detail',
       content: { 'application/json': { schema: RequestDetail } }

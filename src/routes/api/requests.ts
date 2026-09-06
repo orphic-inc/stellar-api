@@ -9,7 +9,7 @@ import {
   parsedQuery,
   parsedParams
 } from '../../middleware/validate';
-import { asyncHandler, authHandler } from '../../modules/asyncHandler';
+import { authHandler } from '../../modules/asyncHandler';
 import * as requestLifecycle from '../../modules/requestLifecycle';
 import { hasPermission } from '../../lib/rankPermissions';
 import {
@@ -29,10 +29,15 @@ const router = Router();
 
 // ─── GET /requests — list with filters ────────────────────────────────────────
 
+// Gated and community-scoped as of #547. `communityId` was a caller-supplied
+// filter with no session required, so private communities' requests — and their
+// NAMES, which the projection carries — were readable by anyone. Identical to
+// the defect #509 F2 fixed on `/search/requests`, left live on the browse path.
 router.get(
   '/',
+  requireAuth,
   validateQuery(listRequestsQuerySchema),
-  asyncHandler(async (req, res) => {
+  authHandler(async (req, res) => {
     const q = parsedQuery<ListRequestsQuery>(res);
     const result = await requestLifecycle.listRequests({
       q: q.q,
@@ -44,7 +49,8 @@ router.get(
       communityId: q.communityId,
       status: q.status,
       orderBy: q.orderBy,
-      order: q.order
+      order: q.order,
+      viewerId: req.user.id
     });
     res.json(result);
   })
@@ -73,10 +79,11 @@ router.post(
 
 router.get(
   '/:id',
+  requireAuth,
   validateParams(requestIdParamsSchema),
-  asyncHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const result = await requestLifecycle.getRequestDetail(id);
+    const result = await requestLifecycle.getRequestDetail(id, req.user.id);
     res.json(result);
   })
 );

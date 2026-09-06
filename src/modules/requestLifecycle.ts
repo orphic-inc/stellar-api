@@ -1,5 +1,6 @@
 import { ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { communityReadableWhere } from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { floorSub } from './ratio';
@@ -97,14 +98,26 @@ export function serializeRequest(request: {
 
 // ─── getRequestDetail ─────────────────────────────────────────────────────────
 
-export async function getRequestDetail(requestId: number): Promise<
+export async function getRequestDetail(
+  requestId: number,
+  viewerId: number
+): Promise<
   SerializedRequest & {
     voteCount: number;
     votes: Array<{ userId: number }>;
   }
 > {
-  const request = await prisma.request.findUnique({
-    where: { id: requestId, deletedAt: null },
+  // findFirst, not findUnique: the community scope is a relation filter, which
+  // findUnique cannot express. An unreachable request simply is not found, so it
+  // answers the same 404 as one that does not exist — a distinguishable 403
+  // would confirm that a private community holds a request with this id (#547,
+  // following #509's reasoning about existence oracles).
+  const request = await prisma.request.findFirst({
+    where: {
+      id: requestId,
+      deletedAt: null,
+      community: communityReadableWhere(viewerId)
+    },
     include: {
       user: { select: { id: true, username: true } },
       filler: { select: { id: true, username: true } },
@@ -704,6 +717,8 @@ export type ListRequestsOptions = {
   status?: RequestStatus;
   orderBy?: 'createdAt' | 'voteCount' | 'random';
   order?: 'asc' | 'desc';
+  /** The caller. Requests in communities they cannot reach are excluded (#547). */
+  viewerId: number;
 };
 
 export async function listRequests({
@@ -716,12 +731,27 @@ export async function listRequests({
   communityId,
   status,
   orderBy = 'createdAt',
-  order = 'desc'
-}: ListRequestsOptions = {}) {
+  order = 'desc',
+  viewerId
+}: ListRequestsOptions) {
   const skip = (Math.max(1, page) - 1) * Math.min(100, limit);
   const take = Math.min(100, limit);
 
+  // `communityId` below is a caller-supplied FILTER. On its own that let anyone
+  // read requests in PRIVATE communities — and the projection carries the
+  // community's NAME — which is exactly the defect #509 F2 fixed for
+  // `/search/requests`. The scope is the restriction; the filter narrows within
+  // it. Every request HAS a community — `Request.communityId` is non-nullable,
+  // unlike `Release.communityId` — so unlike the release scope #509 built there
+  // is no community-less set to preserve here.
+  //
+  // This FILTERS rather than 403s, deliberately and for #509's reason: refusing
+  // when the caller names a community would make `?communityId=N` an existence
+  // oracle for private communities.
+  const scope = { community: communityReadableWhere(viewerId) };
+
   const where: Record<string, unknown> = {
+    AND: [scope],
     deletedAt: null,
     ...(q && {
       OR: [

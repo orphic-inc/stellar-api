@@ -38,8 +38,15 @@ const commentIdParamsSchema = z.object({
 });
 
 // GET /api/comments
+//
+// `requireAuth` here closes the other half of #509 F4 (#547). That fix gated
+// `/comments/{id}` because a comment body "was readable with no session at all
+// by guessing an integer id" — while this route returned the same bodies, plus
+// rendered `bodyHtml` and author refs, PAGINATED. The detail route was gated
+// and the bulk route beside it was not, so no guessing was ever required.
 router.get(
   '/',
+  requireAuth,
   validateQuery(commentQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { context, pageId } = parsedQuery<CommentQueryInput>(res);
