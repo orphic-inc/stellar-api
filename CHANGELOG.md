@@ -8,6 +8,12 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`TagAliases` now documents the 401 and 403 its middleware answers — the seventeenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 86 gaps to 78.** Four operations in one router file, **every one taking both codes** under a uniform `tags_manage`. Fully-documented operations went 283 to 287.
+
+  **The most uniform surface in the burn-down**: all four routes are `...requirePermission('tags_manage')`, single-key, and the whole surface is staff-only — there is no member-facing read here, which is why every operation needed both codes rather than the usual mix. Searched with the corrected pattern from #523: **no handler-level 403 anywhere**, only `404`s for a missing alias or a missing target tag.
+
+  **Purely additive, blast radius proved per operation**: exactly four changed, all under `/tag-aliases`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
 - **`Requests` now documents the 401 its middleware answers, plus a 403 nothing had declared — the sixteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 94 gaps to 86.** Eight operations in one router file. Fully-documented operations went 275 to 283.
 
   **This surface has no permission middleware at all** — every authorization is a handler or module decision, so #494's gate asked only for `401` on all eight. The real work was following the thin routes into `modules/requestLifecycle.ts`, where four functions throw 403 (`updateRequest`, `fillRequest`, `unfillRequest`, `deleteRequest`) and one more sits in the router itself.
