@@ -6,6 +6,38 @@ import {
   makeUserRank
 } from './test/apiTestHarness';
 
+/**
+ * The forum-read fragment the harness's current user produces: level 1000, no
+ * explicitly permitted forums. Spelled out rather than imported from
+ * `forumAccess` so a change to the fragment's shape has to be restated here
+ * deliberately, instead of both sides moving together and asserting nothing.
+ */
+const READABLE_FORUMS = {
+  OR: [{ minClassRead: { lte: 1000 } }, { id: { in: [] as number[] } }]
+};
+
+/** The community-read scope the same user (id 7) produces (#509 F2). */
+const READABLE_COMMUNITIES = {
+  OR: [
+    { communityId: null },
+    {
+      community: {
+        OR: [
+          { registrationStatus: 'open' },
+          {
+            OR: [
+              { consumers: { some: { userId: 7 } } },
+              { contributors: { some: { userId: 7 } } },
+              { curators: { some: { id: 7 } } },
+              { leaderId: 7 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+};
+
 // ─── GET /api/search/releases ─────────────────────────────────────────────────
 
 describe('GET /api/search/releases', () => {
@@ -53,12 +85,17 @@ describe('GET /api/search/releases', () => {
     prismaMock.release.findMany.mockResolvedValue([]);
     prismaMock.release.count.mockResolvedValue(0);
     await request(app).get('/api/search/releases?tags=jazz,blues&tagMode=all');
+    // `tagMode=all` is the one query that already owns `AND`, so it is the
+    // case that proves the community scope APPENDS rather than assigns: both
+    // tag arms must still be here, in order, with the scope added after them.
+    // Assigning would have silently dropped the tag filter (#509).
     expect(prismaMock.release.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           AND: [
             { releaseTags: { some: { tag: { name: 'jazz' } } } },
-            { releaseTags: { some: { tag: { name: 'blues' } } } }
+            { releaseTags: { some: { tag: { name: 'blues' } } } },
+            READABLE_COMMUNITIES
           ]
         })
       })
@@ -210,6 +247,66 @@ describe('GET /api/search/releases', () => {
     await request(app).get('/api/search/releases?orderBy=random');
     expect(prismaMock.release.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 0 })
+    );
+  });
+
+  // ── #509 F2: community access travels into the query ──
+
+  it('never returns a release from a community the caller cannot reach', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+
+    await request(app).get('/api/search/releases');
+
+    // Both the page and its total carry the scope. A count that skipped it
+    // would leak the size of the private corpus through the pagination meta
+    // even with an empty page.
+    for (const call of [
+      prismaMock.release.findMany,
+      prismaMock.release.count
+    ]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ AND: [READABLE_COMMUNITIES] })
+        })
+      );
+    }
+  });
+
+  it('scopes the random branch, which counts and pages separately', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+
+    await request(app).get('/api/search/releases?orderBy=random');
+
+    for (const call of [
+      prismaMock.release.findMany,
+      prismaMock.release.count
+    ]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ AND: [READABLE_COMMUNITIES] })
+        })
+      );
+    }
+  });
+
+  it('keeps a caller-supplied communityId as a filter, not an escape hatch', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+
+    await request(app).get('/api/search/releases?communityId=42');
+
+    // Asking for a specific community narrows the search; it does not replace
+    // the scope. A member outside community 42 gets an empty page rather than
+    // a 403 — filtering, so the query is not an existence oracle.
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          communityId: { in: [42] },
+          AND: [READABLE_COMMUNITIES]
+        })
+      })
     );
   });
 });
@@ -394,6 +491,29 @@ describe('GET /api/search/requests', () => {
     const res = await request(app).get('/api/search/requests?status=bogus');
     expect(res.status).toBe(400);
   });
+
+  it('scopes request search to communities the caller can reach', async () => {
+    // Request.communityId is NOT NULL and the projection carries the community
+    // name, so an unscoped search named private communities outright (#509 F2).
+    prismaMock.request.findMany.mockResolvedValue([]);
+    prismaMock.request.count.mockResolvedValue(0);
+
+    await request(app).get('/api/search/requests');
+
+    for (const call of [
+      prismaMock.request.findMany,
+      prismaMock.request.count
+    ]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            deletedAt: null,
+            AND: [READABLE_COMMUNITIES]
+          })
+        })
+      );
+    }
+  });
 });
 
 // ─── GET /api/search/log ──────────────────────────────────────────────────────
@@ -448,10 +568,13 @@ describe('GET /api/search/log', () => {
     prismaMock.forumPost.findMany.mockResolvedValue([]);
     prismaMock.forumPost.count.mockResolvedValue(0);
     await request(app).get('/api/search/log?type=all&q=modal&authorId=44');
+    // The forum-read scope rides alongside the caller's own filters rather
+    // than replacing them (#509); asserted exactly, so a lost filter fails.
     expect(prismaMock.forumTopic.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           deletedAt: null,
+          forum: READABLE_FORUMS,
           title: { contains: 'modal', mode: 'insensitive' },
           authorId: 44
         }
@@ -461,9 +584,71 @@ describe('GET /api/search/log', () => {
       expect.objectContaining({
         where: {
           deletedAt: null,
+          forumTopic: { forum: READABLE_FORUMS },
           body: { contains: 'modal', mode: 'insensitive' },
           authorId: 44
         }
+      })
+    );
+  });
+
+  // ── #509 F1: forum class travels into the query ──
+
+  it('never searches forums above the caller\u2019s read class', async () => {
+    prismaMock.forumTopic.findMany.mockResolvedValue([]);
+    prismaMock.forumTopic.count.mockResolvedValue(0);
+    prismaMock.forumPost.findMany.mockResolvedValue([]);
+    prismaMock.forumPost.count.mockResolvedValue(0);
+
+    await request(app).get('/api/search/log?type=all');
+
+    // Both spines are restricted, and the post spine reaches the forum through
+    // its topic — a post is the row that leaks a body, so missing it here is
+    // the whole defect.
+    for (const call of [
+      prismaMock.forumTopic.findMany,
+      prismaMock.forumTopic.count
+    ]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ forum: READABLE_FORUMS })
+        })
+      );
+    }
+    for (const call of [
+      prismaMock.forumPost.findMany,
+      prismaMock.forumPost.count
+    ]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            forumTopic: { forum: READABLE_FORUMS }
+          })
+        })
+      );
+    }
+  });
+
+  it('scopes the type=topic and type=post branches too', async () => {
+    // Three branches issue these queries and each builds its own call; a fix
+    // applied to `type=all` alone would leave two doors open.
+    prismaMock.forumTopic.findMany.mockResolvedValue([]);
+    prismaMock.forumTopic.count.mockResolvedValue(0);
+    await request(app).get('/api/search/log?type=topic');
+    expect(prismaMock.forumTopic.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ forum: READABLE_FORUMS })
+      })
+    );
+
+    prismaMock.forumPost.findMany.mockResolvedValue([]);
+    prismaMock.forumPost.count.mockResolvedValue(0);
+    await request(app).get('/api/search/log?type=post');
+    expect(prismaMock.forumPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          forumTopic: { forum: READABLE_FORUMS }
+        })
       })
     );
   });

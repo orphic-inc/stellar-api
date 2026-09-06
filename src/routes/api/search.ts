@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
+import { communityReadableWhere } from '../../modules/communityAccess';
+import { forumReadableWhere } from '../../modules/forumAccess';
 import { computeRatio } from '../../modules/ratio';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
 import { parsedPage, paginatedResponse } from '../../lib/pagination';
@@ -59,6 +61,40 @@ function buildArtistTagWhere(
     : { tags: { some: { tag: { name: { in: names } } } } };
 }
 
+/**
+ * Restrict a search to rows whose community the caller may reach.
+ *
+ * Appends to `AND` rather than assigning it. These `where` objects are
+ * assembled a key at a time and `tagMode=all` already puts an array there, so
+ * a plain assignment would silently drop the tag filter the caller asked for.
+ * Every other key is carried through untouched, which keeps the query shape —
+ * and the assertions in `search.spec.ts` that record it — intact.
+ *
+ * The `communityId: null` arm keeps community-less rows visible. `Release`'s
+ * `communityId` is nullable, and a bare relation filter excludes a null
+ * relation — so without this arm the fix would hide rows that were never
+ * private, turning a security fix into a regression. `Request.communityId` is
+ * `NOT NULL`, so the arm is inert there and kept only so both call sites read
+ * the same.
+ */
+const scopedToReadableCommunities = (
+  where: Record<string, unknown>,
+  userId: number
+): Record<string, unknown> => {
+  const scope = {
+    OR: [{ communityId: null }, { community: communityReadableWhere(userId) }]
+  };
+  const existing = where.AND;
+  return {
+    ...where,
+    AND: Array.isArray(existing)
+      ? [...existing, scope]
+      : existing
+        ? [existing, scope]
+        : [scope]
+  };
+};
+
 // ─── GET /api/search/releases ─────────────────────────────────────────────────
 
 const RELEASE_SELECT = {
@@ -79,7 +115,7 @@ router.get(
   '/releases',
   requireAuth,
   validateQuery(searchReleasesQuerySchema),
-  asyncHandler(async (req, res) => {
+  authHandler(async (req, res) => {
     const q = parsedQuery<SearchReleasesQuery>(res);
     const pg = parsedPage(res);
 
@@ -159,12 +195,17 @@ router.get(
     }
     if (tagPredicate) Object.assign(where, tagPredicate);
 
+    // Every query below reads `scoped`, never `where` — a release in a PRIVATE
+    // community the caller does not belong to must not appear in a search, the
+    // same rule `listCommunityReleases` enforces on the browse path (#509).
+    const scoped = scopedToReadableCommunities(where, req.user.id);
+
     if (q.orderBy === 'random') {
-      const count = await prisma.release.count({ where });
+      const count = await prisma.release.count({ where: scoped });
       const skip =
         count > q.limit ? Math.floor(Math.random() * (count - q.limit)) : 0;
       const data = await prisma.release.findMany({
-        where,
+        where: scoped,
         skip,
         take: q.limit,
         select: RELEASE_SELECT
@@ -189,13 +230,13 @@ router.get(
 
     const [data, total] = await Promise.all([
       prisma.release.findMany({
-        where,
+        where: scoped,
         orderBy: orderByMap[q.orderBy] as never,
         skip: pg.skip,
         take: pg.limit,
         select: RELEASE_SELECT
       }),
-      prisma.release.count({ where })
+      prisma.release.count({ where: scoped })
     ]);
 
     paginatedResponse(
@@ -300,7 +341,7 @@ router.get(
   '/requests',
   requireAuth,
   validateQuery(searchRequestsQuerySchema),
-  asyncHandler(async (req, res) => {
+  authHandler(async (req, res) => {
     const q = parsedQuery<SearchRequestsQuery>(res);
     const pg = parsedPage(res);
 
@@ -320,12 +361,16 @@ router.get(
     if (q.status) where.status = q.status;
     if (q.communityId) where.communityId = q.communityId;
 
+    // A request belongs to a community and carries its name in the projection,
+    // so the same community scope the release search applies belongs here (#509).
+    const scoped = scopedToReadableCommunities(where, req.user.id);
+
     if (q.orderBy === 'random') {
-      const count = await prisma.request.count({ where });
+      const count = await prisma.request.count({ where: scoped });
       const skip =
         count > q.limit ? Math.floor(Math.random() * (count - q.limit)) : 0;
       const data = await prisma.request.findMany({
-        where,
+        where: scoped,
         skip,
         take: q.limit,
         select: REQUEST_SELECT
@@ -345,13 +390,13 @@ router.get(
 
     const [data, total] = await Promise.all([
       prisma.request.findMany({
-        where,
+        where: scoped,
         orderBy: orderByMap[q.orderBy] as never,
         skip: pg.skip,
         take: pg.limit,
         select: REQUEST_SELECT
       }),
-      prisma.request.count({ where })
+      prisma.request.count({ where: scoped })
     ]);
 
     paginatedResponse(
@@ -388,12 +433,23 @@ router.get(
   '/log',
   requireAuth,
   validateQuery(searchLogQuerySchema),
-  asyncHandler(async (req, res) => {
+  authHandler(async (req, res) => {
     const q = parsedQuery<SearchLogQuery>(res);
     const pg = parsedPage(res);
 
-    const topicWhere: Record<string, unknown> = { deletedAt: null };
-    const postWhere: Record<string, unknown> = { deletedAt: null };
+    // Forum class travels into the query, because a search has no single
+    // `forumId` to hand `assertForumReadAccess` (#509). Without it this route
+    // returned the full body of every post on the site — including forums
+    // seeded at `minClassRead: 500` — to any authenticated member.
+    const readable = forumReadableWhere(req.user);
+    const topicWhere: Record<string, unknown> = {
+      deletedAt: null,
+      forum: readable
+    };
+    const postWhere: Record<string, unknown> = {
+      deletedAt: null,
+      forumTopic: { forum: readable }
+    };
     if (q.q) {
       topicWhere.title = { contains: q.q, mode: 'insensitive' };
       postWhere.body = { contains: q.q, mode: 'insensitive' };
