@@ -14,8 +14,6 @@
     "DELETE /posts/{id}/comments/{commentId} 401",
     "DELETE /site-history/{id} 401",
     "DELETE /site-history/{id} 403",
-    "DELETE /tag-aliases/{id} 401",
-    "DELETE /tag-aliases/{id} 403",
     "GET /contributions 401",
     "GET /contributions/{id} 401",
     "GET /contributions/{id}/access/latest 401",
@@ -42,8 +40,6 @@
     "GET /site-history 401",
     "GET /subscriptions 401",
     "GET /subscriptions/comment-status 401",
-    "GET /tag-aliases 401",
-    "GET /tag-aliases 403",
     "GET /top10/history 401",
     "GET /top10/history 403",
     "GET /top10/releases 401",
@@ -75,8 +71,6 @@
     "POST /site-history 403",
     "POST /subscriptions/subscribe 401",
     "POST /subscriptions/subscribe-comments 401",
-    "POST /tag-aliases 401",
-    "POST /tag-aliases 403",
     "POST /top10/snapshot 401",
     "POST /top10/snapshot 403",
     "PUT /comments/{id} 401",
@@ -85,8 +79,6 @@
     "PUT /settings 401",
     "PUT /settings 403",
     "PUT /site-history/{id} 401",
-    "PUT /site-history/{id} 403",
-    "PUT /tag-aliases/{id} 401",
-    "PUT /tag-aliases/{id} 403"
+    "PUT /site-history/{id} 403"
   ]
 }
