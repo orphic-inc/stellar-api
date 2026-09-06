@@ -6,6 +6,32 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The password denylist was enforced on three auth paths and nothing ever wrote a row, so it never blocked anything** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `isPasswordBanned` is called at registration and on both password-change paths, but `prisma.badPassword` appeared exactly **once** in `src/`: that read. No route, no seed, no `bootstrap.ts` helper ever created a `BadPassword` row, so the table was empty in every deployment and the check returned `false` on every call. AGENTS.md filed the model under "Stub models (no routes implemented)", which is wrong in the direction that matters — reading `auth.ts` it looks like a working denylist, and the stub table is where you would go to learn otherwise.
+
+  **A shipped list of 237 entries**, seeded by `seedBadPasswords` into `seedAll` alongside the Golden Rules and theme fixtures. Nothing shorter than six characters is included: `min(6)` is the floor on every creation path, so a shorter entry could never be submitted to match against, and a denylist padded with rows that cannot fire overstates its own coverage — which is the failure this fixes.
+
+  **The comparison now folds case.** Both sides are lowercased, so `PASSWORD` and `PaSsWoRd` are caught. Previously the lookup was exact and case-sensitive, which would have let a capital letter walk straight past the entire list. Folding it in the query rather than with Prisma's `mode: 'insensitive'` keeps the lookup an exact match, which is what the `@unique` btree index on `password` can serve; `findFirst` becomes `findUnique` for the same reason.
+
+  **The seed is guarded by a recorded fact, not a row count.** `SiteSettings.badPasswordsSeededAt` is stamped on the first run and makes every later run a no-op. Counting `bad_passwords` rows instead would be wrong the way ADR-0022 describes for install state: staff are free to delete seeded entries they disagree with, and a count-based guard would resurrect the whole list on the next container boot, silently undoing a moderation decision. `seedGoldenRules` records a second instance of the same trap.
+
+  **The seed upserts the settings row rather than updating it.** No migration plants `site_settings` and it is otherwise created lazily, so on a fresh database `seedAll` is frequently its first writer — an update would throw, and a `findFirst` guard would return null and make the whole seed a silent no-op. That is the exact bug being fixed, so it must not be reintroduced by the fix; an integration test pins it.
+
+  **Scope, stated plainly: this makes a dead control live, it does not make passwords strong.** `min(6)` remains the floor at registration against `min(8)` at password change, and 237 notorious passwords do not constrain the space of weak ones — `dragon7` still registers.
+
+### Added
+
+- **Staff can curate the password denylist** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `GET`/`POST`/`DELETE /api/bad-passwords` behind a new `bad_passwords_manage` permission, mirroring the `email-blacklist` surface, with `audit()` on both mutations. Entries are normalised on the way in exactly as the lookup normalises on the way out, so a mixed-case row can't be stored-but-unmatchable, and `POST` answers **409** rather than surfacing a unique-constraint 500 for a duplicate.
+
+  **The list is paginated, unlike its sibling.** `/api/email-blacklist` returns an unpaginated `findMany`, which is fine for a handful of staff-added rows; this one ships with 237 seeded entries and only grows, which is the unbounded case AGENTS.md requires pagination for. Deleting a seeded row is durable — the seed's marker guard means it is not restored on the next boot.
+
+  A new enum `BadPasswordSource` (`SEEDED` / `STAFF`) records provenance rather than a `String`, so the registry describes it as the enum it is — [#501](https://github.com/orphic-inc/stellar-api/issues/501)/[#503](https://github.com/orphic-inc/stellar-api/issues/503) removed exactly this class of stringly-typed column.
+
+### Changed
+
+- **`AGENTS.md`'s documented pagination helper does not exist** — the guide showed `parsePage(req)`, but `lib/pagination.ts` exports `parsedPage(res)`, which reads an **already-validated** query off `res.locals` and requires the route to run `validateQuery` with a schema spreading `paginationBase` first. Following the documented form is a compile error. Corrected to the real contract, along with the response envelope it produces. `BadPassword` is also removed from the "Stub models" table, since it is no longer one.
+
 ## [0.9.1] — 2026-09-06
 
 ### Added

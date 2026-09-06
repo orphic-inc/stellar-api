@@ -39,7 +39,7 @@ describe('auth.changePassword', () => {
     });
     prismaMock.user.update.mockResolvedValue({} as never);
     prismaMock.userSession.updateMany.mockResolvedValue({ count: 0 } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValue(null);
+    prismaMock.badPassword.findUnique.mockResolvedValue(null);
   });
 
   it('throws 401 when user not found', async () => {
@@ -69,7 +69,7 @@ describe('auth.changePassword', () => {
       id: 1,
       password: hash
     } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValue({
+    prismaMock.badPassword.findUnique.mockResolvedValue({
       password: 'newpass'
     } as never);
     await expect(
@@ -200,7 +200,7 @@ describe('auth.resetPasswordWithToken', () => {
     prismaMock.user.update.mockResolvedValue({} as never);
     prismaMock.accountRecovery.update.mockResolvedValue({} as never);
     prismaMock.userSession.updateMany.mockResolvedValue({ count: 0 } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValue(null);
+    prismaMock.badPassword.findUnique.mockResolvedValue(null);
   });
 
   it('throws 400 when token is invalid or expired', async () => {
@@ -219,7 +219,7 @@ describe('auth.resetPasswordWithToken', () => {
       userId: 7,
       token: 'validtoken'
     } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValue({
+    prismaMock.badPassword.findUnique.mockResolvedValue({
       password: 'banned'
     } as never);
     await expect(

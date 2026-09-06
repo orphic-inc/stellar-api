@@ -277,6 +277,7 @@ describe('API content and shared flows', () => {
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 
@@ -305,6 +306,7 @@ describe('API content and shared flows', () => {
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 

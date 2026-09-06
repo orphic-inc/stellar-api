@@ -48,6 +48,7 @@ describe('API auth/profile/user flows', () => {
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
     prismaMock.user.findFirst.mockResolvedValue(makeUser({ id: 1 }));
@@ -70,6 +71,7 @@ describe('API auth/profile/user flows', () => {
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 
@@ -91,6 +93,7 @@ describe('API auth/profile/user flows', () => {
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 
@@ -137,7 +140,7 @@ describe('API auth/profile/user flows', () => {
       status: 'pending'
     });
     prismaMock.user.findFirst.mockResolvedValueOnce(null);
-    prismaMock.badPassword.findFirst.mockResolvedValueOnce(null);
+    prismaMock.badPassword.findUnique.mockResolvedValueOnce(null);
     prismaMock.userRank.findFirst.mockResolvedValueOnce(makeUserRank());
     prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
@@ -339,7 +342,7 @@ describe('API auth/profile/user flows', () => {
       password: 'hashed-password'
     } as never);
     bcryptMock.compare.mockResolvedValue(true);
-    prismaMock.badPassword.findFirst.mockResolvedValue(null);
+    prismaMock.badPassword.findUnique.mockResolvedValue(null);
 
     const res = await request(app).post('/api/auth/password').send({
       currentPassword: 'password123',
@@ -371,7 +374,7 @@ describe('API auth/profile/user flows', () => {
     expect(wrongCurrent.status).toBe(400);
 
     bcryptMock.compare.mockResolvedValueOnce(true);
-    prismaMock.badPassword.findFirst.mockResolvedValueOnce({ id: 1 } as never);
+    prismaMock.badPassword.findUnique.mockResolvedValueOnce({ id: 1 } as never);
 
     const banned = await request(app).post('/api/auth/password').send({
       currentPassword: 'password123',
@@ -474,7 +477,7 @@ describe('API auth/profile/user flows', () => {
       id: 9,
       userId: 7
     } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValueOnce({ id: 1 } as never);
+    prismaMock.badPassword.findUnique.mockResolvedValueOnce({ id: 1 } as never);
     const bannedReset = await request(app)
       .post('/api/auth/recovery/reset')
       .send({ token: 'good-token', newPassword: 'password' });
@@ -484,7 +487,7 @@ describe('API auth/profile/user flows', () => {
       id: 9,
       userId: 7
     } as never);
-    prismaMock.badPassword.findFirst.mockResolvedValueOnce(null);
+    prismaMock.badPassword.findUnique.mockResolvedValueOnce(null);
     const successReset = await request(app)
       .post('/api/auth/recovery/reset')
       .send({ token: 'good-token', newPassword: 'new-password-123' });

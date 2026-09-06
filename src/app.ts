@@ -78,6 +78,7 @@ import randomRouter from './routes/api/random';
 import top10Router from './routes/api/top10';
 import ipBansRouter from './routes/api/ipBans';
 import emailBlacklistRouter from './routes/api/emailBlacklist';
+import badPasswordsRouter from './routes/api/badPasswords';
 import donationsRouter from './routes/api/donations';
 import staffRouter from './routes/api/staff';
 import rulesRouter from './routes/api/rules';
@@ -183,6 +184,7 @@ export const createApp = () => {
   app.use('/api/top10', top10Router);
   app.use('/api/ip-bans', ipBansRouter);
   app.use('/api/email-blacklist', emailBlacklistRouter);
+  app.use('/api/bad-passwords', badPasswordsRouter);
   app.use('/api/donations', donationsRouter);
   app.use('/api/staff', staffRouter);
   app.use('/api/rules', rulesRouter);

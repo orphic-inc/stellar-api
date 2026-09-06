@@ -1936,9 +1936,21 @@ model ApiUser {
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
+/// Where a denied password came from. Seeded rows ship with the app; staff rows
+/// are added through /api/bad-passwords. The distinction exists so the seed can
+/// tell its own rows apart from curated ones — see `seedBadPasswords`.
+enum BadPasswordSource {
+  SEEDED
+  STAFF
+}
+
 model BadPassword {
-  id       Int    @id @default(autoincrement())
-  password String @unique
+  id       Int               @id @default(autoincrement())
+  /// Stored lowercased. `isPasswordBanned` lowercases the candidate before
+  /// looking it up, so the comparison is case-insensitive without giving up the
+  /// unique btree index an exact match uses.
+  password String            @unique
+  source   BadPasswordSource @default(STAFF)
 
   @@map("bad_passwords")
 }
@@ -2146,6 +2158,11 @@ model SiteSettings {
   // POST /install. null = awaiting setup. Install state is read from this, never
   // inferred from row counts (see installState.ts).
   installedAt              DateTime?
+  /// Stamped once, the first time the bad-password denylist is seeded. A
+  /// recorded fact rather than a row count (ADR-0022): staff may delete every
+  /// seeded row, and inferring "have we seeded?" from `bad_passwords` would
+  /// resurrect the whole list on the next boot.
+  badPasswordsSeededAt     DateTime?
   updatedAt                DateTime           @updatedAt
 
   @@map("site_settings")
