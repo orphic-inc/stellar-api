@@ -66,6 +66,18 @@ All notable changes to stellar-api are documented here.
 
   `DELETE /forums/topic-notes/{id}` is deliberately untouched: its 403 is a handler-level author check, which remains invisible to the gate by design and is tracked under #509's third axis.
 
+### Fixed
+
+- **A community's Do-Not-Contribute list was readable from any other community** ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F5) — `GET /communities/{communityId}/dnc` carried `requireAuth` and nothing else, so any authenticated member could enumerate any community's list by id, including the free-text `comment` staff write about **why** something is banned. The handler signature was `authHandler(async (_req, res)` — the underscore is the tell: the caller's identity was never consulted, while `POST` and `DELETE` on the same path require `dnc_manage`.
+
+  **The route is deliberately member-facing and stays that way.** stellar-ui renders this list in `ContributeForm` as the _"must not be contributed to this community"_ warning, so a contributor has to be able to read it — a staff-only gate would have removed the very thing that prevents bad contributions. The audit originally read this as a leak of staff data; that was wrong, and `dnc.spec.ts`'s test named `'returns the DNC list for any authenticated user'` was recording a real intent rather than rubber-stamping an oversight. What was never intended is cross-community reads.
+
+  Scoped with `assertCommunityAccess` — the same `open || roleUnion` rule the browse paths use.
+
+  **No UI impact, verified rather than assumed.** `GET /communities` already filters its list by exactly `{ OR: [open, communityRoleUnion(userId)] }`, and that list feeds the form's community picker — so a member can only ever select a community they already pass this gate for, and the warning banner is unaffected.
+
+  **The gate could not catch this one.** `assertCommunityAccess` throws from _inside_ the handler, so the middleware-chain reader sees `[auth]` and `openapi:auth-coverage` stayed green at `348/348` across the change. The 403 and 404 were registered by hand. This is exactly the blind spot [#509](https://github.com/orphic-inc/stellar-api/issues/509)'s third axis describes, and the reason a handler-level authorization audit cannot be replaced by the sixth axis.
+
 ### Added
 
 - **Twelve member-facing surfaces close the last of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline — 41 gaps to ZERO.** Thirty-nine operations across `/contributions`, `/posts`, `/search`, `/subscriptions`, `/friends`, `/notifications`, `/settings`, `/comments`, `/profile`, `/random`, `/downloads` and `/install`. **`347 contract routes gated, 347 fully documented, 0 gap(s) (0 baselined)`** — every auth failure the middleware chain can produce is now described, across twenty slices.

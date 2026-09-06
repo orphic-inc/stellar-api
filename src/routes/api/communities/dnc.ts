@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
+import { assertCommunityAccess } from '../../../modules/communityAccess';
 import {
   validate,
   validateParams,
@@ -23,13 +24,28 @@ const dncIdParams = z.object({
   dncId: z.coerce.number().int().positive()
 });
 
-// GET /api/communities/:communityId/dnc — readable by all authenticated users
+// GET /api/communities/:communityId/dnc — readable by members of the community
+//
+// The list is deliberately member-facing, not staff-only: stellar-ui renders it
+// in ContributeForm as the "must not be contributed" warning, so a contributor
+// has to be able to read it. What it was NOT meant to be is readable across
+// communities — any authenticated member could enumerate any community's list,
+// including the free-text `comment` staff write about why something is banned
+// (#509 F5). The handler took `_req`, which is the tell: the caller's identity
+// was never consulted.
+//
+// Scoped with `assertCommunityAccess` — the same `open || roleUnion` rule the
+// browse paths use — so this agrees with `GET /communities`, which already
+// filters its list by exactly that union. The UI's community picker is fed by
+// that list, so a member can only ever select a community they pass here, and
+// the warning banner is unaffected.
 router.get(
   '/',
   requireAuth,
   validateParams(communityIdParams),
-  authHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { communityId } = parsedParams<{ communityId: number }>(res);
+    await assertCommunityAccess(communityId, req.user.id);
     const entries = await prisma.doNotContribute.findMany({
       where: { communityId },
       orderBy: { createdAt: 'desc' }
