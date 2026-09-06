@@ -78,6 +78,18 @@ All notable changes to stellar-api are documented here.
 
   **The gate could not catch this one.** `assertCommunityAccess` throws from _inside_ the handler, so the middleware-chain reader sees `[auth]` and `openapi:auth-coverage` stayed green at `348/348` across the change. The 403 and 404 were registered by hand. This is exactly the blind spot [#509](https://github.com/orphic-inc/stellar-api/issues/509)'s third axis describes, and the reason a handler-level authorization audit cannot be replaced by the sixth axis.
 
+### Fixed
+
+- **Contribution detail served anyone's contribution to any member, by id** ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F6) — `GET /contributions/{id}` had no ownership check and no community check, which put it at odds with **its own sibling**: `GET /contributions` is `where: { userId: req.user.id }` — your own contributions only — while the detail read served anyone's. The two routes disagreed about what a contribution read is.
+
+  It does **not** expose `downloadUrl` (the list does, for your own rows, and grants go through `/contributions/{id}/access`), so this was metadata rather than access: contributor identity, sizes, `approvedAccountingBytes`, `ratioExempt`, link status, the release and its comments.
+
+  **Now readable if you own it, or if you can reach the release's community.** Ownership is tested first and independently of the community, which is the case worth stating: a member who contributed and later lost access to that community still sees the row in their own `/contributions` list, so refusing them the detail would make their own list link to a 403.
+
+  **`Release.communityId` is nullable**, and a release with no community has no membership to test — gating those would hide rows that were never community-scoped. The same arm the search scope carries for the same reason.
+
+  **The gate could not catch this either.** Like [F5](https://github.com/orphic-inc/stellar-api/issues/509), `assertCommunityAccess` throws from inside the handler, so `openapi:auth-coverage` stayed green at `348/348` throughout and the `403` was registered by hand.
+
 ### Added
 
 - **Twelve member-facing surfaces close the last of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline — 41 gaps to ZERO.** Thirty-nine operations across `/contributions`, `/posts`, `/search`, `/subscriptions`, `/friends`, `/notifications`, `/settings`, `/comments`, `/profile`, `/random`, `/downloads` and `/install`. **`347 contract routes gated, 347 fully documented, 0 gap(s) (0 baselined)`** — every auth failure the middleware chain can produce is now described, across twenty slices.

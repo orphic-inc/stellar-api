@@ -6003,8 +6003,12 @@ registry.registerPath({
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    403: {
+      description: 'Not a member of the release\u2019s community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
-      description: 'Contribution not found',
+      description: 'Contribution not found, or its community does not exist',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
