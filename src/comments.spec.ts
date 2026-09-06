@@ -181,6 +181,33 @@ describe('GET /api/comments/:id', () => {
     expect(res.status).toBe(400);
     expect(prismaMock.comment.findUnique).not.toHaveBeenCalled();
   });
+
+  // ── #509 F4 ──
+
+  // The 401 is deliberately NOT asserted here. `apiTestHarness` mocks
+  // `requireAuth` to always populate `req.user` and call `next()`, so no spec
+  // in this suite can produce an unauthenticated request — a test claiming to
+  // check the gate would pass whether or not the route carried it.
+  //
+  // The real proof is mechanical and already runs in CI:
+  // `npm run openapi:auth-coverage` reads gates off the BUILT app via
+  // `markGate`/`readGate`, and this route moved from ungated to gated there
+  // (347 -> 348 gated). A regression that dropped `requireAuth` would show up
+  // as an undocumented-401 gap, not as a green test.
+
+  it('never serves a soft-deleted comment', async () => {
+    // `deleteComment` only stamps `deletedAt` and keeps the body verbatim, so
+    // without this filter a withdrawn comment's text was readable by id. The
+    // sibling list has always filtered it at both findMany and count.
+    prismaMock.comment.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/comments/12');
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.comment.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 12, deletedAt: null } })
+    );
+  });
 });
 
 // ─── POST /api/comments ───────────────────────────────────────────────────────

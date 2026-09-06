@@ -25,6 +25,7 @@ All notable changes to stellar-api are documented here.
   **The release `where` is now built by per-spine helpers** rather than inline. The handler was over both of Codacy's Lizard thresholds before this change (**106 lines, cyclomatic complexity 30**) and the extraction takes it under both — `buildReleaseTextWhere`, `buildReleaseScalarWhere`, `buildReleaseArtistFilter`, `buildEditionFilter` and `buildContributionFilter`, assembled by `buildReleaseWhere`. Behaviour-preserving: the grouping follows the comments the inline block already carried, it matches the `buildTagWhere` helpers this file already had, and all 49 search tests — several of which assert exact query shapes — pass unchanged.
 
   **`GET /search/artists` needed no change** — `Artist` carries no community and the projection exposes name, vanity-house flag, tags and a credit count. An earlier note on #509 grouped it with the other two; that was wrong.
+
 - **Any authenticated member could rename an artist, and `PUT /artists/{id}` reached around a permission gate two routes above it** ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F3) — both `PUT` and `DELETE /artists/{id}` were `requireAuth` only, with no authorization anywhere: `src/modules/artist.ts` contained zero occurrences of `hasPermission`, `requirePermission`, `loadPermissions`, `AppError` or `403`. An artist row is a **shared catalogue entry with no ownership concept**, so a session alone authorized nothing.
 
   **The `PUT` was also a gate bypass.** It accepts `vanityHouse` and `updateArtist` writes it, while `PUT /artists/{id}/vanity-house` requires `news_manage` — so the gated field was settable through the ungated route. `PUT` now requires **`communities_manage`**, matching `POST /artists/revert/{historyId}`, which undoes exactly the edit this route makes; gating the undo more tightly than the do was the inconsistency. `DELETE` requires **`admin`**, since withdrawing a shared catalogue entry is not reversible through any route.
@@ -38,6 +39,18 @@ All notable changes to stellar-api are documented here.
   **Discovery filters; existing references keep resolving.** The artist list, the vanity-house list, artist search, the random artist, the detail read, subscribe, and the three artist counts in site stats all exclude withdrawn rows — matching how stats already treats soft-deleted forum topics and comments. Release credits and notification labels deliberately still resolve: withdrawing a catalogue entry must not blank the artist line on every release that cites it, or retroactively strip a delivered notification of its subject.
 
   **Contract change**: `PUT` and `DELETE /artists/{id}` now declare the `403` their middleware answers (`Missing communities_manage` / `Missing admin`). `openapi:auth-coverage` caught both as gaps the moment the gates landed, which is the sixth axis doing its job. **stellar-ui owes an `api:sync` for this one** — unlike the search fix, which only filtered.
+
+### Fixed
+
+- **`GET /comments/{id}` served soft-deleted comment bodies to anyone, with no session** ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F4) — two defects in one route. It was the **only comment route with no `requireAuth`**, and it did not filter `deletedAt`, which the sibling `GET /comments` applies at both its `findMany` and its `count`. `deleteComment` only stamps `deletedAt` and **keeps the body verbatim**, so a withdrawn comment's text was readable by guessing an integer id, unauthenticated.
+
+  **The registry described this as intentional.** Its `description` read _"Deliberately unauthenticated — this route carries no auth middleware, unlike the PUT and DELETE beside it. It also does NOT filter `deletedAt`, so unlike GET /comments it can serve a soft-deleted comment."_ That text came out of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s burn-down, whose job was to describe what routes **do**, not to ratify it — accurate documentation of a defect is still a defect. The description now states the fixed behaviour.
+
+  **No downstream cost.** stellar-ui's `commentApi` reads `/comments` for the list and `/comments/{id}` only for `PUT` and `DELETE`; it never GETs this route, so the gate breaks nothing.
+
+  **Contract change**: the route now declares its `401`, and its `404` covers the soft-deleted case. `openapi:auth-coverage` moved from **347 gated / 347 documented** to **348 / 348**, having flagged the new 401 as a gap the moment the gate landed.
+
+  **The 401 is not unit-tested, deliberately.** `apiTestHarness` mocks `requireAuth` to always succeed, so no spec in that suite can make an unauthenticated request — a test claiming to check the gate would pass whether or not the route carried it. The mechanical proof is `openapi:auth-coverage`, which reads gates off the **built app** via `markGate`/`readGate` and would fail on a regression that dropped the middleware.
 
 ### Added
 

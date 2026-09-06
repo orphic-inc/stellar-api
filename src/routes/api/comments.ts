@@ -80,13 +80,24 @@ router.get(
 );
 
 // GET /api/comments/:id
+//
+// Two defects, one route (#509 F4). It had no `requireAuth` — the only comment
+// route without one — and no `deletedAt` filter, which the sibling list above
+// applies at both its `findMany` and its `count`. `deleteComment` only stamps
+// `deletedAt` and keeps the body verbatim, so a soft-deleted comment was
+// readable **with no session at all** by guessing an integer id.
+//
+// The gate costs nothing downstream: stellar-ui's `commentApi` reads
+// `/comments` for the list and `/comments/{id}` only for PUT and DELETE. It
+// never GETs this route.
 router.get(
   '/:id',
+  requireAuth,
   validateParams(commentIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     const comment = await prisma.comment.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: {
         author: { select: authorRefSelect }
       }
