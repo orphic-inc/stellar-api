@@ -8642,6 +8642,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8658,6 +8666,14 @@ registry.registerPath({
           schema: z.object({ open: z.number(), claimed: z.number() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8679,6 +8695,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8700,6 +8720,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8721,6 +8749,10 @@ registry.registerPath({
     201: {
       description: 'Report created',
       content: { 'application/json': { schema: ReportObj } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8734,6 +8766,14 @@ registry.registerPath({
     200: {
       description: 'Report detail',
       content: { 'application/json': { schema: ReportObj } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Not the reporter and missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8743,7 +8783,17 @@ registry.registerPath({
   path: '/reports/{id}/claim',
   tags: ['Reports'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Claimed' } }
+  responses: {
+    204: { description: 'Claimed' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -8751,7 +8801,18 @@ registry.registerPath({
   path: '/reports/{id}/unclaim',
   tags: ['Reports'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Unclaimed' } }
+  responses: {
+    204: { description: 'Unclaimed' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description:
+        'Missing reports_manage, or the report is claimed by another staff member',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -8768,7 +8829,17 @@ registry.registerPath({
       }
     }
   },
-  responses: { 204: { description: 'Resolved' } }
+  responses: {
+    204: { description: 'Resolved' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -8787,6 +8858,14 @@ registry.registerPath({
     201: {
       description: 'Note added',
       content: { 'application/json': { schema: ReportNoteObj } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing reports_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

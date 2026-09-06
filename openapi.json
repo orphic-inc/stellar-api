@@ -23797,6 +23797,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -23825,6 +23845,26 @@
                     "open",
                     "claimed"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -23926,6 +23966,16 @@
                     "pageSize",
                     "reports"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -24191,6 +24241,26 @@
                     "pageSize",
                     "reports"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -24553,6 +24623,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -24805,6 +24885,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the reporter and missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -24827,6 +24927,26 @@
         "responses": {
           "204": {
             "description": "Claimed"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -24849,6 +24969,26 @@
         "responses": {
           "204": {
             "description": "Unclaimed"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage, or the report is claimed by another staff member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -24902,6 +25042,26 @@
         "responses": {
           "204": {
             "description": "Resolved"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -24991,6 +25151,26 @@
                     "body",
                     "createdAt"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing reports_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }

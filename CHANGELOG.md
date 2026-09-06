@@ -8,6 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Reports` now documents the 401 and 403 its middleware answers — the ninth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 186 gaps to 169.** Ten operations in one router file, under a single uniform key (`reports_manage`). Fully-documented operations went 200 to 210.
+
+  **Two of the eight 403s are NOT what the middleware would have said**, and both came from reading handlers rather than from the gate. `GET /reports/{id}` is `requireAuth`-only — invisible to #494's gate — and answers a real `403`: `getReport()` admits the **reporter of that report** or a `reports_manage` holder, so it is registered as `Not the reporter and missing reports_manage`. A flat `Missing reports_manage` would tell a client the endpoint is staff-only when a member can read the report they filed.
+
+  **`POST /reports/{id}/unclaim` has TWO independent causes for one code**, which is new in this burn-down. It is permission-gated, so the middleware contributes `Missing reports_manage` — but `unclaimReport()` _also_ answers 403 when the report is **claimed by another staff member**, since holding the permission does not let you release someone else's claim. Registered as `Missing reports_manage, or the report is claimed by another staff member`: the middleware description alone would have implied a `reports_manage` holder never sees a 403 here, which is false.
+
+  **Purely additive, blast radius proved per operation**: exactly ten changed, all under `/reports`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267. Three registrations used the one-line `responses` form (`claim`, `unclaim`, `resolve`) and were expanded in the separate first pass; Prettier reports the result unchanged.
+
+  **This surface is under-described on codes #494 cannot see, and this slice does not close that.** Every `/reports/{id}` route sends a `404` none of them declare; `claim`/`unclaim`/`resolve` map module reasons onto `422`, `409` and a `400` fallback, also undeclared. That is a **different axis** from auth coverage — no gate measures it — and it is left alone deliberately rather than folded in, so the per-operation "gained only its auth codes" check stays the evidence it is meant to be.
+
 - **`Stylesheets` now documents the 401 and 403 its middleware answers — the eighth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 203 gaps to 186.** Thirteen operations in one router file. Nine took **401 only**; four needed both, under a single key. Fully-documented operations went 187 to 200.
 
   **The four are the first `requireStrictAdmin()` gates the burn-down has met**, and the key that describes them needed reading rather than assuming. Its own comment says it "admits only users with the literal `admin` permission" where `requirePermission('admin')` "treats staff ≡ admin" — but `hasPermission()` short-circuits on `permissions.admin` before consulting the requested key, so for the key `admin` the two collapse to the same test and neither admits staff. Both deny exactly when `perms.admin` is falsy, which is what makes `Missing admin` the honest description here. **The stale comment is left alone** — this slice is additive to the contract and changes no gating.
