@@ -7890,6 +7890,10 @@ registry.registerPath({
     200: {
       description: 'Inbox conversations',
       content: { 'application/json': { schema: PaginatedConversations } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7957,6 +7961,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7980,6 +7988,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'No such draft belonging to the caller',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7997,6 +8009,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Draft deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'No such draft belonging to the caller',
@@ -8032,6 +8048,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Missing messages_mass_pm',
       content: { 'application/json': { schema: MsgResponse } }
@@ -8049,6 +8069,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.object({ count: z.number() }) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8061,6 +8085,10 @@ registry.registerPath({
     200: {
       description: 'Sent conversations',
       content: { 'application/json': { schema: PaginatedConversations } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8074,7 +8102,13 @@ registry.registerPath({
       content: { 'application/json': { schema: bulkMessageActionSchema } }
     }
   },
-  responses: { 204: { description: 'Bulk action applied' } }
+  responses: {
+    204: { description: 'Bulk action applied' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -8092,6 +8126,10 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -8105,6 +8143,10 @@ registry.registerPath({
     200: {
       description: 'Conversation with messages',
       content: { 'application/json': { schema: PrivateConversation } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -8126,6 +8168,10 @@ registry.registerPath({
       description: 'Reply sent',
       content: { 'application/json': { schema: PrivateMessage } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Not a participant',
       content: { 'application/json': { schema: MsgResponse } }
@@ -8143,7 +8189,13 @@ registry.registerPath({
       content: { 'application/json': { schema: updateConversationSchema } }
     }
   },
-  responses: { 204: { description: 'Flags updated' } }
+  responses: {
+    204: { description: 'Flags updated' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 registry.registerPath({
@@ -8151,7 +8203,13 @@ registry.registerPath({
   path: '/messages/{id}',
   tags: ['Messages'],
   request: { params: z.object({ id: z.string() }) },
-  responses: { 204: { description: 'Conversation soft-deleted' } }
+  responses: {
+    204: { description: 'Conversation soft-deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
 });
 
 // ─── Staff Inbox ──────────────────────────────────────────────────────────────

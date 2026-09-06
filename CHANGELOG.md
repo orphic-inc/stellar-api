@@ -8,6 +8,12 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Messages` now documents the 401 its middleware answers — the twelfth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 141 gaps to 128.** Thirteen operations in one router file, **401 only**. Fully-documented operations went 236 to 249.
+
+  **Both 403s this surface can answer were already documented, and both are correct.** `POST /messages/mass` is the only permission-gated route here (`messages_mass_pm`) and already declared `Missing messages_mass_pm`. `POST /messages/{id}/reply` is `requireAuth`-only — invisible to the gate — and already declared `Not a participant`, which `replyToConversation()` confirms: its **only** failure is `not_participant`, returned when the caller has no participant row on that conversation. So the slice adds no 403 and corrects none, the third surface in a row to come back clean on the axis the gate cannot see.
+
+  **Purely additive, blast radius proved per operation**: exactly thirteen changed, all under `/messages`, each gaining only its `401`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267. Three registrations used the one-line `responses` form (`POST /bulk`, `PATCH /{id}`, `DELETE /{id}`) and were expanded in the separate first pass.
+
 - **`Bookmarks` now documents the 401 its middleware answers — the eleventh slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 154 gaps to 141.** Thirteen operations, **401 only — the first surface in the burn-down with no 403 anywhere**. Fully-documented operations went 223 to 236.
 
   **The surface really is that simple, and it was verified rather than assumed.** All thirteen routes are `requireAuth` with no permission middleware, no `loadPermissions`/`hasPermission` call in any handler, and no `res.status(4xx)` or `AppError` anywhere in the router. The one module they delegate to — `removeConsumedReleaseBookmarks()` — cannot throw an HTTP error either. So `401` is the complete set of failures, not just the ones the gate can see.
