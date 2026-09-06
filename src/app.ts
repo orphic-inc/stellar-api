@@ -91,6 +91,25 @@ const log = getLogger('app');
 export const createApp = () => {
   const app = express();
 
+  // Who is the client? (#542)
+  //
+  // Until this was set, `trust proxy` was false while three call sites read
+  // `X-Forwarded-For` by hand and took `.split(',')[0]`. nginx APPENDS the real
+  // peer to any client-supplied header, so the first entry is whatever the
+  // client chose — every recorded IP was attacker-controlled.
+  //
+  // It also broke rate limiting in the opposite direction. `api` publishes no
+  // ports and is reachable only through nginx, so with `trust proxy` unset
+  // `req.ip` was nginx's container address for EVERY request — and
+  // express-rate-limit keys on `req.ip` by default. All three limiters shared a
+  // single bucket for the whole site: no per-client brute-force protection, and
+  // one caller could exhaust the auth limit for everyone.
+  //
+  // Setting it here, before any middleware that reads an address, makes `req.ip`
+  // the one answer to this question for the limiters, the audit trail and any
+  // future IP ban (#540).
+  app.set('trust proxy', http.trustProxyHops);
+
   app.use(cors({ origin: http.corsOrigin, credentials: true }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));

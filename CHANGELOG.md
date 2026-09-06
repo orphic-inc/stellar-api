@@ -8,6 +8,20 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Every client IP this API recorded was attacker-controlled, and all rate limiting shared one bucket site-wide** ([#542](https://github.com/orphic-inc/stellar-api/issues/542)) — `trust proxy` was never set, while three call sites read `X-Forwarded-For` by hand and took `.split(',')[0]`. nginx sets `X-Forwarded-For: $proxy_add_x_forwarded_for`, which **appends** the real peer to whatever the client sent, so the first entry is the client's own claim. A request carrying `X-Forwarded-For: 1.2.3.4` was recorded as coming from `1.2.3.4`. Not a misconfiguration risk — the shipped behaviour.
+
+  **`User.lastIp`, `UserSession.ipAddress` and `UserEmailHistory.ipAddress` were all written from that value**, and `GET /users/duplicate-ips` — the staff tool for spotting ban evasion and multi-accounting — reads nothing else. Anyone evading a ban could ensure their accounts never shared a recorded IP, or make innocent accounts appear to.
+
+  **The same unset flag broke rate limiting in the opposite direction.** `api` publishes no ports and is reachable only through nginx, so `req.ip` was nginx's container address on **every** request — and `express-rate-limit` keys on `req.ip` with no `keyGenerator` here. `authLimiter`, `writeLimiter` and `installLimiter` therefore shared **one bucket for the whole site**: no per-client brute-force protection at all, and one caller hammering `/api/auth` could exhaust the limit for every legitimate user.
+
+  `createApp` now sets `trust proxy` from the new **`STELLAR_TRUST_PROXY_HOPS`** (default **1** — the shipped stellar-compose topology puts exactly one nginx in front, always), and all three hand-rolled reads become `req.ip`. Configurable because it describes deployment topology rather than code: a local `npm run dev` has no proxy and should set `0`. A malformed value falls back to `1` rather than crashing boot, and the fallback is deliberately the safe end — too few trusted hops degrades IP accuracy, too many trusts attacker input, which is the bug.
+
+  **A test was pinning the vulnerability.** `install-auth.spec.ts` sent `x-forwarded-for: 203.0.113.10, 10.0.0.1` and asserted the recorded address was `203.0.113.10` — the spoofed entry. It now asserts `10.0.0.1`, the entry nginx appended, so the spoof being ignored is what the suite guards. The harness's mocked config also had to learn `trustProxyHops`: without it `app.set('trust proxy', undefined)` silently disabled the setting, which is how the harness stopped representing the real app.
+
+  **Historical rows cannot be trusted and are not migrated** — the true values are unrecoverable. Duplicate-IP results predating this change should be treated as unreliable, not merely stale.
+
+### Fixed
+
 - **The email blacklist had a full admin surface and nothing ever read it, so staff bans did nothing** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `EmailBlacklist` shipped with CRUD routes, an `email_blacklist_manage` permission and OpenAPI registration, but outside those routes and the registry the Prisma accessor appeared **nowhere** in `src/`. A moderator could add an entry, receive a 201 and see it listed, and the address stayed free to register. This is the inverse of [#536](https://github.com/orphic-inc/stellar-api/issues/536) and worse in one respect: there the control failed silently with no affordance, here every signal said the ban was in force.
 
   **Enforced on both paths an address can enter by** — registration and email change. Guarding registration alone would have left a member free to register with a clean address and then move to a blacklisted one, which is the same half-fix shape the issue is about.

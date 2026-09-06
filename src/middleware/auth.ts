@@ -74,10 +74,10 @@ export const requireAuth = async (
         .catch(() => undefined);
     }
 
-    const ip =
-      (req.headers['x-forwarded-for'] as string | undefined)
-        ?.split(',')[0]
-        ?.trim() ?? req.ip;
+    // `req.ip`, not a hand-parsed header — see createApp's `trust proxy`
+    // note (#542). The old read took X-Forwarded-For's FIRST entry, which is
+    // the client-supplied portion of a header nginx appends to.
+    const ip = req.ip;
     if (ip) {
       prisma.user
         .update({ where: { id: user.id }, data: { lastIp: ip } })

@@ -189,12 +189,11 @@ router.put(
   validate(changeEmailSchema),
   authHandler(async (req, res) => {
     const { newEmail, password } = parsedBody<ChangeEmailInput>(res);
-    const ip =
-      (req.headers['x-forwarded-for'] as string | undefined)
-        ?.split(',')[0]
-        ?.trim() ??
-      req.ip ??
-      '';
+    // `req.ip`, not a hand-parsed header: `trust proxy` is configured in
+    // createApp, so Express resolves the correct entry. Reading
+    // X-Forwarded-For directly took the FIRST entry, which nginx appends
+    // to — i.e. whatever the client sent (#542).
+    const ip = req.ip ?? '';
     await changeEmail(req.user.id, newEmail, password, ip);
     res.json({ msg: 'Email updated' });
   })
@@ -289,12 +288,11 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = parsedBody<LoginInput>(res);
 
-    const ip =
-      (req.headers['x-forwarded-for'] as string | undefined)
-        ?.split(',')[0]
-        ?.trim() ??
-      req.ip ??
-      '';
+    // `req.ip`, not a hand-parsed header: `trust proxy` is configured in
+    // createApp, so Express resolves the correct entry. Reading
+    // X-Forwarded-For directly took the FIRST entry, which nginx appends
+    // to — i.e. whatever the client sent (#542).
+    const ip = req.ip ?? '';
 
     const result = await loginUser(email, password, ip);
     if (!result.ok) {
