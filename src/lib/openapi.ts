@@ -9429,6 +9429,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9448,6 +9452,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9461,6 +9469,10 @@ registry.registerPath({
     200: {
       description: 'Single rules page',
       content: { 'application/json': { schema: RulesPage } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Not found',
@@ -9484,6 +9496,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rules_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     409: {
       description: 'Conflict',
@@ -9509,6 +9529,14 @@ registry.registerPath({
       description: 'Validation failed',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rules_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -9532,6 +9560,14 @@ registry.registerPath({
     204: { description: 'Page deleted' },
     400: {
       description: 'Cannot delete main page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing rules_manage',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
