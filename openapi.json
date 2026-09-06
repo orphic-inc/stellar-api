@@ -34793,6 +34793,16 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid IP address, reversed bounds, or a range spanning both address families",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {

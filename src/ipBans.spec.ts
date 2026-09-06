@@ -52,8 +52,8 @@ describe('POST /api/ip-bans', () => {
     setIpBanManager();
     prismaMock.ipBan.create.mockResolvedValue({
       id: 5,
-      fromIp: 167772161,
-      toIp: 167772170
+      fromIp: '00000000000000000000ffff0a000001',
+      toIp: '00000000000000000000ffff0a00000a'
     } as never);
 
     const res = await request(app).post('/api/ip-bans').send({
@@ -63,7 +63,13 @@ describe('POST /api/ip-bans', () => {
 
     expect(res.status).toBe(201);
     expect(prismaMock.ipBan.create).toHaveBeenCalledWith({
-      data: { fromIp: 167772161, toIp: 167772170 }
+      data: {
+        // Normalised bounds: 32 hex chars, IPv4 mapped into ::ffff:0:0/96.
+        // Previously two signed Ints, which could not order across
+        // 127.255.255.255 and could not hold IPv6 at all (#540).
+        fromIp: '00000000000000000000ffff0a000001',
+        toIp: '00000000000000000000ffff0a00000a'
+      }
     });
     expect(res.body).toEqual({
       id: 5,

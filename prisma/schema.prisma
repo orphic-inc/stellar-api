@@ -1976,10 +1976,21 @@ model EmailBlacklist {
 }
 
 model IpBan {
-  id     Int @id @default(autoincrement())
-  fromIp Int
-  toIp   Int
+  id     Int    @id @default(autoincrement())
+  /// Inclusive range bounds, each the full 128-bit address as 32 lowercase hex
+  /// characters, IPv4 mapped into ::ffff:0:0/96 (see lib/ipAddress.ts).
+  ///
+  /// Was two signed 32-bit Ints. That could not order correctly — everything
+  /// from 128.0.0.0 up stored negative, so a range crossing that boundary was
+  /// unsatisfiable in SQL while the route's validator happily accepted it — and
+  /// could not represent IPv6 at all, though nginx listens on [::]:80.
+  ///
+  /// Fixed width is load-bearing: it makes lexicographic order equal numeric
+  /// order, so a plain btree index serves range containment for both families.
+  fromIp String @db.Char(32)
+  toIp   String @db.Char(32)
 
+  @@index([fromIp, toIp])
   @@map("ip_bans")
 }
 

@@ -512,6 +512,10 @@ export const resetApiTestState = (): void => {
     name: 'sublime'
   } as never);
   prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  // The global ban middleware reads this on EVERY request. Without a default it
+  // returns undefined, the check throws, and the fail-open path logs an error
+  // for every API test — noise that would hide a real one.
+  prismaMock.ipBan.findMany.mockResolvedValue([]);
   prismaMock.commentSubscription.findMany.mockResolvedValue([]);
   prismaMock.collageSubscription.findMany.mockResolvedValue([]);
   prismaMock.artistSubscription.findMany.mockResolvedValue([]);
