@@ -41,7 +41,7 @@ const main = (): void => {
   const app = createApp();
   const routes = collectRoutes(app).filter(isContractRoute).map(stripApi);
 
-  const doc = buildOpenApiDocument() as unknown as {
+  const doc = buildOpenApiDocument(routes) as unknown as {
     paths?: Record<
       string,
       Record<string, { responses?: Record<string, unknown> }>

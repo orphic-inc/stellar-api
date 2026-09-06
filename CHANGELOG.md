@@ -8,6 +8,24 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **The contract defined no security schemes at all, and 309 of 364 operations disagreed with their own middleware** ([#520](https://github.com/orphic-inc/stellar-api/issues/520)) — `components.securitySchemes` was **absent entirely** while 112 operations referenced schemes by name, so every one of those references was dangling. The issue reported that as "109 operations declare `cookieAuth`"; measured, it was 70 `bearerAuth` and 42 `cookieAuth`, and the shape of the problem was different again.
+
+  **The references were inverted.** `requireAuth` reads `req.cookies?.token` and has no `Authorization` path, yet **70 operations gated by it declared `bearerAuth`** — telling a client to send a header the API never reads. Meanwhile the only three routes that genuinely take a bearer token (`requireServiceKey`, korin's inbound calls under ADR-0013) declared **nothing**. The registry even carried a comment explaining why: declaring `bearerAuth` there "would describe the wrong credential". That reasoning was right; the fix was to name the scheme properly rather than to say nothing.
+
+  **And 236 gated operations declared no `security` at all** — the largest bucket, and unmentioned by the issue. Only 42 of 364 were correct.
+
+  **`security` is now derived from the middleware rather than declared.** `routeGate.ts` already stamps every gate as `auth | permission | service` for the [#494](https://github.com/orphic-inc/stellar-api/issues/494) coverage check, and that same stamp answers "with what credential?" — `service` → `serviceKey`, `auth`/`permission` → `cookieAuth`, ungated → nothing. All 103 hand-written blocks are deleted. The result is **351 operations carrying `security` and 13 not**, and 351 is exactly the count `openapi:auth-coverage` independently reports as gated.
+
+  `auth` and `permission` collapse to one scheme deliberately: both present the same cookie, and the difference between them is 401 versus 403, which `responses` already carries. Encoding it twice in two vocabularies is how the two drift.
+
+  **The route table is a required argument** to `buildOpenApiDocument`, so a document with underived `security` is unconstructible. That matters because `GET /api/docs/json` builds the spec live: an optional parameter would let the served document and the committed `openapi.json` disagree, and nothing compares that pair.
+
+  **`bearerAuth` is renamed `serviceKey`.** It guards three machine-to-machine routes with a static shared secret, not a user token — a reader seeing `bearerAuth` could reasonably think a member's session JWT works there. The rename cost nothing: every existing reference to the old name was wrong and is deleted.
+
+  The 13 operations left unsecured were each checked against their handlers rather than assumed — install, version, the five public auth endpoints, and five genuinely unauthenticated reads.
+
+### Fixed
+
 - **IP bans did nothing, and the schema could not have expressed them correctly anyway** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `IpBan` shipped with CRUD routes, an `ip_bans_manage` permission and OpenAPI registration, and nothing ever read the table. A moderator could ban a network, receive a 201, see it listed, and it did nothing. This is the second half of #540; the email blacklist was the first.
 
   **Enforcement could not land before [#542](https://github.com/orphic-inc/stellar-api/issues/542).** With `trust proxy` unset and the client IP read from a hand-parsed `X-Forwarded-For`, a ban would have been bypassable with one header — a control that _appears_ to work, which is worse than one that plainly does not.

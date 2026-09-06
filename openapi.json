@@ -8223,7 +8223,20 @@
         ]
       }
     },
-    "parameters": {}
+    "parameters": {},
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "token",
+        "description": "Session JWT, set as an HttpOnly cookie by `POST /auth`. This is what `requireAuth` reads; there is no Authorization-header equivalent."
+      },
+      "serviceKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The shared `STELLAR_SERVICE_KEY`, presented by korin.pink on its inbound calls (ADR-0013). An opaque secret, not a user token — a member's session JWT is not accepted here."
+      }
+    }
   },
   "paths": {
     "/auth": {
@@ -8306,7 +8319,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/auth/register": {
@@ -8373,11 +8391,6 @@
           "Auth"
         ],
         "summary": "Change the password of the authenticated member",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8411,7 +8424,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/auth/email": {
@@ -8421,11 +8439,6 @@
         ],
         "summary": "Change the email of the authenticated member",
         "description": "Requires the current password. The originating IP is recorded with the change.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8466,7 +8479,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/auth/recovery/request": {
@@ -8576,11 +8594,6 @@
         ],
         "summary": "Active sessions for the authenticated member",
         "description": "Revoked sessions are excluded, so `revokedAt` is always null here. Ordered by `lastActiveAt`, most recent first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Active sessions",
@@ -8605,7 +8618,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/auth/sessions/{id}": {
@@ -8615,11 +8633,6 @@
         ],
         "summary": "Revoke one of your own sessions",
         "description": "Scoped to the caller: another member's session id answers 404 rather than 403, so the endpoint does not confirm that the id exists.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -8654,7 +8667,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/install": {
@@ -8790,11 +8808,6 @@
         ],
         "summary": "Staff: dismiss one launch-checklist item",
         "description": "Idempotent — the dismissed ids are held as a set, so re-dismissing the same item changes nothing. Requires the `staff` permission.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -8829,7 +8842,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/by-irc-nick/{nick}": {
@@ -8880,7 +8898,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
       }
     },
     "/users/irc-nick/verify": {
@@ -8946,7 +8969,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
       }
     },
     "/users/duplicate-ips": {
@@ -8956,11 +8984,6 @@
         ],
         "summary": "Staff: accounts sharing a last-seen IP",
         "description": "Requires `duplicate_ips_view`. Groups only IPs seen on more than one account, busiest first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Shared-IP groups",
@@ -8995,7 +9018,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/registration-log": {
@@ -9005,11 +9033,6 @@
         ],
         "summary": "Staff: accounts by registration date",
         "description": "Requires `registration_log_view` — its own permission, separate from `duplicate_ips_view`. Newest first. Includes email and last IP, so it is a more sensitive read than the ordinary user list.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Paginated registrations",
@@ -9056,7 +9079,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/email-history": {
@@ -9066,11 +9094,6 @@
         ],
         "summary": "Staff: a user past email addresses",
         "description": "Requires `users_view_email`. The stored column is `newEmail`; it is returned as `email`. Newest change first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9127,7 +9150,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/ip-history": {
@@ -9137,11 +9165,6 @@
         ],
         "summary": "Staff: a user IP history",
         "description": "Requires `users_view_ips` — a different permission from `users_view_email`, so the two histories are separately grantable.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9198,7 +9221,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/rank": {
@@ -9208,11 +9236,6 @@
         ],
         "summary": "Staff: a user rank, secondary ranks and lock state",
         "description": "Requires `users_edit`. The canonical staff read of `rankLocked` — the admin rank panel initialises its toggle from here.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9264,7 +9287,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -9272,11 +9300,6 @@
         ],
         "summary": "Staff: set a user rank",
         "description": "Requires `users_edit`. **`secondaryRankIds` REPLACES the whole secondary set** — send the full list, not a delta, or you will strip a Donor/VIP secondary. That is exactly why rank-lock is its own route (PUT /users/{id}/rank-lock) rather than a field here. Answers 200 with a message rather than the new rank state; re-read GET /users/{id}/rank for that.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9366,7 +9389,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/snatch-list": {
@@ -9376,11 +9404,6 @@
         ],
         "summary": "Staff: what a user has downloaded",
         "description": "Requires `staff`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9425,7 +9448,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/me/snatch-list": {
@@ -9435,11 +9463,6 @@
         ],
         "summary": "What you have downloaded",
         "description": "Self only, and needs no permission — the same shape the staff route returns for someone else.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Your snatch list",
@@ -9464,7 +9487,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/donor-ranks": {
@@ -9474,11 +9502,6 @@
         ],
         "summary": "The donor rank ladder",
         "description": "Readable by any authenticated member — this is the only donor route that does NOT require `donor_ranks_manage`, because the perks are member-facing. Ordered by `minDonation`, cheapest first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Donor ranks",
@@ -9503,7 +9526,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -9511,11 +9539,6 @@
         ],
         "summary": "Create a donor rank",
         "description": "Requires `donor_ranks_manage`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9598,7 +9621,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/donor-ranks/{rankId}": {
@@ -9608,11 +9636,6 @@
         ],
         "summary": "Replace a donor rank",
         "description": "Requires `donor_ranks_manage`. **A full replace, not a partial patch** — it validates against the same schema as create, so any optional field you omit is written as its default rather than left as it was.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9715,7 +9738,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -9723,11 +9751,6 @@
         ],
         "summary": "Delete a donor rank",
         "description": "Requires `donor_ranks_manage`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9772,7 +9795,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/donor": {
@@ -9782,11 +9810,6 @@
         ],
         "summary": "Grant donor status to a user",
         "description": "Requires `donor_ranks_manage`. Omit `expiresAt` for a grant that does not lapse. `donorExpiryJob` sweeps expired grants hourly and is condition-based, so a later staff re-grant survives the sweep. Answers **201 with a message rather than the granted row** — unusual for a 201, but that is what ships.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9870,7 +9893,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -9878,11 +9906,6 @@
         ],
         "summary": "Revoke a user donor status",
         "description": "Requires `donor_ranks_manage`. Removes **every** donor-rank grant on that user, not just the most recent, and clears the `isDonor` flag.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9927,7 +9950,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/warnings": {
@@ -9937,11 +9965,6 @@
         ],
         "summary": "Warnings on a user",
         "description": "Requires `users_warn`. Newest first, each carrying the staff member who issued it.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -9986,7 +10009,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/warn": {
@@ -9996,11 +10024,6 @@
         ],
         "summary": "Warn a user",
         "description": "Requires `users_warn`. Beyond creating the row this **increments the user's `warnedTimes` and stamps `warned`**, which is what the Standing tier (PRD-05/ADR-0004) reads — so a warning is a reputation event, not just a note. Omit `expiresAt` for a warning that does not lapse. The response wraps the new row as `{ warning }` and does not include `warnedBy`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10092,7 +10115,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/warnings/{warnId}": {
@@ -10102,11 +10130,6 @@
         ],
         "summary": "Rescind a warning",
         "description": "Requires `users_warn`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10159,7 +10182,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/notes": {
@@ -10169,11 +10197,6 @@
         ],
         "summary": "Staff moderation notes on a user",
         "description": "Requires `users_edit` — a DIFFERENT permission from the warnings above, so a moderator who can warn cannot necessarily read notes. Newest first, each carrying its author.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10218,7 +10241,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -10226,11 +10254,6 @@
         ],
         "summary": "Add a moderation note to a user",
         "description": "Requires `users_edit`. Unlike a warning this is staff-internal and has no effect on the member's standing. The response wraps the new row as `{ note }` and does not include `author`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10318,7 +10341,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/notes/{noteId}": {
@@ -10328,11 +10356,6 @@
         ],
         "summary": "Delete a moderation note",
         "description": "Requires `users_edit`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10385,7 +10408,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/disable": {
@@ -10395,11 +10423,6 @@
         ],
         "summary": "Disable a user account",
         "description": "Requires `users_disable` — a third permission, distinct from both `users_warn` and `users_edit`. This is the SOFT delete: it sets `disabled: true`, it does not remove the row, and the action is written to the audit log. Answers **200 with a message, not 204**.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10451,7 +10474,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/enable": {
@@ -10461,11 +10489,6 @@
         ],
         "summary": "Re-enable a disabled user account",
         "description": "Requires `users_disable`, the same permission that disables. Audited. Answers **200 with a message, not 204**.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -10517,7 +10540,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}": {
@@ -10635,7 +10663,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/rank-lock": {
@@ -10721,7 +10754,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/settings": {
@@ -10760,7 +10798,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -10885,7 +10928,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users": {
@@ -10968,7 +11016,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/recovery-requests": {
@@ -11057,7 +11110,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/recovery-requests/{reqId}": {
@@ -11126,7 +11184,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/warnings": {
@@ -11198,7 +11261,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/recovery": {
@@ -11267,7 +11335,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/me": {
@@ -11306,7 +11379,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -11437,7 +11515,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/me/reputation/history": {
@@ -11484,7 +11567,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/user/{userId}": {
@@ -11533,7 +11621,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile": {
@@ -11555,7 +11648,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -11587,7 +11685,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/reputation": {
@@ -11628,7 +11731,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
       }
     },
     "/profile/me/reputation": {
@@ -11659,7 +11767,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/referral/create-invite": {
@@ -11742,7 +11855,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/me/donor-rewards": {
@@ -11781,7 +11899,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -11921,7 +12044,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/me/donor-title": {
@@ -11992,7 +12120,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/home/featured": {
@@ -12047,7 +12180,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/version": {
@@ -12155,7 +12293,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/{id}": {
@@ -12165,11 +12308,6 @@
         ],
         "summary": "Staff: update a news item",
         "description": "Requires the `news_manage` permission. Title and body are passed through `sanitizePlain`, so markup in either is stripped rather than stored.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -12254,7 +12392,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -12304,7 +12447,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/blog": {
@@ -12376,7 +12524,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/blog/{id}": {
@@ -12428,7 +12581,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/global-notices": {
@@ -12470,7 +12628,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/global-notice": {
@@ -12546,7 +12709,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/global-notice/{id}": {
@@ -12598,7 +12766,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats": {
@@ -12627,7 +12800,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/history": {
@@ -12660,7 +12838,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/snapshot": {
@@ -12701,7 +12884,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/stats/history": {
@@ -12793,7 +12981,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/author": {
@@ -12857,7 +13050,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/author/{userId}": {
@@ -12931,7 +13129,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/author-stylesheet/{id}": {
@@ -12980,7 +13183,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -13072,7 +13280,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -13122,7 +13335,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/author-stylesheet/{id}/adopt": {
@@ -13171,7 +13389,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/author-stylesheet/{id}/css": {
@@ -13220,7 +13443,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/asset/{hash}": {
@@ -13279,7 +13507,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/asset": {
@@ -13327,7 +13560,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet": {
@@ -13359,7 +13597,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -13438,7 +13681,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/admin/stats": {
@@ -13480,7 +13728,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stylesheet/{id}": {
@@ -13529,7 +13782,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -13622,7 +13880,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -13682,7 +13945,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/notifications": {
@@ -13714,7 +13982,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/notifications/{id}": {
@@ -13766,7 +14039,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/notifications/unread-count": {
@@ -13804,7 +14082,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/notifications/read-all": {
@@ -13827,7 +14110,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/notifications/{id}/read": {
@@ -13881,7 +14169,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/subscriptions": {
@@ -13913,7 +14206,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/subscriptions/subscribe": {
@@ -13962,7 +14260,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/subscriptions/subscribe-comments": {
@@ -14026,7 +14329,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/subscriptions/comment-status": {
@@ -14094,7 +14402,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/categories": {
@@ -14126,7 +14439,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -14194,7 +14512,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/categories/{id}": {
@@ -14245,7 +14568,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -14323,7 +14651,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -14373,7 +14706,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{id}/catchup": {
@@ -14442,7 +14780,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums": {
@@ -14474,7 +14817,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -14578,7 +14926,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{id}": {
@@ -14627,7 +14980,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -14726,7 +15084,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -14776,7 +15139,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics": {
@@ -14823,7 +15191,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -14901,7 +15274,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}/session": {
@@ -14976,7 +15354,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}": {
@@ -15033,7 +15416,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -15110,7 +15498,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -15158,7 +15551,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}/trash": {
@@ -15225,7 +15623,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}/posts": {
@@ -15295,7 +15698,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -15368,7 +15776,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}/posts/{id}": {
@@ -15433,7 +15846,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -15514,7 +15932,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -15570,7 +15993,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/{forumId}/topics/{topicId}/posts/{id}/edits": {
@@ -15656,7 +16084,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/polls/{topicId}": {
@@ -15705,7 +16138,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/polls": {
@@ -15773,7 +16211,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/polls/{id}/close": {
@@ -15822,7 +16265,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/poll-votes": {
@@ -15885,7 +16333,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/last-read": {
@@ -15917,7 +16370,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -15979,7 +16437,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities": {
@@ -16023,7 +16486,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -16031,11 +16499,6 @@
         ],
         "summary": "Create a community",
         "description": "Requires `communities_manage`. `leaderId` is mandatory unless `registrationStatus` is `open`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -16159,7 +16622,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}": {
@@ -16208,7 +16676,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -16216,11 +16689,6 @@
         ],
         "summary": "Update a community",
         "description": "Gated on `communities_manage` ALONE — a community leader or curator cannot configure their own community, so everything here including `announceVisibility` is site-staff-only. That is the settled position, not an oversight: ADR-0030 section 5 was amended to match the code (PR #469).",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16337,7 +16805,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -16345,11 +16818,6 @@
         ],
         "summary": "Delete a community",
         "description": "Requires `communities_manage`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16394,7 +16862,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/health": {
@@ -16453,7 +16926,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/health/history": {
@@ -16528,7 +17006,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases": {
@@ -16582,7 +17065,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -16590,11 +17078,6 @@
         ],
         "summary": "Create a release in a community",
         "description": "Requires `communities_manage`. At least one artist credit is required.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16752,7 +17235,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/members": {
@@ -16762,11 +17250,6 @@
         ],
         "summary": "Add a member (consumer) to a community",
         "description": "Community admin or curator only.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16837,7 +17320,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/members/{userId}": {
@@ -16847,11 +17335,6 @@
         ],
         "summary": "Remove a member from a community",
         "description": "Answers 409 when the target is the community LEADER or a CURATOR: that role has to be removed first. The leader is checked before the curator because a leader is always also a curator, so the message names the role that actually has to be reassigned.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16914,7 +17397,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/curators": {
@@ -16924,11 +17412,6 @@
         ],
         "summary": "Promote a user to community curator",
         "description": "Answers **204, not 201**, unlike POST /communities/{id}/members which answers 201. The asymmetry is existing behaviour and is documented rather than changed.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -16992,7 +17475,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{id}/curators/{userId}": {
@@ -17001,11 +17489,6 @@
           "Communities"
         ],
         "summary": "Demote a community curator",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -17048,7 +17531,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}": {
@@ -17058,11 +17546,6 @@
         ],
         "summary": "Update release metadata",
         "description": "Returns the release workbench view, not the bare release. **`tagIds` is accepted by the schema and then ignored** — tags are managed through the /tags routes, so sending them here succeeds and changes nothing. `editSummary` is recorded on the resulting history entry.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -17173,7 +17656,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -17181,11 +17669,6 @@
         ],
         "summary": "Delete a release",
         "description": "Requires `communities_manage`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -17238,7 +17721,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -17293,7 +17781,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/vote": {
@@ -17303,11 +17796,6 @@
         ],
         "summary": "Cast or change your vote on a release",
         "description": "`positive: true` is an up-vote, `false` a down-vote.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -17384,7 +17872,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -17392,11 +17885,6 @@
         ],
         "summary": "Clear your vote on a release",
         "description": "Answers **200 with the new state**, not 204 — it clears a vote rather than deleting a resource, and the caller needs the updated aggregate.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -17456,7 +17944,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/history": {
@@ -17538,7 +18031,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/history/{historyId}/revert": {
@@ -17623,7 +18121,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/tags": {
@@ -17699,7 +18202,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/tags/{tagId}": {
@@ -17767,7 +18275,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/tags/{tagId}/vote": {
@@ -17853,7 +18366,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/releases/{releaseId}/contributions": {
@@ -17923,7 +18441,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -18086,7 +18609,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions": {
@@ -18130,7 +18658,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -18388,7 +18921,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions/{id}": {
@@ -18449,7 +18987,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions/{id}/report": {
@@ -18529,7 +19072,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions/{id}/ratio-exempt": {
@@ -18539,11 +19087,6 @@
         ],
         "summary": "Staff: set or clear a contribution ratio exemption",
         "description": "Requires the `contributions_manage` permission. FREEPASS and NEUTRALPASS are the Freepass/Neutralpass exemptions; NONE clears them.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -18617,7 +19160,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/user-ranks": {
@@ -18659,7 +19207,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -18924,7 +19477,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/user-ranks/permissions": {
@@ -19001,7 +19559,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/user-ranks/{id}": {
@@ -19060,7 +19623,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -19330,7 +19898,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -19390,7 +19963,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/promotion-rules": {
@@ -19432,7 +20010,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -19551,7 +20134,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/promotion-rules/{id}": {
@@ -19610,7 +20198,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -19735,7 +20328,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -19785,7 +20383,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/staff-groups": {
@@ -19827,7 +20430,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -19907,7 +20515,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tools/staff-groups/{id}": {
@@ -19995,7 +20608,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20055,7 +20673,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff": {
@@ -20095,7 +20718,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/staff-bio": {
@@ -20173,7 +20801,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/comments": {
@@ -20329,7 +20962,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/comments/{id}": {
@@ -20380,7 +21018,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -20455,7 +21098,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20505,7 +21153,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists": {
@@ -20549,7 +21202,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -20607,7 +21265,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/{id}": {
@@ -20656,7 +21319,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -20734,7 +21402,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20784,7 +21457,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/{id}/subscribe": {
@@ -20831,7 +21509,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -20886,7 +21569,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20931,7 +21619,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/history/{artistId}": {
@@ -20973,7 +21666,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/revert/{historyId}": {
@@ -21044,7 +21742,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/{id}/similar": {
@@ -21086,7 +21789,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/similar": {
@@ -21140,7 +21848,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/alias": {
@@ -21194,7 +21907,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/tag": {
@@ -21248,7 +21966,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/posts": {
@@ -21280,7 +22003,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -21351,7 +22079,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/posts/{id}": {
@@ -21400,7 +22133,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -21450,7 +22188,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/posts/{id}/comments": {
@@ -21517,7 +22260,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/posts/{id}/comments/{commentId}": {
@@ -21577,7 +22325,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/topic-notes/{topicId}": {
@@ -21629,7 +22382,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/topic-notes": {
@@ -21702,7 +22460,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/forums/topic-notes/{id}": {
@@ -21754,7 +22517,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests/{id}": {
@@ -21764,11 +22532,6 @@
         ],
         "summary": "Edit a request",
         "description": "The owner, or a holder of `requests_moderate`. Only requests in the `open` status may be edited — editing a filled or deleted one answers **422**, which this router uses for STATE violations as distinct from the 400 it uses for validation.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -21892,7 +22655,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -21900,11 +22668,6 @@
         ],
         "summary": "Delete a request",
         "description": "The owner, or a holder of `requests_moderate`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -21949,7 +22712,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "get": {
         "summary": "Get request details",
@@ -21998,11 +22766,6 @@
         ],
         "summary": "Toggle your vote on a request",
         "description": "A TOGGLE despite the name: posting when you have already voted removes the vote. The response says which state you ended in. Takes no body.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -22052,7 +22815,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests/{id}/unfill": {
@@ -22062,11 +22830,6 @@
         ],
         "summary": "Reverse a fill on a request",
         "description": "The owner, the filler, or a holder of `requests_moderate`. A request that is not currently filled answers **422**.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -22143,7 +22906,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests/{id}/bounty-history": {
@@ -22212,7 +22980,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests": {
@@ -22367,11 +23140,6 @@
         "tags": [
           "Requests"
         ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -22488,7 +23256,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests/{id}/bounty": {
@@ -22498,11 +23271,6 @@
           "Requests"
         ],
         "description": "The amount is deducted from the caller's contributed balance, so an insufficient balance answers 400 rather than 403. There is a site minimum bounty; below it is also a 400.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -22572,7 +23340,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/requests/{id}/fill": {
@@ -22582,11 +23355,6 @@
           "Requests"
         ],
         "description": "Nominates a contribution as the fill. The bounty is paid out and the request moves to the `filled` status; POST /requests/{id}/unfill reverses it.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -22677,7 +23445,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages": {
@@ -22726,7 +23499,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -22797,7 +23575,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/drafts": {
@@ -22807,11 +23590,6 @@
         ],
         "summary": "Draft private messages belonging to the caller",
         "description": "Newest `updatedAt` first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Drafts",
@@ -22836,7 +23614,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -22844,11 +23627,6 @@
         ],
         "summary": "Create a draft private message",
         "description": "The recipient may be given as `toUserId` or `toUsername`; either is optional, so a draft can be saved before a recipient is chosen.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -22910,7 +23688,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/drafts/{id}": {
@@ -22919,11 +23702,6 @@
           "Messages"
         ],
         "summary": "Update one of your drafts",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -23005,18 +23783,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
           "Messages"
         ],
         "summary": "Delete one of your drafts",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -23051,7 +23829,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/mass": {
@@ -23061,11 +23844,6 @@
         ],
         "summary": "Staff: send one message to every active member, or one rank",
         "description": "Requires the `messages_mass_pm` permission. **Capped at 1000 recipients** (`take: 1000`), so a larger site silently reaches only the first 1000; the sender is skipped. Omit `targetRankId` to target every active member. The send is also recorded as a MassMessage row.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -23142,7 +23920,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/unread-count": {
@@ -23179,7 +23962,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/sent": {
@@ -23208,7 +23996,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/bulk": {
@@ -23262,7 +24055,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/{id}": {
@@ -23311,7 +24109,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -23358,7 +24161,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -23388,7 +24196,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/messages/{id}/reply": {
@@ -23455,7 +24268,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets": {
@@ -23484,7 +24302,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -23535,7 +24358,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/count": {
@@ -23572,7 +24400,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/queue": {
@@ -23664,7 +24497,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/queue/count": {
@@ -23711,7 +24549,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/bulk-resolve": {
@@ -23785,7 +24628,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/{id}": {
@@ -23834,7 +24682,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/{id}/reply": {
@@ -23913,7 +24766,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/{id}/resolve": {
@@ -23945,7 +24803,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/{id}/unresolve": {
@@ -23987,7 +24850,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/tickets/{id}/assign": {
@@ -24051,7 +24919,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/responses": {
@@ -24093,7 +24966,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -24154,7 +25032,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/staff-inbox/responses/{id}": {
@@ -24233,7 +25116,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -24273,7 +25161,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/stats": {
@@ -24355,7 +25248,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/counts": {
@@ -24406,7 +25304,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/mine": {
@@ -24517,7 +25420,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports": {
@@ -24802,7 +25710,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -25171,7 +26084,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/{id}": {
@@ -25443,7 +26361,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/{id}/claim": {
@@ -25485,7 +26408,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/{id}/unclaim": {
@@ -25527,7 +26455,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/{id}/resolve": {
@@ -25600,7 +26533,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/reports/{id}/notes": {
@@ -25712,7 +26650,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/profile/me/ratio": {
@@ -25768,7 +26711,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/ratio-policy/{userId}": {
@@ -25817,7 +26765,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/ratio-policy/{userId}/override": {
@@ -25898,7 +26851,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/settings": {
@@ -25927,7 +26885,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -26001,7 +26964,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/releases": {
@@ -26086,7 +27054,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/users": {
@@ -26153,7 +27126,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/tags": {
@@ -26217,7 +27195,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/votes": {
@@ -26286,7 +27269,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/history": {
@@ -26366,7 +27354,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/top10/snapshot": {
@@ -26444,7 +27437,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/rules/tree": {
@@ -26492,7 +27490,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/rules": {
@@ -26543,7 +27546,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -26638,7 +27646,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/rules/{slug}": {
@@ -26687,7 +27700,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/rules/{id}": {
@@ -26793,7 +27811,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -26853,7 +27876,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends": {
@@ -26920,7 +27948,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/requests": {
@@ -26987,7 +28020,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/status/{userId}": {
@@ -27046,7 +28084,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/{userId}": {
@@ -27126,7 +28169,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -27157,7 +28205,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/{userId}/accept": {
@@ -27207,7 +28260,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/{userId}/reject": {
@@ -27257,7 +28315,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/friends/{userId}/comment": {
@@ -27335,7 +28398,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tag-aliases": {
@@ -27399,7 +28467,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -27481,7 +28554,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/tag-aliases/{id}": {
@@ -27565,7 +28643,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -27615,7 +28698,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/sessions": {
@@ -27687,7 +28775,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/invites": {
@@ -27764,7 +28857,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/invite-tree": {
@@ -27828,7 +28926,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/{id}/invite-tree": {
@@ -27892,7 +28995,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/users/ratio-watch": {
@@ -27956,7 +29064,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/vanity-house": {
@@ -28020,7 +29133,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/artists/{id}/vanity-house": {
@@ -28096,7 +29214,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/album-of-month": {
@@ -28138,7 +29261,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -28231,7 +29359,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/announcements/album-of-month/{albumId}": {
@@ -28283,7 +29416,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages": {
@@ -28422,18 +29560,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
           "Collages"
         ],
         "summary": "Create a collage",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -28516,7 +29654,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}": {
@@ -28526,11 +29669,6 @@
         ],
         "summary": "One collage with its entries and your subscription context",
         "description": "Entries are ordered by `sort`. `isSubscribed`/`isBookmarked` describe the CALLER, so this response is per-viewer and not cacheable across members. Visiting while subscribed updates your `lastVisit`. Two access rules are worth noting: a DELETED collage answers 404 to non-staff rather than 403, and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner or staff.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -28582,7 +29720,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -28590,11 +29733,6 @@
         ],
         "summary": "Update a collage",
         "description": "`isLocked` and the two entry limits are STAFF-ONLY fields: an owner sending them gets 403, distinct from the 403 for editing a collage that is not theirs.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -28700,7 +29838,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -28708,11 +29851,6 @@
         ],
         "summary": "Delete a collage",
         "description": "The deletion is NOT uniform. A PERSONAL collage (categoryId 0) is HARD deleted by its owner or staff and cannot be recovered. A PUBLIC collage is soft-deleted (sets `isDeleted`) and only staff may do it, so an owner who can delete their personal collage gets 403 on a public one; use POST /collages/{id}/recover to restore that case.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -28757,7 +29895,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/recover": {
@@ -28766,11 +29909,6 @@
           "Collages"
         ],
         "summary": "Staff: restore a soft-deleted collage",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -28832,7 +29970,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/entries": {
@@ -28841,11 +29984,6 @@
           "Collages"
         ],
         "summary": "Add a release to a collage",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -28936,7 +30074,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -28944,11 +30087,6 @@
         ],
         "summary": "Reorder the entries of a collage",
         "description": "Send every entry id with its new `sort`.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29029,7 +30167,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/entries/{releaseId}": {
@@ -29039,11 +30182,6 @@
         ],
         "summary": "Remove a release from a collage",
         "description": "Addressed by RELEASE id, not entry id — the pair is unique per collage.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29096,7 +30234,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/subscribe": {
@@ -29106,11 +30249,6 @@
         ],
         "summary": "Toggle your subscription to a collage",
         "description": "A TOGGLE despite the name: posting when already subscribed unsubscribes you. The response says which state you ended in.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29160,7 +30298,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/bookmark": {
@@ -29170,11 +30313,6 @@
         ],
         "summary": "Toggle your bookmark on a collage",
         "description": "A toggle, like /subscribe.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29224,7 +30362,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/{id}/subscriptions": {
@@ -29234,11 +30377,6 @@
         ],
         "summary": "Staff: who is subscribed to a collage",
         "description": "Requires `collages_moderate`. Ordered by `lastVisit`, most recent first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29293,7 +30431,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki": {
@@ -29411,7 +30554,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -29419,11 +30567,6 @@
         ],
         "summary": "Create a wiki page",
         "description": "Requires `wiki_edit`, or one of `wiki_manage`/`admin`/`staff`. **`minReadLevel` and `minEditLevel` are forced to 0 unless the caller can MANAGE the wiki** — a plain `wiki_edit` author cannot create a restricted page, and the values they send are ignored rather than rejected.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -29506,7 +30649,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/by-alias/{alias}": {
@@ -29567,7 +30715,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}": {
@@ -29628,18 +30781,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
           "Wiki"
         ],
         "summary": "Update a wiki page",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29731,7 +30884,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -29739,11 +30897,6 @@
         ],
         "summary": "Delete a wiki page",
         "description": "Gated at the middleware by `wiki_manage` or `admin` — the per-page edit level does not grant deletion.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -29788,7 +30941,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/revisions": {
@@ -29864,7 +31022,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/revisions/{rev}": {
@@ -29933,7 +31096,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/compare": {
@@ -30024,7 +31192,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/rollback/{rev}": {
@@ -30034,11 +31207,6 @@
         ],
         "summary": "Roll a page back to an earlier revision",
         "description": "Requires the page EDIT level. The rollback is written as a NEW revision rather than by rewinding, so history is never discarded.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -30098,7 +31266,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/aliases": {
@@ -30107,11 +31280,6 @@
           "Wiki"
         ],
         "summary": "Add an alias to a page",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -30211,7 +31379,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/wiki/{id}/aliases/{alias}": {
@@ -30221,11 +31394,6 @@
         ],
         "summary": "Remove an alias from a page",
         "description": "The alias is addressed by its slug, which is its primary key.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "schema": {
@@ -30278,7 +31446,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/collages/deleted": {
@@ -30342,7 +31515,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/economy": {
@@ -30399,7 +31577,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/releases": {
@@ -30492,7 +31675,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/clients": {
@@ -30547,7 +31735,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/user-flow": {
@@ -30632,7 +31825,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/stats/site-info": {
@@ -30719,18 +31917,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/dnc": {
       "get": {
         "tags": [
           "Communities"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -30786,16 +31984,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "Communities"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Communities"
         ],
         "parameters": [
           {
@@ -30860,18 +32058,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/communities/{communityId}/dnc/{dncId}": {
       "delete": {
         "tags": [
           "Communities"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -30915,18 +32113,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/artists": {
       "get": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -30988,18 +32186,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/artists/{artistId}": {
       "post": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -31040,16 +32238,16 @@
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Bookmarks"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Bookmarks"
         ],
         "parameters": [
           {
@@ -31075,18 +32273,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/releases": {
       "get": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31173,18 +32371,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/releases/{releaseId}": {
       "post": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -31225,16 +32423,16 @@
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Bookmarks"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Bookmarks"
         ],
         "parameters": [
           {
@@ -31260,18 +32458,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/communities": {
       "get": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31337,18 +32535,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/communities/{communityId}": {
       "post": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -31389,16 +32587,16 @@
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Bookmarks"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Bookmarks"
         ],
         "parameters": [
           {
@@ -31424,18 +32622,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/requests": {
       "get": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31497,18 +32695,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/requests/{requestId}": {
       "post": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -31549,16 +32747,16 @@
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Bookmarks"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Bookmarks"
         ],
         "parameters": [
           {
@@ -31584,18 +32782,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bookmarks/releases/consumed": {
       "delete": {
         "tags": [
           "Bookmarks"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31626,18 +32824,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/random/release": {
       "get": {
         "tags": [
           "Random"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31707,18 +32905,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/random/artist": {
       "get": {
         "tags": [
           "Random"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -31763,18 +32961,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/search/releases": {
       "get": {
         "tags": [
           "Search"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -32248,18 +33446,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/search/artists": {
       "get": {
         "tags": [
           "Search"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -32442,18 +33640,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/search/requests": {
       "get": {
         "tags": [
           "Search"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -32739,18 +33937,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/search/log": {
       "get": {
         "tags": [
           "Search"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33105,18 +34303,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/search/users": {
       "get": {
         "tags": [
           "Search"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33276,18 +34474,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/site-history": {
       "get": {
         "tags": [
           "Site history"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -33357,16 +34555,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "Site history"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Site history"
         ],
         "requestBody": {
           "content": {
@@ -33448,18 +34646,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/site-history/{id}": {
       "put": {
         "tags": [
           "Site history"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33561,16 +34759,16 @@
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Site history"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Site history"
         ],
         "parameters": [
           {
@@ -33616,18 +34814,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions/{id}/access": {
       "post": {
         "tags": [
           "Downloads"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33703,18 +34901,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/contributions/{id}/access/latest": {
       "get": {
         "tags": [
           "Downloads"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33785,18 +34983,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/downloads/{grantId}/reverse": {
       "post": {
         "tags": [
           "Downloads"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33866,18 +35064,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/donations": {
       "get": {
         "tags": [
           "Donations"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -33987,16 +35185,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "Donations"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Donations"
         ],
         "requestBody": {
           "content": {
@@ -34139,18 +35337,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/donations/{id}": {
       "delete": {
         "tags": [
           "Donations"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -34196,18 +35394,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bad-passwords": {
       "get": {
         "tags": [
           "Bad passwords"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -34297,16 +35495,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "Bad passwords"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Bad passwords"
         ],
         "requestBody": {
           "content": {
@@ -34388,18 +35586,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/bad-passwords/{id}": {
       "delete": {
         "tags": [
           "Bad passwords"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -34447,18 +35645,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/email-blacklist": {
       "get": {
         "tags": [
           "Email blacklist"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -34518,16 +35716,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "Email blacklist"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Email blacklist"
         ],
         "requestBody": {
           "content": {
@@ -34615,18 +35813,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/email-blacklist/{id}": {
       "delete": {
         "tags": [
           "Email blacklist"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -34672,18 +35870,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/ip-bans": {
       "get": {
         "tags": [
           "IP bans"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "responses": {
           "200": {
@@ -34735,16 +35933,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "IP bans"
-        ],
+        },
         "security": [
           {
             "cookieAuth": []
           }
+        ]
+      },
+      "post": {
+        "tags": [
+          "IP bans"
         ],
         "requestBody": {
           "content": {
@@ -34823,18 +36021,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/ip-bans/{id}": {
       "delete": {
         "tags": [
           "IP bans"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
         ],
         "parameters": [
           {
@@ -34880,7 +36078,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     },
     "/log-check": {
@@ -34987,7 +36190,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
       }
     }
   }

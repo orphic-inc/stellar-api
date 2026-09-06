@@ -49,7 +49,7 @@ const main = (): void => {
   // `paths` is typed as PathItemObject, whose optional-keys shape is not
   // assignable to a plain index signature; we only need the method names, so
   // widen through `unknown` rather than importing the OpenAPI types here.
-  const doc = buildOpenApiDocument() as unknown as {
+  const doc = buildOpenApiDocument(routes) as unknown as {
     paths?: Record<string, Record<string, unknown>>;
   };
   const registered: Operation[] = [];
