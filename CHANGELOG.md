@@ -8,6 +8,26 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **The email blacklist had a full admin surface and nothing ever read it, so staff bans did nothing** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `EmailBlacklist` shipped with CRUD routes, an `email_blacklist_manage` permission and OpenAPI registration, but outside those routes and the registry the Prisma accessor appeared **nowhere** in `src/`. A moderator could add an entry, receive a 201 and see it listed, and the address stayed free to register. This is the inverse of [#536](https://github.com/orphic-inc/stellar-api/issues/536) and worse in one respect: there the control failed silently with no affordance, here every signal said the ban was in force.
+
+  **Enforced on both paths an address can enter by** — registration and email change. Guarding registration alone would have left a member free to register with a clean address and then move to a blacklisted one, which is the same half-fix shape the issue is about.
+
+  **An entry matches as a full address or a bare domain**, which is what the admin route's own validation message ("Email or domain is required") has always promised. Matching is literal — `example.com` does not silently also ban `@mail.example.com`, because widening a ban past what the moderator typed is a decision rather than a default. The lookup is two exact matches via `IN`, both served by the existing `email` index, rather than a `LIKE` scan.
+
+  **Existing rows were unmatchable and are migrated.** Nothing ever read the column, so nothing cared about its case or whitespace; enforcement compares a lowercased address. Without `LOWER(TRIM(...))` over the existing rows the fix would have worked for new entries and quietly failed for old ones — the exact failure being fixed, reintroduced by the fix.
+
+  **The check is independent of the invite flow.** A blacklisted address holding a valid invite is precisely the case a moderator is trying to stop: someone banned returning through a friend.
+
+  **Blacklisting gates entry only; it does not disable existing accounts.** Deliberate — a domain-wide entry would otherwise turn adding a list row into a mass account action from a form whose only guidance is "Email or domain is required". Disabling an account stays a separate, explicit staff action.
+
+- **`POST /email-blacklist` could always answer 400 and the contract never said so** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `validate()` emits the `{ errors }` envelope, and the pre-existing `comment` rule alone guaranteed it was reachable. Registered here rather than left to the #517 sweep because the same change makes it substantially more reachable.
+
+### Changed
+
+- **The email blacklist rejects entries that could never match** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `email` was `z.string().min(1)`, so `known spammer` was accepted, stored, and unable to fire against any address. It now requires an address- or domain-shaped value, surfacing the mistake while the author can still correct it, and is normalised on write exactly as the lookup normalises on read. This is the same reasoning that dropped 24 unreachable entries from the password denylist. **Behaviour change on a staff-only endpoint:** input previously accepted now returns `{ errors: { email: [...] } }`; existing unmatchable rows are left in place.
+
+### Fixed
+
 - **The password denylist was enforced on three auth paths and nothing ever wrote a row, so it never blocked anything** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `isPasswordBanned` is called at registration and on both password-change paths, but `prisma.badPassword` appeared exactly **once** in `src/`: that read. No route, no seed, no `bootstrap.ts` helper ever created a `BadPassword` row, so the table was empty in every deployment and the check returned `false` on every call. AGENTS.md filed the model under "Stub models (no routes implemented)", which is wrong in the direction that matters — reading `auth.ts` it looks like a working denylist, and the stub table is where you would go to learn otherwise.
 
   **A shipped list of 237 entries**, seeded by `seedBadPasswords` into `seedAll` alongside the Golden Rules and theme fixtures. Nothing shorter than six characters is included: `min(6)` is the floor on every creation path, so a shorter entry could never be submitted to match against, and a denylist padded with rows that cannot fire overstates its own coverage — which is the failure this fixes.

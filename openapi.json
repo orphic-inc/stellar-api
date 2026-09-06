@@ -34585,6 +34585,16 @@
               }
             }
           },
+          "400": {
+            "description": "Entry is neither an email address nor a domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {

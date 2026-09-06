@@ -136,6 +136,14 @@ router.post(
             .json({ msg: 'Invite key is not valid for this email address' });
         case 'bad_password':
           return res.status(400).json({ msg: 'Password is not allowed' });
+        case 'email_blacklisted':
+          // Deliberately non-specific. It tells a legitimate user to stop
+          // retrying without confirming a moderation decision about the
+          // address. 400 matches bad_password, the nearest precedent in this
+          // handler, and needs no contract change.
+          return res.status(400).json({
+            msg: 'Registration is not available for this email address'
+          });
         default:
           return res.status(400).json({ msg: 'User already exists' });
       }
