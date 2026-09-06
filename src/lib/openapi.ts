@@ -7565,6 +7565,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Neither the owner nor a request moderator',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7592,8 +7596,13 @@ registry.registerPath({
     204: {
       description: 'Request deleted'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
-      description: 'Neither the owner nor a request moderator',
+      description:
+        'Neither the owner nor a request moderator, or the request is filled and the caller is not a request moderator',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
@@ -7619,6 +7628,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.object({ voted: z.boolean() }) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Request not found',
@@ -7646,6 +7659,10 @@ registry.registerPath({
     200: {
       description: 'The request, back in the open status',
       content: { 'application/json': { schema: Request } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Neither owner, filler, nor a request moderator',
@@ -7683,6 +7700,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Request not found',
@@ -7728,6 +7749,14 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing requests_create',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7781,6 +7810,10 @@ registry.registerPath({
         'Below the minimum bounty, or insufficient contributed balance',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Request not found, or not open',
       content: { 'application/json': { schema: MsgResponse } }
@@ -7812,6 +7845,10 @@ registry.registerPath({
     400: {
       description:
         'The contribution is not eligible: wrong community, wrong release type, or already the active fill for another request',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
     403: {

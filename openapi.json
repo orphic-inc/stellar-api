@@ -21565,6 +21565,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Neither the owner nor a request moderator",
             "content": {
@@ -21622,8 +21632,18 @@
           "204": {
             "description": "Request deleted"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
-            "description": "Neither the owner nor a request moderator",
+            "description": "Neither the owner nor a request moderator, or the request is filled and the caller is not a request moderator",
             "content": {
               "application/json": {
                 "schema": {
@@ -21725,6 +21745,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Request not found",
             "content": {
@@ -21782,6 +21812,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -21861,6 +21901,16 @@
                     "bounties",
                     "actions"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -22130,6 +22180,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing requests_create",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -22187,6 +22257,16 @@
           },
           "400": {
             "description": "Below the minimum bounty, or insufficient contributed balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
@@ -22262,6 +22342,16 @@
           },
           "400": {
             "description": "The contribution is not eligible: wrong community, wrong release type, or already the active fill for another request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
