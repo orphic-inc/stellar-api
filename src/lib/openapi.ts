@@ -10335,6 +10335,10 @@ registry.registerPath({
           schema: z.object({ data: z.array(Collage), meta: PaginationMeta })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -10356,6 +10360,10 @@ registry.registerPath({
     400: {
       description: 'Validation error, or a creation rule rejected the request',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Not permitted to create collages',
@@ -10382,6 +10390,10 @@ registry.registerPath({
     200: {
       description: 'Collage detail',
       content: { 'application/json': { schema: CollageDetail } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Personal collage belonging to someone else',
@@ -10417,9 +10429,13 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description:
-        'Not the owner, or a staff-only field (isLocked, maxEntries, maxEntriesPerUser) was sent',
+        'Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)',
       content: { 'application/json': { schema: MsgResponse } }
     },
     409: {
@@ -10445,6 +10461,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Collage deleted — hard if personal, soft if public'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description:
@@ -10474,6 +10494,14 @@ registry.registerPath({
       description: 'The collage is not deleted',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing collages_moderate',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -10499,6 +10527,10 @@ registry.registerPath({
     400: {
       description:
         'An entry limit was reached — either the collage maximum or your per-user limit',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    401: {
+      description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
@@ -10534,6 +10566,10 @@ registry.registerPath({
     204: {
       description: 'Entries reordered'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Only the collage owner or staff may reorder entries',
       content: { 'application/json': { schema: MsgResponse } }
@@ -10560,8 +10596,13 @@ registry.registerPath({
     204: {
       description: 'Entry removed'
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
-      description: "The collage is locked, or the entry is not the caller's",
+      description:
+        'The collage is locked, or the caller is neither the collage owner, the member who added the entry, nor collage staff',
       content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
@@ -10590,6 +10631,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Collage not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -10614,6 +10659,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Collage not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -10636,6 +10685,10 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(CollageSubscriber) }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing collages_moderate',
@@ -11107,6 +11160,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing collages_moderate',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

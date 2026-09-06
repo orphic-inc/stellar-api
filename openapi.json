@@ -27514,6 +27514,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -27589,6 +27599,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not permitted to create collages",
             "content": {
@@ -27631,6 +27651,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollageDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -27743,8 +27773,18 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
-            "description": "Not the owner, or a staff-only field (isLocked, maxEntries, maxEntriesPerUser) was sent",
+            "description": "Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)",
             "content": {
               "application/json": {
                 "schema": {
@@ -27789,6 +27829,16 @@
         "responses": {
           "204": {
             "description": "Collage deleted — hard if personal, soft if public"
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Neither owner nor staff, or a public collage and the caller is not staff",
@@ -27847,6 +27897,26 @@
           },
           "400": {
             "description": "The collage is not deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing collages_moderate",
             "content": {
               "application/json": {
                 "schema": {
@@ -27921,6 +27991,16 @@
           },
           "400": {
             "description": "An entry limit was reached — either the collage maximum or your per-user limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
@@ -28022,6 +28102,16 @@
           "204": {
             "description": "Entries reordered"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Only the collage owner or staff may reorder entries",
             "content": {
@@ -28079,8 +28169,18 @@
           "204": {
             "description": "Entry removed"
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "403": {
-            "description": "The collage is locked, or the entry is not the caller's",
+            "description": "The collage is locked, or the caller is neither the collage owner, the member who added the entry, nor collage staff",
             "content": {
               "application/json": {
                 "schema": {
@@ -28143,6 +28243,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Collage not found",
             "content": {
@@ -28197,6 +28307,16 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Collage not found",
             "content": {
@@ -28242,6 +28362,16 @@
                   "items": {
                     "$ref": "#/components/schemas/CollageSubscriber"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -29151,6 +29281,26 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing collages_moderate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
