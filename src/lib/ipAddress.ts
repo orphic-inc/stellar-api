@@ -50,42 +50,56 @@ const normalizeIpv4 = (value: string): string | null => {
   return '00000000000000000000ffff' + v4;
 };
 
-const normalizeIpv6 = (value: string): string | null => {
-  // A trailing dotted quad (`::ffff:1.2.3.4`, `64:ff9b::1.2.3.4`) is the last
-  // 32 bits written in IPv4 form. Rewrite it to two hex groups first.
+/**
+ * Rewrite a trailing dotted quad into two hex groups.
+ *
+ * `::ffff:1.2.3.4` and `64:ff9b::1.2.3.4` write their last 32 bits in IPv4
+ * form. Returns the text unchanged when there is no such tail, or null when the
+ * tail is present but not a valid IPv4 address.
+ */
+const rewriteIpv4Tail = (value: string): string | null => {
   const tail = /^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(value);
-  let text = value;
-  if (tail) {
-    const v4 = normalizeIpv4(tail[2]);
-    if (!v4) return null;
-    const last32 = v4.slice(-8);
-    text = `${tail[1]}${last32.slice(0, 4)}:${last32.slice(4)}`;
-  }
+  if (!tail) return value;
+  const v4 = normalizeIpv4(tail[2]);
+  if (!v4) return null;
+  const last32 = v4.slice(-8);
+  return `${tail[1]}${last32.slice(0, 4)}:${last32.slice(4)}`;
+};
+
+/** Split into hex groups, or null if any group is malformed. */
+const hexGroups = (part: string): string[] | null => {
+  if (part === '') return [];
+  const groups = part.split(':');
+  if (groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups;
+};
+
+/** Expand the `::` elision to exactly eight groups. */
+const expandElision = (head: string, tail: string): string[] | null => {
+  const a = hexGroups(head);
+  const b = hexGroups(tail);
+  if (a === null || b === null) return null;
+  const missing = 8 - a.length - b.length;
+  // `::` must stand for at least one group, or the address is over-long.
+  if (missing < 1) return null;
+  return [...a, ...Array(missing).fill('0'), ...b];
+};
+
+const normalizeIpv6 = (value: string): string | null => {
+  const text = rewriteIpv4Tail(value);
+  if (text === null) return null;
 
   const halves = text.split('::');
   if (halves.length > 2) return null;
 
-  const expand = (part: string): string[] | null => {
-    if (part === '') return [];
-    const groups = part.split(':');
-    if (groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
-    return groups;
-  };
+  const groups =
+    halves.length === 2
+      ? expandElision(halves[0], halves[1])
+      : hexGroups(text)?.length === 8
+        ? hexGroups(text)
+        : null;
 
-  let groups: string[];
-  if (halves.length === 2) {
-    const head = expand(halves[0]);
-    const tailGroups = expand(halves[1]);
-    if (head === null || tailGroups === null) return null;
-    const missing = 8 - head.length - tailGroups.length;
-    if (missing < 1) return null; // `::` must stand for at least one group
-    groups = [...head, ...Array(missing).fill('0'), ...tailGroups];
-  } else {
-    const all = expand(text);
-    if (all === null || all.length !== 8) return null;
-    groups = all;
-  }
-
+  if (groups === null || groups === undefined) return null;
   return groups.map((g) => g.padStart(4, '0')).join('');
 };
 
