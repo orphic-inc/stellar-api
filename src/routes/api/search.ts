@@ -367,6 +367,30 @@ router.get(
 
 // ─── GET /api/search/requests ─────────────────────────────────────────────────
 
+/**
+ * The request `where`, built outside the handler for the same reason
+ * `buildReleaseWhere` is: the filters are many and individually trivial, and
+ * the handler reads better as "build the filter, scope it, run it".
+ */
+function buildRequestWhere(q: SearchRequestsQuery): Record<string, unknown> {
+  const where: Record<string, unknown> = { deletedAt: null };
+  if (q.q) {
+    where.OR = [
+      { title: { contains: q.q, mode: 'insensitive' } },
+      { description: { contains: q.q, mode: 'insensitive' } }
+    ];
+  }
+  if (q.artist)
+    where.artists = {
+      some: { artist: { name: { contains: q.artist, mode: 'insensitive' } } }
+    };
+  if (q.type) where.type = q.type;
+  if (q.year) where.year = q.year;
+  if (q.status) where.status = q.status;
+  if (q.communityId) where.communityId = q.communityId;
+  return where;
+}
+
 const REQUEST_SELECT = {
   id: true,
   title: true,
@@ -406,21 +430,7 @@ router.get(
     const q = parsedQuery<SearchRequestsQuery>(res);
     const pg = parsedPage(res);
 
-    const where: Record<string, unknown> = { deletedAt: null };
-    if (q.q) {
-      where.OR = [
-        { title: { contains: q.q, mode: 'insensitive' } },
-        { description: { contains: q.q, mode: 'insensitive' } }
-      ];
-    }
-    if (q.artist)
-      where.artists = {
-        some: { artist: { name: { contains: q.artist, mode: 'insensitive' } } }
-      };
-    if (q.type) where.type = q.type;
-    if (q.year) where.year = q.year;
-    if (q.status) where.status = q.status;
-    if (q.communityId) where.communityId = q.communityId;
+    const where = buildRequestWhere(q);
 
     // A request belongs to a community and carries its name in the projection,
     // so the same community scope the release search applies belongs here (#509).
@@ -490,6 +500,86 @@ const POST_SELECT = {
   author: { select: { id: true, username: true } }
 } as const;
 
+/**
+ * The topic and post filters for a log search, which differ only in the column
+ * the free-text term matches and in how each reaches its forum.
+ *
+ * Forum class travels into the query, because a search has no single `forumId`
+ * to hand `assertForumReadAccess` (#509). Without it this route returned the
+ * full body of every post on the site — including forums seeded at
+ * `minClassRead: 500` — to any authenticated member.
+ */
+function buildLogWheres(
+  user: AuthenticatedRequest['user'],
+  q: SearchLogQuery
+): { topicWhere: Record<string, unknown>; postWhere: Record<string, unknown> } {
+  const readable = forumReadableWhere(user);
+  const topicWhere: Record<string, unknown> = {
+    deletedAt: null,
+    forum: readable
+  };
+  const postWhere: Record<string, unknown> = {
+    deletedAt: null,
+    forumTopic: { forum: readable }
+  };
+  if (q.q) {
+    topicWhere.title = { contains: q.q, mode: 'insensitive' };
+    postWhere.body = { contains: q.q, mode: 'insensitive' };
+  }
+  if (q.authorId) {
+    topicWhere.authorId = q.authorId;
+    postWhere.authorId = q.authorId;
+  }
+  return { topicWhere, postWhere };
+}
+
+type LogPage = { skip: number; limit: number; page: number };
+
+/** One page of topics plus its total, as the three branches all need it. */
+const queryTopics = (
+  where: Record<string, unknown>,
+  orderBy: { createdAt: 'asc' | 'desc' },
+  pg: LogPage
+) =>
+  Promise.all([
+    prisma.forumTopic.findMany({
+      where,
+      orderBy,
+      skip: pg.skip,
+      take: pg.limit,
+      select: TOPIC_SELECT
+    }),
+    prisma.forumTopic.count({ where })
+  ]);
+
+/** The same for posts. */
+const queryPosts = (
+  where: Record<string, unknown>,
+  orderBy: { createdAt: 'asc' | 'desc' },
+  pg: LogPage
+) =>
+  Promise.all([
+    prisma.forumPost.findMany({
+      where,
+      orderBy,
+      skip: pg.skip,
+      take: pg.limit,
+      select: POST_SELECT
+    }),
+    prisma.forumPost.count({ where })
+  ]);
+
+/** `type=all` returns two paginated sections rather than one envelope. */
+const logSection = <T>(data: T[], total: number, pg: LogPage) => ({
+  data,
+  meta: {
+    total,
+    page: pg.page,
+    limit: pg.limit,
+    totalPages: Math.ceil(total / pg.limit)
+  }
+});
+
 router.get(
   '/log',
   requireAuth,
@@ -498,97 +588,28 @@ router.get(
     const q = parsedQuery<SearchLogQuery>(res);
     const pg = parsedPage(res);
 
-    // Forum class travels into the query, because a search has no single
-    // `forumId` to hand `assertForumReadAccess` (#509). Without it this route
-    // returned the full body of every post on the site — including forums
-    // seeded at `minClassRead: 500` — to any authenticated member.
-    const readable = forumReadableWhere(req.user);
-    const topicWhere: Record<string, unknown> = {
-      deletedAt: null,
-      forum: readable
-    };
-    const postWhere: Record<string, unknown> = {
-      deletedAt: null,
-      forumTopic: { forum: readable }
-    };
-    if (q.q) {
-      topicWhere.title = { contains: q.q, mode: 'insensitive' };
-      postWhere.body = { contains: q.q, mode: 'insensitive' };
-    }
-    if (q.authorId) {
-      topicWhere.authorId = q.authorId;
-      postWhere.authorId = q.authorId;
-    }
-
+    const { topicWhere, postWhere } = buildLogWheres(req.user, q);
     const orderBy = { createdAt: q.order } as const;
 
     if (q.type === 'topic') {
-      const [data, total] = await Promise.all([
-        prisma.forumTopic.findMany({
-          where: topicWhere,
-          orderBy,
-          skip: pg.skip,
-          take: pg.limit,
-          select: TOPIC_SELECT
-        }),
-        prisma.forumTopic.count({ where: topicWhere })
-      ]);
+      const [data, total] = await queryTopics(topicWhere, orderBy, pg);
       return paginatedResponse(res, data, total, pg);
     }
 
     if (q.type === 'post') {
-      const [data, total] = await Promise.all([
-        prisma.forumPost.findMany({
-          where: postWhere,
-          orderBy,
-          skip: pg.skip,
-          take: pg.limit,
-          select: POST_SELECT
-        }),
-        prisma.forumPost.count({ where: postWhere })
-      ]);
+      const [data, total] = await queryPosts(postWhere, orderBy, pg);
       return paginatedResponse(res, data, total, pg);
     }
 
-    // type === 'all'
-    const [topics, topicTotal, posts, postTotal] = await Promise.all([
-      prisma.forumTopic.findMany({
-        where: topicWhere,
-        orderBy,
-        skip: pg.skip,
-        take: pg.limit,
-        select: TOPIC_SELECT
-      }),
-      prisma.forumTopic.count({ where: topicWhere }),
-      prisma.forumPost.findMany({
-        where: postWhere,
-        orderBy,
-        skip: pg.skip,
-        take: pg.limit,
-        select: POST_SELECT
-      }),
-      prisma.forumPost.count({ where: postWhere })
+    // type === 'all' — still one round of concurrent queries, as before.
+    const [[topics, topicTotal], [posts, postTotal]] = await Promise.all([
+      queryTopics(topicWhere, orderBy, pg),
+      queryPosts(postWhere, orderBy, pg)
     ]);
 
     res.json({
-      topics: {
-        data: topics,
-        meta: {
-          total: topicTotal,
-          page: pg.page,
-          limit: pg.limit,
-          totalPages: Math.ceil(topicTotal / pg.limit)
-        }
-      },
-      posts: {
-        data: posts,
-        meta: {
-          total: postTotal,
-          page: pg.page,
-          limit: pg.limit,
-          totalPages: Math.ceil(postTotal / pg.limit)
-        }
-      }
+      topics: logSection(topics, topicTotal, pg),
+      posts: logSection(posts, postTotal, pg)
     });
   })
 );
