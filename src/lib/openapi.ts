@@ -9259,6 +9259,10 @@ registry.registerPath({
           schema: z.object({ items: z.array(Top10ReleaseItem) })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9290,6 +9294,10 @@ registry.registerPath({
           schema: z.object({ items: z.array(Top10UserItem) })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9313,6 +9321,10 @@ registry.registerPath({
           schema: z.object({ items: z.array(Top10TagItem) })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9337,6 +9349,10 @@ registry.registerPath({
           schema: z.object({ items: z.array(Top10VoteItem) })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9356,6 +9372,14 @@ registry.registerPath({
     200: {
       description: 'History snapshot',
       content: { 'application/json': { schema: Top10Snapshot } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing staff',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'No snapshot found',
@@ -9393,6 +9417,14 @@ registry.registerPath({
     400: {
       description: 'type is not one of Daily | Weekly',
       content: { 'application/json': { schema: ValidationError } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

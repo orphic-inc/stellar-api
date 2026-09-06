@@ -8,6 +8,14 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Top10` now documents the 401 and 403 its middleware answers — the eighteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 78 gaps to 70, and the last single-surface slice.** Six operations in one router file; four member reads took **401 only** and two staff routes needed both. Fully-documented operations went 287 to 293.
+
+  **Two different keys on one small surface**, which is why the insertion was driven by an explicit `{"METHOD /path": "key"}` map rather than a single key: `GET /top10/history` is `...requirePermission('staff')` and `POST /top10/snapshot` is `...requirePermission('admin')`. The map form asserts that the keys given and the operations needing a 403 are **exactly equal in both directions**, so assuming one key for the surface would have failed loudly instead of quietly mislabelling the snapshot route as staff-accessible.
+
+  **No handler-level 403 anywhere** — checked with the corrected pattern from #523. The router's only other failure is a `404` when no snapshot exists for a given date and type, and `modules/top10.ts` throws nothing at all.
+
+  **Purely additive, blast radius proved per operation**: exactly six changed, all under `/top10`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
 - **`TagAliases` now documents the 401 and 403 its middleware answers — the seventeenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 86 gaps to 78.** Four operations in one router file, **every one taking both codes** under a uniform `tags_manage`. Fully-documented operations went 283 to 287.
 
   **The most uniform surface in the burn-down**: all four routes are `...requirePermission('tags_manage')`, single-key, and the whole surface is staff-only — there is no member-facing read here, which is why every operation needed both codes rather than the usual mix. Searched with the corrected pattern from #523: **no handler-level 403 anywhere**, only `404`s for a missing alias or a missing target tag.
