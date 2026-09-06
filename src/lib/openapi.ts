@@ -3085,6 +3085,10 @@ registry.registerPath({
     200: {
       description: 'Site statistics',
       content: { 'application/json': { schema: SiteStats } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3098,6 +3102,10 @@ registry.registerPath({
     200: {
       description: 'Historical site stat snapshots (ascending by capturedAt)',
       content: { 'application/json': { schema: z.array(SiteStatSnapshot) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -3109,8 +3117,12 @@ registry.registerPath({
   tags: ['Stats'],
   responses: {
     204: { description: 'Snapshot captured' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
-      description: 'Forbidden',
+      description: 'Missing admin',
       content: { 'application/json': { schema: z.object({ msg: z.string() }) } }
     }
   }
@@ -11284,6 +11296,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11310,6 +11330,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11330,6 +11358,14 @@ registry.registerPath({
           )
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11359,6 +11395,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11389,6 +11433,14 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

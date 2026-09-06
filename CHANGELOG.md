@@ -8,6 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Stats` now documents the 401 and 403 its middleware answers — the thirteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 128 gaps to 115.** Eight operations in one router file; five needed both codes, three took **401 only**. Fully-documented operations went 249 to 257.
+
+  **All five 403s are `Missing admin` despite coming from two different gates** — four routes use `requirePermission('admin')` and `GET /stats/site-info` uses `requireAdminOnly()`. Per [#515](https://github.com/orphic-inc/stellar-api/issues/515) those are the same test: `hasPermission()` short-circuits on `permissions.admin` before consulting the requested key, so both deny exactly when `perms.admin` is falsy and neither admits staff. One description is correct for both.
+
+  **A content-free description was replaced with the real condition.** `POST /stats/snapshot` already declared a 403 — so the gate never flagged it — but the description was the single word `Forbidden`, which tells a client nothing about how to avoid it. It is `requirePermission('admin')`, so it now says `Missing admin` like its five neighbours. Description-only; the response schema is byte-identical. **There are more of these** — `Not authorized` × 8 and `Forbidden` × 4 across the contract — and a bare 403 satisfies #494's gate exactly as well as a useful one does.
+
+  **The `403` in `statsHistory.ts` belongs to a different route, and attributing it here would have been wrong.** `AppError(403, 'Stats are private')` sits in `getUserStatHistory()`, which serves `/users/{id}/stats/history`; `GET /stats/history` calls `getSiteStatHistory()`, which contains no throw at all. A module-level grep for `403` cannot tell those apart — only reading which function the route calls can.
+
+  **Purely additive apart from that one correction, blast radius proved per operation**: exactly eight changed, all under `/stats`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
 - **`Messages` now documents the 401 its middleware answers — the twelfth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 141 gaps to 128.** Thirteen operations in one router file, **401 only**. Fully-documented operations went 236 to 249.
 
   **Both 403s this surface can answer were already documented, and both are correct.** `POST /messages/mass` is the only permission-gated route here (`messages_mass_pm`) and already declared `Missing messages_mass_pm`. `POST /messages/{id}/reply` is `requireAuth`-only — invisible to the gate — and already declared `Not a participant`, which `replyToConversation()` confirms: its **only** failure is `not_participant`, returned when the caller has no participant row on that conversation. So the slice adds no 403 and corrects none, the third surface in a row to come back clean on the axis the gate cannot see.
