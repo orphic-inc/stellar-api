@@ -8,6 +8,27 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **Twelve member-facing surfaces close the last of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline — 41 gaps to ZERO.** Thirty-nine operations across `/contributions`, `/posts`, `/search`, `/subscriptions`, `/friends`, `/notifications`, `/settings`, `/comments`, `/profile`, `/random`, `/downloads` and `/install`. **`347 contract routes gated, 347 fully documented, 0 gap(s) (0 baselined)`** — every auth failure the middleware chain can produce is now described, across twenty slices.
+
+  **`POST /downloads/{grantId}/reverse` is the burn-down's second any-of gate.** It is `...requirePermission('staff', 'admin')`, and `middleware/permissions.ts` evaluates `permissions.some(...)`, so the keys are alternatives — registered as `Missing staff or admin`. Assuming one key would have told clients an `admin`-only caller gets a 403 they do not get, exactly as it would have on `…/history/{historyId}/revert` in #513.
+
+  **`DELETE /notifications/{id}` answered a 403 nothing declared.** It is `requireAuth`-only and so invisible to the gate; the handler rejects a notification belonging to someone else. Registered as `Not the recipient`, matching the wording its already-correct sibling `POST /notifications/{id}/read` uses for the same test.
+
+  **Four content-free descriptions were replaced with the condition they actually describe**, since the slice already had those operations open (the rule recorded in #522: a bare 403 satisfies the gate exactly as well as a useful one).
+
+  | Operation                                 | Was              | Now                                                 |
+  | ----------------------------------------- | ---------------- | --------------------------------------------------- |
+  | `DELETE /posts/{id}`                      | `Not authorized` | `Not the post author`                               |
+  | `DELETE /posts/{id}/comments/{commentId}` | `Not authorized` | `Not the comment author`                            |
+  | `PUT /comments/{id}`                      | `Not authorized` | `Not the comment author`                            |
+  | `DELETE /comments/{id}`                   | `Not authorized` | `Not the comment author and missing reports_manage` |
+
+  The last is the one that was actively misleading: a `reports_manage` holder **can** delete someone else's comment, which `Not authorized` gave no hint of.
+
+  **Purely additive apart from those four descriptions, blast radius proved per operation and per surface**: exactly thirty-nine operations changed, the set of prefixes touched **equals** the twelve claimed, per-surface counts match the baseline's own breakdown, `components` byte-identical, path count unmoved at 267, and the four edited responses keep byte-identical schemas.
+
+  **What "zero" does and does not mean.** It means every failure the **middleware chain** can produce is documented — the guarantee #494's gate can actually enforce. It does **not** mean every 403 is described: a handler-thrown 403 stays invisible to that gate, which is why this burn-down kept finding them by reading (#511, #516, #518, #523, #525 and this slice). [#509](https://github.com/orphic-inc/stellar-api/issues/509) covers the routes whose gating is itself wrong, [#517](https://github.com/orphic-inc/stellar-api/issues/517) the non-auth codes nothing measures, and [#520](https://github.com/orphic-inc/stellar-api/issues/520) the `security` blocks — the other half of #494's own title, which its gate never read.
+
 - **Five staff-tooling surfaces now document the 401 and 403 their middleware answers — the nineteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline and the first BATCHED one, 70 gaps to 41.** Fifteen operations across `/donations`, `/email-blacklist`, `/ip-bans`, `/ratio-policy` and `/site-history`. Fully-documented operations went 293 to 308.
 
   | Surface            | Ops | Key                      | Codes |
