@@ -8,6 +8,24 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **Five staff-tooling surfaces now document the 401 and 403 their middleware answers — the nineteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline and the first BATCHED one, 70 gaps to 41.** Fifteen operations across `/donations`, `/email-blacklist`, `/ip-bans`, `/ratio-policy` and `/site-history`. Fully-documented operations went 293 to 308.
+
+  | Surface            | Ops | Key                      | Codes |
+  | ------------------ | --: | ------------------------ | ----: |
+  | `/site-history`    |   4 | `site_history_manage`    |     7 |
+  | `/donations`       |   3 | `admin`                  |     6 |
+  | `/email-blacklist` |   3 | `email_blacklist_manage` |     6 |
+  | `/ip-bans`         |   3 | `ip_bans_manage`         |     6 |
+  | `/ratio-policy`    |   2 | `ratio_policy_manage`    |     4 |
+
+  **Batching changes the PR, not the method.** Each surface got its own permission-key derivation, its own handler read with the corrected pattern from #523, and its own run of the insertion script; they share only a branch and a changelog entry. **All five are single-key with no any-of**, and **none has a handler-level 403** — the only other failures are `404`s for a missing row and one `400` for a malformed IPv4.
+
+  **The verification gains one assertion when a PR spans surfaces: the prefix SET, not one prefix.** A single-surface slice asserts every changed operation is under its prefix; a batch must assert the set of prefixes touched **equals** the set claimed, or an edit leaking into a sixth surface would pass a count-based check. It does: exactly fifteen operations changed, across exactly those five prefixes, and the per-surface code counts (7/6/6/6/4) match the baseline's own breakdown.
+
+  **`/site-history` is the only mixed surface here** — `GET /` is `requireAuth` and took the `401` alone, while the three writes are permission-gated. The other four are staff-only end to end, so every one of their operations took both codes.
+
+  Note `modules/donor.ts` throws three 403s that look adjacent to `/donations` and are **not** on it: `donations.ts` imports nothing from `donor.ts`, and those belong to the donor-perk surface. Attributing them here would have been the same error #522 avoided with `statsHistory.ts`.
+
 - **`Top10` now documents the 401 and 403 its middleware answers — the eighteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 78 gaps to 70, and the last single-surface slice.** Six operations in one router file; four member reads took **401 only** and two staff routes needed both. Fully-documented operations went 287 to 293.
 
   **Two different keys on one small surface**, which is why the insertion was driven by an explicit `{"METHOD /path": "key"}` map rather than a single key: `GET /top10/history` is `...requirePermission('staff')` and `POST /top10/snapshot` is `...requirePermission('admin')`. The map form asserts that the keys given and the operations needing a 403 are **exactly equal in both directions**, so assuming one key for the surface would have failed loudly instead of quietly mislabelling the snapshot route as staff-accessible.
