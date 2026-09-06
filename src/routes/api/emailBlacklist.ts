@@ -10,13 +10,27 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
+import {
+  normalizeEmail,
+  isMatchableBlacklistEntry
+} from '../../modules/emailBlacklist';
 
 const router = express.Router();
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
 
+// An entry is matched as either a full address or a bare domain, so anything
+// of neither shape would sit in the table unable to ever fire — the same
+// unmatchable-row problem that dropped 24 entries from the password denylist
+// (#536). Refusing it here surfaces the mistake while the author can still fix
+// it, rather than leaving a moderator believing someone is blocked.
 const emailBlacklistSchema = z.object({
-  email: z.string().min(1, 'Email or domain is required'),
+  email: z
+    .string()
+    .min(1, 'Email or domain is required')
+    .refine(isMatchableBlacklistEntry, {
+      message: 'Must be a full email address or a domain, e.g. spam.example'
+    }),
   comment: z.string().min(1, 'Comment is required')
 });
 
@@ -41,10 +55,12 @@ router.post(
   validate(emailBlacklistSchema),
   authHandler(async (req, res) => {
     const { email, comment } = parsedBody<EmailBlacklistInput>(res);
+    // Normalised on the way in exactly as the lookup normalises on the way out,
+    // so a mixed-case entry cannot be stored-but-unmatchable.
     const entry = await prisma.emailBlacklist.create({
       data: {
         userId: req.user.id,
-        email,
+        email: normalizeEmail(email),
         comment,
         addedAt: new Date()
       }
@@ -55,7 +71,7 @@ router.post(
       'emailblacklist.create',
       'EmailBlacklist',
       entry.id,
-      { email }
+      { email: entry.email }
     );
     res.status(201).json(entry);
   })

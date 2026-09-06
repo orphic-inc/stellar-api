@@ -7,6 +7,7 @@ import { computeRatio } from './ratio';
 import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
 import { getDefaultStylesheetName } from './stylesheet';
 import { normalizePassword } from './badPasswords';
+import { isEmailBlacklisted } from './emailBlacklist';
 
 /**
  * Is this password on the denylist?
@@ -131,6 +132,7 @@ type RegisterResult =
       reason:
         | 'user_exists'
         | 'bad_password'
+        | 'email_blacklisted'
         | 'registration_closed'
         | 'invite_required'
         | 'invalid_invite'
@@ -182,6 +184,13 @@ export const registerUser = async ({
     where: { OR: [{ email: email.toLowerCase() }, { username }] }
   });
   if (existing) return { ok: false, reason: 'user_exists' };
+
+  // Deliberately independent of the invite branch above: a blacklisted address
+  // holding a valid invite is precisely the case a moderator is trying to stop
+  // — someone banned returning through a friend.
+  if (await isEmailBlacklisted(email)) {
+    return { ok: false, reason: 'email_blacklisted' };
+  }
 
   if (await isPasswordBanned(password)) {
     return { ok: false, reason: 'bad_password' };
@@ -284,6 +293,13 @@ export const changeEmail = async (
     where: { email: newEmail.toLowerCase() }
   });
   if (taken) throw new AppError(400, 'Email already in use');
+
+  // Registration is not the only way an address enters the system. Guarding it
+  // alone would leave a member free to register clean and then move to a
+  // blacklisted address.
+  if (await isEmailBlacklisted(newEmail)) {
+    throw new AppError(400, 'That email address is not available');
+  }
 
   await prisma.$transaction([
     prisma.userEmailHistory.create({

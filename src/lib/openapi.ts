@@ -12701,6 +12701,10 @@ registry.registerPath({
       description: 'Created entry',
       content: { 'application/json': { schema: emailBlacklistItem } }
     },
+    400: {
+      description: 'Entry is neither an email address nor a domain',
+      content: { 'application/json': { schema: ValidationError } }
+    },
     401: {
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
