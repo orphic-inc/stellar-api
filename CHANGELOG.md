@@ -8,6 +8,20 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Requests` now documents the 401 its middleware answers, plus a 403 nothing had declared — the sixteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 94 gaps to 86.** Eight operations in one router file. Fully-documented operations went 275 to 283.
+
+  **This surface has no permission middleware at all** — every authorization is a handler or module decision, so #494's gate asked only for `401` on all eight. The real work was following the thin routes into `modules/requestLifecycle.ts`, where four functions throw 403 (`updateRequest`, `fillRequest`, `unfillRequest`, `deleteRequest`) and one more sits in the router itself.
+
+  **`POST /requests` answers a 403 that nothing declared.** The handler checks `hasPermission(perms, 'requests_create')` inline and throws — registered now as `Missing requests_create`.
+
+  **`DELETE /requests/{id}` had an incomplete description, and the shape is the one #516 found on `unclaim`: one code, two independent causes.** It said `Neither the owner nor a request moderator`, which is true of the first check — but `deleteRequest()` has a **second**, separate throw: a **filled** request can only be deleted by a request moderator, so the owner of a filled request is denied despite passing the first test. Now reads `Neither the owner nor a request moderator, or the request is filled and the caller is not a request moderator`. Description-only; the response schema is byte-identical.
+
+  **The other three were already correct**, checked rather than assumed: `PUT /requests/{id}` (`Neither the owner nor a request moderator`), `POST /requests/{id}/unfill` (`Neither owner, filler, nor a request moderator`) and `POST /requests/{id}/fill` (`You can only fill a request with your own contribution`, an ownership test on the _contribution_ rather than the request).
+
+  **Purely additive apart from that one correction**: exactly eight operations changed, all under `/requests`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
+  Note that `GET /requests` and `GET /requests/{id}` are **ungated** and so were never in this baseline — they are [#509](https://github.com/orphic-inc/stellar-api/issues/509)'s territory, not this slice's.
+
 - **`Rules` now documents the 401 and 403 its middleware answers — the fifteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 103 gaps to 94.** Six operations in one router file; three needed both codes under a uniform `rules_manage`, three took **401 only**. Fully-documented operations went 269 to 275.
 
   **The cleanest surface in the burn-down.** The three reads are `requireAuth` and the three writes are `...requirePermission('rules_manage')`, single-key throughout — no any-of, no second key, no per-route variation. Searched with the corrected pattern from #523 (`\.status(4\|\.status(5\|AppError(`, which catches the prettier-wrapped chains the old `res\.status(` missed): this router has **no handler-level 403 at all**, only `404`, `409` and one `400`. So `Missing rules_manage` is the whole story for every 403 here.
