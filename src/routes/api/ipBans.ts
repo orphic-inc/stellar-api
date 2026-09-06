@@ -25,11 +25,18 @@ const ipBanIdParamsSchema = z.object({
 // nginx listens on [::]:80.
 const ipBanSchema = z
   .object({
-    fromIp: z.string().refine((v) => normalizeIp(v) !== null, {
-      message: 'Invalid IP address'
-    }),
+    fromIp: z
+      .string()
+      // 45 is the longest legal textual address (a fully written IPv4-mapped
+      // IPv6). Bounding it before the normaliser's regexes see the value keeps
+      // an arbitrarily long body out of them.
+      .max(45)
+      .refine((v) => normalizeIp(v) !== null, {
+        message: 'Invalid IP address'
+      }),
     toIp: z
       .string()
+      .max(45)
       .refine((v) => normalizeIp(v) !== null, {
         message: 'Invalid IP address'
       })
