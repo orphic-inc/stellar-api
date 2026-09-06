@@ -1,9 +1,9 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { z } from 'zod';
 import { RatioExempt } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { sizeBytesToNumber } from '../../../lib/serialize';
-import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
+import { authHandler } from '../../../modules/asyncHandler';
 import {
   createContributionSubmission,
   setContributionRatioExempt
@@ -13,6 +13,7 @@ import { recordContributionReport } from '../../../modules/linkHealth';
 import { emitNotifications } from '../../../lib/notifications';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
+import { assertCommunityAccess } from '../../../modules/communityAccess';
 import {
   parsedBody,
   validate,
@@ -97,12 +98,25 @@ router.get(
   })
 );
 
-// GET /api/contributions/:id
+// GET /api/contributions/:id — your own, or one in a community you can reach
+//
+// This read had no ownership check and no community check (#509 F6), which put
+// it at odds with its own sibling: `GET /contributions` is
+// `where: { userId: req.user.id }` — your own contributions only — while this
+// route served anyone's by id. It does not expose `downloadUrl` (the list does,
+// for your own rows, and grants go through `/contributions/:id/access`), but it
+// does carry contributor identity, sizes, `ratioExempt`, link status and the
+// release.
+//
+// Ownership is checked first and independently of the community. A member who
+// contributed and later lost access to that community still appears in their
+// own `/contributions` list, so refusing them the detail would make their own
+// list link to a 403.
 router.get(
   '/:id',
   requireAuth,
   validateParams(contributionIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const contribution = await prisma.contribution.findUnique({
       where: { id },
@@ -135,6 +149,16 @@ router.get(
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Contribution not found' });
+
+    // `Release.communityId` is nullable, and a release with no community has no
+    // membership to test — the same arm the search scope carries for exactly
+    // this reason (#509 F2). Gating those would hide rows that were never
+    // community-scoped at all.
+    const communityId = contribution.release?.communityId ?? null;
+    if (contribution.userId !== req.user.id && communityId !== null) {
+      await assertCommunityAccess(communityId, req.user.id);
+    }
+
     res.json({
       ...contribution,
       sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes),

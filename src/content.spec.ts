@@ -183,6 +183,92 @@ describe('API content and shared flows', () => {
     expect(res.body.id).toBe(5);
   });
 
+  // ── #509 F6: the detail read is scoped to the release's community ──
+
+  const contributionRow = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 5,
+      userId: 7,
+      releaseId: 3,
+      contributorId: null,
+      releaseDescription: 'Seeded',
+      sizeInBytes: 1234,
+      approvedAccountingBytes: 1234,
+      linkStatus: 'PASS',
+      linkCheckedAt: null,
+      type: 'flac',
+      releaseFile: {
+        bitrate: null,
+        hasLog: false,
+        hasCue: false,
+        isScene: false
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: { id: 7, username: 'kai' },
+      release: { id: 3, title: 'Kind of Blue', communityId: 9 },
+      collaborators: [],
+      comments: [],
+      ...over
+    }) as never;
+
+  it('lets the owner read their own contribution without a community check', async () => {
+    // Ownership is tested first and independently: a member who contributed
+    // and later lost access to that community still sees the row in their own
+    // /contributions list, so the detail must not 403 on them.
+    prismaMock.contribution.findUnique.mockResolvedValue(contributionRow());
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("lets a member of the release's community read someone else's", async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue(
+      contributionRow({ userId: 99, user: { id: 99, username: 'other' } })
+    );
+    prismaMock.community.findUnique.mockResolvedValue({
+      registrationStatus: 'open'
+    } as never);
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a non-member someone else's contribution", async () => {
+    prismaMock.contribution.findUnique.mockResolvedValue(
+      contributionRow({ userId: 99, user: { id: 99, username: 'other' } })
+    );
+    prismaMock.community.findUnique.mockResolvedValue({
+      registrationStatus: 'closed'
+    } as never);
+    prismaMock.community.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('does not gate a contribution whose release has no community', async () => {
+    // Release.communityId is nullable; a release with no community has no
+    // membership to test, and gating it would hide rows that were never
+    // community-scoped (the same arm the search scope carries).
+    prismaMock.contribution.findUnique.mockResolvedValue(
+      contributionRow({
+        userId: 99,
+        user: { id: 99, username: 'other' },
+        release: { id: 3, title: 'Kind of Blue', communityId: null }
+      })
+    );
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findUnique).not.toHaveBeenCalled();
+  });
+
   it('rejects contribution creation for invalid download URLs when domains are enforced', async () => {
     prismaMock.siteSettings.upsert.mockResolvedValue({
       id: 1,

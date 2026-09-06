@@ -18428,8 +18428,18 @@
               }
             }
           },
+          "403": {
+            "description": "Not a member of the release’s community",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "Contribution not found",
+            "description": "Contribution not found, or its community does not exist",
             "content": {
               "application/json": {
                 "schema": {
