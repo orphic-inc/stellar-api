@@ -8,6 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Bookmarks` now documents the 401 its middleware answers — the eleventh slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 154 gaps to 141.** Thirteen operations, **401 only — the first surface in the burn-down with no 403 anywhere**. Fully-documented operations went 223 to 236.
+
+  **The surface really is that simple, and it was verified rather than assumed.** All thirteen routes are `requireAuth` with no permission middleware, no `loadPermissions`/`hasPermission` call in any handler, and no `res.status(4xx)` or `AppError` anywhere in the router. The one module they delegate to — `removeConsumedReleaseBookmarks()` — cannot throw an HTTP error either. So `401` is the complete set of failures, not just the ones the gate can see.
+
+  **It also needed a different edit, because twelve of the thirteen operations come from ONE source block.** `registerBookmark(segment, paramName, item)` is called four times (`artists`, `releases`, `communities`, `requests`) and registers three operations each. The insertion script used for every slice since #506 matches one registration block per operation, so it **refused to run** — its "baseline names operations with no registration" assertion fired, naming all twelve, instead of silently doing nothing. The fix was four hand edits: three inside the helper, one on the standalone `DELETE /bookmarks/releases/consumed`.
+
+  **The risk that creates is leakage**, and it is what the per-operation diff is for: an edit inside a shared helper could touch operations the slice never intended. Exactly thirteen operations changed, **all under `/bookmarks`**, each gaining only its `401`, `components` byte-identical, path count unmoved at 267.
+
+  This also confirms the honest caveat recorded on [#517](https://github.com/orphic-inc/stellar-api/issues/517): the twelve `/bookmarks` operations that declare no non-auth `4xx` are **correctly** silent, not omissions. That surface was the reason for stating the 47 param-bearing candidates there as candidates rather than as a defect list.
+
 - **`Collages` now documents the 401 and 403 its middleware answers — the tenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 169 gaps to 154.** Thirteen operations in one router file. Eleven took **401 only**; two needed both, under `collages_moderate`. Fully-documented operations went 210 to 223.
 
   **This is the most handler-authorized surface the burn-down has met, and it was already documented.** Seven `requireAuth`-only operations perform their authorization inside the handler — `#494`'s gate is structurally blind to every one of them — and all seven already declared a `403`. The reason is visible in the code: `loadActiveCollage()` deliberately does _not_ carry authorization with it, because the five routes sharing that load each gate differently afterwards, so each route states its own rule and the registry had followed suit.
