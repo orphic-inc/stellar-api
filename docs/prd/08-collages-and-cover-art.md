@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Owner:** @obrien-k
 **Extends:** [PRD-01 Community-Score / CRS](01-Community-Score.md) (contribution weighting) · **Relates:** [PRD-03 Stylesheets](03-stylesheet-themes-and-scoring.md) (CommunityStylesheet ↔ Collage/Contest), [PRD-04 Contribution/Release/Music](04-contribution-release-music.md) (Edition/lossless model — forthcoming)
-**Decisions:** stellar-ui [ADR-0001 Injected Theme Contract](../../../stellar-ui/docs/adr/0001-injected-theme-contract.md) (the `data-st` / `--st-*` contract the Collage surface targets)
+**Decisions:** stellar-ui [ADR-0005 Injected Theme Contract](https://github.com/orphic-inc/stellar-ui/blob/main/docs/adr/0005-injected-theme-contract.md) (the `data-st` / `--st-*` contract the Collage surface targets)
 **Numbering:** PRD-01 Community-Score · PRD-02 IRC & Announce · PRD-03 Stylesheets · PRD-04 Contribution/Release/Music · PRD-05 Rules & Governance · PRD-06 Ratio · PRD-07 Donations · **PRD-08 Collages & Cover Art**
 
 > Lean PRD. Captures the decided shape of a Collage surface, anchored to a **measured corpus** rather than a greenfield guess, and maps each concept to existing code so this is a red-green descent.
@@ -37,15 +37,15 @@ Three patterns the corpus makes non-negotiable:
 
 ## Concept → existing code (the descent map)
 
-| Concept                        | Lives in                                                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collage CRUD / entries / subs  | `stellar-api` collage routes; `stellar-ui` `collageApi.ts`, `components/collages/`                                                          |
-| Collage detail surface         | `stellar-ui` `CollageDetail.tsx` (flat today — the gap)                                                                                     |
-| **Edition / lossless model**   | **PRD-04** (Contribution/Release/Music) — net-new                                                                                           |
-| Contribution weighting → CRS   | [PRD-01](01-Community-Score.md) `ContributionScore`, `statsHistory.ts`                                                                      |
-| Theme contract for the surface | stellar-ui [ADR-0001](../../../stellar-ui/docs/adr/0001-injected-theme-contract.md), `src/global.css` (`data-st` hooks seeded for this PRD) |
-| CommunityStylesheet ↔ Collage | [PRD-03](03-stylesheet-themes-and-scoring.md) (CommunityStylesheet is "Community-scoped theme — tied to Contests")                          |
-| Comments                       | `stellar-ui` `CommentsSection`                                                                                                              |
+| Concept                        | Lives in                                                                                                                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collage CRUD / entries / subs  | `stellar-api` collage routes; `stellar-ui` `collageApi.ts`, `components/collages/`                                                                                         |
+| Collage detail surface         | `stellar-ui` `CollageDetail.tsx` (flat today — the gap)                                                                                                                    |
+| **Edition / lossless model**   | **PRD-04** (Contribution/Release/Music) — net-new                                                                                                                          |
+| Contribution weighting → CRS   | [PRD-01](01-Community-Score.md) `ContributionScore`, `statsHistory.ts`                                                                                                     |
+| Theme contract for the surface | stellar-ui [ADR-0005](https://github.com/orphic-inc/stellar-ui/blob/main/docs/adr/0005-injected-theme-contract.md), `src/global.css` (`data-st` hooks seeded for this PRD) |
+| CommunityStylesheet ↔ Collage  | [PRD-03](03-stylesheet-themes-and-scoring.md) (CommunityStylesheet is "Community-scoped theme — tied to Contests")                                                         |
+| Comments                       | `stellar-ui` `CommentsSection`                                                                                                                                             |
 
 ## Red-green descent targets
 
@@ -61,4 +61,4 @@ Three patterns the corpus makes non-negotiable:
 - Is `Collector` (bulk download in preferred format) in scope v1, or deferred?
 - CommunityStylesheet scoping to a Collage/Contest — **with PRD-03**.
 
-**Resolved:** the surface targets the `data-st`/`--st-*` contract (ADR-0001), not Tailwind overrides · the field inventory + activity model come from the measured corpus, not greenfield.
+**Resolved:** the surface targets the `data-st`/`--st-*` contract (stellar-ui ADR-0005), not Tailwind overrides · the field inventory + activity model come from the measured corpus, not greenfield.
