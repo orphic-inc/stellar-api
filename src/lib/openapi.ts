@@ -9053,6 +9053,14 @@ registry.registerPath({
     200: {
       description: "User's ratio policy state",
       content: { 'application/json': { schema: RatioPolicyState } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ratio_policy_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -9075,6 +9083,14 @@ registry.registerPath({
     200: {
       description: 'Override applied',
       content: { 'application/json': { schema: RatioPolicyState } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ratio_policy_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'User not found',
@@ -12095,6 +12111,10 @@ registry.registerPath({
     200: {
       description: 'Site history entries',
       content: { 'application/json': { schema: z.array(siteHistoryEntry) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12111,6 +12131,14 @@ registry.registerPath({
     201: {
       description: 'Created entry',
       content: { 'application/json': { schema: siteHistoryBase } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing site_history_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12129,6 +12157,14 @@ registry.registerPath({
       description: 'Updated entry',
       content: { 'application/json': { schema: siteHistoryBase } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing site_history_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -12144,6 +12180,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing site_history_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -12253,6 +12297,14 @@ registry.registerPath({
     200: {
       description: 'Donation log',
       content: { 'application/json': { schema: paged(donationItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12276,6 +12328,14 @@ registry.registerPath({
       description: 'Donation recorded',
       content: { 'application/json': { schema: donationItem } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'User not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -12291,6 +12351,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing admin',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -12321,6 +12389,14 @@ registry.registerPath({
     200: {
       description: 'Blacklisted emails',
       content: { 'application/json': { schema: z.array(emailBlacklistItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing email_blacklist_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12337,6 +12413,14 @@ registry.registerPath({
     201: {
       description: 'Created entry',
       content: { 'application/json': { schema: emailBlacklistItem } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing email_blacklist_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12349,6 +12433,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing email_blacklist_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -12377,6 +12469,14 @@ registry.registerPath({
     200: {
       description: 'IP bans',
       content: { 'application/json': { schema: z.array(ipBanItem) } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ip_bans_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12393,6 +12493,14 @@ registry.registerPath({
     201: {
       description: 'Created ban',
       content: { 'application/json': { schema: ipBanItem } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ip_bans_manage',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -12405,6 +12513,14 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing ip_bans_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Not found',
       content: { 'application/json': { schema: MsgResponse } }
