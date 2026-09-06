@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { canAccessForumLevel } from '../lib/userRankAccess';
@@ -29,3 +31,30 @@ export const assertForumReadAccess = async (
     throw new AppError(403, 'Insufficient class to read this forum');
   }
 };
+
+/**
+ * The same rule as `canAccessForumLevel`, expressed as a `where` fragment.
+ *
+ * The assert above answers "may this member read forum X?" one forum at a time,
+ * which is all a topic or post route needs — it already knows its `forumId`.
+ * A *search* has the question the other way round: it spans every forum at once
+ * and must never surface a row from one the caller cannot read. There is no
+ * forum id to check, so the rule has to travel into the query.
+ *
+ * The two must stay in step. `forumAccess.spec.ts` asserts the fragment and the
+ * predicate agree over a matrix of levels and permits — the drift ADR-0010
+ * warns about, and the reason this lives next to its predicate rather than in
+ * the one route that currently needs it.
+ *
+ * Both arms are required, and the second is not cosmetic: `permittedForumIds`
+ * grants a specific forum to a rank *below* its read floor, so a level-only
+ * filter would hide forums the member has been explicitly admitted to.
+ */
+export const forumReadableWhere = (
+  user: Pick<AuthUser, 'userRankLevel'> & { permittedForumIds?: number[] }
+): Prisma.ForumWhereInput => ({
+  OR: [
+    { minClassRead: { lte: user.userRankLevel } },
+    { id: { in: user.permittedForumIds ?? [] } }
+  ]
+});

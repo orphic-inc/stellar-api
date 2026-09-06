@@ -11,6 +11,7 @@ jest.mock('../lib/prisma', () => ({
 import { RegistrationStatus } from '@prisma/client';
 import {
   COMMUNITY_ROLES,
+  communityReadableWhere,
   communityRoleUnion,
   hasCommunityAccess,
   listCommunityMembers
@@ -130,5 +131,51 @@ describe('hasCommunityAccess', () => {
     await expect(
       hasCommunityAccess(1, 7, RegistrationStatus.invite)
     ).resolves.toBe(false);
+  });
+});
+
+describe('communityReadableWhere', () => {
+  it('is the gate composed as a filter: open OR the role union', () => {
+    expect(communityReadableWhere(7)).toEqual({
+      OR: [
+        { registrationStatus: RegistrationStatus.open },
+        communityRoleUnion(7)
+      ]
+    });
+  });
+
+  // The guard: `hasCommunityAccess` short-circuits on `open` and otherwise
+  // queries the union, and the fragment has to reach the same verdict without
+  // being able to ask (#509). A search has no single community to gate, so the
+  // rule exists twice; only this keeps the two in step.
+  it.each([
+    { status: RegistrationStatus.open, inUnion: false, expected: true },
+    { status: RegistrationStatus.open, inUnion: true, expected: true },
+    { status: RegistrationStatus.closed, inUnion: true, expected: true },
+    { status: RegistrationStatus.closed, inUnion: false, expected: false }
+  ])(
+    'agrees with hasCommunityAccess ($status, member=$inUnion)',
+    async ({ status, inUnion, expected }) => {
+      mockPrismaCommunity.findFirst.mockResolvedValueOnce(
+        inUnion ? { id: 1 } : null
+      );
+      await expect(hasCommunityAccess(1, 7, status)).resolves.toBe(expected);
+
+      // Evaluate the fragment's two arms against the same community.
+      const arms = communityReadableWhere(7).OR as Array<
+        Record<string, unknown>
+      >;
+      const openArm = arms[0] as { registrationStatus: RegistrationStatus };
+      const matches = openArm.registrationStatus === status || inUnion;
+      expect(matches).toBe(expected);
+    }
+  );
+
+  it('carries no visibility arm either', () => {
+    // Same hard constraint as the union it wraps: `announceVisibility` routes
+    // announcements and must never become an authorization gate (ADR-0030).
+    expect(JSON.stringify(communityReadableWhere(7))).not.toContain(
+      'announceVisibility'
+    );
   });
 });

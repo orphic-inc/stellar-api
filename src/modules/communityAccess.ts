@@ -144,6 +144,35 @@ export const hasCommunityAccess = async (
 };
 
 /**
+ * The same question `hasCommunityAccess` asks — `open || roleUnion` — expressed
+ * as a `where` fragment over communities.
+ *
+ * The gate above answers it for one community the caller has already named, so
+ * a browse route can load-then-gate and throw. A *search* names no community:
+ * it spans them all, and a row from a `PRIVATE` community the caller does not
+ * belong to must simply not be in the result set. There is nothing to throw
+ * about, so the rule has to travel into the query instead.
+ *
+ * **A search filters where a browse refuses**, and that difference is
+ * deliberate. `assertCommunityAccess` answers 403 because the caller asked for
+ * a specific community and is owed a straight answer. Making search do the same
+ * would turn every query into an existence oracle for private communities —
+ * `?communityId=N` returning 403 rather than an empty page confirms N is real
+ * and private. Filtering leaks nothing.
+ *
+ * `communityAccess.spec.ts` asserts this agrees with `hasCommunityAccess` over
+ * the same inputs; they are one rule with two shapes and must not drift.
+ */
+export const communityReadableWhere = (
+  userId: number
+): Prisma.CommunityWhereInput => ({
+  OR: [
+    { registrationStatus: RegistrationStatus.open },
+    communityRoleUnion(userId)
+  ]
+});
+
+/**
  * Load a community the user is allowed to reach, or throw the 404/403 the
  * route would have sent. The load-then-gate shape every module-side caller
  * needs, so the gate can't be forgotten between the two.

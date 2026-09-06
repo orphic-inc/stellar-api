@@ -6,6 +6,24 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Forum search returned every post body on the site, ignoring forum read class** ([#509](https://github.com/orphic-inc/stellar-api/issues/509)) — `GET /search/log` filtered on `deletedAt: null` and nothing else, while its `POST_SELECT` returns the full post **`body`**. Forum class is enforced everywhere else (`assertForumReadAccess` on the post and topic routes, `canAccessForumLevel` inside `getTopicSession`), but `search.ts` contained **no `minClassRead`, no `canAccessForumLevel` and no `userRankLevel` anywhere in the file**. This was reachable in the shipped default configuration: `bootstrap.ts` seeds forums at `minClassRead: 500` (Staff+), so any authenticated member could read staff forum posts by searching for them.
+
+  **The rule had to travel into the query**, because a search has no single `forumId` to hand the existing assert. `modules/forumAccess.ts` now also exports `forumReadableWhere(user)` — the same rule as `canAccessForumLevel`, shaped as a `Prisma.ForumWhereInput`. Both arms matter: `permittedForumIds` admits a rank to a specific forum _below_ its read floor, so a level-only filter would have hidden forums a member was explicitly granted.
+
+- **Release and request search ignored community membership** ([#509](https://github.com/orphic-inc/stellar-api/issues/509)) — `communityId` was only ever a caller-supplied _filter_ (`if (communityIds) where.communityId = { in: communityIds }`), never a restriction, so `GET /search/releases` returned releases from `PRIVATE` communities the caller does not belong to. `GET /search/requests` had the same gap and its projection carries the community's **name**.
+
+  The contrast was one function deep and is what makes this a defect rather than a design choice: the browse path `GET /communities/{communityId}/releases` delegates to `listCommunityReleases`, whose first statement is `assertCommunityAccess`. **The same rows were gated on one path and open on the other.** `modules/communityAccess.ts` now exports `communityReadableWhere(userId)` — `open || roleUnion`, the same question `hasCommunityAccess` asks, as a `Prisma.CommunityWhereInput`.
+
+  **A search filters where a browse refuses, deliberately.** `assertCommunityAccess` answers 403 because the caller named one community and is owed a straight answer; making search do the same would turn `?communityId=N` into an existence oracle for private communities, where a 403 rather than an empty page confirms N is real and private.
+
+  **No contract change, and nothing downstream to re-vendor.** These routes filter rather than reject, so they answer no new status codes: `openapi:completeness` and `openapi:auth-coverage` both stay at zero, and stellar-ui owes no `api:sync` for this.
+
+  **Two things this deliberately does not do.** `Release.communityId` is nullable, so the scope carries a `communityId: null` arm — without it the fix would have hidden community-less releases that were never private, turning a security fix into a regression. And the scope **appends to `AND`** rather than assigning it, because `tagMode=all` already puts an array there; the existing `tagMode=all` test now asserts both tag arms survive alongside the scope, which is the regression that would otherwise have been silent.
+
+  **`GET /search/artists` needed no change** — `Artist` carries no community and the projection exposes name, vanity-house flag, tags and a credit count. An earlier note on #509 grouped it with the other two; that was wrong.
+
 ### Added
 
 - **Twelve member-facing surfaces close the last of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline — 41 gaps to ZERO.** Thirty-nine operations across `/contributions`, `/posts`, `/search`, `/subscriptions`, `/friends`, `/notifications`, `/settings`, `/comments`, `/profile`, `/random`, `/downloads` and `/install`. **`347 contract routes gated, 347 fully documented, 0 gap(s) (0 baselined)`** — every auth failure the middleware chain can produce is now described, across twenty slices.
