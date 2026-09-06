@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import { randomUUID } from 'crypto';
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
+import { rejectBannedIps } from './middleware/ipBan';
 import cors from 'cors';
 
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -114,6 +115,12 @@ export const createApp = () => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
   app.use(cookieParser());
+
+  // Before routing, so a banned network is refused everywhere — including on
+  // routes that need no session, and including a caller who already holds a
+  // valid cookie. Placed after `trust proxy` above, which is what makes `req.ip`
+  // the address nginx observed rather than one the client chose (#542).
+  app.use(rejectBannedIps);
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();

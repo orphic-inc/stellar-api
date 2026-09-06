@@ -12785,6 +12785,11 @@ registry.registerPath({
       description: 'Created ban',
       content: { 'application/json': { schema: ipBanItem } }
     },
+    400: {
+      description:
+        'Invalid IP address, reversed bounds, or a range spanning both address families',
+      content: { 'application/json': { schema: ValidationError } }
+    },
     401: {
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }

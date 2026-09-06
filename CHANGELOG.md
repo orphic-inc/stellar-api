@@ -8,6 +8,28 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **IP bans did nothing, and the schema could not have expressed them correctly anyway** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `IpBan` shipped with CRUD routes, an `ip_bans_manage` permission and OpenAPI registration, and nothing ever read the table. A moderator could ban a network, receive a 201, see it listed, and it did nothing. This is the second half of #540; the email blacklist was the first.
+
+  **Enforcement could not land before [#542](https://github.com/orphic-inc/stellar-api/issues/542).** With `trust proxy` unset and the client IP read from a hand-parsed `X-Forwarded-For`, a ban would have been bypassable with one header — a control that _appears_ to work, which is worse than one that plainly does not.
+
+  **The columns were wrong in three ways**, and fixing them was a precondition, not a tidy-up:
+
+  1. `fromIp`/`toIp` were **signed** 32-bit `Int`s, so every address from `128.0.0.0` up stored negative. A range crossing that boundary — `100.0.0.0` to `200.0.0.0` — stored `from = 1677721600` and `to = -939524096`, and no `from <= c AND to >= c` can be satisfied by those. **The route's validator accepted such ranges**, so staff could create a ban that silently matched nothing.
+  2. **IPv6 was unrepresentable**, while nginx listens on `[::]:80` — so IPv6 clients connected and could never be banned.
+  3. `req.ip` yields the IPv4-mapped form (`::ffff:8.8.8.8`) on a dual-stack socket, which the IPv4-only parser rejected outright.
+
+  Both bounds are now the full 128-bit address as **32 lowercase hex characters**, IPv4 mapped into `::ffff:0:0/96`. Fixed width is the point: lexicographic order equals numeric order, so range containment is correct in SQL for both families and an ordinary btree index serves it. Prisma's generated migration for the type change carried **no `USING` clause**, which would have cast each `Int` to its decimal string and quietly turned every existing ban into an unmatchable value; the conversion is explicit and recovers the unsigned value with `::bigint & 4294967295`.
+
+  **The check runs before routing**, so a banned network is refused everywhere — including on routes needing no session, and including a caller already holding a valid cookie. It applies to everyone, staff included: an exemption would have to load the session first, defeating "refused before routing" and adding a bypass path, and a moderator who bans their own network can be readmitted from elsewhere, whereas a wrong exemption is a hole nobody sees. The list is cached for 60s and invalidated on every ban write, so a ban a moderator just typed bites immediately.
+
+  **It fails open** — an unparseable address, or a database error during the check, allows the request. A ban that misses is recoverable; a site that refuses everyone is not.
+
+### Changed
+
+- **The IP ban admin surface accepts IPv6, and refuses ranges it cannot mean** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `POST /api/ip-bans` still takes addresses and returns them, so the API shape is unchanged, but it now accepts IPv6 bounds and rejects a range spanning both address families (the space between them is every IPv4-mapped address plus most of IPv6, which is never what a moderator means). The reversed-bounds check is now correct for ranges the previous signed-`Int` version accepted and then stored unsatisfiably. Its **400** is registered in the contract, which it could always answer and never declared.
+
+### Fixed
+
 - **Every client IP this API recorded was attacker-controlled, and all rate limiting shared one bucket site-wide** ([#542](https://github.com/orphic-inc/stellar-api/issues/542)) — `trust proxy` was never set, while three call sites read `X-Forwarded-For` by hand and took `.split(',')[0]`. nginx sets `X-Forwarded-For: $proxy_add_x_forwarded_for`, which **appends** the real peer to whatever the client sent, so the first entry is the client's own claim. A request carrying `X-Forwarded-For: 1.2.3.4` was recorded as coming from `1.2.3.4`. Not a misconfiguration risk — the shipped behaviour.
 
   **`User.lastIp`, `UserSession.ipAddress` and `UserEmailHistory.ipAddress` were all written from that value**, and `GET /users/duplicate-ips` — the staff tool for spotting ban evasion and multi-accounting — reads nothing else. Anyone evading a ban could ensure their accounts never shared a recorded IP, or make innocent accounts appear to.
