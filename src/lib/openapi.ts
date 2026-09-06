@@ -11827,6 +11827,14 @@ registry.registerPath({
     401: {
       description: 'Not authenticated',
       content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Not a member of this community',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Community not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });

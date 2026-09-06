@@ -19,17 +19,27 @@ const BASE = '/api/communities/5/dnc';
 // ─── GET /api/communities/:communityId/dnc ─────────────────────────────────────
 
 describe('GET /api/communities/:communityId/dnc', () => {
-  it('returns the DNC list for any authenticated user', async () => {
-    prismaMock.doNotContribute.findMany.mockResolvedValue([
-      {
-        id: 1,
-        communityId: 5,
-        name: 'Pirate Label',
-        comment: 'Known bootlegger',
-        userId: 7,
-        createdAt: new Date('2026-01-01')
-      }
-    ] as never);
+  // #509 F5. This route is deliberately MEMBER-facing, not staff-only — the UI
+  // renders the list in ContributeForm as the "must not be contributed"
+  // warning. What changed is that it is now scoped to the community: it was
+  // readable across every community by any authenticated member.
+  const dncRows = [
+    {
+      id: 1,
+      communityId: 5,
+      name: 'Pirate Label',
+      comment: 'Known bootlegger',
+      userId: 7,
+      createdAt: new Date('2026-01-01')
+    }
+  ];
+
+  it('returns the list to a member of the community', async () => {
+    // `open` short-circuits hasCommunityAccess without touching the union.
+    prismaMock.community.findUnique.mockResolvedValue({
+      registrationStatus: 'open'
+    } as never);
+    prismaMock.doNotContribute.findMany.mockResolvedValue(dncRows as never);
     prismaMock.user.findMany.mockResolvedValue([] as never);
 
     const res = await request(app).get(BASE);
@@ -37,6 +47,42 @@ describe('GET /api/communities/:communityId/dnc', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe('Pirate Label');
+  });
+
+  it('admits a member of a closed community via the role union', async () => {
+    prismaMock.community.findUnique.mockResolvedValue({
+      registrationStatus: 'closed'
+    } as never);
+    prismaMock.community.findFirst.mockResolvedValue({ id: 5 } as never);
+    prismaMock.doNotContribute.findMany.mockResolvedValue(dncRows as never);
+    prismaMock.user.findMany.mockResolvedValue([] as never);
+
+    const res = await request(app).get(BASE);
+
+    expect(res.status).toBe(200);
+  });
+
+  it('refuses a non-member of a closed community', async () => {
+    // The behaviour this fix exists for: the free-text `comment` staff write
+    // about why something is banned is no longer readable across communities.
+    prismaMock.community.findUnique.mockResolvedValue({
+      registrationStatus: 'closed'
+    } as never);
+    prismaMock.community.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get(BASE);
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.doNotContribute.findMany).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a community that does not exist', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get(BASE);
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.doNotContribute.findMany).not.toHaveBeenCalled();
   });
 });
 
