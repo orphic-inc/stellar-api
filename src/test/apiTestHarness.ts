@@ -521,6 +521,7 @@ export const resetApiTestState = (): void => {
     maxUsers: 7000,
     dismissedLaunchChecklist: [],
     installedAt: null,
+    badPasswordsSeededAt: null,
     updatedAt: new Date()
   });
   prismaMock.$transaction.mockImplementation(async (arg: unknown) => {

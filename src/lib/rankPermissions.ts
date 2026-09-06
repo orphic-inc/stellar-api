@@ -215,6 +215,11 @@ export const PERMISSION_GROUPS = [
         description: 'Manage blacklisted email domains and addresses.'
       },
       {
+        key: 'bad_passwords_manage',
+        label: 'Manage password denylist',
+        description: 'Manage the passwords members are not allowed to set.'
+      },
+      {
         key: 'donor_ranks_manage',
         label: 'Manage donor ranks',
         description: 'Manage donor ranks and donor assignments.'

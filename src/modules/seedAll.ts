@@ -26,12 +26,16 @@ import { seedGoldenRules } from './goldenRules';
 import { seedAssetFixtures } from './assetFixtures';
 import { seedStylesheetFixtures } from './stylesheetFixtures';
 import { seedWikiFixtures } from './wikiFixtures';
+import { seedBadPasswords } from './badPasswords';
 
 export async function seedAll(client: PrismaClient): Promise<void> {
   await seedRanks(client);
   await seedRankPromotionRules(client);
   await seedForums(client);
   await seedGoldenRules(client);
+  // Independent of everything else here — it needs no users, ranks or forums,
+  // and writes only bad_passwords plus the marker on site_settings.
+  await seedBadPasswords(client);
   // Theme imagery must land before the stylesheets referencing it, or an
   // asset-bearing theme is briefly served with dangling /api/asset targets.
   await seedAssetFixtures(client);

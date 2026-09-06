@@ -22,6 +22,7 @@ const seedGoldenRules = jest.fn();
 const seedStylesheetFixtures = jest.fn();
 const seedAssetFixtures = jest.fn();
 const seedWikiFixtures = jest.fn();
+const seedBadPasswords = jest.fn();
 
 const SYSTEM_USER_ID = 4242;
 
@@ -42,6 +43,9 @@ jest.mock('./stylesheetFixtures', () => ({
 }));
 jest.mock('./wikiFixtures', () => ({
   seedWikiFixtures: (...a: unknown[]) => seedWikiFixtures(...a)
+}));
+jest.mock('./badPasswords', () => ({
+  seedBadPasswords: (...a: unknown[]) => seedBadPasswords(...a)
 }));
 
 import { seedAll } from './seedAll';
@@ -66,7 +70,8 @@ describe('seedAll', () => {
       seedSystemUser,
       seedAssetFixtures,
       seedStylesheetFixtures,
-      seedWikiFixtures
+      seedWikiFixtures,
+      seedBadPasswords
     ]) {
       expect(fn).toHaveBeenCalledTimes(1);
       expect(fn.mock.calls[0][0]).toBe(client);

@@ -12559,6 +12559,100 @@ registry.registerPath({
   }
 });
 
+// ─── Bad passwords (denylist) ────────────────────────────────────────────────
+
+const badPasswordItem = z.object({
+  id: z.number(),
+  password: z.string(),
+  source: z.enum(['SEEDED', 'STAFF'])
+});
+const badPasswordBody = z.object({ password: z.string().min(6).max(255) });
+
+registry.registerPath({
+  method: 'get',
+  path: '/bad-passwords',
+  tags: ['Bad passwords'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated password denylist',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(badPasswordItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing bad_passwords_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/bad-passwords',
+  tags: ['Bad passwords'],
+  security: [{ cookieAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: badPasswordBody } } }
+  },
+  responses: {
+    201: {
+      description: 'Created entry',
+      content: { 'application/json': { schema: badPasswordItem } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing bad_passwords_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Password is already denied',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/bad-passwords/{id}',
+  tags: ['Bad passwords'],
+  security: [{ cookieAuth: [] }],
+  request: { params: z.object({ id: z.coerce.number().int().positive() }) },
+  responses: {
+    204: { description: 'Entry removed' },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Missing bad_passwords_manage',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Entry not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
+  }
+});
+
 // ─── Email blacklist ──────────────────────────────────────────────────────────
 
 const emailBlacklistItem = z.object({

@@ -4,7 +4,12 @@ import type { UpdateSettingsInput } from '../schemas/settings';
 
 type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
-const DEFAULTS = {
+/**
+ * The `id: 1` singleton's create-shape. Exported because every writer of this
+ * row must agree on it — `seedBadPasswords` stamps its marker here too, and on
+ * a fresh database it is often the first writer of all.
+ */
+export const DEFAULTS = {
   id: 1,
   approvedDomains: [] as string[],
   // 'closed' until the admin deliberately opens registration (#332); the

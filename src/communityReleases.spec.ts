@@ -467,6 +467,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 
@@ -485,6 +486,7 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
       maxUsers: 7000,
       dismissedLaunchChecklist: [],
       installedAt: null,
+      badPasswordsSeededAt: null,
       updatedAt: new Date()
     });
 

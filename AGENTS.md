@@ -241,7 +241,7 @@ src/
     openapi.ts              # Zod→OpenAPI registry (@asteasolutions/zod-to-openapi) — the contract source of truth. Registration is manual: a route absent from it is invisible to openapi.json and to stellar-ui
     openapiCompleteness.ts  # Pure checker (#474): mounted routes vs registered operations, with a shrink-only baseline. CLI wrapper in scripts/
     expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
-    pagination.ts           # parsePage(req) → { skip, limit, page }
+    pagination.ts           # paginationBase (Zod) + parsedPage(res) → { page, limit, skip }
                             # paginatedResponse(res, data, total, pg)
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
     cssValidate.ts          # Store-time CSS boundary (ADR-0031): detects and REJECTS, stores bytes verbatim; reports every violation with rule + location
@@ -394,13 +394,25 @@ Do not introduce named role checks (`isModerator`, `isStaffUser`). See `docs/adr
 
 ### Pagination
 
+`parsedPage` reads the **already-validated** query off `res.locals`, so the
+route must run `validateQuery` with a schema that spreads `paginationBase`
+first. There is no `parsePage(req)`.
+
 ```ts
-const pg = parsePage(req); // reads ?page=&limit= with sane defaults
-const [rows, total] = await Promise.all([
-  prisma.foo.findMany({ skip: pg.skip, take: pg.limit }),
-  prisma.foo.count()
-]);
-paginatedResponse(res, rows, total, pg);
+const listQuerySchema = z.object({ ...paginationBase });
+
+router.get(
+  '/',
+  validateQuery(listQuerySchema),
+  asyncHandler(async (_req, res) => {
+    const pg = parsedPage(res); // { page, limit, skip }
+    const [rows, total] = await Promise.all([
+      prisma.foo.findMany({ skip: pg.skip, take: pg.limit }),
+      prisma.foo.count()
+    ]);
+    paginatedResponse(res, rows, total, pg); // -> { data, meta: { total, page, limit, totalPages } }
+  })
+);
 ```
 
 ### Typed errors
@@ -456,7 +468,6 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 | `Concert`, `ContestType`    | Planned — events/contests              |
 | `ForumSpecificRule`         | Planned — per-forum/topic/thread rules |
 | `Note`                      | Planned — admin messaging/content      |
-| `BadPassword`               | Planned — admin moderation tools       |
 | `CurrencyConversionRate`    | Planned — economy system               |
 | `FeaturedMerch`             | Planned — merch feature                |
 | `GroupLog`                  | Planned — misc features                |

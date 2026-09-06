@@ -6,9 +6,24 @@ import { AppError } from '../lib/errors';
 import { computeRatio } from './ratio';
 import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
 import { getDefaultStylesheetName } from './stylesheet';
+import { normalizePassword } from './badPasswords';
 
+/**
+ * Is this password on the denylist?
+ *
+ * Lowercased before lookup, and every stored row is lowercase, so the match is
+ * case-insensitive. Doing the folding here rather than with Prisma's
+ * `mode: 'insensitive'` keeps the query an exact match, which is what the
+ * `@unique` btree index on `password` can actually serve.
+ *
+ * `findUnique` rather than `findFirst`: the column is unique, so there is never
+ * a second row to scan for.
+ */
 export const isPasswordBanned = async (password: string): Promise<boolean> => {
-  const found = await prisma.badPassword.findFirst({ where: { password } });
+  const found = await prisma.badPassword.findUnique({
+    where: { password: normalizePassword(password) },
+    select: { id: true }
+  });
   return !!found;
 };
 
