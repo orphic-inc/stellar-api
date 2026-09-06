@@ -14,7 +14,7 @@
 // against a synthetic app, so an Express upgrade that changes the internals
 // fails a unit test here rather than silently reporting zero routes.
 
-import type { Express } from 'express';
+import type { Express, Application } from 'express';
 
 import type { Operation } from './openapiCompleteness';
 import { readGate, type GateKind } from './routeGate';
@@ -88,7 +88,7 @@ const gatesOf = (
  * placeholders, each carrying the auth `gates` its chain enforces (#494).
  * Methods are upper-cased; Express's internal `_all` is dropped.
  */
-export const collectRoutes = (app: Express): Operation[] => {
+export const collectRoutes = (app: Express | Application): Operation[] => {
   const found: Operation[] = [];
 
   const walk = (

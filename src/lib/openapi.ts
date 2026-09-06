@@ -23,6 +23,7 @@ import {
   RequestActionType
 } from '@prisma/client';
 import { appVersion } from './version';
+import type { Operation } from './openapiCompleteness';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -394,7 +395,6 @@ registry.registerPath({
   path: '/auth/password',
   tags: ['Auth'],
   summary: 'Change the password of the authenticated member',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: ChangePasswordBody } } }
   },
@@ -421,7 +421,6 @@ registry.registerPath({
   description:
     'Requires the current password. The originating IP is recorded with the ' +
     'change.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: ChangeEmailBody } } }
   },
@@ -505,7 +504,6 @@ registry.registerPath({
   description:
     'Revoked sessions are excluded, so `revokedAt` is always null here. ' +
     'Ordered by `lastActiveAt`, most recent first.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Active sessions',
@@ -526,7 +524,6 @@ registry.registerPath({
   description:
     "Scoped to the caller: another member's session id answers 404 rather " +
     'than 403, so the endpoint does not confirm that the id exists.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -610,7 +607,6 @@ registry.registerPath({
   description:
     'Idempotent — the dismissed ids are held as a set, so re-dismissing the ' +
     'same item changes nothing. Requires the `staff` permission.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -957,9 +953,13 @@ const AdminCreatedUser = registry.register(
 //
 // Three routes in this file are gated by `requireServiceKey` — a Bearer service
 // key that fails closed — and NOT by a member session. They exist for the IRC
-// bridge to call; no browser client should ever reach them. They deliberately
-// carry no `bearerAuth` security block, because that would describe the wrong
-// credential.
+// bridge to call; no browser client should ever reach them.
+//
+// They used to carry NO security block at all, and the reasoning here was
+// right: declaring `bearerAuth` "would describe the wrong credential", because
+// that name was being used across 70 cookie-gated routes. The fix was to name
+// the scheme for what it is rather than to say nothing — these now derive
+// `serviceKey`, and they are the only three that do (#520).
 
 const IrcNickAccount = registry.register(
   'IrcNickAccount',
@@ -1097,7 +1097,6 @@ registry.registerPath({
   description:
     'Requires `duplicate_ips_view`. Groups only IPs seen on more than one ' +
     'account, busiest first.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Shared-IP groups',
@@ -1125,7 +1124,6 @@ registry.registerPath({
     'Requires `registration_log_view` — its own permission, separate from ' +
     '`duplicate_ips_view`. Newest first. Includes email and last IP, so it is ' +
     'a more sensitive read than the ordinary user list.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Paginated registrations',
@@ -1157,7 +1155,6 @@ registry.registerPath({
   description:
     'Requires `users_view_email`. The stored column is `newEmail`; it is ' +
     'returned as `email`. Newest change first.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1189,7 +1186,6 @@ registry.registerPath({
   description:
     'Requires `users_view_ips` — a different permission from ' +
     '`users_view_email`, so the two histories are separately grantable.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1219,7 +1215,6 @@ registry.registerPath({
   description:
     'Requires `users_edit`. The canonical staff read of `rankLocked` — the ' +
     'admin rank panel initialises its toggle from here.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1253,7 +1248,6 @@ registry.registerPath({
     '(PUT /users/{id}/rank-lock) rather than a field here. Answers 200 with a ' +
     'message rather than the new rank state; re-read GET /users/{id}/rank for ' +
     'that.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: setRankSchema } } }
@@ -1288,7 +1282,6 @@ registry.registerPath({
   tags: ['Users'],
   summary: 'Staff: what a user has downloaded',
   description: 'Requires `staff`.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1314,7 +1307,6 @@ registry.registerPath({
   description:
     'Self only, and needs no permission — the same shape the staff route ' +
     'returns for someone else.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Your snatch list',
@@ -1352,7 +1344,6 @@ registry.registerPath({
     'Readable by any authenticated member — this is the only donor route ' +
     'that does NOT require `donor_ranks_manage`, because the perks are ' +
     'member-facing. Ordered by `minDonation`, cheapest first.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Donor ranks',
@@ -1371,7 +1362,6 @@ registry.registerPath({
   tags: ['Users'],
   summary: 'Create a donor rank',
   description: 'Requires `donor_ranks_manage`.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: donorRankSchema } } }
   },
@@ -1404,7 +1394,6 @@ registry.registerPath({
     'Requires `donor_ranks_manage`. **A full replace, not a partial patch** — ' +
     'it validates against the same schema as create, so any optional field ' +
     'you omit is written as its default rather than left as it was.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ rankId: z.string() }),
     body: { content: { 'application/json': { schema: donorRankSchema } } }
@@ -1439,7 +1428,6 @@ registry.registerPath({
   tags: ['Users'],
   summary: 'Delete a donor rank',
   description: 'Requires `donor_ranks_manage`.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ rankId: z.string() }) },
   responses: {
     204: {
@@ -1471,7 +1459,6 @@ registry.registerPath({
     'condition-based, so a later staff re-grant survives the sweep. Answers ' +
     '**201 with a message rather than the granted row** — unusual for a 201, ' +
     'but that is what ships.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: grantDonorSchema } } }
@@ -1508,7 +1495,6 @@ registry.registerPath({
   description:
     'Requires `donor_ranks_manage`. Removes **every** donor-rank grant on ' +
     'that user, not just the most recent, and clears the `isDonor` flag.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -1567,7 +1553,6 @@ registry.registerPath({
   description:
     'Requires `users_warn`. Newest first, each carrying the staff member who ' +
     'issued it.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1597,7 +1582,6 @@ registry.registerPath({
     'just a note. Omit `expiresAt` for a warning that does not lapse. The ' +
     'response wraps the new row as `{ warning }` and does not include ' +
     '`warnedBy`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: warnUserSchema } } }
@@ -1634,7 +1618,6 @@ registry.registerPath({
   tags: ['Users'],
   summary: 'Rescind a warning',
   description: 'Requires `users_warn`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), warnId: z.string() })
   },
@@ -1666,7 +1649,6 @@ registry.registerPath({
     'Requires `users_edit` — a DIFFERENT permission from the warnings above, ' +
     'so a moderator who can warn cannot necessarily read notes. Newest first, ' +
     'each carrying its author.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1695,7 +1677,6 @@ registry.registerPath({
     'Requires `users_edit`. Unlike a warning this is staff-internal and has ' +
     "no effect on the member's standing. The response wraps the new row as " +
     '`{ note }` and does not include `author`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -1736,7 +1717,6 @@ registry.registerPath({
   tags: ['Users'],
   summary: 'Delete a moderation note',
   description: 'Requires `users_edit`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), noteId: z.string() })
   },
@@ -1769,7 +1749,6 @@ registry.registerPath({
     '`users_warn` and `users_edit`. This is the SOFT delete: it sets ' +
     '`disabled: true`, it does not remove the row, and the action is written ' +
     'to the audit log. Answers **200 with a message, not 204**.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -1799,7 +1778,6 @@ registry.registerPath({
   description:
     'Requires `users_disable`, the same permission that disables. Audited. ' +
     'Answers **200 with a message, not 204**.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -2896,7 +2874,6 @@ registry.registerPath({
   description:
     'Requires the `news_manage` permission. Title and body are passed through ' +
     '`sanitizePlain`, so markup in either is stripped rather than stored.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5255,7 +5232,6 @@ registry.registerPath({
   description:
     'Requires `communities_manage`. `leaderId` is mandatory unless ' +
     '`registrationStatus` is `open`.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: {
       content: { 'application/json': { schema: createCommunitySchema } }
@@ -5296,7 +5272,6 @@ registry.registerPath({
     '`announceVisibility` is site-staff-only. That is the settled position, ' +
     'not an oversight: ADR-0030 section 5 was amended to match the code ' +
     '(PR #469).',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5333,7 +5308,6 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Delete a community',
   description: 'Requires `communities_manage`.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -5360,7 +5334,6 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Add a member (consumer) to a community',
   description: 'Community admin or curator only.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5401,7 +5374,6 @@ registry.registerPath({
     'role has to be removed first. The leader is checked before the curator ' +
     'because a leader is always also a curator, so the message names the ' +
     'role that actually has to be reassigned.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), userId: z.string() })
   },
@@ -5438,7 +5410,6 @@ registry.registerPath({
     'Answers **204, not 201**, unlike POST /communities/{id}/members which ' +
     'answers 201. The asymmetry is existing behaviour and is documented ' +
     'rather than changed.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5473,7 +5444,6 @@ registry.registerPath({
   path: '/communities/{id}/curators/{userId}',
   tags: ['Communities'],
   summary: 'Demote a community curator',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), userId: z.string() })
   },
@@ -5499,7 +5469,6 @@ registry.registerPath({
   summary: 'Create a release in a community',
   description:
     'Requires `communities_manage`. At least one artist credit is required.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ communityId: z.string() }),
     body: { content: { 'application/json': { schema: createGroupSchema } } }
@@ -5534,7 +5503,6 @@ registry.registerPath({
     'accepted by the schema and then ignored** — tags are managed through the ' +
     '/tags routes, so sending them here succeeds and changes nothing. ' +
     '`editSummary` is recorded on the resulting history entry.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       communityId: z.string(),
@@ -5572,7 +5540,6 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Delete a release',
   description: 'Requires `communities_manage`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       communityId: z.string(),
@@ -5604,7 +5571,6 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Cast or change your vote on a release',
   description: '`positive: true` is an up-vote, `false` a down-vote.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       communityId: z.string(),
@@ -5640,7 +5606,6 @@ registry.registerPath({
   description:
     'Answers **200 with the new state**, not 204 — it clears a vote rather ' +
     'than deleting a resource, and the caller needs the updated aggregate.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       communityId: z.string(),
@@ -6061,7 +6026,6 @@ registry.registerPath({
   description:
     'Requires the `contributions_manage` permission. FREEPASS and ' +
     'NEUTRALPASS are the Freepass/Neutralpass exemptions; NONE clears them.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -7662,7 +7626,6 @@ registry.registerPath({
     '`open` status may be edited — editing a filled or deleted one answers ' +
     '**422**, which this router uses for STATE violations as distinct from ' +
     'the 400 it uses for validation.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -7703,7 +7666,6 @@ registry.registerPath({
   tags: ['Requests'],
   summary: 'Delete a request',
   description: 'The owner, or a holder of `requests_moderate`.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -7733,7 +7695,6 @@ registry.registerPath({
   description:
     'A TOGGLE despite the name: posting when you have already voted removes ' +
     'the vote. The response says which state you ended in. Takes no body.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -7761,7 +7722,6 @@ registry.registerPath({
   description:
     'The owner, the filler, or a holder of `requests_moderate`. A request ' +
     'that is not currently filled answers **422**.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -7848,7 +7808,6 @@ registry.registerPath({
   path: '/requests',
   summary: 'Create a new request',
   tags: ['Requests'],
-  security: [{ bearerAuth: [] }],
   request: {
     body: {
       content: { 'application/json': { schema: createRequestSchema } }
@@ -7906,7 +7865,6 @@ registry.registerPath({
     "The amount is deducted from the caller's contributed balance, so an " +
     'insufficient balance answers 400 rather than 403. There is a site ' +
     'minimum bounty; below it is also a 400.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -7943,7 +7901,6 @@ registry.registerPath({
     'Nominates a contribution as the fill. The bounty is paid out and the ' +
     'request moves to the `filled` status; POST /requests/{id}/unfill reverses ' +
     'it.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -8088,7 +8045,6 @@ registry.registerPath({
   tags: ['Messages'],
   summary: 'Draft private messages belonging to the caller',
   description: 'Newest `updatedAt` first.',
-  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Drafts',
@@ -8111,7 +8067,6 @@ registry.registerPath({
   description:
     'The recipient may be given as `toUserId` or `toUsername`; either is ' +
     'optional, so a draft can be saved before a recipient is chosen.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: pmDraftSchema } } }
   },
@@ -8136,7 +8091,6 @@ registry.registerPath({
   path: '/messages/drafts/{id}',
   tags: ['Messages'],
   summary: 'Update one of your drafts',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: pmDraftSchema } } }
@@ -8166,7 +8120,6 @@ registry.registerPath({
   path: '/messages/drafts/{id}',
   tags: ['Messages'],
   summary: 'Delete one of your drafts',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -8193,7 +8146,6 @@ registry.registerPath({
     '(`take: 1000`), so a larger site silently reaches only the first 1000; ' +
     'the sender is skipped. Omit `targetRankId` to target every active member. ' +
     'The send is also recorded as a MassMessage row.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: massPmSchema } } }
   },
@@ -10712,7 +10664,6 @@ registry.registerPath({
   path: '/collages',
   tags: ['Collages'],
   summary: 'Create a collage',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: createCollageSchema } } }
   },
@@ -10748,7 +10699,6 @@ registry.registerPath({
     'worth noting: a DELETED collage answers 404 to non-staff rather than 403, ' +
     'and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner ' +
     'or staff.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -10779,7 +10729,6 @@ registry.registerPath({
     '`isLocked` and the two entry limits are STAFF-ONLY fields: an owner ' +
     'sending them gets 403, distinct from the 403 for editing a collage that ' +
     'is not theirs.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: updateCollageSchema } } }
@@ -10820,7 +10769,6 @@ registry.registerPath({
     'is soft-deleted (sets `isDeleted`) and only staff may do it, so an owner ' +
     'who can delete their personal collage gets 403 on a public one; use ' +
     'POST /collages/{id}/recover to restore that case.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -10847,7 +10795,6 @@ registry.registerPath({
   path: '/collages/{id}/recover',
   tags: ['Collages'],
   summary: 'Staff: restore a soft-deleted collage',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -10878,7 +10825,6 @@ registry.registerPath({
   path: '/collages/{id}/entries',
   tags: ['Collages'],
   summary: 'Add a release to a collage',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: addEntrySchema } } }
@@ -10919,7 +10865,6 @@ registry.registerPath({
   tags: ['Collages'],
   summary: 'Reorder the entries of a collage',
   description: 'Send every entry id with its new `sort`.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -10952,7 +10897,6 @@ registry.registerPath({
   summary: 'Remove a release from a collage',
   description:
     'Addressed by RELEASE id, not entry id — the pair is unique per collage.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), releaseId: z.string() })
   },
@@ -10984,7 +10928,6 @@ registry.registerPath({
   description:
     'A TOGGLE despite the name: posting when already subscribed unsubscribes ' +
     'you. The response says which state you ended in.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -11012,7 +10955,6 @@ registry.registerPath({
   tags: ['Collages'],
   summary: 'Toggle your bookmark on a collage',
   description: 'A toggle, like /subscribe.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -11041,7 +10983,6 @@ registry.registerPath({
   summary: 'Staff: who is subscribed to a collage',
   description:
     'Requires `collages_moderate`. Ordered by `lastVisit`, most recent first.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -11210,7 +11151,6 @@ registry.registerPath({
     '**`minReadLevel` and `minEditLevel` are forced to 0 unless the caller can ' +
     'MANAGE the wiki** — a plain `wiki_edit` author cannot create a restricted ' +
     'page, and the values they send are ignored rather than rejected.',
-  security: [{ bearerAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: createWikiPageSchema } } }
   },
@@ -11300,7 +11240,6 @@ registry.registerPath({
   path: '/wiki/{id}',
   tags: ['Wiki'],
   summary: 'Update a wiki page',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: updateWikiPageSchema } } }
@@ -11337,7 +11276,6 @@ registry.registerPath({
   description:
     'Gated at the middleware by `wiki_manage` or `admin` — the per-page edit ' +
     'level does not grant deletion.',
-  security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: {
@@ -11471,7 +11409,6 @@ registry.registerPath({
   description:
     'Requires the page EDIT level. The rollback is written as a NEW revision ' +
     'rather than by rewinding, so history is never discarded.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), rev: z.string() })
   },
@@ -11500,7 +11437,6 @@ registry.registerPath({
   path: '/wiki/{id}/aliases',
   tags: ['Wiki'],
   summary: 'Add an alias to a page',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: addAliasSchema } } }
@@ -11541,7 +11477,6 @@ registry.registerPath({
   tags: ['Wiki'],
   summary: 'Remove an alias from a page',
   description: 'The alias is addressed by its slug, which is its primary key.',
-  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({ id: z.string(), alias: z.string() })
   },
@@ -11814,7 +11749,6 @@ registry.registerPath({
   method: 'get',
   path: '/communities/{communityId}/dnc',
   tags: ['Communities'],
-  security: [{ cookieAuth: [] }],
   parameters: [
     {
       name: 'communityId',
@@ -11847,7 +11781,6 @@ registry.registerPath({
   method: 'post',
   path: '/communities/{communityId}/dnc',
   tags: ['Communities'],
-  security: [{ cookieAuth: [] }],
   parameters: [
     {
       name: 'communityId',
@@ -11885,7 +11818,6 @@ registry.registerPath({
   method: 'delete',
   path: '/communities/{communityId}/dnc/{dncId}',
   tags: ['Communities'],
-  security: [{ cookieAuth: [] }],
   parameters: [
     {
       name: 'communityId',
@@ -11959,7 +11891,6 @@ const registerBookmark = (
     method: 'get',
     path: `/bookmarks/${segment}`,
     tags: ['Bookmarks'],
-    security: [{ cookieAuth: [] }],
     responses: {
       200: {
         description: 'Bookmark list',
@@ -11975,7 +11906,6 @@ const registerBookmark = (
     method: 'post',
     path: `/bookmarks/${segment}/{${paramName}}`,
     tags: ['Bookmarks'],
-    security: [{ cookieAuth: [] }],
     request: { params: z.object({ [paramName]: z.string() }) },
     responses: {
       200: {
@@ -11992,7 +11922,6 @@ const registerBookmark = (
     method: 'delete',
     path: `/bookmarks/${segment}/{${paramName}}`,
     tags: ['Bookmarks'],
-    security: [{ cookieAuth: [] }],
     request: { params: z.object({ [paramName]: z.string() }) },
     responses: {
       204: { description: 'Removed' },
@@ -12013,7 +11942,6 @@ registry.registerPath({
   method: 'delete',
   path: '/bookmarks/releases/consumed',
   tags: ['Bookmarks'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'Removed the caller’s release bookmarks they have consumed',
@@ -12036,7 +11964,6 @@ registry.registerPath({
   method: 'get',
   path: '/random/release',
   tags: ['Random'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'A random release',
@@ -12067,7 +11994,6 @@ registry.registerPath({
   method: 'get',
   path: '/random/artist',
   tags: ['Random'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'A random artist',
@@ -12169,7 +12095,6 @@ registry.registerPath({
   method: 'get',
   path: '/search/releases',
   tags: ['Search'],
-  security: [{ cookieAuth: [] }],
   request: { query: searchReleasesQuerySchema },
   responses: {
     200: {
@@ -12187,7 +12112,6 @@ registry.registerPath({
   method: 'get',
   path: '/search/artists',
   tags: ['Search'],
-  security: [{ cookieAuth: [] }],
   request: { query: searchArtistsQuerySchema },
   responses: {
     200: {
@@ -12205,7 +12129,6 @@ registry.registerPath({
   method: 'get',
   path: '/search/requests',
   tags: ['Search'],
-  security: [{ cookieAuth: [] }],
   request: { query: searchRequestsQuerySchema },
   responses: {
     200: {
@@ -12223,7 +12146,6 @@ registry.registerPath({
   method: 'get',
   path: '/search/log',
   tags: ['Search'],
-  security: [{ cookieAuth: [] }],
   request: { query: searchLogQuerySchema },
   responses: {
     200: {
@@ -12252,7 +12174,6 @@ registry.registerPath({
   method: 'get',
   path: '/search/users',
   tags: ['Search'],
-  security: [{ cookieAuth: [] }],
   request: { query: searchUsersQuerySchema },
   responses: {
     200: {
@@ -12283,7 +12204,6 @@ registry.registerPath({
   method: 'get',
   path: '/site-history',
   tags: ['Site history'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'Site history entries',
@@ -12300,7 +12220,6 @@ registry.registerPath({
   method: 'post',
   path: '/site-history',
   tags: ['Site history'],
-  security: [{ cookieAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: siteHistoryBody } } }
   },
@@ -12324,7 +12243,6 @@ registry.registerPath({
   method: 'put',
   path: '/site-history/{id}',
   tags: ['Site history'],
-  security: [{ cookieAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: { content: { 'application/json': { schema: siteHistoryBody } } }
@@ -12353,7 +12271,6 @@ registry.registerPath({
   method: 'delete',
   path: '/site-history/{id}',
   tags: ['Site history'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
@@ -12386,7 +12303,6 @@ registry.registerPath({
   method: 'post',
   path: '/contributions/{id}/access',
   tags: ['Downloads'],
-  security: [{ cookieAuth: [] }],
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -12413,7 +12329,6 @@ registry.registerPath({
   method: 'get',
   path: '/contributions/{id}/access/latest',
   tags: ['Downloads'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
@@ -12435,7 +12350,6 @@ registry.registerPath({
   method: 'post',
   path: '/downloads/{grantId}/reverse',
   tags: ['Downloads'],
-  security: [{ cookieAuth: [] }],
   request: {
     params: z.object({ grantId: z.string() }),
     body: {
@@ -12484,7 +12398,6 @@ registry.registerPath({
   method: 'get',
   path: '/donations',
   tags: ['Donations'],
-  security: [{ cookieAuth: [] }],
   request: { query: z.object({ userId: z.string().optional() }) },
   responses: {
     200: {
@@ -12506,7 +12419,6 @@ registry.registerPath({
   method: 'post',
   path: '/donations',
   tags: ['Donations'],
-  security: [{ cookieAuth: [] }],
   request: {
     body: {
       content: {
@@ -12540,7 +12452,6 @@ registry.registerPath({
   method: 'delete',
   path: '/donations/{id}',
   tags: ['Donations'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
@@ -12572,7 +12483,6 @@ registry.registerPath({
   method: 'get',
   path: '/bad-passwords',
   tags: ['Bad passwords'],
-  security: [{ cookieAuth: [] }],
   request: {
     query: z.object({
       page: z.coerce.number().int().positive().optional(),
@@ -12606,7 +12516,6 @@ registry.registerPath({
   method: 'post',
   path: '/bad-passwords',
   tags: ['Bad passwords'],
-  security: [{ cookieAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: badPasswordBody } } }
   },
@@ -12634,7 +12543,6 @@ registry.registerPath({
   method: 'delete',
   path: '/bad-passwords/{id}',
   tags: ['Bad passwords'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.coerce.number().int().positive() }) },
   responses: {
     204: { description: 'Entry removed' },
@@ -12671,7 +12579,6 @@ registry.registerPath({
   method: 'get',
   path: '/email-blacklist',
   tags: ['Email blacklist'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'Blacklisted emails',
@@ -12692,7 +12599,6 @@ registry.registerPath({
   method: 'post',
   path: '/email-blacklist',
   tags: ['Email blacklist'],
-  security: [{ cookieAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: emailBlacklistBody } } }
   },
@@ -12720,7 +12626,6 @@ registry.registerPath({
   method: 'delete',
   path: '/email-blacklist/{id}',
   tags: ['Email blacklist'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
@@ -12755,7 +12660,6 @@ registry.registerPath({
   method: 'get',
   path: '/ip-bans',
   tags: ['IP bans'],
-  security: [{ cookieAuth: [] }],
   responses: {
     200: {
       description: 'IP bans',
@@ -12776,7 +12680,6 @@ registry.registerPath({
   method: 'post',
   path: '/ip-bans',
   tags: ['IP bans'],
-  security: [{ cookieAuth: [] }],
   request: {
     body: { content: { 'application/json': { schema: ipBanBody } } }
   },
@@ -12805,7 +12708,6 @@ registry.registerPath({
   method: 'delete',
   path: '/ip-bans/{id}',
   tags: ['IP bans'],
-  security: [{ cookieAuth: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Deleted' },
@@ -12904,7 +12806,63 @@ function normalizeNullableRefsDeep(node: unknown): unknown {
   return node;
 }
 
-export function buildOpenApiDocument() {
+/**
+ * The two credentials this API actually accepts (#520).
+ *
+ * Before this, `components.securitySchemes` was **absent entirely** while 112
+ * operations referenced schemes by name — every one of those references
+ * dangling. Worse, the references were inverted: 70 operations declared
+ * `bearerAuth` while being gated by `requireAuth`, which reads a **cookie** and
+ * has no `Authorization` path at all, and the only three routes that genuinely
+ * take a bearer token declared nothing.
+ */
+const SECURITY_SCHEMES = {
+  cookieAuth: {
+    type: 'apiKey' as const,
+    in: 'cookie' as const,
+    name: 'token',
+    description:
+      'Session JWT, set as an HttpOnly cookie by `POST /auth`. This is what ' +
+      '`requireAuth` reads; there is no Authorization-header equivalent.'
+  },
+  serviceKey: {
+    type: 'http' as const,
+    scheme: 'bearer' as const,
+    description:
+      'The shared `STELLAR_SERVICE_KEY`, presented by korin.pink on its ' +
+      'inbound calls (ADR-0013). An opaque secret, not a user token — a ' +
+      "member's session JWT is not accepted here."
+  }
+};
+
+/**
+ * The `security` block a route's gates imply.
+ *
+ * Derived rather than declared, because the gates already know. `routeGate.ts`
+ * stamps every gate as `auth | permission | service` for the #494 coverage
+ * check, and that same stamp answers "with what credential?" — so this cannot
+ * drift from the middleware the way 309 of 364 hand-written blocks had.
+ *
+ * `auth` and `permission` collapse deliberately: both present the same cookie,
+ * and the difference between them is 401 versus 403, which lives in
+ * `responses` already. Encoding it twice in two vocabularies is how the two
+ * drift apart.
+ */
+export const securityForGates = (
+  gates: readonly string[] | undefined
+): { [scheme: string]: string[] }[] | undefined => {
+  if (!gates || gates.length === 0) return undefined;
+  if (gates.includes('service')) return [{ serviceKey: [] }];
+  return [{ cookieAuth: [] }];
+};
+
+/**
+ * @param routes every contract route the mounted app serves, with its gates.
+ *   **Required**, so a document cannot be built without deriving `security`.
+ *   An optional parameter would let the served `/api/docs/json` and the
+ *   committed `openapi.json` disagree, and nothing compares that pair.
+ */
+export function buildOpenApiDocument(routes: readonly Operation[]) {
   const generator = new OpenApiGeneratorV3(registry.definitions);
   const doc = generator.generateDocument({
     openapi: '3.0.0',
@@ -12918,6 +12876,13 @@ export function buildOpenApiDocument() {
     servers: [{ url: '/api', description: 'API server' }]
   });
 
+  // The generator owns `components`, so the schemes are attached to the built
+  // document rather than passed into the config.
+  doc.components = {
+    ...(doc.components ?? {}),
+    securitySchemes: SECURITY_SCHEMES
+  };
+
   // Only PublicProfile and MyProfile (which spreads PublicProfile.shape) hit
   // the nullable-ref registered-schema path (#295) — scope the reshape to
   // those instead of walking the whole document.
@@ -12928,6 +12893,26 @@ export function buildOpenApiDocument() {
       if (schema) {
         schemas[name] = normalizeNullableRefsDeep(schema) as typeof schema;
       }
+    }
+  }
+
+  // Inject `security` from the gates. Done here rather than per registerPath so
+  // there is exactly one place it can be wrong, and it is a place that reads
+  // the middleware rather than restating it.
+  const gatesByOp = new Map<string, readonly string[] | undefined>(
+    routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.gates])
+  );
+  const paths = doc.paths ?? {};
+  for (const [path, item] of Object.entries(paths)) {
+    for (const [method, op] of Object.entries(
+      item as Record<string, { security?: unknown }>
+    )) {
+      if (!op || typeof op !== 'object') continue;
+      const security = securityForGates(
+        gatesByOp.get(`${method.toUpperCase()} ${path}`)
+      );
+      if (security) op.security = security;
+      else delete op.security;
     }
   }
 
