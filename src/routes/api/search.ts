@@ -62,6 +62,135 @@ function buildArtistTagWhere(
 }
 
 /**
+ * Contribution-level filters. `type` (file format) stays on the Contribution
+ * spine; the music-rip specifics (bitrate, log/cue/scene) are edition-agnostic
+ * per-file metadata living on the ReleaseFile satellite, so they nest under
+ * `releaseFile`. bitrate is a typed enum now, so match exactly rather than
+ * substring.
+ */
+function buildContributionFilter(
+  q: SearchReleasesQuery
+): Record<string, unknown> | undefined {
+  const releaseFile: Record<string, unknown> = {};
+  if (q.bitrate) releaseFile.bitrate = q.bitrate;
+  if (q.hasLog !== undefined) releaseFile.hasLog = q.hasLog;
+  if (q.hasCue !== undefined) releaseFile.hasCue = q.hasCue;
+  if (q.isScene !== undefined) releaseFile.isScene = q.isScene;
+
+  const filter: Record<string, unknown> = {};
+  if (q.format) filter.type = q.format;
+  if (Object.keys(releaseFile).length) filter.releaseFile = releaseFile;
+  return Object.keys(filter).length ? filter : undefined;
+}
+
+/** Edition-level filters — label, catalogue and media are edition-scoped. */
+function buildEditionFilter(
+  q: SearchReleasesQuery
+): Record<string, unknown> | undefined {
+  const filter: Record<string, unknown> = {};
+  if (q.recordLabel)
+    filter.recordLabel = { contains: q.recordLabel, mode: 'insensitive' };
+  if (q.catalogueNumber)
+    filter.catalogueNumber = {
+      contains: q.catalogueNumber,
+      mode: 'insensitive'
+    };
+  if (q.media) filter.media = q.media;
+  return Object.keys(filter).length ? filter : undefined;
+}
+
+/** Artist-credit filters (name + vanityHouse), traversing the credits relation. */
+function buildReleaseArtistFilter(
+  q: SearchReleasesQuery
+): Record<string, unknown> | undefined {
+  const filter: Record<string, unknown> = {};
+  if (q.artist) filter.name = { contains: q.artist, mode: 'insensitive' };
+  if (q.vanityHouse !== undefined) filter.vanityHouse = q.vanityHouse;
+  return Object.keys(filter).length ? filter : undefined;
+}
+
+/**
+ * Free-text and per-column text matching. `q` spans title, description and
+ * credited artist name; the named params match their own column only.
+ */
+function buildReleaseTextWhere(
+  q: SearchReleasesQuery
+): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  if (q.q) {
+    where.OR = [
+      { title: { contains: q.q, mode: 'insensitive' } },
+      { description: { contains: q.q, mode: 'insensitive' } },
+      {
+        credits: {
+          some: { artist: { name: { contains: q.q, mode: 'insensitive' } } }
+        }
+      }
+    ];
+  }
+  if (q.title) where.title = { contains: q.title, mode: 'insensitive' };
+  if (q.description)
+    where.description = { contains: q.description, mode: 'insensitive' };
+  return where;
+}
+
+/**
+ * Scalar column matching, including the year range.
+ *
+ * `year` alone is a lower bound, `year`+`yearTo` a closed range, and `yearTo`
+ * alone an upper bound — three shapes on one column, which is why this is
+ * spelled out rather than folded into a generic equality pass.
+ */
+function buildReleaseScalarWhere(
+  q: SearchReleasesQuery
+): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  if (q.type) where.type = q.type;
+  if (q.releaseType) where.releaseType = q.releaseType;
+  if (q.year)
+    where.year = { gte: q.year, ...(q.yearTo ? { lte: q.yearTo } : {}) };
+  if (q.yearTo && !q.year) where.year = { lte: q.yearTo };
+  return where;
+}
+
+/**
+ * The whole release `where`, assembled from the per-spine builders above.
+ *
+ * Extracted from the route handler rather than inlined: the handler was over
+ * both of Codacy's Lizard thresholds (106 lines, complexity 30) before this
+ * change and after it, because the filters are genuinely many — but each spine
+ * is independently small, and grouping them by the spine they target is how
+ * the original block was already commented.
+ */
+function buildReleaseWhere(
+  q: SearchReleasesQuery,
+  communityIds: number[] | undefined
+): Record<string, unknown> {
+  const where: Record<string, unknown> = {
+    ...buildReleaseTextWhere(q),
+    ...buildReleaseScalarWhere(q)
+  };
+
+  if (communityIds) where.communityId = { in: communityIds };
+
+  const artist = buildReleaseArtistFilter(q);
+  if (artist) where.credits = { some: { artist } };
+
+  const edition = buildEditionFilter(q);
+  if (edition) where.editions = { some: edition };
+
+  const contribution = buildContributionFilter(q);
+  if (contribution) where.contributions = { some: contribution };
+
+  // Assigned last, so `tagMode=all`'s `AND` array lands on the finished object
+  // exactly as it did when this was inline.
+  const tagPredicate = buildTagWhere(q.tags, q.tagMode);
+  if (tagPredicate) Object.assign(where, tagPredicate);
+
+  return where;
+}
+
+/**
  * Restrict a search to rows whose community the caller may reach.
  *
  * Appends to `AND` rather than assigning it. These `where` objects are
@@ -125,75 +254,7 @@ router.get(
         : [q.communityId]
       : undefined;
 
-    const tagPredicate = buildTagWhere(q.tags, q.tagMode);
-
-    // Contribution-level filters. `type` (file format) stays on the
-    // Contribution spine; the music-rip specifics (bitrate, log/cue/scene) are
-    // edition-agnostic per-file metadata living on the ReleaseFile satellite,
-    // so they nest under `releaseFile`. bitrate is a typed enum now, so match
-    // exactly rather than substring.
-    const contributionFilter: Record<string, unknown> = {};
-    if (q.format) contributionFilter.type = q.format;
-    const releaseFileFilter: Record<string, unknown> = {};
-    if (q.bitrate) releaseFileFilter.bitrate = q.bitrate;
-    if (q.hasLog !== undefined) releaseFileFilter.hasLog = q.hasLog;
-    if (q.hasCue !== undefined) releaseFileFilter.hasCue = q.hasCue;
-    if (q.isScene !== undefined) releaseFileFilter.isScene = q.isScene;
-    if (Object.keys(releaseFileFilter).length)
-      contributionFilter.releaseFile = releaseFileFilter;
-
-    // Edition-level filters — label, catalogue and media are edition-scoped now.
-    const editionFilter: Record<string, unknown> = {};
-    if (q.recordLabel)
-      editionFilter.recordLabel = {
-        contains: q.recordLabel,
-        mode: 'insensitive'
-      };
-    if (q.catalogueNumber)
-      editionFilter.catalogueNumber = {
-        contains: q.catalogueNumber,
-        mode: 'insensitive'
-      };
-    if (q.media) editionFilter.media = q.media;
-
-    // Artist-credit filters (name + vanityHouse) traverse the credits relation.
-    const artistFilter: Record<string, unknown> = {};
-    if (q.artist)
-      artistFilter.name = { contains: q.artist, mode: 'insensitive' };
-    if (q.vanityHouse !== undefined) artistFilter.vanityHouse = q.vanityHouse;
-
-    const where: Record<string, unknown> = {};
-
-    if (q.q) {
-      where.OR = [
-        { title: { contains: q.q, mode: 'insensitive' } },
-        { description: { contains: q.q, mode: 'insensitive' } },
-        {
-          credits: {
-            some: { artist: { name: { contains: q.q, mode: 'insensitive' } } }
-          }
-        }
-      ];
-    }
-    if (q.title) where.title = { contains: q.title, mode: 'insensitive' };
-    if (q.description)
-      where.description = { contains: q.description, mode: 'insensitive' };
-    if (q.type) where.type = q.type;
-    if (q.releaseType) where.releaseType = q.releaseType;
-    if (q.year)
-      where.year = { gte: q.year, ...(q.yearTo ? { lte: q.yearTo } : {}) };
-    if (q.yearTo && !q.year) where.year = { lte: q.yearTo };
-    if (communityIds) where.communityId = { in: communityIds };
-    if (Object.keys(artistFilter).length) {
-      where.credits = { some: { artist: artistFilter } };
-    }
-    if (Object.keys(editionFilter).length) {
-      where.editions = { some: editionFilter };
-    }
-    if (Object.keys(contributionFilter).length) {
-      where.contributions = { some: contributionFilter };
-    }
-    if (tagPredicate) Object.assign(where, tagPredicate);
+    const where = buildReleaseWhere(q, communityIds);
 
     // Every query below reads `scoped`, never `where` — a release in a PRIVATE
     // community the caller does not belong to must not appear in a search, the

@@ -22,6 +22,8 @@ All notable changes to stellar-api are documented here.
 
   **Two things this deliberately does not do.** `Release.communityId` is nullable, so the scope carries a `communityId: null` arm — without it the fix would have hidden community-less releases that were never private, turning a security fix into a regression. And the scope **appends to `AND`** rather than assigning it, because `tagMode=all` already puts an array there; the existing `tagMode=all` test now asserts both tag arms survive alongside the scope, which is the regression that would otherwise have been silent.
 
+  **The release `where` is now built by per-spine helpers** rather than inline. The handler was over both of Codacy's Lizard thresholds before this change (**106 lines, cyclomatic complexity 30**) and the extraction takes it under both — `buildReleaseTextWhere`, `buildReleaseScalarWhere`, `buildReleaseArtistFilter`, `buildEditionFilter` and `buildContributionFilter`, assembled by `buildReleaseWhere`. Behaviour-preserving: the grouping follows the comments the inline block already carried, it matches the `buildTagWhere` helpers this file already had, and all 49 search tests — several of which assert exact query shapes — pass unchanged.
+
   **`GET /search/artists` needed no change** — `Artist` carries no community and the projection exposes name, vanity-house flag, tags and a credit count. An earlier note on #509 grouped it with the other two; that was wrong.
 
 ### Added
