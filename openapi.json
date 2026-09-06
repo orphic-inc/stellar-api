@@ -21603,7 +21603,7 @@
             }
           },
           "403": {
-            "description": "Not authorized",
+            "description": "Missing forums_moderate",
             "content": {
               "application/json": {
                 "schema": {
@@ -21676,7 +21676,7 @@
             }
           },
           "403": {
-            "description": "Not authorized",
+            "description": "Missing forums_moderate",
             "content": {
               "application/json": {
                 "schema": {

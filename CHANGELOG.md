@@ -52,6 +52,20 @@ All notable changes to stellar-api are documented here.
 
   **The 401 is not unit-tested, deliberately.** `apiTestHarness` mocks `requireAuth` to always succeed, so no spec in that suite can make an unauthenticated request — a test claiming to check the gate would pass whether or not the route carried it. The mechanical proof is `openapi:auth-coverage`, which reads gates off the **built app** via `markGate`/`readGate` and would fail on a regression that dropped the middleware.
 
+### Fixed
+
+- **A real 403 gate the auth-coverage machinery could not see** ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F7) — `forumTopicNote.ts` defined its own `requireModerator`, which checked `forums_moderate` and answered 403, but was never `markGate`d. `readGate()` returned `undefined`, so the built app classified `GET /forums/topic-notes/{topicId}` and `POST /forums/topic-notes` as `auth`-only, and `expectedCodes(['auth'])` is `[401]`.
+
+  **The contract was right anyway — nothing was holding it there.** Both routes already declared their 403 because a human registered them correctly. The defect was that deleting those declarations would not have failed anything: a silent hole in the sixth guarded axis, of exactly the species this repo keeps finding — _a check that looks authoritative while measuring the wrong thing_.
+
+  **Verified by breaking it on purpose**: removing the 403 from `GET /forums/topic-notes/{topicId}` now fails `openapi:auth-coverage` with `1 gap(s)`. Before this change the same deletion left the gate green.
+
+  **Fixed by deletion rather than annotation.** A one-line `markGate(requireModerator, 'permission')` would have closed the hole, but `requireModerator` was **the only locally-defined gate middleware in the entire routes tree** — every other gate already lives in `middleware/`. Both call sites now use the shared `...requirePermission('forums_moderate')`, which is identical in semantics (`hasPermission(perms, 'forums_moderate')`, via the same `loadPermissions`) and additionally brings the `secLog.warn('Permission denied', …)` audit line and the `try/catch → next(err)` the local copy lacked — an async rejection in the local version would not have reached the error handler. The gate machinery now reads `[auth, permission]` on both routes.
+
+  **One response-body string changes**: the 403 message goes from `Not authorized` to `Permission denied`, the shared gate's wording. Checked against stellar-ui before making it — the only occurrences of `Not authorized` there are OpenAPI _descriptions_ in the generated `openapi.json`/`api.ts`, never a runtime comparison, so no UI branch depends on it. The two descriptions now read `Missing forums_moderate`, matching the #494 convention.
+
+  `DELETE /forums/topic-notes/{id}` is deliberately untouched: its 403 is a handler-level author check, which remains invisible to the gate by design and is tracked under #509's third axis.
+
 ### Added
 
 - **Twelve member-facing surfaces close the last of [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline — 41 gaps to ZERO.** Thirty-nine operations across `/contributions`, `/posts`, `/search`, `/subscriptions`, `/friends`, `/notifications`, `/settings`, `/comments`, `/profile`, `/random`, `/downloads` and `/install`. **`347 contract routes gated, 347 fully documented, 0 gap(s) (0 baselined)`** — every auth failure the middleware chain can produce is now described, across twenty slices.

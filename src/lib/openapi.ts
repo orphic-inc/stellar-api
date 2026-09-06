@@ -7468,7 +7468,7 @@ registry.registerPath({
       content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
-      description: 'Not authorized',
+      description: 'Missing forums_moderate',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -7495,7 +7495,7 @@ registry.registerPath({
       content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
-      description: 'Not authorized',
+      description: 'Missing forums_moderate',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }

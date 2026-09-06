@@ -1,14 +1,10 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createTopicNote } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
-import {
-  loadPermissions,
-  hasPermission
-} from '../../../middleware/permissions';
-import type { AuthenticatedRequest } from '../../../types/auth';
+import { requirePermission } from '../../../middleware/permissions';
 import {
   parsedBody,
   validate,
@@ -25,26 +21,10 @@ const noteIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
 
-const requireModerator = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  if (
-    hasPermission(
-      await loadPermissions(req as AuthenticatedRequest, res),
-      'forums_moderate'
-    )
-  )
-    return next();
-  res.status(403).json({ msg: 'Not authorized' });
-};
-
 // GET /api/forums/topic-notes/:topicId — moderators only
 router.get(
   '/:topicId',
-  requireAuth,
-  requireModerator,
+  ...requirePermission('forums_moderate'),
   validateParams(topicIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { topicId: forumTopicId } = parsedParams<{
@@ -61,8 +41,7 @@ router.get(
 // POST /api/forums/topic-notes — moderators only
 router.post(
   '/',
-  requireAuth,
-  requireModerator,
+  ...requirePermission('forums_moderate'),
   validate(topicNoteSchema),
   authHandler(async (req, res) => {
     const { forumTopicId, body } = parsedBody<TopicNoteInput>(res);
