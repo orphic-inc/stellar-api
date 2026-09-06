@@ -8,6 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Collages` now documents the 401 and 403 its middleware answers — the tenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 169 gaps to 154.** Thirteen operations in one router file. Eleven took **401 only**; two needed both, under `collages_moderate`. Fully-documented operations went 210 to 223.
+
+  **This is the most handler-authorized surface the burn-down has met, and it was already documented.** Seven `requireAuth`-only operations perform their authorization inside the handler — `#494`'s gate is structurally blind to every one of them — and all seven already declared a `403`. The reason is visible in the code: `loadActiveCollage()` deliberately does _not_ carry authorization with it, because the five routes sharing that load each gate differently afterwards, so each route states its own rule and the registry had followed suit.
+
+  **Two of those seven descriptions were incomplete, found by verifying rather than assuming.** `PUT /collages/{id}` listed `isLocked`, `maxEntries` and `maxEntriesPerUser` as the staff-only fields but omitted a fourth: setting `name` on a **public** collage is staff-only too. `DELETE /collages/{id}/entries/{releaseId}` said the 403 meant "the entry is not the caller's", which implies only the member who added an entry may remove it — the handler also admits the **collage owner** and staff. Both corrected; both are description-only, with the response schema untouched.
+
+  **`collage staff` is its own notion here and does not mean `collages_moderate`.** `hasCollageStaffPermission()` reads `perms['collages_moderate'] || perms['staff'] || perms['admin']` **directly**, bypassing `hasPermission()` — so the handler checks admit two keys the middleware gate on `/deleted` and `/{id}/recover` does not. Describing the handler 403s as `Missing collages_moderate` would have been wrong, which is why they say `collage staff`.
+
+  **Purely additive apart from those two corrections, blast radius proved per operation**: exactly thirteen changed, all under `/collages`, none losing a response, no non-`responses` key touched, `components` byte-identical, path count unmoved at 267. The only pre-existing responses that changed are the two 403 descriptions, and their schemas are byte-identical before and after.
+
 - **`Reports` now documents the 401 and 403 its middleware answers — the ninth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 186 gaps to 169.** Ten operations in one router file, under a single uniform key (`reports_manage`). Fully-documented operations went 200 to 210.
 
   **Two of the eight 403s are NOT what the middleware would have said**, and both came from reading handlers rather than from the gate. `GET /reports/{id}` is `requireAuth`-only — invisible to #494's gate — and answers a real `403`: `getReport()` admits the **reporter of that report** or a `reports_manage` holder, so it is registered as `Not the reporter and missing reports_manage`. A flat `Missing reports_manage` would tell a client the endpoint is staff-only when a member can read the report they filed.
