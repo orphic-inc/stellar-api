@@ -384,7 +384,7 @@ describe('GET /api/requests/:id', () => {
 
     await request(app).get('/api/requests/42');
 
-    expect(mod.getRequestDetail).toHaveBeenCalledWith(42);
+    expect(mod.getRequestDetail).toHaveBeenCalledWith(42, 7);
   });
 });
 

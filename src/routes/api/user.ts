@@ -562,15 +562,24 @@ router.get(
   })
 );
 
-// GET /api/users/:id — get user by id (public profile)
+// GET /api/users/:id — member profile
+//
+// "Public profile" meant the projection, not the audience: this served member
+// existence, registration date, donor status and profile text to anyone with no
+// session, on an invite-only site (#547). Gated now; stellar-ui never read it
+// before login, so nothing downstream changes.
+//
+// `disabled: false` was also missing. Users are soft-deleted rather than
+// removed (AGENTS.md), so without it a withdrawn account stayed readable by id.
 router.get(
   '/:id',
+  requireAuth,
   validateParams(userIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    const user = await prisma.user.findUnique({
-      where: { id },
+    const user = await prisma.user.findFirst({
+      where: { id, disabled: false },
       select: {
         id: true,
         username: true,

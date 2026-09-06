@@ -44,6 +44,9 @@ jest.mock('../lib/prisma', () => ({
       findMany: jest.fn(),
       count: jest.fn(),
       findUnique: jest.fn(),
+      // getRequestDetail moved to findFirst: the community scope is a relation
+      // filter, which findUnique cannot express (#547).
+      findFirst: jest.fn(),
       update: jest.fn()
     },
     requestBounty: {
@@ -846,9 +849,9 @@ describe('deleteRequest', () => {
 describe('getRequestDetail', () => {
   it('throws 404 when request is not found', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
-    await expect(getRequestDetail(999)).rejects.toMatchObject({
+    await expect(getRequestDetail(999, 7)).rejects.toMatchObject({
       statusCode: 404
     });
   });
@@ -876,9 +879,9 @@ describe('getRequestDetail', () => {
       votes: [{ userId: 1 }],
       voteCount: 1
     };
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(rawRequest);
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce(rawRequest);
 
-    const result = await getRequestDetail(10);
+    const result = await getRequestDetail(10, 7);
 
     expect(result.totalBounty).toBe('104857600');
     expect(result.voteCount).toBe(1);
@@ -1105,14 +1108,22 @@ describe('listRequests', () => {
 
     const result = await listRequests({
       communityId: 1,
-      status: RequestStatus.open
+      status: RequestStatus.open,
+      viewerId: 7
     });
 
     expect(result.data[0].totalBounty).toBe('209715200');
     expect(typeof result.data[0].totalBounty).toBe('string');
     expect(prisma.request.findMany as jest.Mock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ communityId: 1, status: 'open' })
+        where: expect.objectContaining({
+          communityId: 1,
+          status: 'open',
+          // The caller-supplied communityId narrows WITHIN the scope; the scope
+          // is what restricts. Pinned because a filter that quietly replaced
+          // the restriction is the #547 defect.
+          AND: [{ community: expect.anything() }]
+        })
       })
     );
   });
