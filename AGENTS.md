@@ -394,9 +394,10 @@ Do not introduce named role checks (`isModerator`, `isStaffUser`). See `docs/adr
 
 ### Pagination
 
-`parsedPage` reads the **already-validated** query off `res.locals`, so the
-route must run `validateQuery` with a schema that spreads `paginationBase`
-first. There is no `parsePage(req)`.
+`parsedPage` reads the **already-validated** query off `res.locals`, so it only
+returns anything useful once the route has run `validateQuery` with a schema
+spreading `paginationBase` — without that, `res.locals.parsedQuery` is
+undefined. There is no `parsePage(req)`.
 
 ```ts
 const listQuerySchema = z.object({ ...paginationBase });
