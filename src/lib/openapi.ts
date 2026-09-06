@@ -11496,6 +11496,10 @@ const registerBookmark = (
       200: {
         description: 'Bookmark list',
         content: { 'application/json': { schema: z.array(item) } }
+      },
+      401: {
+        description: 'Not authenticated',
+        content: { 'application/json': { schema: MsgResponse } }
       }
     }
   });
@@ -11509,6 +11513,10 @@ const registerBookmark = (
       200: {
         description: 'Toggled bookmark',
         content: { 'application/json': { schema: bookmarkToggle } }
+      },
+      401: {
+        description: 'Not authenticated',
+        content: { 'application/json': { schema: MsgResponse } }
       }
     }
   });
@@ -11518,7 +11526,13 @@ const registerBookmark = (
     tags: ['Bookmarks'],
     security: [{ cookieAuth: [] }],
     request: { params: z.object({ [paramName]: z.string() }) },
-    responses: { 204: { description: 'Removed' } }
+    responses: {
+      204: { description: 'Removed' },
+      401: {
+        description: 'Not authenticated',
+        content: { 'application/json': { schema: MsgResponse } }
+      }
+    }
   });
 };
 
@@ -11540,6 +11554,10 @@ registry.registerPath({
           schema: z.object({ removed: z.number() })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
