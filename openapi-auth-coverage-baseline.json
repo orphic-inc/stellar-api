@@ -19,8 +19,6 @@
     "DELETE /site-history/{id} 403",
     "DELETE /tag-aliases/{id} 401",
     "DELETE /tag-aliases/{id} 403",
-    "DELETE /wiki/{id} 401",
-    "DELETE /wiki/{id}/aliases/{alias} 401",
     "GET /contributions 401",
     "GET /contributions/{id} 401",
     "GET /contributions/{id}/access/latest 401",
@@ -59,12 +57,6 @@
     "GET /top10/tags 401",
     "GET /top10/users 401",
     "GET /top10/votes 401",
-    "GET /wiki 401",
-    "GET /wiki/by-alias/{alias} 401",
-    "GET /wiki/{id} 401",
-    "GET /wiki/{id}/compare 401",
-    "GET /wiki/{id}/revisions 401",
-    "GET /wiki/{id}/revisions/{rev} 401",
     "POST /contributions 401",
     "POST /contributions/{id}/access 401",
     "POST /contributions/{id}/report 401",
@@ -101,9 +93,6 @@
     "POST /tag-aliases 403",
     "POST /top10/snapshot 401",
     "POST /top10/snapshot 403",
-    "POST /wiki 401",
-    "POST /wiki/{id}/aliases 401",
-    "POST /wiki/{id}/rollback/{rev} 401",
     "PUT /comments/{id} 401",
     "PUT /contributions/{id}/ratio-exempt 401",
     "PUT /friends/{userId}/comment 401",
@@ -115,7 +104,6 @@
     "PUT /site-history/{id} 401",
     "PUT /site-history/{id} 403",
     "PUT /tag-aliases/{id} 401",
-    "PUT /tag-aliases/{id} 403",
-    "PUT /wiki/{id} 401"
+    "PUT /tag-aliases/{id} 403"
   ]
 }

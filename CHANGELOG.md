@@ -8,6 +8,16 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **`Wiki` now documents the 401 its middleware answers, plus two 403s nothing had noticed — the fourteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 115 gaps to 103.** Twelve operations in one router file. Fully-documented operations went 257 to 269.
+
+  **The two undeclared 403s were found by fixing the grep, not by reading harder.** `POST /wiki/{id}/aliases` and `DELETE /wiki/{id}/aliases/{alias}` are `requireAuth`-only — invisible to #494's gate — and both call `canEdit()`, answering `403 Insufficient permission to edit this page`. Neither declared it. **The documented search pattern is what hid them:** `grep "res\.status(4"` matches only a single-line chain, and this file writes nine of its ten 403s as `return res` on one line and `.status(403)` on the next. On `/wiki` that pattern finds **1 of 10 sites**. Searching for `\.status(403)` instead finds all ten.
+
+  **`/messages` and `/stats` were re-checked with the corrected pattern and neither had missed anything** — `/messages` has exactly the one 403 it already declared, `/stats` and `/bookmarks` have none. The narrow pattern happened not to bite on those surfaces; it would have bitten here.
+
+  **Everything else on this surface was already correct**, which is what api#486 and #487 bought during the [ui#277](https://github.com/orphic-inc/stellar-ui/issues/277) migration. Eight of the ten remaining 403s were declared with accurate, specific descriptions, including the split that the migration originally got wrong: a **direct page read** answers `403 Insufficient rank to view this page`, while a **history read** answers `404` for the same `canRead` failure — deliberate non-confirmation — and reserves its `403` for the separate `canEdit` check. `DELETE /wiki/{id}` is an any-of gate and already says `Missing wiki_manage/admin`, naming both keys.
+
+  **Purely additive, blast radius proved per operation**: exactly twelve changed, all under `/wiki`, none losing a response or changing a non-`responses` key, `components` byte-identical, path count unmoved at 267.
+
 - **`Stats` now documents the 401 and 403 its middleware answers — the thirteenth slice off [#494](https://github.com/orphic-inc/stellar-api/issues/494)'s baseline, 128 gaps to 115.** Eight operations in one router file; five needed both codes, three took **401 only**. Fully-documented operations went 249 to 257.
 
   **All five 403s are `Missing admin` despite coming from two different gates** — four routes use `requirePermission('admin')` and `GET /stats/site-info` uses `requireAdminOnly()`. Per [#515](https://github.com/orphic-inc/stellar-api/issues/515) those are the same test: `hasPermission()` short-circuits on `permissions.admin` before consulting the requested key, so both deny exactly when `perms.admin` is falsy and neither admits staff. One description is correct for both.

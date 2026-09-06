@@ -10898,6 +10898,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -10925,6 +10929,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Neither wiki_edit nor a managing permission',
       content: { 'application/json': { schema: MsgResponse } }
@@ -10945,6 +10953,10 @@ registry.registerPath({
     200: {
       description: 'The aliased page',
       content: { 'application/json': { schema: WikiPageRendered } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient rank to view this page',
@@ -10973,6 +10985,10 @@ registry.registerPath({
     200: {
       description: 'Page',
       content: { 'application/json': { schema: WikiPageRendered } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient rank to view this page',
@@ -11004,6 +11020,10 @@ registry.registerPath({
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Insufficient permission to edit this page',
       content: { 'application/json': { schema: MsgResponse } }
@@ -11028,6 +11048,10 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Page deleted'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Missing wiki_manage/admin',
@@ -11061,6 +11085,10 @@ registry.registerPath({
         }
       }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Insufficient permission to view revision history',
       content: { 'application/json': { schema: MsgResponse } }
@@ -11088,6 +11116,10 @@ registry.registerPath({
     200: {
       description: 'Revision content',
       content: { 'application/json': { schema: WikiRevisionContent } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient permission to view revision content',
@@ -11121,6 +11153,10 @@ registry.registerPath({
       description: '`old` must be less than `new`',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     403: {
       description: 'Insufficient permission to compare revisions',
       content: { 'application/json': { schema: MsgResponse } }
@@ -11149,6 +11185,10 @@ registry.registerPath({
     200: {
       description: 'The page after rollback',
       content: { 'application/json': { schema: WikiPage } }
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     403: {
       description: 'Insufficient permission to edit this page',
@@ -11182,6 +11222,14 @@ registry.registerPath({
       description: 'The alias normalised to nothing usable',
       content: { 'application/json': { schema: MsgResponse } }
     },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Insufficient permission to edit this page',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
     404: {
       description: 'Page not found',
       content: { 'application/json': { schema: MsgResponse } }
@@ -11206,6 +11254,14 @@ registry.registerPath({
   responses: {
     204: {
       description: 'Alias removed'
+    },
+    401: {
+      description: 'Not authenticated',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    403: {
+      description: 'Insufficient permission to edit this page',
+      content: { 'application/json': { schema: MsgResponse } }
     },
     404: {
       description: 'Page not found, or that alias is not on this page',
