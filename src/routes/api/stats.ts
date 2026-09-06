@@ -76,7 +76,7 @@ router.get(
         prisma.contribution.count(),
         prisma.contribution.groupBy({ by: ['type'], _count: true }),
         prisma.contribution.groupBy({ by: ['linkStatus'], _count: true }),
-        prisma.artist.count()
+        prisma.artist.count({ where: { deletedAt: null } })
       ]);
     res.json({ releases, contributions, byType, byLinkStatus, artists });
   })
@@ -138,7 +138,7 @@ router.get(
       prisma.user.count({ where: { disabled: false } }),
       prisma.user.count({ where: { disabled: true } }),
       prisma.release.count(),
-      prisma.artist.count(),
+      prisma.artist.count({ where: { deletedAt: null } }),
       prisma.contribution.count(),
       prisma.community.count(),
       prisma.forumTopic.count({ where: { deletedAt: null } }),

@@ -903,6 +903,16 @@ model Artist {
   id             Int                  @id @default(autoincrement())
   name           String
   vanityHouse    Boolean              @default(false)
+  /// Soft delete (#509 F3). Set by `DELETE /api/artists/:id`; every artist
+  /// list, search, count and detail read filters it out. A hard delete is not
+  /// available here: artist_histories, release credits, tags, aliases,
+  /// comments, bookmarks, subscriptions and both similar-artist sides are all
+  /// `ON DELETE RESTRICT`, and `createArtist` writes a history row at creation,
+  /// so `prisma.artist.delete()` could only ever raise a foreign-key error.
+  /// Credits already rendered on a release keep resolving, which is deliberate:
+  /// withdrawing a catalogue entry must not blank the artist line on every
+  /// release that cites it.
+  deletedAt      DateTime?
   histories      ArtistHistory[]
   aliases        ArtistAlias[]        @relation("ArtistAliases")
   redirects      ArtistAlias[]        @relation("ArtistRedirects")
@@ -917,6 +927,7 @@ model Artist {
   subscriptions  ArtistSubscription[]
   credits        ReleaseArtist[]
 
+  @@index([deletedAt])
   @@map("artists")
 }
 

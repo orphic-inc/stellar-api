@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { communityRoleUnion } from '../../../modules/communityAccess';
 import {
@@ -58,12 +59,13 @@ router.get(
     const pg = parsedPage(res);
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
+        where: { deletedAt: null },
         skip: pg.skip,
         take: pg.limit,
         include: { _count: { select: { credits: true } } },
         orderBy: { name: 'asc' }
       }),
-      prisma.artist.count()
+      prisma.artist.count({ where: { deletedAt: null } })
     ]);
     paginatedResponse(res, artists, total, pg);
   })
@@ -78,13 +80,13 @@ router.get(
     const pg = parsedPage(res);
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
-        where: { vanityHouse: true },
+        where: { vanityHouse: true, deletedAt: null },
         skip: pg.skip,
         take: pg.limit,
         include: { _count: { select: { credits: true } } },
         orderBy: { name: 'asc' }
       }),
-      prisma.artist.count({ where: { vanityHouse: true } })
+      prisma.artist.count({ where: { vanityHouse: true, deletedAt: null } })
     ]);
     paginatedResponse(res, artists, total, pg);
   })
@@ -100,7 +102,9 @@ router.put(
     const parsed = vanityHouseSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ msg: 'vanityHouse (boolean) required' });
-    const artist = await prisma.artist.findUnique({ where: { id } });
+    const artist = await prisma.artist.findUnique({
+      where: { id, deletedAt: null }
+    });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
     const updated = await prisma.artist.update({
       where: { id },
@@ -226,7 +230,9 @@ router.post(
   validateParams(artistIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const artist = await prisma.artist.findUnique({ where: { id } });
+    const artist = await prisma.artist.findUnique({
+      where: { id, deletedAt: null }
+    });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
     await prisma.artistSubscription.upsert({
       where: { userId_artistId: { userId: req.user.id, artistId: id } },
@@ -274,7 +280,7 @@ router.get(
 
     const [artist, subscription] = await Promise.all([
       prisma.artist.findUnique({
-        where: { id },
+        where: { id, deletedAt: null },
         include: {
           aliases: {
             include: { redirect: { select: { id: true, name: true } } }
@@ -333,9 +339,18 @@ router.get(
 );
 
 // PUT /api/artists/:id
+// PUT /api/artists/:id — requires communities_manage
+//
+// An artist row is a shared catalogue entry with no ownership concept, so
+// `requireAuth` alone authorized nothing (#509 F3). It also accepts
+// `vanityHouse`, which `PUT /:id/vanity-house` above gates behind
+// `news_manage` — so the gate on that route was reachable around, through this
+// one. `communities_manage` matches `POST /revert/:historyId`, which undoes
+// exactly the edit this route makes; gating the undo more tightly than the do
+// was the inconsistency.
 router.put(
   '/:id',
-  requireAuth,
+  ...requirePermission('communities_manage'),
   validateParams(artistIdParamsSchema),
   validate(updateArtistSchema),
   authHandler(async (req, res) => {
@@ -343,7 +358,9 @@ router.put(
     const { name, vanityHouse, description } =
       parsedBody<UpdateArtistInput>(res);
 
-    const existing = await prisma.artist.findUnique({ where: { id } });
+    const existing = await prisma.artist.findUnique({
+      where: { id, deletedAt: null }
+    });
     if (!existing) return res.status(404).json({ msg: 'Artist not found' });
 
     const artist = await updateArtist(id, req.user.id, {
@@ -355,16 +372,35 @@ router.put(
   })
 );
 
-// DELETE /api/artists/:id
+// DELETE /api/artists/:id — requires admin; soft delete
+//
+// Withdrawing a shared catalogue entry is the most destructive act available
+// on an artist and it is not reversible through any route, so it sits at
+// `admin` rather than alongside the edit gate.
+//
+// The delete is a soft one, and that is a correctness fix as much as a policy
+// one: every relation that matters is `ON DELETE RESTRICT` and `createArtist`
+// writes an artist_histories row at creation, so `prisma.artist.delete()`
+// could only ever raise a foreign-key error the global handler renders as a
+// 500. It could not have succeeded on any artist created through the API.
 router.delete(
   '/:id',
-  requireAuth,
+  ...requirePermission('admin'),
   validateParams(artistIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const artist = await prisma.artist.findUnique({ where: { id } });
+    const artist = await prisma.artist.findUnique({
+      where: { id, deletedAt: null }
+    });
     if (!artist) return res.status(404).json({ msg: 'Artist not found' });
-    await prisma.artist.delete({ where: { id } });
+
+    await prisma.artist.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
+    await audit(prisma, req.user.id, 'artist.delete', 'Artist', id, {
+      name: artist.name
+    });
     res.status(204).send();
   })
 );

@@ -413,7 +413,59 @@ describe('GET /api/artists/:id/similar', () => {
 
 // ─── PUT /api/artists/:id ─────────────────────────────────────────────────────
 
+describe('withdrawn artists are excluded from discovery (#509 F3)', () => {
+  // A soft delete is only worth the column if every discovery read honours it.
+  // These assert the where-clause rather than the payload, because the mock
+  // returns whatever it is told — only the query proves the filter is applied.
+  it('filters the artist list and its total', async () => {
+    prismaMock.artist.findMany.mockResolvedValue([] as never);
+    prismaMock.artist.count.mockResolvedValue(0 as never);
+
+    await request(app).get('/api/artists');
+
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { deletedAt: null } })
+    );
+    expect(prismaMock.artist.count).toHaveBeenCalledWith({
+      where: { deletedAt: null }
+    });
+  });
+
+  it('filters the vanity-house list alongside its own predicate', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+    prismaMock.artist.findMany.mockResolvedValue([] as never);
+    prismaMock.artist.count.mockResolvedValue(0 as never);
+
+    await request(app).get('/api/artists/vanity-house');
+
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { vanityHouse: true, deletedAt: null }
+      })
+    );
+  });
+
+  it('treats a withdrawn artist as absent on the detail read', async () => {
+    prismaMock.community.findMany.mockResolvedValue([] as never);
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+    prismaMock.artistSubscription.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/artists/1');
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.artist.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1, deletedAt: null } })
+    );
+  });
+});
+
 describe('PUT /api/artists/:id', () => {
+  // #509 F3: an artist row is a shared catalogue entry with no ownership
+  // concept, so this was `requireAuth`-only and authorized nothing.
+  beforeEach(() => setCommunityManage());
+
   it('updates an artist and returns the updated record', async () => {
     prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
     updateArtistMock.mockResolvedValue(
@@ -426,6 +478,44 @@ describe('PUT /api/artists/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Miles Davis Jr.');
+  });
+
+  it('answers 403 without communities_manage', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({}));
+
+    const res = await request(app)
+      .put('/api/artists/1')
+      .send({ name: 'Miles Davis Jr.' });
+
+    expect(res.status).toBe(403);
+    expect(updateArtistMock).not.toHaveBeenCalled();
+  });
+
+  it('does not let vanityHouse in around the news_manage gate', async () => {
+    // The bypass this fix closes: `PUT /:id/vanity-house` requires
+    // news_manage, and this route writes the same field. A caller with
+    // neither key must not reach it through here.
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank({}));
+
+    const res = await request(app)
+      .put('/api/artists/1')
+      .send({ vanityHouse: true });
+
+    expect(res.status).toBe(403);
+    expect(updateArtistMock).not.toHaveBeenCalled();
+  });
+
+  it('treats a withdrawn artist as absent', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/artists/1')
+      .send({ name: 'New Name' });
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.artist.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1, deletedAt: null } })
+    );
   });
 
   it('returns 404 when the artist does not exist', async () => {
@@ -443,14 +533,52 @@ describe('PUT /api/artists/:id', () => {
 // ─── DELETE /api/artists/:id ──────────────────────────────────────────────────
 
 describe('DELETE /api/artists/:id', () => {
-  it('deletes an artist and returns 204', async () => {
+  const setAdmin = () =>
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ admin: true })
+    );
+
+  beforeEach(() => setAdmin());
+
+  it('soft-deletes an artist and returns 204', async () => {
     prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
-    prismaMock.artist.delete.mockResolvedValue({} as never);
+    prismaMock.artist.update.mockResolvedValue({} as never);
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
 
     const res = await request(app).delete('/api/artists/1');
 
     expect(res.status).toBe(204);
-    expect(prismaMock.artist.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    // A hard delete could never have succeeded: every artist relation is
+    // ON DELETE RESTRICT and createArtist writes a history row at creation.
+    expect(prismaMock.artist.delete).not.toHaveBeenCalled();
+    expect(prismaMock.artist.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { deletedAt: expect.any(Date) }
+    });
+  });
+
+  it('answers 403 without admin', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+
+    const res = await request(app).delete('/api/artists/1');
+
+    // communities_manage edits an artist but must not withdraw one.
+    expect(res.status).toBe(403);
+    expect(prismaMock.artist.update).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent — a withdrawn artist reads as absent', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/artists/1');
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.artist.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1, deletedAt: null } })
+    );
+    expect(prismaMock.artist.update).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the artist does not exist', async () => {

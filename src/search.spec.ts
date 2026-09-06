@@ -316,6 +316,17 @@ describe('GET /api/search/releases', () => {
 describe('GET /api/search/artists', () => {
   beforeEach(() => resetApiTestState());
 
+  it('excludes withdrawn artists (#509 F3)', async () => {
+    prismaMock.artist.findMany.mockResolvedValue([]);
+    prismaMock.artist.count.mockResolvedValue(0);
+    await request(app).get('/api/search/artists?q=miles');
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ deletedAt: null })
+      })
+    );
+  });
+
   it('returns 200 with empty results and no params', async () => {
     prismaMock.artist.findMany.mockResolvedValue([]);
     prismaMock.artist.count.mockResolvedValue(0);
