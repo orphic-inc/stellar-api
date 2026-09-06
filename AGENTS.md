@@ -140,6 +140,7 @@ Copy `.env.default` → `.env`.
 | `STELLAR_AUTH_JWT_SECRET`  | JWT signing secret                                                                                                                      |
 | `STELLAR_HTTP_PORT`        | Server port (default 8080)                                                                                                              |
 | `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin                                                                                                                     |
+| `STELLAR_TRUST_PROXY_HOPS` | Reverse-proxy hops in front of the API (#542; default 1 — the shipped nginx topology; set 0 for proxy-less local dev)                   |
 | `STELLAR_LOG_LEVEL`        | Winston log level (default `info`)                                                                                                      |
 | `KORIN_API_URL`            | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)                                                             |
 | `KORIN_PULL_KEY`           | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013)                                                |

@@ -396,6 +396,10 @@ describe('API auth/profile/user flows', () => {
 
     const res = await request(app)
       .put('/api/auth/email')
+      // The client claims 203.0.113.10; nginx appends the real peer, so the
+      // header arrives as "<spoof>, <real>". Before #542 the API recorded the
+      // FIRST entry — this assertion previously expected 203.0.113.10, i.e. it
+      // pinned the vulnerability. It now pins that the spoof is ignored.
       .set('x-forwarded-for', '203.0.113.10, 10.0.0.1')
       .send({
         newEmail: 'NEW@example.com',
@@ -408,7 +412,8 @@ describe('API auth/profile/user flows', () => {
         userId: 7,
         oldEmail: 'old@example.com',
         newEmail: 'new@example.com',
-        ipAddress: '203.0.113.10'
+        // The rightmost entry — the one nginx appended — not the client's.
+        ipAddress: '10.0.0.1'
       }
     });
     expect(prismaMock.user.update).toHaveBeenCalledWith({

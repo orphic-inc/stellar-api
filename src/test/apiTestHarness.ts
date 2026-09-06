@@ -147,7 +147,14 @@ jest.mock('../lib/mailer', () => ({
 
 jest.mock('../modules/config', () => ({
   auth: { jwtSecret: 'x'.repeat(32) },
-  http: { port: 8080, corsOrigin: 'http://localhost:3000' },
+  // trustProxyHops must be present, or `app.set('trust proxy', undefined)`
+  // disables it and the harness stops representing the real app — which is how
+  // an assertion encoding the #542 spoof survived here.
+  http: {
+    port: 8080,
+    corsOrigin: 'http://localhost:3000',
+    trustProxyHops: 1
+  },
   logging: { level: 'error', timestampFormat: undefined },
   assets: { maxBytes: 2000000 },
   economy: { minimumBounty: 104857600 },

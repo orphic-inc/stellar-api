@@ -58,9 +58,43 @@ export const logging = {
   timestampFormat: process.env.STELLAR_LOG_TIME_FMT
 };
 
+/**
+ * How many reverse-proxy hops sit in front of this API (#542).
+ *
+ * Express's `trust proxy` decides which entry of `X-Forwarded-For` becomes
+ * `req.ip`. In the shipped stack (stellar-compose) the `ui` service *is* nginx,
+ * it owns ports 80/443, and `api` publishes none and lives on the `internal`
+ * network — so exactly one hop is in front and it is always present. nginx sets
+ * `X-Forwarded-For: $proxy_add_x_forwarded_for`, which **appends** the real peer
+ * to whatever the client sent, so the rightmost entry is ours and everything to
+ * its left is attacker-supplied. One trusted hop selects exactly that entry.
+ *
+ * Configurable because it describes deployment topology, not code: a local
+ * `npm run dev` has no proxy at all and should set `0`, and a stack that later
+ * grows a CDN or load balancer will need a different number. Defaulting to `1`
+ * keeps the shipped topology correct without configuration.
+ *
+ * A negative or non-numeric value falls back to `1` rather than crashing boot —
+ * getting this wrong should not take the site down, and `1` is the safe end of
+ * the mistake: too few trusted hops under-trusts the header, which degrades IP
+ * accuracy. Too many would trust attacker input, which is the bug itself.
+ */
+const parseTrustProxyHops = (raw?: string): number => {
+  if (raw === undefined || raw === '') return 1;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    console.warn(
+      `STELLAR_TRUST_PROXY_HOPS is not a non-negative integer ('${raw}') — using 1`
+    );
+    return 1;
+  }
+  return parsed;
+};
+
 export const http = {
   port: parseInt(process.env.STELLAR_HTTP_PORT || '8080', 10),
-  corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN || 'http://localhost:3000'
+  corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN || 'http://localhost:3000',
+  trustProxyHops: parseTrustProxyHops(process.env.STELLAR_TRUST_PROXY_HOPS)
 };
 
 // Site identity + the canonical targets the Golden Rules `${...}` tokens resolve
