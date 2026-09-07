@@ -72,9 +72,9 @@ What the hook does **not** cover, run yourself before committing:
 2. `npm run test --no-coverage` — full suite (too slow for the hook; CI is the authority, but run it locally before pushing)
 3. `npm run changelog:check` — CI runs this per-PR (#386): changes under `src/`, `prisma/` or `.github/workflows/` need a `CHANGELOG.md` entry, unless the PR carries the `no-changelog` label.
 
-   **Append under the `### Added` / `### Changed` / `### Fixed` heading already in `[Unreleased]`. Do not open a second one** — gated since #537, because six consecutive PRs each prepended a fresh block and the section reached ten headings for three types. Coalescing that by hand on release day is what misfiled eight entries at the 0.9.1 cut.
+   **Append under the `### Added` / `### Changed` / `### Fixed` heading already in `[Unreleased]`.** Do not open a second one. This is gated since #537. Six consecutive PRs each prepended a fresh block, and the section reached ten headings for three types. Coalescing that by hand on release day is what misfiled eight entries at the 0.9.1 cut.
 
-   The `release` job publishes **the section matching the tag** (`publish.yml` greps `^## \[<version>\]` and fails loudly if it is absent) — not `[Unreleased]`. So a release cut renames `[Unreleased]` to `## [<version>] — <date>` and leaves an empty `[Unreleased]` above it, which is what the next PR's gate needs.
+   The `release` job publishes **the section matching the tag**, not `[Unreleased]`. `publish.yml` greps `^## \[<version>\]` and fails loudly when that section is absent. So a release cut renames `[Unreleased]` to `## [<version>] — <date>`. Leave an empty `[Unreleased]` above it — the next PR's gate needs one.
 
 4. Commit with a descriptive message following existing log style
 
