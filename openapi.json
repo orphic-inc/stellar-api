@@ -8833,7 +8833,7 @@
             }
           },
           "403": {
-            "description": "Missing the staff permission",
+            "description": "Missing staff",
             "content": {
               "application/json": {
                 "schema": {
@@ -10750,7 +10750,7 @@
             }
           },
           "403": {
-            "description": "Missing users_edit permission",
+            "description": "Missing users_edit",
             "content": {
               "application/json": {
                 "schema": {
@@ -11116,7 +11116,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Missing recovery_manage",
             "content": {
               "application/json": {
                 "schema": {
@@ -11170,7 +11170,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Missing recovery_manage",
             "content": {
               "application/json": {
                 "schema": {
@@ -11321,7 +11321,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Missing recovery_manage",
             "content": {
               "application/json": {
                 "schema": {
@@ -12901,15 +12901,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "msg": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "msg"
-                  ]
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -30997,7 +30989,7 @@
             }
           },
           "403": {
-            "description": "Missing wiki_manage/admin",
+            "description": "Missing wiki_manage or admin",
             "content": {
               "application/json": {
                 "schema": {

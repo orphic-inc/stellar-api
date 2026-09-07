@@ -182,8 +182,8 @@ describe('API forum flows', () => {
 
     expect(res.status).toBe(403);
     // 'Permission denied' since #509 F7: this route was gated by a bespoke
-    // local middleware answering 'Not authorized', which the auth-coverage
-    // machinery could not see. It now uses the shared
+    // local middleware answering 'Not authorized', which `readGate` could not
+    // see because it carried no stamp. It now uses the shared
     // requirePermission('forums_moderate'), whose refusal wording this is.
     expect(res.body).toEqual({ msg: 'Permission denied' });
     expect(createTopicNoteMock).not.toHaveBeenCalled();

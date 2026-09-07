@@ -1,5 +1,5 @@
 // CLI wrapper for the failure-coverage gate (#517). Mirrors
-// check-openapi-auth-coverage.ts: build the real app, read the real spec, feed
+// check-openapi-completeness.ts: build the real app, read the real spec, feed
 // both into the pure checker in lib/openapiFailureCoverage.ts.
 //
 // Usage:

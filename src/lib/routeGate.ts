@@ -1,9 +1,10 @@
-// Machine-readable auth gates on middleware, for the auth-coverage gate (#494).
+// Machine-readable auth gates on middleware — the source the OpenAPI contract
+// derives a route's `security` and its 401/403 from (#494, #520, #517).
 //
 // #474 proved every route is REGISTERED. It never claimed each registration is
-// complete, and auth failure modes are the largest remaining gap: of 361
-// operations only 39 declare a 401 and 88 a 403, and the three axes (401, 403,
-// `security`) do not correlate — the signature of drift rather than policy.
+// complete, and auth failure modes were the largest remaining gap: of 361
+// operations only 39 declared a 401 and 88 a 403, and the three axes (401, 403,
+// `security`) did not correlate — the signature of drift rather than policy.
 //
 // The authority for "can this route answer 401/403?" is the middleware chain,
 // and nothing read it. It cannot be read reliably by inspection either:
@@ -14,6 +15,9 @@
 // So the gates label themselves. `markGate` stamps a non-enumerable symbol on
 // the handler; `readGate` reads it back off the built app's route stack. A
 // handler with no stamp is simply unknown, never guessed at.
+//
+// #494 GATED the hand-written blocks against this stamp; #517 derives them from
+// it instead, so the gate is gone and the drift it measured cannot recur.
 import type { RequestHandler } from 'express';
 
 /** What a route's middleware chain can reject with before the handler runs. */
