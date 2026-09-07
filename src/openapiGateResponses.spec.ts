@@ -29,7 +29,7 @@ describe('responsesForGates', () => {
   ) => responses[code]?.description;
 
   it('describes an auth gate as an unauthenticated caller meets it', () => {
-    const r = responsesForGates([{ kind: 'auth' }]);
+    const r = responsesForGates([{ kind: 'auth' }], 'GET');
     expect(Object.keys(r)).toEqual(['401']);
     expect(description(r, '401')).toBe('Not authenticated');
   });
@@ -38,9 +38,10 @@ describe('responsesForGates', () => {
     // `requirePermission()` spreads [requireAuth, check]: an anonymous caller
     // is refused by the first element and an authenticated one without the
     // permission by the second. Declaring only 403 describes half the gate.
-    const r = responsesForGates([
-      { kind: 'permission', permissions: ['news_manage'] }
-    ]);
+    const r = responsesForGates(
+      [{ kind: 'permission', permissions: ['news_manage'] }],
+      'GET'
+    );
     expect(Object.keys(r).sort()).toEqual(['401', '403']);
     expect(description(r, '403')).toBe('Missing news_manage');
   });
@@ -48,9 +49,10 @@ describe('responsesForGates', () => {
   it('joins alternative permissions with "or", never "and"', () => {
     // ANY of them satisfies the gate — `requirePermission` spreads its varargs
     // into a `.some()`. "and" would describe a route nobody can reach.
-    const r = responsesForGates([
-      { kind: 'permission', permissions: ['wiki_manage', 'admin'] }
-    ]);
+    const r = responsesForGates(
+      [{ kind: 'permission', permissions: ['wiki_manage', 'admin'] }],
+      'GET'
+    );
     expect(description(r, '403')).toBe('Missing wiki_manage or admin');
   });
 
@@ -58,21 +60,56 @@ describe('responsesForGates', () => {
     // `requireOwnerOrPermission` stamps its kind alone: an owner passes it
     // WITHOUT the permission, so naming one would put a requirement in the
     // contract that is not one.
-    const r = responsesForGates([{ kind: 'permission' }]);
+    const r = responsesForGates([{ kind: 'permission' }], 'GET');
     expect(description(r, '403')).toBe('Permission denied');
   });
 
   it('calls a service-key failure what it is', () => {
     // The key rides in an Authorization header, so a missing or wrong one is
     // an authentication failure — 401, not 403.
-    const r = responsesForGates([{ kind: 'service' }]);
+    const r = responsesForGates([{ kind: 'service' }], 'GET');
     expect(Object.keys(r)).toEqual(['401']);
     expect(description(r, '401')).toBe('Missing or wrong service key');
   });
 
+  it('gives a rate-limit gate a 429, on the methods it actually guards', () => {
+    // The site-wide limiter runs for mutations and passes reads straight
+    // through, so a method-blind derivation would put a 429 on all 156 of the
+    // contract's GETs and be wrong about every one of them (#553).
+    const gate = [
+      {
+        kind: 'rateLimit' as const,
+        methods: ['POST', 'PUT', 'PATCH', 'DELETE']
+      }
+    ];
+    expect(Object.keys(responsesForGates(gate, 'POST'))).toEqual(['429']);
+    expect(responsesForGates(gate, 'POST')['429'].description).toBe(
+      'Rate limited'
+    );
+    expect(responsesForGates(gate, 'GET')).toEqual({});
+  });
+
+  it('applies a gate naming no methods to every method', () => {
+    // A limiter mounted on one route needs no method list — the route fixes it.
+    const gate = [{ kind: 'rateLimit' as const }];
+    expect(Object.keys(responsesForGates(gate, 'GET'))).toEqual(['429']);
+    expect(Object.keys(responsesForGates(gate, 'POST'))).toEqual(['429']);
+  });
+
+  it('combines a rate-limit gate with the auth codes, in order', () => {
+    const r = responsesForGates(
+      [
+        { kind: 'permission', permissions: ['forums_create'] },
+        { kind: 'rateLimit', methods: ['POST'] }
+      ],
+      'POST'
+    );
+    expect(Object.keys(r)).toEqual(['401', '403', '429']);
+  });
+
   it('yields nothing for an ungated route', () => {
-    expect(responsesForGates([])).toEqual({});
-    expect(responsesForGates(undefined)).toEqual({});
+    expect(responsesForGates([], 'POST')).toEqual({});
+    expect(responsesForGates(undefined, 'POST')).toEqual({});
   });
 });
 
@@ -242,6 +279,44 @@ describe('the committed openapi.json', () => {
       expect(op.responses['401']?.description).not.toBe(
         'Missing or wrong service key'
       );
+    }
+  });
+
+  it('rate-limits no read', () => {
+    // The site-wide limiter passes GET straight through. A method-blind
+    // derivation would put a 429 on all 156 of them and be wrong every time.
+    const reads = operations
+      .filter((op) => !/^(POST|PUT|PATCH|DELETE) /.test(op.key))
+      .filter((op) => op.responses['429'])
+      .map((op) => op.key);
+
+    expect(reads).toEqual([]);
+  });
+
+  it('documents a 429 on every mutation the limiter reaches', () => {
+    // One mutation is genuinely outside it, and naming it here is the point:
+    // `/api/install` is mounted BEFORE the site-wide limiter in app.ts, so the
+    // limiter never runs for it, and this route carries none of its own. The
+    // sibling `POST /install` does (`installLimiter`). Filed separately; the
+    // contract is right to stay silent while that is true.
+    const unlimited = operations
+      .filter((op) => /^(POST|PUT|PATCH|DELETE) /.test(op.key))
+      .filter((op) => !op.responses['429'])
+      .map((op) => op.key);
+
+    expect(unlimited).toEqual(['POST /install/checklist/{id}/dismiss']);
+  });
+
+  it('does not mistake a rate limiter for a credential', () => {
+    // `securityForGates` returned cookieAuth for ANY non-empty gate list, so
+    // stamping the write limiter made six public endpoints claim a session
+    // requirement that does not exist. A limiter refuses a caller whose
+    // credentials were fine, or who needed none.
+    for (const key of ['POST /auth', 'POST /auth/register', 'POST /install']) {
+      const op = operations.find((o) => o.key === key);
+      expect(op).toBeDefined();
+      expect(op?.schemes).toEqual([]);
+      expect(op?.responses['429']).toBeDefined();
     }
   });
 
