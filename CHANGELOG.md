@@ -50,6 +50,10 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
+
+  **Not exploitable** — every consumer is build-time and read-only, and `readonly string[]` blocks it at the type level — so it is defence in depth rather than a fix for a reachable bug. But `src/middleware/permissions.ts` is a documented high-risk file and metadata has no business aliasing enforcement state, so the stamp now stores a frozen copy. Found by the security review on [#555](https://github.com/orphic-inc/stellar-api/pull/555), which merged before the fix landed.
+
 - **Five read endpoints served content with no session, and `/requests` ignored community membership** ([#547](https://github.com/orphic-inc/stellar-api/issues/547)) — found while enumerating the ungated routes for [#520](https://github.com/orphic-inc/stellar-api/issues/520): deriving `security` from the gates is only correct if "ungated" is _true_, so all 13 were read against their handlers. Five were gaps rather than intent.
 
   **`GET /requests` and `GET /requests/{id}` are the authorization defect.** Neither required a session, and `communityId` was a caller-supplied **filter, never a restriction** — while the projection carries the community's **name**. This is exactly what [#509](https://github.com/orphic-inc/stellar-api/issues/509) F2 fixed for `GET /search/requests`, left live on the browse path. #509's own writeup named the shape — _"the same rows were gated on one path and open on the other"_ — and this was the mirror image. Both now scope with `communityReadableWhere`, the same helper the search path uses.

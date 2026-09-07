@@ -238,3 +238,33 @@ describe('permission gates name what they enforce', () => {
     expect(gate).not.toHaveProperty('permissions');
   });
 });
+
+/**
+ * The stamp must not alias the array the gate evaluates.
+ *
+ * `requirePermission` passes the very array its closure runs `.some()` over, so
+ * storing the reference would let anything holding the stamp mutate a live
+ * authorization check. `permissions.ts` is a documented high-risk file; this is
+ * the assertion that keeps the metadata inert.
+ */
+describe('a gate stamp cannot reach back into the check', () => {
+  it('copies and freezes the permission list', () => {
+    const chain = requirePermission('news_manage');
+    const gate = chain
+      .map((h) => readGate(h))
+      .find((g) => g?.kind === 'permission');
+
+    expect(Object.isFrozen(gate?.permissions)).toBe(true);
+    expect(() => {
+      (gate?.permissions as string[]).push('admin');
+    }).toThrow();
+    expect(gate?.permissions).toEqual(['news_manage']);
+  });
+
+  it('is unaffected by mutating the array the caller passed', () => {
+    const perms: string[] = ['news_manage'];
+    const fn = markGate(jest.fn(), 'permission', perms);
+    perms.push('admin');
+    expect(readGate(fn)?.permissions).toEqual(['news_manage']);
+  });
+});
