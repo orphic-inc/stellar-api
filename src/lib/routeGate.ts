@@ -21,7 +21,8 @@
 import type { RequestHandler } from 'express';
 
 /** What a route's middleware chain can reject with before the handler runs. */
-export type GateKind = 'auth' | 'permission' | 'service' | 'rateLimit';
+export type GateKind =
+  'auth' | 'permission' | 'service' | 'rateLimit' | 'validation';
 
 /**
  * A gate, and whatever parameters it needs to describe itself.
@@ -59,6 +60,19 @@ export interface Gate {
    * here, so the contract cannot come to disagree with the check.
    */
   methods?: readonly string[];
+  /**
+   * For a `validation` gate: which part of the request its schema covers —
+   * `body`, `query` and/or `params`.
+   *
+   * It is what makes the derived description worth more than the 77 identical
+   * `Validation error` strings it replaced (#567). `Invalid path parameters`
+   * and `Invalid request body` are different problems for a caller, and the
+   * middleware already knows which one it checks; only the contract did not.
+   *
+   * A route running two validators carries two gates, so the targets union
+   * across them rather than being restated in one place.
+   */
+  targets?: readonly string[];
 }
 
 const GATE = Symbol.for('stellar.routeGate');
@@ -74,7 +88,8 @@ export const markGate = <T extends RequestHandler>(
   fn: T,
   kind: GateKind,
   permissions?: readonly string[],
-  methods?: readonly string[]
+  methods?: readonly string[],
+  targets?: readonly string[]
 ): T => {
   // COPIED, not aliased. `requirePermission` passes the same array its closure
   // evaluates on every request, so storing the reference would let anything
@@ -86,12 +101,14 @@ export const markGate = <T extends RequestHandler>(
 
   const permissionList = frozen(permissions);
   const methodList = frozen(methods);
+  const targetList = frozen(targets);
 
   Object.defineProperty(fn, GATE, {
     value: {
       kind,
       ...(permissionList ? { permissions: permissionList } : {}),
-      ...(methodList ? { methods: methodList } : {})
+      ...(methodList ? { methods: methodList } : {}),
+      ...(targetList ? { targets: targetList } : {})
     },
     enumerable: false,
     configurable: true
@@ -132,5 +149,8 @@ export const expectedCodes = (
   // a 401 — it is an authentication failure, not an authorization one.
   if (set.has('service')) codes.add(401);
   if (set.has('rateLimit')) codes.add(429);
+  // Validation runs before the handler like every other gate here, and rejects
+  // with a 400 the contract was silent about on 170 of 269 routes (#567).
+  if (set.has('validation')) codes.add(400);
   return [...codes].sort((a, b) => a - b);
 };

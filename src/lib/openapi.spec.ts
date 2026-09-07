@@ -4,7 +4,15 @@ import type { Router } from 'express';
 // requireEnv() and exit the process for a JWT secret this spec never uses.
 import '../test/apiTestHarness';
 import stylesheetRouter from '../routes/api/stylesheet';
-import { msgResponse, registry, validationResponse } from './openapi';
+import {
+  buildOpenApiDocument,
+  msgResponse,
+  registry,
+  validationResponse
+} from './openapi';
+import { collectRoutes } from './expressRoutes';
+import { isContractRoute, stripApi } from './openapiCompleteness';
+import { createApp } from '../app';
 
 /**
  * #198-class guard — a route can ship in routes/api/*.ts without ever being
@@ -95,5 +103,63 @@ describe('response helpers (#562)', () => {
         }
       }
     });
+  });
+});
+
+/**
+ * #567 — the validation gate must not imply a credential.
+ *
+ * `securityForGates` returns `cookieAuth` for any gate it does not recognise as
+ * non-credential, and 299 routes now carry a `validation` gate. #553 made
+ * exactly this mistake with the site-wide write limiter and put a session
+ * requirement on six public endpoints; `POST /auth/register` is the route its
+ * comment names, so it is the one pinned here.
+ */
+describe('validation gates are not credentials (#567)', () => {
+  // Same wiring as scripts/export-openapi.ts: the document's paths carry no
+  // `/api` prefix, so the routes fed to the derivation must not either.
+  const doc = buildOpenApiDocument(
+    collectRoutes(createApp()).filter(isContractRoute).map(stripApi)
+  ) as unknown as {
+    paths: Record<
+      string,
+      Record<string, { security?: unknown; responses: Record<string, unknown> }>
+    >;
+  };
+
+  it('leaves a public validated route with no security requirement', () => {
+    const op = doc.paths['/auth/register'].post;
+    expect(op.security).toBeUndefined();
+  });
+
+  it('still derives the 400 on that route', () => {
+    const op = doc.paths['/auth/register'].post;
+    expect(op.responses['400']).toBeDefined();
+  });
+
+  it('derives a 400 whose body is ValidationError, not MsgResponse', () => {
+    // stellar-ui generates its service types from this document; MsgResponse
+    // here would assert that `errors` does not exist.
+    const op = doc.paths['/auth/sessions/{id}'].delete;
+    expect(op.responses['400']).toEqual(
+      validationResponse('Invalid path parameters')
+    );
+  });
+
+  it('names every part of the request its validators cover', () => {
+    const op = doc.paths['/users/{id}/irc-nick'].put;
+    expect((op.responses['400'] as { description: string }).description).toBe(
+      'Invalid path parameters or request body'
+    );
+  });
+
+  // REGISTERED WINS, still. A route that spells its own 400 out keeps it until
+  // #567's second half deletes the plain restatements; only the 5 bespoke and
+  // the 19 MsgResponse ones survive that.
+  it('does not overwrite a registration that states its own 400', () => {
+    const op = doc.paths['/auth'].post;
+    expect((op.responses['400'] as { description: string }).description).toBe(
+      'Invalid credentials'
+    );
   });
 });
