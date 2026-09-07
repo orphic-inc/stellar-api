@@ -33,7 +33,7 @@ export const requireServiceKey = (
   next();
 };
 
-// Labelled for the auth-coverage gate (#494). The key is presented as a Bearer
+// Labelled for the contract's gate derivation (#494). The key is a Bearer
 // header, so a bad or missing one is a 401 — authentication, not authorization.
 // Stamped in place, for the reason auth.ts records.
 markGate(requireServiceKey, 'service');

@@ -103,8 +103,8 @@ export const requireAuth = async (
   }
 };
 
-// Labelled so the auth-coverage gate (#494) can read this route's failure mode
-// off the built app rather than guess it from a function name. Stamped in place
+// Labelled so the contract can read this route's failure mode off the built app
+// rather than guess it from a function name (#494). Stamped in place
 // rather than via `export const requireAuth = markGate(fn, 'auth')`, because
 // that form renames the declaration and Codacy's Lizard then reports the
 // function's pre-existing complexity as NEW under the new symbol. markGate

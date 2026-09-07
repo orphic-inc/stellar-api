@@ -1,12 +1,12 @@
 // Pure OpenAPI *failure-coverage* checker (#517). No I/O: the CLI wrapper
 // (src/scripts/check-openapi-failure-coverage.ts) builds the real Express app,
 // reads the real spec, and feeds them in — the same shape as
-// openapiAuthCoverage.ts and openapiCompleteness.ts.
+// openapiCompleteness.ts.
 //
 // WHERE THIS SITS IN THE STACK:
 //
 //   registry <-> routes that exist                  openapi:completeness (#474)
-//   registry <-> what a route's GATES can answer    openapi:auth-coverage (#494)
+//   registry <-> what a route's GATES can answer    derived from the gates
 //   registry <-> what a route's HANDLER can answer  NOTHING CHECKED THIS
 //
 // 154 of 364 operations declare no 4xx at all beyond the 401/403 their
@@ -14,9 +14,9 @@
 // at 17 and 422 at 8.
 //
 // THIS AXIS DIFFERS FROM THE OTHER TWO IN KIND, AND THAT SHAPES EVERYTHING
-// BELOW. #474's authority is the Express route table; #494's is middleware that
-// labels itself through `lib/routeGate.ts`. Both read the thing that does the
-// work, so description and behaviour cannot diverge. A handler's failure modes
+// BELOW. #474's authority is the Express route table; the gate-implied codes
+// come from middleware that labels itself through `lib/routeGate.ts`. Both read
+// the thing that does the work, so description and behaviour cannot diverge. A handler's failure modes
 // have no such structure — 121 of 151 `AppError` throws live in MODULES, a call
 // or more away from the route, often behind a reason-string map with a `?? 400`
 // fallback. Static analysis would be approximate, and a runtime probe has

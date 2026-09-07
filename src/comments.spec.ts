@@ -189,11 +189,11 @@ describe('GET /api/comments/:id', () => {
   // in this suite can produce an unauthenticated request — a test claiming to
   // check the gate would pass whether or not the route carried it.
   //
-  // The real proof is mechanical and already runs in CI:
-  // `npm run openapi:auth-coverage` reads gates off the BUILT app via
-  // `markGate`/`readGate`, and this route moved from ungated to gated there
-  // (347 -> 348 gated). A regression that dropped `requireAuth` would show up
-  // as an undocumented-401 gap, not as a green test.
+  // The real proof is mechanical and already runs in CI: the contract derives
+  // this route's `security` and its 401 from the gate itself, read off the
+  // BUILT app via `markGate`/`readGate` (#517). A regression that dropped
+  // `requireAuth` would drop both from `openapi.json`, and the export step
+  // fails on any diff — it does not show up as a green test.
 
   it('never serves a soft-deleted comment', async () => {
     // `deleteComment` only stamps `deletedAt` and keeps the body verbatim, so

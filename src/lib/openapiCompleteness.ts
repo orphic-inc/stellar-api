@@ -39,10 +39,10 @@ export interface Operation {
  *   /api/docs/*  the Swagger UI and the spec document itself
  *   /health, /   liveness and root, outside /api entirely
  *
- * Lives here rather than in a CLI so the completeness gate and the auth-coverage
- * gate (#494) share ONE definition of what is in the contract. Two copies of
- * this predicate would be the same duplicate-description problem both gates
- * exist to catch.
+ * Lives here rather than in a CLI so the completeness gate and the
+ * failure-coverage gate (#517) share ONE definition of what is in the
+ * contract. Two copies of this predicate would be the same duplicate-
+ * description problem both gates exist to catch.
  */
 export const isContractRoute = (op: Operation): boolean =>
   op.path.startsWith('/api/') &&

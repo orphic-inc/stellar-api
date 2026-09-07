@@ -1,5 +1,0 @@
-{
-  "$comment": "Grandfathered gaps for the OpenAPI auth-coverage gate (#494): gated operations that do not document the 401/403 their middleware can answer. One entry is one (operation, code) pair. This list only ever SHRINKS \u2014 document the response, then delete its line. A stale entry (now documented, or no longer routed) fails the check, so the list cannot rot into a permanent mute. Regenerate with `npm run openapi:auth-coverage -- --write-baseline`.",
-  "generated": "2026-09-04",
-  "gaps": []
-}
