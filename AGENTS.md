@@ -72,7 +72,9 @@ What the hook does **not** cover, run yourself before committing:
 2. `npm run test --no-coverage` — full suite (too slow for the hook; CI is the authority, but run it locally before pushing)
 3. `npm run changelog:check` — CI runs this per-PR (#386): changes under `src/`, `prisma/` or `.github/workflows/` need a `CHANGELOG.md` entry, unless the PR carries the `no-changelog` label.
 
-   **Append under the `### Added` / `### Changed` / `### Fixed` heading already in `[Unreleased]`.** Never open a second one (gated, #537).
+   **Append under the `### Added` / `### Changed` / `### Fixed` heading already in `[Unreleased]`** (gated, #537).
+
+   Open a fresh heading only when the section has none of that type yet, as it will not after a release cut.
 
    Six consecutive PRs each prepended a fresh block, taking the section to ten headings for three types.
 
