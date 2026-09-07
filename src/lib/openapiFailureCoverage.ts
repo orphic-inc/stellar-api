@@ -119,18 +119,33 @@ export const gateIndependentCodes = (
     .sort();
 };
 
-export const checkFailureCoverage = (
-  input: FailureCoverageInput
-): FailureCoverageResult => {
-  const { routes, declared, baseline } = input;
-  const unreviewed = new Set(baseline.unreviewed);
-  const silent = new Set(baseline.noFailureModes);
+/** What the live routes say, before the dead-entry sweep. */
+interface LiveSweep {
+  unclassified: string[];
+  staleUnreviewed: string[];
+  staleNoFailureModes: string[];
+  documented: number;
+}
 
-  const live = new Set(routes.map(key));
-  const unclassified: string[] = [];
-  const staleUnreviewed: string[] = [];
-  const staleNoFailureModes: string[] = [];
-  let documented = 0;
+/**
+ * Classify every operation the app actually serves.
+ *
+ * Split from `checkFailureCoverage` so the two sweeps stay separable: this one
+ * asks "is each live route accounted for?", the dead-entry sweep below asks
+ * "does each accounted-for route still exist?". They fail for opposite reasons.
+ */
+const sweepLiveRoutes = (
+  routes: Operation[],
+  declared: Map<string, Set<string>>,
+  unreviewed: Set<string>,
+  silent: Set<string>
+): LiveSweep => {
+  const out: LiveSweep = {
+    unclassified: [],
+    staleUnreviewed: [],
+    staleNoFailureModes: [],
+    documented: 0
+  };
 
   for (const route of routes) {
     const k = key(route);
@@ -140,27 +155,49 @@ export const checkFailureCoverage = (
     const codes = declared.get(k);
     if (!codes) continue;
 
-    if (gateIndependentCodes(route, codes).length > 0) {
-      documented++;
-      // Both lists are claims that this operation declares nothing. It now
-      // does, so whichever list holds it is out of date.
-      if (unreviewed.has(k)) staleUnreviewed.push(k);
-      if (silent.has(k)) staleNoFailureModes.push(k);
+    if (gateIndependentCodes(route, codes).length === 0) {
+      if (!unreviewed.has(k) && !silent.has(k)) out.unclassified.push(k);
       continue;
     }
 
-    if (!unreviewed.has(k) && !silent.has(k)) unclassified.push(k);
+    // Both lists are claims that this operation declares nothing. It now does,
+    // so whichever list holds it is out of date.
+    out.documented++;
+    if (unreviewed.has(k)) out.staleUnreviewed.push(k);
+    if (silent.has(k)) out.staleNoFailureModes.push(k);
   }
 
-  // An entry naming a route the app no longer serves is stale in both lists —
-  // same rule #474 and #494 use, and what stops either list rotting into a
-  // permanent mute.
-  for (const k of unreviewed) if (!live.has(k)) staleUnreviewed.push(k);
-  for (const k of silent) if (!live.has(k)) staleNoFailureModes.push(k);
+  return out;
+};
 
-  unclassified.sort();
-  staleUnreviewed.sort();
-  staleNoFailureModes.sort();
+/**
+ * Baseline entries naming a route the app no longer serves.
+ *
+ * The same rule #474 and #494 use, and what stops either list rotting into a
+ * permanent mute: a grandfathered entry has to keep earning its place.
+ */
+const deadEntries = (entries: Set<string>, live: Set<string>): string[] =>
+  [...entries].filter((k) => !live.has(k));
+
+export const checkFailureCoverage = (
+  input: FailureCoverageInput
+): FailureCoverageResult => {
+  const { routes, declared, baseline } = input;
+  const unreviewed = new Set(baseline.unreviewed);
+  const silent = new Set(baseline.noFailureModes);
+  const live = new Set(routes.map(key));
+
+  const swept = sweepLiveRoutes(routes, declared, unreviewed, silent);
+
+  const unclassified = [...swept.unclassified].sort();
+  const staleUnreviewed = [
+    ...swept.staleUnreviewed,
+    ...deadEntries(unreviewed, live)
+  ].sort();
+  const staleNoFailureModes = [
+    ...swept.staleNoFailureModes,
+    ...deadEntries(silent, live)
+  ].sort();
 
   return {
     unclassified,
@@ -168,7 +205,7 @@ export const checkFailureCoverage = (
     staleNoFailureModes,
     totals: {
       routes: routes.length,
-      documented,
+      documented: swept.documented,
       silent: silent.size,
       unreviewed: unreviewed.size
     },
@@ -179,65 +216,52 @@ export const checkFailureCoverage = (
   };
 };
 
+/** One failing section: a heading, the offending keys, then what to do. */
+const section = (
+  heading: string,
+  keys: string[],
+  guidance: string
+): string[] =>
+  keys.length === 0
+    ? []
+    : [heading, ...keys.map((k) => `  - ${k}`), '', guidance, ''];
+
 export const formatFailureCoverageReport = (
   r: FailureCoverageResult
 ): string => {
-  const lines: string[] = [];
+  const { routes, documented, silent, unreviewed } = r.totals;
 
-  if (r.unclassified.length > 0) {
-    lines.push(
+  return [
+    ...section(
       `${r.unclassified.length} operation(s) declare no failure code their ` +
-        `middleware does not already imply, and are in neither baseline list:`
-    );
-    for (const g of r.unclassified) lines.push(`  - ${g}`);
-    lines.push('');
-    lines.push(
+        `middleware does not already imply, and are in neither baseline list:`,
+      r.unclassified,
       'Read the handler, then do one of two things. If it can answer a 4xx, ' +
         'add that response to its registerPath() in src/lib/openapi.ts. If it ' +
         'genuinely answers none, add it to `noFailureModes` in ' +
         'openapi-failure-coverage-baseline.json — that is a verified finding, ' +
         'not a backlog entry, so record it only after reading the handler.'
-    );
-    lines.push('');
-  }
-
-  if (r.staleUnreviewed.length > 0) {
-    lines.push(
-      `${r.staleUnreviewed.length} \`unreviewed\` entr(ies) are stale:`
-    );
-    for (const b of r.staleUnreviewed) lines.push(`  - ${b}`);
-    lines.push('');
-    lines.push(
+    ),
+    ...section(
+      `${r.staleUnreviewed.length} \`unreviewed\` entr(ies) are stale:`,
+      r.staleUnreviewed,
       'Each is now documented, or no longer routed. Delete it — `unreviewed` ' +
         'only ever shrinks.'
-    );
-    lines.push('');
-  }
-
-  if (r.staleNoFailureModes.length > 0) {
-    lines.push(
-      `${r.staleNoFailureModes.length} \`noFailureModes\` entr(ies) contradict ` +
-        `the contract:`
-    );
-    for (const b of r.staleNoFailureModes) lines.push(`  - ${b}`);
-    lines.push('');
-    lines.push(
+    ),
+    ...section(
+      `${r.staleNoFailureModes.length} \`noFailureModes\` entr(ies) ` +
+        `contradict the contract:`,
+      r.staleNoFailureModes,
       'Each was recorded as answering no failure code, but now declares one ' +
         '(or is no longer routed). The earlier reading was wrong or the route ' +
         'has changed: re-read the handler and move or delete the entry.'
-    );
-    lines.push('');
-  }
-
-  const { routes, documented, silent, unreviewed } = r.totals;
-  // "declares one", never "documented" — this gate cannot tell a COMPLETE
-  // registration from a partial one, and saying otherwise would claim a
-  // property it never established. `GET /reports/{id}` declares a
-  // handler-thrown 403 and still omits the 404 its handler sends: it counts
-  // here, and it is not finished.
-  lines.push(
-    `${routes} contract routes, ${documented} declare at least one ` +
-      `handler failure code, ${silent} verified silent, ${unreviewed} unreviewed.`
-  );
-  return lines.join('\n');
+    ),
+    // "declare at least one", never "documented" — this gate cannot tell a
+    // COMPLETE registration from a partial one, and saying otherwise would
+    // claim a property it never established. `GET /reports/{id}` declares a
+    // handler-thrown 403 and still omits the 404 its handler sends: it counts
+    // here, and it is not finished.
+    `${routes} contract routes, ${documented} declare at least one handler ` +
+      `failure code, ${silent} verified silent, ${unreviewed} unreviewed.`
+  ].join('\n');
 };
