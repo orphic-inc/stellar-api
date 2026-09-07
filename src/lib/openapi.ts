@@ -24,7 +24,7 @@ import {
 } from '@prisma/client';
 import { appVersion } from './version';
 import type { Operation } from './openapiCompleteness';
-import { expectedCodes, type Gate } from './routeGate';
+import { type GateKind, expectedCodes, type Gate } from './routeGate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -10033,11 +10033,52 @@ export const securityForGates = (
   // stamping the site-wide write limiter (#553) put `cookieAuth` on
   // `POST /auth/register` and five other public endpoints — the contract
   // asserting a session requirement that does not exist.
-  const credentials = (gates ?? []).filter((gate) => gate.kind !== 'rateLimit');
+  //
+  // A `validation` gate is the same case and was added knowing it (#567):
+  // `POST /auth/register` validates its body and needs no session, so an
+  // unfiltered list would have reintroduced the identical bug on a far wider
+  // blast radius — 269 routes run a validator, and 95 of them are public.
+  const NOT_CREDENTIALS: readonly GateKind[] = ['rateLimit', 'validation'];
+  const credentials = (gates ?? []).filter(
+    (gate) => !NOT_CREDENTIALS.includes(gate.kind)
+  );
   if (credentials.length === 0) return undefined;
   if (credentials.some((gate) => gate.kind === 'service'))
     return [{ serviceKey: [] }];
   return [{ cookieAuth: [] }];
+};
+
+/**
+ * Which part of the request a route's validators cover, as prose.
+ *
+ * A route running two validators carries two gates, so the targets union. The
+ * order is fixed (path, then query, then body) rather than following mount
+ * order, because a description that varied with middleware ordering would churn
+ * `openapi.json` for a change that alters no behaviour.
+ */
+const validationFailureDescription = (gates: readonly Gate[]): string => {
+  const targets = new Set(
+    gates.flatMap((gate) =>
+      gate.kind === 'validation' ? (gate.targets ?? []) : []
+    )
+  );
+  const parts = [
+    targets.has('params') ? 'path' : undefined,
+    targets.has('query') ? 'query' : undefined
+  ].filter((part): part is string => part !== undefined);
+
+  // Always plural: the schema covers the whole of `req.params` or `req.query`,
+  // not one field, and a route with a single path segment can still fail on it
+  // for several reasons at once.
+  const params =
+    parts.length > 0 ? `Invalid ${parts.join(' or ')} parameters` : undefined;
+
+  if (targets.has('body')) {
+    return params ? `${params} or request body` : 'Invalid request body';
+  }
+  // A validation gate with no target cannot happen through the three factories,
+  // but a hand-stamped one could; say the generic thing rather than nothing.
+  return params ?? 'Validation error';
 };
 
 /**
@@ -10059,11 +10100,15 @@ export const securityForGates = (
  */
 const gateFailureDescription = (
   gates: readonly Gate[],
-  code: 401 | 403 | 429
+  code: 400 | 401 | 403 | 429
 ): string => {
   // The limiter's own body is `{ msg: 'Too many requests, …' }`; this describes
   // the condition, as every other entry here does.
   if (code === 429) return 'Rate limited';
+  // Which part of the request failed to parse. A caller sent a bad path
+  // segment and a caller sent a bad payload have different problems, and the
+  // 79 hand-written blocks this replaces called both `Validation error`.
+  if (code === 400) return validationFailureDescription(gates);
   if (code === 401)
     return gates.some((gate) => gate.kind === 'service')
       ? 'Missing or wrong service key'
@@ -10096,10 +10141,19 @@ export const responsesForGates = (
   method: string
 ): Record<string, ReturnType<typeof msgResponse>> => {
   if (!gates || gates.length === 0) return {};
+  // THE BODY IS NOT UNIFORM. Three of these codes send `{ msg }`; the
+  // validation 400 sends `{ msg, errors }`. stellar-ui generates its service
+  // types from this document, so emitting `MsgResponse` here would propagate a
+  // type asserting `errors` does not exist, on 170 operations at once (#567).
+  const bodyFor = (code: number) =>
+    code === 400 ? validationResponse : msgResponse;
+
   return Object.fromEntries(
     expectedCodes(gates, method).map((code) => [
       String(code),
-      msgResponse(gateFailureDescription(gates, code as 401 | 403 | 429))
+      bodyFor(code)(
+        gateFailureDescription(gates, code as 400 | 401 | 403 | 429)
+      )
     ])
   );
 };
