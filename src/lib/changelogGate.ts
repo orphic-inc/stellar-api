@@ -186,3 +186,181 @@ export function checkUnreleasedPreserved(
 
   return { removed, checked: entries.length, failed: removed.length > 0 };
 }
+
+// ---------------------------------------------------------------------------
+// Headings: one `### <type>` per type under `[Unreleased]` (#537)
+// ---------------------------------------------------------------------------
+//
+// The `[Unreleased]` section accumulates duplicate subheadings — nine `### Fixed`
+// at the 0.9.1 cut, ten headings for three types again six commits later. Both
+// releases were tidied by hand on release day, and nothing measured it in
+// between.
+//
+// #537 attributes this to `merge=union` (#467). MEASURED, IT IS NOT THAT. Every
+// duplicate in the 0.9.1→0.9.2 cycle arrived in the authoring commit itself:
+// six consecutive commits each touch this file in ONE hunk at the same anchor,
+// with no conflict for a merge driver to resolve. The pattern is that a PR
+// PREPENDS its own `### Fixed` block to the top of the section instead of
+// appending under the heading already there. Union merge is not implicated; the
+// convention is.
+//
+// That matters twice over. It means a per-PR check genuinely sees the defect —
+// it is present in the head commit, not conjured at merge time — and it means
+// the durable fix is the documented convention in AGENTS.md, of which this is
+// the enforcement half.
+//
+// The misfiling half of #537 is real but has a different mechanism than filed.
+// The contract slices it cites were authored under `### Added` and shipped under
+// `### Added`; what put eight entries under the wrong heading at 0.9.1 was the
+// MANUAL COALESCE of twelve scrambled blocks on release day. Keeping the section
+// at one heading per type is what removes that coalesce, and with it the step
+// where a human retypes entries by hand.
+
+/**
+ * Heading types allowed under `[Unreleased]`.
+ *
+ * A closed set rather than "count whatever is there", because the `release` job
+ * publishes the section verbatim: `### Fixes` is worse than a duplicate, since
+ * it reads as correct and ships as a section nobody meant to publish. Open
+ * counting cannot see it — a typo appears once.
+ *
+ * `Removed` earns its place on precedent (0.8.0, 0.5.6). `Internal`,
+ * `Migration` and `Stub tracking` do not: each appeared once, before 0.6.0, and
+ * none has been used since. Adding a type is a one-line change here, which is
+ * the right amount of friction for text that publishes verbatim.
+ */
+export const UNRELEASED_HEADINGS = [
+  'Added',
+  'Changed',
+  'Fixed',
+  'Security',
+  'Docs',
+  'Removed'
+] as const;
+
+/** One `### ` heading found under `[Unreleased]`. */
+export interface HeadingOccurrence {
+  /** The heading text, `### ` stripped, whitespace trimmed. */
+  name: string;
+  /** 1-based line number, so a failure message can point at the file. */
+  line: number;
+}
+
+export interface HeadingRatchetResult {
+  /** Types this branch duplicates beyond what the base already did. */
+  worsened: {
+    name: string;
+    baseSurplus: number;
+    headSurplus: number;
+    lines: number[];
+  }[];
+  /** Unrecognised heading names this branch introduced. */
+  introduced: HeadingOccurrence[];
+  /** Every heading in the head's `[Unreleased]`, for the success line. */
+  headHeadings: HeadingOccurrence[];
+  /**
+   * Types appearing more than once in the head, whoever introduced them.
+   *
+   * Distinct from `worsened`, and the caller needs both: the ratchet passes on
+   * inherited surplus, so a run can succeed with this non-empty — and reporting
+   * that as "one per type" would announce a property never established.
+   */
+  surplus: { name: string; count: number }[];
+  failed: boolean;
+}
+
+/**
+ * The `### ` headings under `## [Unreleased]`, in file order.
+ *
+ * Scoped to that section alone. Released sections are historical — 0.6.0 groups
+ * by date (`### 2026-06-23`), 0.5.4 uses `### Migration` — and rewriting them to
+ * satisfy a convention adopted afterwards would edit published Release notes to
+ * no purpose.
+ */
+export function extractUnreleasedHeadings(
+  changelog: string
+): HeadingOccurrence[] {
+  const lines = changelog.split('\n');
+  const start = lines.findIndex((line) => /^## \[Unreleased\]/i.test(line));
+  if (start === -1) return [];
+
+  const headings: HeadingOccurrence[] = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    // Any other `## ` heading ends the section — the previous release.
+    if (/^## /.test(line)) break;
+    const match = /^### +(.+?) *$/.exec(line);
+    if (match) headings.push({ name: match[1], line: i + 1 });
+  }
+  return headings;
+}
+
+/** How many times each heading name appears. */
+const countByName = (
+  headings: readonly HeadingOccurrence[]
+): Map<string, number> => {
+  const counts = new Map<string, number>();
+  for (const h of headings) counts.set(h.name, (counts.get(h.name) ?? 0) + 1);
+  return counts;
+};
+
+/** Occurrences beyond the first, for one name. `0` when it appears once or not at all. */
+const surplusOf = (counts: Map<string, number>, name: string): number =>
+  Math.max((counts.get(name) ?? 0) - 1, 0);
+
+/**
+ * Did this branch make `[Unreleased]`'s headings worse than the base's?
+ *
+ * A shrink-only ratchet, not an absolute assertion, for the reason every other
+ * guard in this repo is one: a branch must never fail for dirt it inherited.
+ * The absolute form would fail both open Renovate PRs the moment the section is
+ * tidied, for a file neither of them touches.
+ *
+ * Compared PER TYPE rather than on a total, so that adding a seventh `### Fixed`
+ * while dropping a spare `### Changed` still fails — the totals net out, the
+ * defect does not.
+ *
+ * The base is the MERGE BASE in both callers (CI reads
+ * `.merge_base_commit.sha`, local runs `git merge-base`), so "the base" means
+ * the state this branch actually started from, not a moving `main`.
+ */
+export function checkUnreleasedHeadings(
+  baseChangelog: string,
+  headChangelog: string
+): HeadingRatchetResult {
+  const baseHeadings = extractUnreleasedHeadings(baseChangelog);
+  const headHeadings = extractUnreleasedHeadings(headChangelog);
+  const baseCounts = countByName(baseHeadings);
+  const headCounts = countByName(headHeadings);
+
+  const worsened: HeadingRatchetResult['worsened'] = [];
+  for (const [name, count] of headCounts) {
+    const headSurplus = Math.max(count - 1, 0);
+    const baseSurplus = surplusOf(baseCounts, name);
+    if (headSurplus > baseSurplus) {
+      worsened.push({
+        name,
+        baseSurplus,
+        headSurplus,
+        lines: headHeadings.filter((h) => h.name === name).map((h) => h.line)
+      });
+    }
+  }
+
+  // An unrecognised name the base already carried is inherited, and failing on
+  // it would blame the wrong branch — same reasoning as the surplus ratchet.
+  const known = new Set<string>(UNRELEASED_HEADINGS);
+  const introduced = headHeadings.filter(
+    (h) => !known.has(h.name) && !baseCounts.has(h.name)
+  );
+
+  return {
+    worsened,
+    introduced,
+    headHeadings,
+    surplus: [...headCounts]
+      .filter(([, count]) => count > 1)
+      .map(([name, count]) => ({ name, count })),
+    failed: worsened.length > 0 || introduced.length > 0
+  };
+}

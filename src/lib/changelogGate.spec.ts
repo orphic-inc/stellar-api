@@ -8,10 +8,13 @@
  */
 import {
   checkChangelogGate,
+  checkUnreleasedHeadings,
   checkUnreleasedPreserved,
   extractUnreleasedEntries,
+  extractUnreleasedHeadings,
   CHANGELOG_PATH,
-  ENTRY_REQUIRED_PREFIXES
+  ENTRY_REQUIRED_PREFIXES,
+  UNRELEASED_HEADINGS
 } from './changelogGate';
 
 describe('checkChangelogGate', () => {
@@ -220,5 +223,152 @@ describe('checkUnreleasedPreserved', () => {
     const result = checkUnreleasedPreserved(empty, '# Changelog\n');
     expect(result.checked).toBe(0);
     expect(result.failed).toBe(false);
+  });
+});
+
+/**
+ * Heading duplication under `[Unreleased]` (#537).
+ *
+ * The cases that matter are the last two: the shape six consecutive commits
+ * actually produced between 0.9.1 and 0.9.2, and the inherited-surplus case
+ * that must NOT fail, because failing it would block two Renovate PRs over a
+ * file neither of them touches.
+ */
+describe('checkUnreleasedHeadings', () => {
+  /** A changelog whose `[Unreleased]` holds the given headings, in order. */
+  const withHeadings = (...headings: string[]): string =>
+    [
+      '# Changelog',
+      '',
+      '## [Unreleased]',
+      ...headings.flatMap((h) => [
+        '',
+        `### ${h}`,
+        '',
+        `- **An entry under ${h}.**`
+      ]),
+      '',
+      '## [0.9.1] — 2026-09-06',
+      '',
+      '### Fixed',
+      '',
+      '- **Something already released.**',
+      ''
+    ].join('\n');
+
+  it('reads the headings under [Unreleased] and stops at the previous release', () => {
+    const headings = extractUnreleasedHeadings(withHeadings('Added', 'Fixed'));
+    expect(headings.map((h) => h.name)).toEqual(['Added', 'Fixed']);
+  });
+
+  it('returns nothing when there is no [Unreleased] section at all', () => {
+    // The shape immediately after a release cut renames it. Nothing to check,
+    // and emphatically not a failure.
+    const cut = [
+      '# Changelog',
+      '',
+      '## [0.9.1] — 2026-09-06',
+      '',
+      '### Fixed',
+      ''
+    ].join('\n');
+    expect(extractUnreleasedHeadings(cut)).toEqual([]);
+    expect(checkUnreleasedHeadings(cut, cut).failed).toBe(false);
+  });
+
+  it('passes a branch that appends under the heading already there', () => {
+    // The convention the gate exists to enforce: same headings before and after.
+    const base = withHeadings('Added', 'Fixed');
+    const head = withHeadings('Added', 'Fixed');
+    expect(checkUnreleasedHeadings(base, head).failed).toBe(false);
+  });
+
+  it('fails a branch that opens a second heading of a type — the #537 shape', () => {
+    const base = withHeadings('Fixed');
+    const head = withHeadings('Fixed', 'Fixed');
+    const result = checkUnreleasedHeadings(base, head);
+    expect(result.failed).toBe(true);
+    expect(result.worsened).toHaveLength(1);
+    expect(result.worsened[0]).toMatchObject({
+      name: 'Fixed',
+      baseSurplus: 0,
+      headSurplus: 1
+    });
+    // The lines are what makes the failure actionable rather than a scolding.
+    expect(result.worsened[0].lines).toHaveLength(2);
+  });
+
+  it('passes a branch that coalesces — the ratchet only ever shrinks', () => {
+    const base = withHeadings('Fixed', 'Fixed', 'Changed', 'Fixed');
+    const head = withHeadings('Changed', 'Fixed');
+    expect(checkUnreleasedHeadings(base, head).failed).toBe(false);
+  });
+
+  it('passes surplus it inherited from the base rather than introduced', () => {
+    // A branch that never touches CHANGELOG.md still carries whatever main had.
+    // Blaming it is how an absolute check would block both open Renovate PRs.
+    const dirty = withHeadings('Fixed', 'Fixed', 'Changed');
+    expect(checkUnreleasedHeadings(dirty, dirty).failed).toBe(false);
+  });
+
+  it('compares per type, so a swap that nets to zero still fails', () => {
+    // Total surplus is 1 on both sides; the Fixed duplication is still new.
+    const base = withHeadings('Changed', 'Changed', 'Fixed');
+    const head = withHeadings('Changed', 'Fixed', 'Fixed');
+    const result = checkUnreleasedHeadings(base, head);
+    expect(result.failed).toBe(true);
+    expect(result.worsened.map((w) => w.name)).toEqual(['Fixed']);
+  });
+
+  it('fails a typo’d heading, which open counting could never see', () => {
+    // `### Fixes` appears once, so a duplicate rule alone passes it — and the
+    // release job would publish a section nobody meant to write.
+    const result = checkUnreleasedHeadings(
+      withHeadings('Fixed'),
+      withHeadings('Fixed', 'Fixes')
+    );
+    expect(result.failed).toBe(true);
+    expect(result.introduced.map((h) => h.name)).toEqual(['Fixes']);
+  });
+
+  it('passes an unrecognised heading the base already carried', () => {
+    const inherited = withHeadings('Internal');
+    expect(checkUnreleasedHeadings(inherited, inherited).failed).toBe(false);
+  });
+
+  it('accepts every name in the published vocabulary', () => {
+    const all = withHeadings(...UNRELEASED_HEADINGS);
+    expect(checkUnreleasedHeadings(all, all).failed).toBe(false);
+  });
+
+  describe('against real history', () => {
+    it('fails the 0.9.1→0.9.2 cycle as it stood, against a coalesced base', () => {
+      // The section on main at 3b1ac92: ten headings for three types, one
+      // added by each of six consecutive commits. Measured, none of it came
+      // from `merge=union` — every duplicate is in its authoring commit.
+      const asItStood = withHeadings(
+        'Fixed',
+        'Fixed',
+        'Fixed',
+        'Changed',
+        'Fixed',
+        'Fixed',
+        'Changed',
+        'Fixed',
+        'Added',
+        'Changed'
+      );
+      const coalesced = withHeadings('Added', 'Changed', 'Fixed');
+
+      const result = checkUnreleasedHeadings(coalesced, asItStood);
+      expect(result.failed).toBe(true);
+      expect(result.worsened.map((w) => [w.name, w.headSurplus + 1])).toEqual([
+        ['Fixed', 6],
+        ['Changed', 3]
+      ]);
+
+      // And the direction this PR actually travels is a pass.
+      expect(checkUnreleasedHeadings(asItStood, coalesced).failed).toBe(false);
+    });
   });
 });

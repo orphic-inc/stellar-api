@@ -57,9 +57,11 @@ import { resolve } from 'path';
 import { isatty } from 'tty';
 import {
   checkChangelogGate,
+  checkUnreleasedHeadings,
   checkUnreleasedPreserved,
   CHANGELOG_PATH,
-  ENTRY_REQUIRED_PREFIXES
+  ENTRY_REQUIRED_PREFIXES,
+  UNRELEASED_HEADINGS
 } from '../lib/changelogGate';
 
 const root = resolve(__dirname, '../..');
@@ -263,6 +265,36 @@ if (preserved.failed) {
   process.exit(1);
 }
 
+// The third gate (#537), and independent of both above it: the first asks
+// whether an entry was ADDED, the second whether the existing ones SURVIVED,
+// this one whether the section they live in is still SHAPED to be published.
+// It reuses `base` and `head` as loaded, so it costs no extra I/O.
+const headings = checkUnreleasedHeadings(base, head);
+
+if (headings.failed) {
+  for (const dup of headings.worsened) {
+    console.error(
+      `[Unreleased] now has ${dup.headSurplus + 1} \u00d7 '### ${dup.name}' ` +
+        `(lines ${dup.lines.join(', ')}); the base had ${dup.baseSurplus + 1}.`
+    );
+  }
+  for (const bad of headings.introduced) {
+    console.error(
+      `[Unreleased] introduces an unrecognised heading '### ${bad.name}' (line ${bad.line}).`
+    );
+  }
+  console.error(
+    `\nEach heading type may appear at most once under [Unreleased]. Append your entry\n` +
+      `under the '### <type>' heading already there rather than opening a second one.\n\n` +
+      `The release job publishes a version's section verbatim as the GitHub Release notes,\n` +
+      `so a section split across repeated headings ships that way, and coalescing it by hand\n` +
+      `on release day is what misfiled eight entries at 0.9.1.\n\n` +
+      `Valid types: ${UNRELEASED_HEADINGS.join(', ')}. To add one, edit UNRELEASED_HEADINGS\n` +
+      `in src/lib/changelogGate.ts \u2014 it is a closed set because the names publish verbatim.`
+  );
+  process.exit(1);
+}
+
 console.log(
   result.triggeringPaths.length === 0
     ? 'Changelog gate not engaged (no shipping-code changes).'
@@ -273,3 +305,21 @@ console.log(
     ? 'No [Unreleased] entries on the base branch to preserve.'
     : `All ${preserved.checked} [Unreleased] entries from the base branch are still present.`
 );
+// Distinguish "clean" from "no worse than the base". The ratchet passes on
+// inherited surplus, and reporting that as one per type would be a check
+// announcing a property it never established.
+const distinctTypes = [...new Set(headings.headHeadings.map((h) => h.name))];
+
+if (headings.headHeadings.length === 0) {
+  console.log('No [Unreleased] headings to check.');
+} else if (headings.surplus.length === 0) {
+  console.log(
+    `[Unreleased] headings are one per type (${distinctTypes.join(', ')}).`
+  );
+} else {
+  console.log(
+    `[Unreleased] carries surplus headings from the base branch, not introduced here: ` +
+      `${headings.surplus.map((x) => `${x.count} \u00d7 ${x.name}`).join(', ')}. ` +
+      `They will need coalescing before the next release cut.`
+  );
+}

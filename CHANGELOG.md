@@ -6,6 +6,30 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **CI gates duplicate `[Unreleased]` headings, and the section is coalesced to one per type** ([#537](https://github.com/orphic-inc/stellar-api/issues/537)) — `changelog:check` now asserts that each `### <type>` appears at most once under `[Unreleased]`. It is a **shrink-only ratchet against the merge base**, like every other guard here, so a branch fails for duplication it introduced and never for what it inherited — an absolute check would have blocked both open Renovate PRs over a file neither touches.
+
+  **The issue's stated cause is not what is happening.** #537 attributes the duplication to `merge=union` ([#467](https://github.com/orphic-inc/stellar-api/issues/467)). Measured across the six commits between 0.9.1 and this one, every duplicate arrived in its own authoring commit: one clean hunk at the same anchor, with no conflict for a merge driver to resolve. The pattern is that a PR **prepends** its own `### Fixed` block instead of appending under the heading already there — the convention is at fault, not the merge driver. That is also why a per-PR gate can see it at all. The durable half of the fix is the rule now written into `AGENTS.md`; this is its enforcement half.
+
+  The vocabulary is a **closed set** (`Added`, `Changed`, `Fixed`, `Security`, `Docs`, `Removed`) because the `release` job publishes a section verbatim. A typo'd `### Fixes` appears once, so a duplicate rule alone cannot see it, and it would ship as a section nobody meant to write.
+
+  **`[Unreleased]` is coalesced from ten headings to three** — 11 entries in, 11 out, each keeping the type it was authored with, proved by asserting the (type, entry) multiset is unchanged rather than by reading the diff. That hand-coalesce is what misfiled eight entries at the 0.9.1 cut; removing the need for it is the point. `AGENTS.md`'s claim that the `release` job publishes `[Unreleased]` is corrected in the same pass — it publishes the section matching the **tag**, and fails loudly when that section is absent.
+
+- **Staff can curate the password denylist** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `GET`/`POST`/`DELETE /api/bad-passwords` behind a new `bad_passwords_manage` permission, mirroring the `email-blacklist` surface, with `audit()` on both mutations. Entries are normalised on the way in exactly as the lookup normalises on the way out, so a mixed-case row can't be stored-but-unmatchable, and `POST` answers **409** rather than surfacing a unique-constraint 500 for a duplicate.
+
+  **The list is paginated, unlike its sibling.** `/api/email-blacklist` returns an unpaginated `findMany`, which is fine for a handful of staff-added rows; this one ships with 237 seeded entries and only grows, which is the unbounded case AGENTS.md requires pagination for. Deleting a seeded row is durable — the seed's marker guard means it is not restored on the next boot.
+
+  A new enum `BadPasswordSource` (`SEEDED` / `STAFF`) records provenance rather than a `String`, so the registry describes it as the enum it is — [#501](https://github.com/orphic-inc/stellar-api/issues/501)/[#503](https://github.com/orphic-inc/stellar-api/issues/503) removed exactly this class of stringly-typed column.
+
+### Changed
+
+- **The IP ban admin surface accepts IPv6, and refuses ranges it cannot mean** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `POST /api/ip-bans` still takes addresses and returns them, so the API shape is unchanged, but it now accepts IPv6 bounds and rejects a range spanning both address families (the space between them is every IPv4-mapped address plus most of IPv6, which is never what a moderator means). The reversed-bounds check is now correct for ranges the previous signed-`Int` version accepted and then stored unsatisfiably. Its **400** is registered in the contract, which it could always answer and never declared.
+
+- **The email blacklist rejects entries that could never match** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `email` was `z.string().min(1)`, so `known spammer` was accepted, stored, and unable to fire against any address. It now requires an address- or domain-shaped value, surfacing the mistake while the author can still correct it, and is normalised on write exactly as the lookup normalises on read. This is the same reasoning that dropped 24 unreachable entries from the password denylist. **Behaviour change on a staff-only endpoint:** input previously accepted now returns `{ errors: { email: [...] } }`; existing unmatchable rows are left in place.
+
+- **`AGENTS.md`'s documented pagination helper does not exist** — the guide showed `parsePage(req)`, but `lib/pagination.ts` exports `parsedPage(res)`, which reads an **already-validated** query off `res.locals` and requires the route to run `validateQuery` with a schema spreading `paginationBase` first. Following the documented form is a compile error. Corrected to the real contract, along with the response envelope it produces. `BadPassword` is also removed from the "Stub models" table, since it is no longer one.
+
 ### Fixed
 
 - **Five read endpoints served content with no session, and `/requests` ignored community membership** ([#547](https://github.com/orphic-inc/stellar-api/issues/547)) — found while enumerating the ungated routes for [#520](https://github.com/orphic-inc/stellar-api/issues/520): deriving `security` from the gates is only correct if "ungated" is _true_, so all 13 were read against their handlers. Five were gaps rather than intent.
@@ -26,8 +50,6 @@ All notable changes to stellar-api are documented here.
 
   All five now declare the **401** they can answer: `openapi:auth-coverage` moved to **356 gated, 356 documented, 0 gaps**, and their `security` blocks appeared automatically from #520's derivation.
 
-### Fixed
-
 - **The contract defined no security schemes at all, and 309 of 364 operations disagreed with their own middleware** ([#520](https://github.com/orphic-inc/stellar-api/issues/520)) — `components.securitySchemes` was **absent entirely** while 112 operations referenced schemes by name, so every one of those references was dangling. The issue reported that as "109 operations declare `cookieAuth`"; measured, it was 70 `bearerAuth` and 42 `cookieAuth`, and the shape of the problem was different again.
 
   **The references were inverted.** `requireAuth` reads `req.cookies?.token` and has no `Authorization` path, yet **70 operations gated by it declared `bearerAuth`** — telling a client to send a header the API never reads. Meanwhile the only three routes that genuinely take a bearer token (`requireServiceKey`, korin's inbound calls under ADR-0013) declared **nothing**. The registry even carried a comment explaining why: declaring `bearerAuth` there "would describe the wrong credential". That reasoning was right; the fix was to name the scheme properly rather than to say nothing.
@@ -43,8 +65,6 @@ All notable changes to stellar-api are documented here.
   **`bearerAuth` is renamed `serviceKey`.** It guards three machine-to-machine routes with a static shared secret, not a user token — a reader seeing `bearerAuth` could reasonably think a member's session JWT works there. The rename cost nothing: every existing reference to the old name was wrong and is deleted.
 
   The 13 operations left unsecured were each checked against their handlers rather than assumed — install, version, the five public auth endpoints, and five genuinely unauthenticated reads.
-
-### Fixed
 
 - **IP bans did nothing, and the schema could not have expressed them correctly anyway** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `IpBan` shipped with CRUD routes, an `ip_bans_manage` permission and OpenAPI registration, and nothing ever read the table. A moderator could ban a network, receive a 201, see it listed, and it did nothing. This is the second half of #540; the email blacklist was the first.
 
@@ -62,12 +82,6 @@ All notable changes to stellar-api are documented here.
 
   **It fails open** — an unparseable address, or a database error during the check, allows the request. A ban that misses is recoverable; a site that refuses everyone is not.
 
-### Changed
-
-- **The IP ban admin surface accepts IPv6, and refuses ranges it cannot mean** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `POST /api/ip-bans` still takes addresses and returns them, so the API shape is unchanged, but it now accepts IPv6 bounds and rejects a range spanning both address families (the space between them is every IPv4-mapped address plus most of IPv6, which is never what a moderator means). The reversed-bounds check is now correct for ranges the previous signed-`Int` version accepted and then stored unsatisfiably. Its **400** is registered in the contract, which it could always answer and never declared.
-
-### Fixed
-
 - **Every client IP this API recorded was attacker-controlled, and all rate limiting shared one bucket site-wide** ([#542](https://github.com/orphic-inc/stellar-api/issues/542)) — `trust proxy` was never set, while three call sites read `X-Forwarded-For` by hand and took `.split(',')[0]`. nginx sets `X-Forwarded-For: $proxy_add_x_forwarded_for`, which **appends** the real peer to whatever the client sent, so the first entry is the client's own claim. A request carrying `X-Forwarded-For: 1.2.3.4` was recorded as coming from `1.2.3.4`. Not a misconfiguration risk — the shipped behaviour.
 
   **`User.lastIp`, `UserSession.ipAddress` and `UserEmailHistory.ipAddress` were all written from that value**, and `GET /users/duplicate-ips` — the staff tool for spotting ban evasion and multi-accounting — reads nothing else. Anyone evading a ban could ensure their accounts never shared a recorded IP, or make innocent accounts appear to.
@@ -79,8 +93,6 @@ All notable changes to stellar-api are documented here.
   **A test was pinning the vulnerability.** `install-auth.spec.ts` sent `x-forwarded-for: 203.0.113.10, 10.0.0.1` and asserted the recorded address was `203.0.113.10` — the spoofed entry. It now asserts `10.0.0.1`, the entry nginx appended, so the spoof being ignored is what the suite guards. The harness's mocked config also had to learn `trustProxyHops`: without it `app.set('trust proxy', undefined)` silently disabled the setting, which is how the harness stopped representing the real app.
 
   **Historical rows cannot be trusted and are not migrated** — the true values are unrecoverable. Duplicate-IP results predating this change should be treated as unreliable, not merely stale.
-
-### Fixed
 
 - **The email blacklist had a full admin surface and nothing ever read it, so staff bans did nothing** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `EmailBlacklist` shipped with CRUD routes, an `email_blacklist_manage` permission and OpenAPI registration, but outside those routes and the registry the Prisma accessor appeared **nowhere** in `src/`. A moderator could add an entry, receive a 201 and see it listed, and the address stayed free to register. This is the inverse of [#536](https://github.com/orphic-inc/stellar-api/issues/536) and worse in one respect: there the control failed silently with no affordance, here every signal said the ban was in force.
 
@@ -96,12 +108,6 @@ All notable changes to stellar-api are documented here.
 
 - **`POST /email-blacklist` could always answer 400 and the contract never said so** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `validate()` emits the `{ errors }` envelope, and the pre-existing `comment` rule alone guaranteed it was reachable. Registered here rather than left to the #517 sweep because the same change makes it substantially more reachable.
 
-### Changed
-
-- **The email blacklist rejects entries that could never match** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `email` was `z.string().min(1)`, so `known spammer` was accepted, stored, and unable to fire against any address. It now requires an address- or domain-shaped value, surfacing the mistake while the author can still correct it, and is normalised on write exactly as the lookup normalises on read. This is the same reasoning that dropped 24 unreachable entries from the password denylist. **Behaviour change on a staff-only endpoint:** input previously accepted now returns `{ errors: { email: [...] } }`; existing unmatchable rows are left in place.
-
-### Fixed
-
 - **The password denylist was enforced on three auth paths and nothing ever wrote a row, so it never blocked anything** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `isPasswordBanned` is called at registration and on both password-change paths, but `prisma.badPassword` appeared exactly **once** in `src/`: that read. No route, no seed, no `bootstrap.ts` helper ever created a `BadPassword` row, so the table was empty in every deployment and the check returned `false` on every call. AGENTS.md filed the model under "Stub models (no routes implemented)", which is wrong in the direction that matters — reading `auth.ts` it looks like a working denylist, and the stub table is where you would go to learn otherwise.
 
   **A shipped list of 237 entries**, seeded by `seedBadPasswords` into `seedAll` alongside the Golden Rules and theme fixtures. Nothing shorter than six characters is included: `min(6)` is the floor on every creation path, so a shorter entry could never be submitted to match against, and a denylist padded with rows that cannot fire overstates its own coverage — which is the failure this fixes.
@@ -113,18 +119,6 @@ All notable changes to stellar-api are documented here.
   **The seed upserts the settings row rather than updating it.** No migration plants `site_settings` and it is otherwise created lazily, so on a fresh database `seedAll` is frequently its first writer — an update would throw, and a `findFirst` guard would return null and make the whole seed a silent no-op. That is the exact bug being fixed, so it must not be reintroduced by the fix; an integration test pins it.
 
   **Scope, stated plainly: this makes a dead control live, it does not make passwords strong.** `min(6)` remains the floor at registration against `min(8)` at password change, and 237 notorious passwords do not constrain the space of weak ones — `dragon7` still registers.
-
-### Added
-
-- **Staff can curate the password denylist** ([#536](https://github.com/orphic-inc/stellar-api/issues/536)) — `GET`/`POST`/`DELETE /api/bad-passwords` behind a new `bad_passwords_manage` permission, mirroring the `email-blacklist` surface, with `audit()` on both mutations. Entries are normalised on the way in exactly as the lookup normalises on the way out, so a mixed-case row can't be stored-but-unmatchable, and `POST` answers **409** rather than surfacing a unique-constraint 500 for a duplicate.
-
-  **The list is paginated, unlike its sibling.** `/api/email-blacklist` returns an unpaginated `findMany`, which is fine for a handful of staff-added rows; this one ships with 237 seeded entries and only grows, which is the unbounded case AGENTS.md requires pagination for. Deleting a seeded row is durable — the seed's marker guard means it is not restored on the next boot.
-
-  A new enum `BadPasswordSource` (`SEEDED` / `STAFF`) records provenance rather than a `String`, so the registry describes it as the enum it is — [#501](https://github.com/orphic-inc/stellar-api/issues/501)/[#503](https://github.com/orphic-inc/stellar-api/issues/503) removed exactly this class of stringly-typed column.
-
-### Changed
-
-- **`AGENTS.md`'s documented pagination helper does not exist** — the guide showed `parsePage(req)`, but `lib/pagination.ts` exports `parsedPage(res)`, which reads an **already-validated** query off `res.locals` and requires the route to run `validateQuery` with a schema spreading `paginationBase` first. Following the documented form is a compile error. Corrected to the real contract, along with the response envelope it produces. `BadPassword` is also removed from the "Stub models" table, since it is no longer one.
 
 ## [0.9.1] — 2026-09-06
 
