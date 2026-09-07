@@ -21,7 +21,7 @@
 import type { RequestHandler } from 'express';
 
 /** What a route's middleware chain can reject with before the handler runs. */
-export type GateKind = 'auth' | 'permission' | 'service';
+export type GateKind = 'auth' | 'permission' | 'service' | 'rateLimit';
 
 /**
  * A gate, and whatever parameters it needs to describe itself.
@@ -47,6 +47,18 @@ export interface Gate {
    * actually sends.
    */
   permissions?: readonly string[];
+  /**
+   * The HTTP methods this gate applies to. Absent means all of them.
+   *
+   * Needed because one gate in this codebase is genuinely method-conditional:
+   * the app-level write limiter runs for `POST`/`PUT`/`PATCH`/`DELETE` and
+   * passes everything else straight through (#553). A gate mounted on a single
+   * route has no use for this — the route already fixes the method.
+   *
+   * The list is supplied by the middleware that branches on it, never restated
+   * here, so the contract cannot come to disagree with the check.
+   */
+  methods?: readonly string[];
 }
 
 const GATE = Symbol.for('stellar.routeGate');
@@ -61,17 +73,26 @@ const GATE = Symbol.for('stellar.routeGate');
 export const markGate = <T extends RequestHandler>(
   fn: T,
   kind: GateKind,
-  permissions?: readonly string[]
+  permissions?: readonly string[],
+  methods?: readonly string[]
 ): T => {
+  // COPIED, not aliased. `requirePermission` passes the same array its closure
+  // evaluates on every request, so storing the reference would let anything
+  // holding the stamp mutate a live authorization check. Nothing does today,
+  // and this makes sure nothing can. The same reasoning covers `methods`, which
+  // the write limiter branches on per request.
+  const frozen = (values: readonly string[] | undefined) =>
+    values && values.length > 0 ? Object.freeze([...values]) : undefined;
+
+  const permissionList = frozen(permissions);
+  const methodList = frozen(methods);
+
   Object.defineProperty(fn, GATE, {
-    value:
-      permissions && permissions.length > 0
-        ? // COPIED, not aliased. `requirePermission` passes the same array its
-          // closure evaluates on every request, so storing the reference would
-          // let anything holding the stamp mutate a live authorization check.
-          // Nothing does today, and this makes sure nothing can.
-          { kind, permissions: Object.freeze([...permissions]) }
-        : { kind },
+    value: {
+      kind,
+      ...(permissionList ? { permissions: permissionList } : {}),
+      ...(methodList ? { methods: methodList } : {})
+    },
     enumerable: false,
     configurable: true
   });
@@ -94,13 +115,22 @@ export const readGate = (fn: unknown): Gate | undefined =>
  * one without the permission gets 403 from the second. A registration that
  * declares only 403 describes half the gate.
  */
-export const expectedCodes = (gates: Iterable<Gate>): number[] => {
-  const set = new Set([...gates].map((gate) => gate.kind));
+export const expectedCodes = (
+  gates: Iterable<Gate>,
+  method: string
+): number[] => {
+  // A gate that does not run for this method cannot reject it, and saying
+  // otherwise would put a `429` on every `GET` in the contract (#553).
+  const applies = (gate: Gate): boolean =>
+    !gate.methods || gate.methods.includes(method.toUpperCase());
+
+  const set = new Set([...gates].filter(applies).map((gate) => gate.kind));
   const codes = new Set<number>();
   if (set.has('auth') || set.has('permission')) codes.add(401);
   if (set.has('permission')) codes.add(403);
   // The service key is presented as a Bearer header, so a bad or absent key is
   // a 401 — it is an authentication failure, not an authorization one.
   if (set.has('service')) codes.add(401);
+  if (set.has('rateLimit')) codes.add(429);
   return [...codes].sort((a, b) => a - b);
 };

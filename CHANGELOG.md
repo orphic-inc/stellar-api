@@ -62,6 +62,20 @@ All notable changes to stellar-api are documented here.
 
   **What replaces it is a spec, and it is narrower than the gate was.** `src/openapiGateResponses.spec.ts` pins the derivation's wording, the registered-wins merge and the ordering, and each was verified by breaking it. It does **not** walk the app: `apiTestHarness` mocks `requireAuth` away, so 214 of the 356 gated routes carry no stamp there and an app-walking assertion would pass against a route table that is not the real one. The real chain is read by `openapi:export`, whose output CI re-derives and diffs, so the committed `openapi.json` is what the spec asserts against instead.
 
+- **The contract derives the `429` its rate limiters answer** ([#553](https://github.com/orphic-inc/stellar-api/issues/553)) — `GateKind` gains `rateLimit`, the four limiters stamp themselves, and `expectedCodes` maps the kind to **429**. **205 operations gain the rate-limit failure they could always answer and never declared**, taking the total from 2 to 207. **stellar-ui owes an `api:sync`.**
+
+  **The issue understates the surface by a factor of 26, and measuring it first is what shaped the fix.** It counts 8 route-level limiter mounts. It misses that `writeLimiter` is mounted **app-level** in `app.ts` for every `POST`/`PUT`/`PATCH`/`DELETE` under `/api`, so the real answer set is **208 mutating operations**, not 8 — and all 8 route-level mounts are `POST`s already inside it. This is the thirteenth issue in this repo wrong about its own cause, extent, or progress, and again in the direction of understating.
+
+  **A gate can now name the methods it guards**, because one here genuinely is method-conditional. A read is never write-limited, so a method-blind derivation would have put a `429` on all 156 `GET`s and been wrong about every one. `expectedCodes` takes the method and skips a gate that does not run for it.
+
+  **The method list has one home.** The branch moved out of an inline arrow in `app.ts` into `mutationRateLimit` in `rateLimiter.ts`, beside the limiter it guards and the `RATE_LIMITED_METHODS` its gate stamp carries. As an anonymous wrapper it was invisible to `readGate` — the limiter underneath could be stamped all day and the contract would never see it — and a second copy of the method list is the encoded-twice shape that let 309 of 364 `security` blocks drift.
+
+  **`securityForGates` no longer treats every gate as a credential**, which the spec caught rather than review. A limiter refuses a caller whose credentials were fine, or who needed none, so stamping the site-wide one briefly put `cookieAuth` on `POST /auth/register` and five other public endpoints — the contract asserting a session requirement that does not exist. Verified after the fix: **0 of 364 `security` blocks changed**, and the whole contract diff is the 205 added `429`s.
+
+  **One mutation is genuinely unlimited, and the contract correctly stays silent about it.** `POST /install/checklist/{id}/dismiss` sits under a router mounted **before** the site-wide limiter and carries none of its own, so nothing rate-limits it. Filed separately; a spec names it so the exception reads as a finding rather than an oversight.
+
+  The two hand-written `429`s are deleted, since both read exactly what derivation produces. **No hand-written 429 remains in the registry**, and `openapi:failure-coverage` reads 215 / 0 / 149 before and after — the interaction #553 warned about, measured at zero.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.

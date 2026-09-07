@@ -26,7 +26,7 @@ if (sentry.dsn) {
   });
 }
 import { isInstalled } from './modules/installState';
-import { writeLimiter } from './middleware/rateLimiter';
+import { mutationRateLimit } from './middleware/rateLimiter';
 import { startLinkHealthJob } from './modules/linkHealthJob';
 import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
@@ -163,12 +163,12 @@ export const createApp = () => {
     });
   });
 
-  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      return writeLimiter(req, res, next);
-    }
-    next();
-  });
+  // Mutations only, and the branch lives in rateLimiter.ts beside the limiter
+  // it guards — as an inline arrow here it was an anonymous wrapper that
+  // `readGate` could not see, so the contract had no way to derive the 429
+  // (#553). Mounted after /api/install, /api/version and /api/docs, which
+  // therefore keep their own limiting or none.
+  app.use('/api', mutationRateLimit);
 
   app.use('/api/tools', toolsRouter);
   app.use('/api/home', homeRouter);

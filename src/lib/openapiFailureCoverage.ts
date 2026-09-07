@@ -111,7 +111,7 @@ export const gateIndependentCodes = (
   op: Operation,
   declared: Set<string>
 ): string[] => {
-  const implied = new Set(expectedCodes(op.gates ?? []).map(String));
+  const implied = new Set(expectedCodes(op.gates ?? [], op.method).map(String));
   return [...declared]
     .filter((code) => code.startsWith('4') && !implied.has(code))
     .sort();

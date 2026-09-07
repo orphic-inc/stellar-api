@@ -451,10 +451,6 @@ registry.registerPath({
     400: {
       description: 'Validation error',
       content: { 'application/json': { schema: ValidationError } }
-    },
-    429: {
-      description: 'Rate limited',
-      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -476,10 +472,6 @@ registry.registerPath({
     400: {
       description:
         'Invalid or expired token, or the new password is disallowed',
-      content: { 'application/json': { schema: MsgResponse } }
-    },
-    429: {
-      description: 'Rate limited',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -10936,8 +10928,15 @@ const SECURITY_SCHEMES = {
 export const securityForGates = (
   gates: readonly Gate[] | undefined
 ): { [scheme: string]: string[] }[] | undefined => {
-  if (!gates || gates.length === 0) return undefined;
-  if (gates.some((gate) => gate.kind === 'service'))
+  // NOT EVERY GATE IS A CREDENTIAL. A rate limiter rejects a caller who
+  // presented perfectly good credentials, or none at all where none are needed,
+  // so it says nothing about what to authenticate with. Before this filter,
+  // stamping the site-wide write limiter (#553) put `cookieAuth` on
+  // `POST /auth/register` and five other public endpoints — the contract
+  // asserting a session requirement that does not exist.
+  const credentials = (gates ?? []).filter((gate) => gate.kind !== 'rateLimit');
+  if (credentials.length === 0) return undefined;
+  if (credentials.some((gate) => gate.kind === 'service'))
     return [{ serviceKey: [] }];
   return [{ cookieAuth: [] }];
 };
@@ -10971,8 +10970,11 @@ const msgResponse = (description: string) => ({
  */
 const gateFailureDescription = (
   gates: readonly Gate[],
-  code: 401 | 403
+  code: 401 | 403 | 429
 ): string => {
+  // The limiter's own body is `{ msg: 'Too many requests, …' }`; this describes
+  // the condition, as every other entry here does.
+  if (code === 429) return 'Rate limited';
   if (code === 401)
     return gates.some((gate) => gate.kind === 'service')
       ? 'Missing or wrong service key'
@@ -11001,13 +11003,14 @@ const gateFailureDescription = (
  * read and stay registered by hand, which is the axis #517 tracks.
  */
 export const responsesForGates = (
-  gates: readonly Gate[] | undefined
+  gates: readonly Gate[] | undefined,
+  method: string
 ): Record<string, ReturnType<typeof msgResponse>> => {
   if (!gates || gates.length === 0) return {};
   return Object.fromEntries(
-    expectedCodes(gates).map((code) => [
+    expectedCodes(gates, method).map((code) => [
       String(code),
-      msgResponse(gateFailureDescription(gates, code as 401 | 403))
+      msgResponse(gateFailureDescription(gates, code as 401 | 403 | 429))
     ])
   );
 };
@@ -11028,9 +11031,10 @@ export const responsesForGates = (
  */
 const withGateResponses = (
   responses: Record<string, unknown> | undefined,
-  gates: readonly Gate[] | undefined
+  gates: readonly Gate[] | undefined,
+  method: string
 ): Record<string, unknown> => {
-  const merged = { ...responsesForGates(gates), ...(responses ?? {}) };
+  const merged = { ...responsesForGates(gates, method), ...(responses ?? {}) };
   return Object.fromEntries(
     Object.entries(merged).sort(([a], [b]) => Number(a) - Number(b))
   );
@@ -11069,7 +11073,8 @@ const applyGateDerivations = (
 
       op.responses = withGateResponses(
         op.responses as Record<string, unknown> | undefined,
-        gates
+        gates,
+        method
       );
     }
   }
