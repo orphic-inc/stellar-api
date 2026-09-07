@@ -7596,6 +7596,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
@@ -7617,6 +7621,10 @@ registry.registerPath({
           })
         }
       }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
@@ -7638,6 +7646,10 @@ registry.registerPath({
     201: {
       description: 'Report created',
       content: { 'application/json': { schema: ReportObj } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
     }
   }
 });
@@ -7655,6 +7667,14 @@ registry.registerPath({
     403: {
       description: 'Not the reporter and missing reports_manage',
       content: { 'application/json': { schema: MsgResponse } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Report not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -7665,7 +7685,23 @@ registry.registerPath({
   tags: ['Reports'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    204: { description: 'Claimed' }
+    204: { description: 'Claimed' },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Report not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    409: {
+      description: 'Already claimed by another staff member',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Already resolved, so there is nothing to claim',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -7676,9 +7712,21 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Unclaimed' },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
     403: {
       description:
         'Missing reports_manage, or the report is claimed by another staff member',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    404: {
+      description: 'Report not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Not claimed, so there is nothing to release',
       content: { 'application/json': { schema: MsgResponse } }
     }
   }
@@ -7699,7 +7747,19 @@ registry.registerPath({
     }
   },
   responses: {
-    204: { description: 'Resolved' }
+    204: { description: 'Resolved' },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Report not found',
+      content: { 'application/json': { schema: MsgResponse } }
+    },
+    422: {
+      description: 'Already resolved',
+      content: { 'application/json': { schema: MsgResponse } }
+    }
   }
 });
 
@@ -7719,6 +7779,14 @@ registry.registerPath({
     201: {
       description: 'Note added',
       content: { 'application/json': { schema: ReportNoteObj } }
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ValidationError } }
+    },
+    404: {
+      description: 'Report not found',
+      content: { 'application/json': { schema: MsgResponse } }
     }
   }
 });
@@ -11093,9 +11161,21 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
     info: {
       title: 'Stellar API',
       version: appVersion,
+      // The IP-ban 403 is stated ONCE, here, rather than on all 364
+      // operations. `rejectBannedIps` runs before routing, so every operation
+      // can emit it and none of them owns it — declaring it per-operation
+      // would be accurate in a literal sense and would drown the
+      // per-operation distinctions the derived 401/403 exist to draw. OpenAPI
+      // has no top-level `responses` to say it in, so prose is the only place
+      // it can go (#517).
       description:
         'REST API for the Stellar community tracker. All routes under `/api/*`. ' +
-        'Authentication uses JWT cookies (`token` cookie set on login).'
+        'Authentication uses JWT cookies (`token` cookie set on login). ' +
+        'Separately from any per-operation failure documented below, **every** ' +
+        'endpoint can answer `403` with ' +
+        '`{ msg: "Access from this network is not permitted" }` when the ' +
+        "caller's IP is banned: that check runs before routing and applies " +
+        'even to endpoints needing no session.'
     },
     servers: [{ url: '/api', description: 'API server' }]
   });
