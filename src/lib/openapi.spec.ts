@@ -4,7 +4,7 @@ import type { Router } from 'express';
 // requireEnv() and exit the process for a JWT secret this spec never uses.
 import '../test/apiTestHarness';
 import stylesheetRouter from '../routes/api/stylesheet';
-import { registry } from './openapi';
+import { msgResponse, registry, validationResponse } from './openapi';
 
 /**
  * #198-class guard — a route can ship in routes/api/*.ts without ever being
@@ -60,5 +60,40 @@ describe('OpenAPI contract coverage — stylesheet router (#198-class guard)', (
     );
 
     expect(missing).toEqual([]);
+  });
+});
+
+/**
+ * #562 — the helpers replaced 356 hand-written blocks, and the whole refactor
+ * rests on them emitting exactly what those blocks said. That equivalence is
+ * asserted here rather than left to the `openapi.json` freshness gate: the gate
+ * would catch a regression, but only as a 356-operation JSON diff someone has
+ * to interpret, and it cannot catch it at all if the document is regenerated in
+ * the same commit. This fails first, and says what broke.
+ *
+ * The literal `$ref` is the contract, not an implementation detail — see the
+ * helpers' own comment for why the registered Zod object cannot be substituted.
+ */
+describe('response helpers (#562)', () => {
+  it('msgResponse emits the block the 293 call sites used to write', () => {
+    expect(msgResponse('Report not found')).toEqual({
+      description: 'Report not found',
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/MsgResponse' }
+        }
+      }
+    });
+  });
+
+  it('validationResponse emits the block the 63 call sites used to write', () => {
+    expect(validationResponse('Validation error')).toEqual({
+      description: 'Validation error',
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/ValidationError' }
+        }
+      }
+    });
   });
 });
