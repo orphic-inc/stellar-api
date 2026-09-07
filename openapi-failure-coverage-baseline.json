@@ -87,22 +87,6 @@
     "GET /top10/tags",
     "GET /top10/users",
     "GET /top10/votes",
-    "GET /users/donor-ranks",
-    "GET /users/duplicate-ips",
-    "GET /users/invite-tree",
-    "GET /users/invites",
-    "GET /users/me/snatch-list",
-    "GET /users/ratio-watch",
-    "GET /users/recovery-requests",
-    "GET /users/registration-log",
-    "GET /users/sessions",
-    "GET /users/warnings",
-    "GET /users/{id}/email-history",
-    "GET /users/{id}/ip-history",
-    "GET /users/{id}/notes",
-    "GET /users/{id}/reputation",
-    "GET /users/{id}/snatch-list",
-    "GET /users/{id}/warnings",
     "GET /version",
     "GET /wiki",
     "PATCH /messages/{id}",
@@ -137,6 +121,9 @@
     "GET /bookmarks/releases",
     "GET /bookmarks/requests",
     "GET /reports/counts",
-    "GET /reports/stats"
+    "GET /reports/stats",
+    "GET /users/donor-ranks",
+    "GET /users/duplicate-ips",
+    "GET /users/me/snatch-list"
   ]
 }
