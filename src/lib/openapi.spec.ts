@@ -153,9 +153,10 @@ describe('validation gates are not credentials (#567)', () => {
     );
   });
 
-  // REGISTERED WINS, still. A route that spells its own 400 out keeps it until
-  // #567's second half deletes the plain restatements; only the 5 bespoke and
-  // the 19 MsgResponse ones survive that.
+  // REGISTERED WINS, still. #567 deleted the 73 restatements that merely said
+  // `Validation error`; the 5 bespoke and 19 MsgResponse registrations that say
+  // something the middleware cannot are exactly what survived, and this pins
+  // one of them.
   it('does not overwrite a registration that states its own 400', () => {
     const op = doc.paths['/auth'].post;
     expect((op.responses['400'] as { description: string }).description).toBe(

@@ -470,8 +470,7 @@ registry.registerPath({
   responses: {
     200: msgResponse(
       'Generic acknowledgement — identical for a known and an unknown address'
-    ),
-    400: validationResponse('Validation error')
+    )
   }
 });
 
@@ -1046,8 +1045,7 @@ registry.registerPath({
     200: {
       description: 'Verification result, successful or not',
       content: { 'application/json': { schema: IrcNickVerifyResult } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1089,8 +1087,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1113,8 +1110,7 @@ registry.registerPath({
           )
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1135,8 +1131,7 @@ registry.registerPath({
           schema: z.array(z.object({ ip: z.string(), seenAt: z.string() }))
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1176,7 +1171,6 @@ registry.registerPath({
   },
   responses: {
     200: msgResponse('Rank updated'),
-    400: validationResponse('Validation error'),
     404: msgResponse('User or rank not found')
   }
 });
@@ -1192,8 +1186,7 @@ registry.registerPath({
     200: {
       description: 'Snatch list',
       content: { 'application/json': { schema: z.array(SnatchItem) } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1259,8 +1252,7 @@ registry.registerPath({
     201: {
       description: 'Donor rank created',
       content: { 'application/json': { schema: DonorRank } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1282,7 +1274,6 @@ registry.registerPath({
       description: 'Updated donor rank',
       content: { 'application/json': { schema: DonorRank } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Donor rank not found')
   }
 });
@@ -1319,7 +1310,6 @@ registry.registerPath({
   },
   responses: {
     201: msgResponse('Donor status granted'),
-    400: validationResponse('Validation error'),
     404: msgResponse('User or donor rank not found')
   }
 });
@@ -1384,8 +1374,7 @@ registry.registerPath({
     200: {
       description: 'Warnings',
       content: { 'application/json': { schema: z.array(UserWarning) } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1412,7 +1401,6 @@ registry.registerPath({
         'application/json': { schema: z.object({ warning: UserWarning }) }
       }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('User not found')
   }
 });
@@ -1450,8 +1438,7 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(UserModerationNote) }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1479,7 +1466,6 @@ registry.registerPath({
         }
       }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('User not found')
   }
 });
@@ -1612,7 +1598,6 @@ registry.registerPath({
     200: msgResponse(
       'Rank lock toggled (freezes/unfreezes auto class-progression)'
     ),
-    400: validationResponse('Validation failed'),
     404: msgResponse('User not found')
   }
 });
@@ -1722,8 +1707,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1773,8 +1757,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -1958,8 +1941,7 @@ registry.registerPath({
     200: {
       description: 'Unfiltered reputation, including the moderation signal',
       content: { 'application/json': { schema: CrsView } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2078,7 +2060,6 @@ registry.registerPath({
       description: 'Updated donor reward settings',
       content: { 'application/json': { schema: DonorRewardsSchema } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('No active donor rank')
   }
 });
@@ -2097,7 +2078,6 @@ registry.registerPath({
       description: 'Updated forum title',
       content: { 'application/json': { schema: DonorForumTitleSchema } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Perk not enabled for this rank')
   }
 });
@@ -2401,8 +2381,7 @@ registry.registerPath({
     201: {
       description: 'Announcement created',
       content: { 'application/json': { schema: Announcement } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2425,7 +2404,6 @@ registry.registerPath({
       description: 'Updated news item',
       content: { 'application/json': { schema: Announcement } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Not found')
   }
 });
@@ -2456,8 +2434,7 @@ registry.registerPath({
     201: {
       description: 'Blog post created',
       content: { 'application/json': { schema: BlogPost } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2513,8 +2490,7 @@ registry.registerPath({
     201: {
       description: 'Global notice created',
       content: { 'application/json': { schema: GlobalNotice } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2602,8 +2578,7 @@ registry.registerPath({
     201: {
       description: 'Author stylesheet created',
       content: { 'application/json': { schema: AuthorStylesheet } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2662,7 +2637,6 @@ registry.registerPath({
       description: 'Author stylesheet updated; edits propagate to adopters',
       content: { 'application/json': { schema: AuthorStylesheet } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Not your stylesheet'),
     404: msgResponse('Not found')
   }
@@ -2817,8 +2791,7 @@ registry.registerPath({
     201: {
       description: 'Stylesheet created',
       content: { 'application/json': { schema: Stylesheet } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -2837,7 +2810,6 @@ registry.registerPath({
       description: 'Stylesheet updated',
       content: { 'application/json': { schema: Stylesheet } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Not found')
   }
 });
@@ -3193,8 +3165,7 @@ registry.registerPath({
     201: {
       description: 'Category created',
       content: { 'application/json': { schema: ForumCategory } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -3307,8 +3278,7 @@ registry.registerPath({
     201: {
       description: 'Forum created',
       content: { 'application/json': { schema: Forum } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -3405,8 +3375,7 @@ registry.registerPath({
     201: {
       description: 'Topic created',
       content: { 'application/json': { schema: ForumTopic } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -3611,8 +3580,7 @@ registry.registerPath({
     201: {
       description: 'Poll created',
       content: { 'application/json': { schema: ForumPoll } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -3671,8 +3639,7 @@ registry.registerPath({
     200: {
       description: 'Last-read marker saved',
       content: { 'application/json': { schema: ForumLastReadTopic } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -4245,7 +4212,6 @@ registry.registerPath({
       description: 'Community created',
       content: { 'application/json': { schema: Community } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Leader user not found')
   }
 });
@@ -4272,7 +4238,6 @@ registry.registerPath({
       description: 'Updated community',
       content: { 'application/json': { schema: Community } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Community, or the named leader user, not found')
   }
 });
@@ -4402,8 +4367,7 @@ registry.registerPath({
     201: {
       description: 'Release created',
       content: { 'application/json': { schema: Release } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -4429,7 +4393,6 @@ registry.registerPath({
       description: 'Updated release, as the workbench view',
       content: { 'application/json': { schema: Release } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Not permitted to edit this release'),
     404: msgResponse('Release not found')
   }
@@ -4678,7 +4641,6 @@ registry.registerPath({
       description: 'Contribution created',
       content: { 'application/json': { schema: Contribution } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Release not found')
   }
 });
@@ -4724,7 +4686,6 @@ registry.registerPath({
         }
       }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Community not found')
   }
 });
@@ -4770,7 +4731,6 @@ registry.registerPath({
   },
   responses: {
     201: msgResponse('Report submitted'),
-    400: validationResponse('Validation error'),
     404: msgResponse('Contribution not found')
   }
 });
@@ -4797,8 +4757,7 @@ registry.registerPath({
     200: {
       description: 'Updated contribution',
       content: { 'application/json': { schema: Contribution } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -4870,7 +4829,6 @@ registry.registerPath({
       description: 'User rank created',
       content: { 'application/json': { schema: UserRank } }
     },
-    400: validationResponse('Validation error'),
     409: msgResponse('Duplicate rank name or level'),
     422: msgResponse('Staff group not found')
   }
@@ -5066,7 +5024,6 @@ registry.registerPath({
       description: 'Promotion rule created',
       content: { 'application/json': { schema: PromotionRule } }
     },
-    400: validationResponse('Validation error'),
     409: msgResponse('Duplicate rank pair'),
     422: msgResponse('fromRank or toRank not found')
   }
@@ -5132,7 +5089,6 @@ registry.registerPath({
       description: 'Staff group created',
       content: { 'application/json': { schema: StaffGroup } }
     },
-    400: validationResponse('Validation error'),
     409: msgResponse('Duplicate name')
   }
 });
@@ -5440,8 +5396,7 @@ registry.registerPath({
     201: {
       description: 'Artist created',
       content: { 'application/json': { schema: Artist } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -5734,8 +5689,7 @@ registry.registerPath({
     201: {
       description: 'Post created',
       content: { 'application/json': { schema: Post } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -5823,8 +5777,7 @@ registry.registerPath({
     201: {
       description: 'Note created',
       content: { 'application/json': { schema: ForumTopicNote } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -5986,7 +5939,6 @@ registry.registerPath({
       description: 'Updated request',
       content: { 'application/json': { schema: Request } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Neither the owner nor a request moderator'),
     404: msgResponse('Request not found'),
     422: msgResponse('Only open requests can be edited')
@@ -6115,7 +6067,6 @@ registry.registerPath({
       description: 'Request created',
       content: { 'application/json': { schema: Request } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Missing requests_create')
   }
 });
@@ -6328,8 +6279,7 @@ registry.registerPath({
     201: {
       description: 'Draft created',
       content: { 'application/json': { schema: PmDraft } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -6347,7 +6297,6 @@ registry.registerPath({
       description: 'Draft updated',
       content: { 'application/json': { schema: PmDraft } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('No such draft belonging to the caller')
   }
 });
@@ -6387,8 +6336,7 @@ registry.registerPath({
           schema: z.object({ sentCount: z.number().int() })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -6921,8 +6869,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -6943,8 +6890,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -6965,8 +6911,7 @@ registry.registerPath({
     201: {
       description: 'Report created',
       content: { 'application/json': { schema: ReportObj } }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -6981,7 +6926,6 @@ registry.registerPath({
       content: { 'application/json': { schema: ReportObj } }
     },
     403: msgResponse('Not the reporter and missing reports_manage'),
-    400: validationResponse('Validation error'),
     404: msgResponse('Report not found')
   }
 });
@@ -6993,7 +6937,6 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Claimed' },
-    400: validationResponse('Validation error'),
     404: msgResponse('Report not found'),
     409: msgResponse('Already claimed by another staff member'),
     422: msgResponse('Already resolved, so there is nothing to claim')
@@ -7007,7 +6950,6 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Unclaimed' },
-    400: validationResponse('Validation error'),
     403: msgResponse(
       'Missing reports_manage, or the report is claimed by another staff member'
     ),
@@ -7032,7 +6974,6 @@ registry.registerPath({
   },
   responses: {
     204: { description: 'Resolved' },
-    400: validationResponse('Validation error'),
     404: msgResponse('Report not found'),
     422: msgResponse('Already resolved')
   }
@@ -7055,7 +6996,6 @@ registry.registerPath({
       description: 'Note added',
       content: { 'application/json': { schema: ReportNoteObj } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Report not found')
   }
 });
@@ -7585,7 +7525,6 @@ registry.registerPath({
       description: 'Page created',
       content: { 'application/json': { schema: RulesPage } }
     },
-    400: validationResponse('Validation error'),
     409: msgResponse('Conflict')
   }
 });
@@ -7603,7 +7542,6 @@ registry.registerPath({
       description: 'Page updated',
       content: { 'application/json': { schema: RulesPage } }
     },
-    400: validationResponse('Validation failed'),
     404: msgResponse('Not found'),
     // Same conflict POST answers: promoting a page to isMain while another
     // main page exists. The update path checks it too (routes/api/rules.ts),
@@ -7827,7 +7765,6 @@ registry.registerPath({
   },
   responses: {
     200: msgResponse('Comment updated'),
-    400: validationResponse('Validation error'),
     404: msgResponse('Friend not found')
   }
 });
@@ -7881,7 +7818,6 @@ registry.registerPath({
       description: 'Tag alias created',
       content: { 'application/json': { schema: TagAliasItem } }
     },
-    400: validationResponse('Validation error'),
     404: msgResponse('Canonical tag not found')
   }
 });
@@ -7949,8 +7885,7 @@ registry.registerPath({
           schema: z.object({ data: z.array(SessionItem), meta: PaginationMeta })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -7986,8 +7921,7 @@ registry.registerPath({
           schema: z.object({ data: z.array(InviteItem), meta: PaginationMeta })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -8023,8 +7957,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -8120,8 +8053,7 @@ registry.registerPath({
           })
         }
       }
-    },
-    400: validationResponse('Validation error')
+    }
   }
 });
 
@@ -8417,7 +8349,6 @@ registry.registerPath({
       description: 'Updated collage',
       content: { 'application/json': { schema: Collage } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse(
       'Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)'
     ),
@@ -8741,7 +8672,6 @@ registry.registerPath({
       description: 'Page created',
       content: { 'application/json': { schema: WikiPage } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Neither wiki_edit nor a managing permission')
   }
 });
@@ -8801,7 +8731,6 @@ registry.registerPath({
       description: 'Updated page',
       content: { 'application/json': { schema: WikiPage } }
     },
-    400: validationResponse('Validation error'),
     403: msgResponse('Insufficient permission to edit this page'),
     404: msgResponse('Not found, or above the caller read level')
   }
@@ -9310,8 +9239,7 @@ const registerBookmark = (
       200: {
         description: 'Toggled bookmark',
         content: { 'application/json': { schema: bookmarkToggle } }
-      },
-      400: validationResponse('Validation error')
+      }
     }
   });
   registry.registerPath({
@@ -9320,8 +9248,7 @@ const registerBookmark = (
     tags: ['Bookmarks'],
     request: { params: z.object({ [paramName]: z.string() }) },
     responses: {
-      204: { description: 'Removed' },
-      400: validationResponse('Validation error')
+      204: { description: 'Removed' }
     }
   });
 };
