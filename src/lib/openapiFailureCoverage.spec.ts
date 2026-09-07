@@ -14,11 +14,16 @@ import {
   type FailureBaseline
 } from './openapiFailureCoverage';
 import type { Operation } from './openapiCompleteness';
+import type { GateKind } from './routeGate';
 
-const op = (method: string, path: string, gates: string[] = []): Operation => ({
+const op = (
+  method: string,
+  path: string,
+  gates: GateKind[] = []
+): Operation => ({
   method,
   path,
-  gates
+  gates: gates.map((kind) => ({ kind }))
 });
 
 const decl = (entries: [string, string[]][]): Map<string, Set<string>> =>

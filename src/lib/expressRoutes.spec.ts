@@ -127,6 +127,11 @@ describe('collectRoutes', () => {
   const gatesFor = (app: Express, key: string) =>
     collectRoutes(app).find((r) => `${r.method} ${r.path}` === key)?.gates;
 
+  // These assertions are about WHICH gates a route inherits, not about the
+  // parameters each carries (#517) — so project to kinds and keep them legible.
+  const kindsFor = (app: Express, key: string) =>
+    gatesFor(app, key)?.map((gate) => gate.kind);
+
   it('reads a gate off the route own handler chain', () => {
     const app = express();
     app.get(
@@ -135,14 +140,14 @@ describe('collectRoutes', () => {
       (_req, res) => res.json({})
     );
 
-    expect(gatesFor(app, 'GET /x')).toEqual(['auth']);
+    expect(kindsFor(app, 'GET /x')).toEqual(['auth']);
   });
 
   it('reports no gates for an unguarded route rather than guessing', () => {
     const app = express();
     app.get('/open', (_req, res) => res.json({}));
 
-    expect(gatesFor(app, 'GET /open')).toEqual([]);
+    expect(kindsFor(app, 'GET /open')).toEqual([]);
   });
 
   it('inherits a gate applied to the router with `use`', () => {
@@ -152,7 +157,7 @@ describe('collectRoutes', () => {
     r.get('/inner', (_req, res) => res.json({}));
     app.use('/api', r);
 
-    expect(gatesFor(app, 'GET /api/inner')).toEqual(['auth']);
+    expect(kindsFor(app, 'GET /api/inner')).toEqual(['auth']);
   });
 
   it('accumulates an inherited gate with the route own', () => {
@@ -166,7 +171,7 @@ describe('collectRoutes', () => {
     );
     app.use('/api', r);
 
-    expect(gatesFor(app, 'POST /api/inner')).toEqual(['auth', 'permission']);
+    expect(kindsFor(app, 'POST /api/inner')).toEqual(['auth', 'permission']);
   });
 
   // A gate registered AFTER a route does not protect it, and must not be
@@ -180,8 +185,8 @@ describe('collectRoutes', () => {
     r.get('/late', (_req, res) => res.json({}));
     app.use('/api', r);
 
-    expect(gatesFor(app, 'GET /api/early')).toEqual([]);
-    expect(gatesFor(app, 'GET /api/late')).toEqual(['auth']);
+    expect(kindsFor(app, 'GET /api/early')).toEqual([]);
+    expect(kindsFor(app, 'GET /api/late')).toEqual(['auth']);
   });
 
   it('throws rather than reporting nothing when the internals move', () => {

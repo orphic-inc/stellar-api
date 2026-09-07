@@ -16,21 +16,27 @@ import { isContractRoute, stripApi } from './lib/openapiCompleteness';
  */
 describe('securityForGates', () => {
   it('maps a service gate to serviceKey', () => {
-    expect(securityForGates(['service'])).toEqual([{ serviceKey: [] }]);
+    expect(securityForGates([{ kind: 'service' }])).toEqual([
+      { serviceKey: [] }
+    ]);
   });
 
   it('maps auth and permission alike to cookieAuth', () => {
     // They present the same cookie. The difference between them is 401 vs 403,
     // which lives in `responses` — encoding it twice is how the two drift.
-    expect(securityForGates(['auth'])).toEqual([{ cookieAuth: [] }]);
-    expect(securityForGates(['permission'])).toEqual([{ cookieAuth: [] }]);
-    expect(securityForGates(['auth', 'permission'])).toEqual([
+    expect(securityForGates([{ kind: 'auth' }])).toEqual([{ cookieAuth: [] }]);
+    expect(securityForGates([{ kind: 'permission' }])).toEqual([
       { cookieAuth: [] }
     ]);
+    expect(
+      securityForGates([{ kind: 'auth' }, { kind: 'permission' }])
+    ).toEqual([{ cookieAuth: [] }]);
   });
 
   it('prefers serviceKey when a route carries both', () => {
-    expect(securityForGates(['auth', 'service'])).toEqual([{ serviceKey: [] }]);
+    expect(securityForGates([{ kind: 'auth' }, { kind: 'service' }])).toEqual([
+      { serviceKey: [] }
+    ]);
   });
 
   it('yields nothing for an ungated route', () => {
@@ -91,7 +97,7 @@ describe('the built document', () => {
     // cookie-gated routes and on none of the three that actually take a bearer
     // token. This is the highest-value single assertion in the file.
     const serviceRoutes = routes
-      .filter((r) => r.gates?.includes('service'))
+      .filter((r) => r.gates?.some((gate) => gate.kind === 'service'))
       .map((r) => `${r.method} ${r.path}`);
     expect(serviceRoutes.length).toBeGreaterThan(0);
 

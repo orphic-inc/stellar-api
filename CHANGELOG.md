@@ -34,6 +34,14 @@ All notable changes to stellar-api are documented here.
 
 ### Changed
 
+- **A route's gates carry what they enforce, not just that they enforce something** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `markGate` takes an optional permission list and `Operation.gates` becomes `{ kind, permissions? }[]`. Groundwork with no behaviour change: `openapi.json` is **byte-identical**, and all three registry gates read exactly as before.
+
+  The parameter lives on the gate that has it rather than in a second array kept in correspondence with `gates` — two arrays that must agree is the same encoded-twice shape that let 309 of 364 `security` blocks drift before [#520](https://github.com/orphic-inc/stellar-api/issues/520) derived them.
+
+  **`requireOwnerOrPermission` deliberately stamps no names.** An owner passes it _without_ the permission, so naming one would have the contract assert a requirement that is not one. It stamps its kind alone and will derive the generic message its middleware actually sends. `requirePermission` stamps its varargs, and the two admin-only helpers stamp `admin`.
+
+  Nothing reads the names yet, so a wrong or missing stamp would have passed every existing test — four specs assert the stamps directly, including that `requireOwnerOrPermission` carries no `permissions` property at all.
+
 - **The IP ban admin surface accepts IPv6, and refuses ranges it cannot mean** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `POST /api/ip-bans` still takes addresses and returns them, so the API shape is unchanged, but it now accepts IPv6 bounds and rejects a range spanning both address families (the space between them is every IPv4-mapped address plus most of IPv6, which is never what a moderator means). The reversed-bounds check is now correct for ranges the previous signed-`Int` version accepted and then stored unsatisfiably. Its **400** is registered in the contract, which it could always answer and never declared.
 
 - **The email blacklist rejects entries that could never match** ([#540](https://github.com/orphic-inc/stellar-api/issues/540)) — `email` was `z.string().min(1)`, so `known spammer` was accepted, stored, and unable to fire against any address. It now requires an address- or domain-shaped value, surfacing the mistake while the author can still correct it, and is normalised on write exactly as the lookup normalises on read. This is the same reasoning that dropped 24 unreachable entries from the password denylist. **Behaviour change on a staff-only endpoint:** input previously accepted now returns `{ errors: { email: [...] } }`; existing unmatchable rows are left in place.
