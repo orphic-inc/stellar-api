@@ -9257,6 +9257,21 @@ const requestBookmark = z.object({
   request: z.object({ id: z.number(), title: z.string() })
 });
 
+/**
+ * The three operations each bookmark segment serves, registered once for four
+ * segments (#517).
+ *
+ * The `400` on `post` and `delete` is `validateParams`' — `z.coerce.number()
+ * .int().positive()` on the path id, reachable with any non-numeric segment.
+ * The `get` has no param to validate and answers nothing beyond its gate, so it
+ * sits in `noFailureModes` rather than declaring a code it cannot emit.
+ *
+ * NOT declared, because the handlers do not answer it: a `post` naming a
+ * well-formed but nonexistent id hits a foreign-key violation, which carries no
+ * `statusCode` and so surfaces as a **500** (#564). Declaring a 404 here would
+ * document an intent rather than the behaviour, and this axis records what the
+ * handler answers today.
+ */
 const registerBookmark = (
   segment: string,
   paramName: string,
@@ -9282,7 +9297,8 @@ const registerBookmark = (
       200: {
         description: 'Toggled bookmark',
         content: { 'application/json': { schema: bookmarkToggle } }
-      }
+      },
+      400: validationResponse('Validation error')
     }
   });
   registry.registerPath({
@@ -9291,7 +9307,8 @@ const registerBookmark = (
     tags: ['Bookmarks'],
     request: { params: z.object({ [paramName]: z.string() }) },
     responses: {
-      204: { description: 'Removed' }
+      204: { description: 'Removed' },
+      400: validationResponse('Validation error')
     }
   });
 };
