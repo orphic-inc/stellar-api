@@ -1,5 +1,5 @@
 {
-  "$comment": "Grandfathered operations for the OpenAPI failure-coverage gate (#517): operations that do not document any 4xx beyond the 401/403 their middleware already implies. TWO LISTS, TWO MEANINGS. `unreviewed` is the burn-down — nobody has read the handler yet — and only ever SHRINKS: read the surface, declare the codes in src/lib/openapi.ts, then delete the line. `noFailureModes` is the opposite, a DURABLE record that someone read the handler and found it answers no failure code at all; add to it only from a real reading, never from a regeneration. An entry in either list that is now documented, or no longer routed, fails the check, so neither can rot into a permanent mute. Regenerate `unreviewed` with `npm run openapi:failure-coverage -- --write-baseline`; that command preserves `noFailureModes` and never adds to it.",
+  "$comment": "Grandfathered operations for the OpenAPI failure-coverage gate (#517): operations that do not document any 4xx beyond the 401/403 their middleware already implies. TWO LISTS, TWO MEANINGS. `unreviewed` is the burn-down \u2014 nobody has read the handler yet \u2014 and only ever SHRINKS: read the surface, declare the codes in src/lib/openapi.ts, then delete the line. `noFailureModes` is the opposite, a DURABLE record that someone read the handler and found it answers no failure code at all; add to it only from a real reading, never from a regeneration. An entry in either list that is now documented, or no longer routed, fails the check, so neither can rot into a permanent mute. Regenerate `unreviewed` with `npm run openapi:failure-coverage -- --write-baseline`; that command preserves `noFailureModes` and never adds to it.",
   "generated": "2026-09-07",
   "unreviewed": [
     "DELETE /artists/{id}/subscribe",
@@ -59,10 +59,6 @@
     "GET /profile/me/reputation",
     "GET /profile/me/reputation/history",
     "GET /ratio-policy/{userId}",
-    "GET /reports",
-    "GET /reports/counts",
-    "GET /reports/mine",
-    "GET /reports/stats",
     "GET /requests",
     "GET /rules",
     "GET /rules/tree",
@@ -135,11 +131,6 @@
     "POST /install/checklist/{id}/dismiss",
     "POST /messages/bulk",
     "POST /notifications/read-all",
-    "POST /reports",
-    "POST /reports/{id}/claim",
-    "POST /reports/{id}/notes",
-    "POST /reports/{id}/resolve",
-    "POST /reports/{id}/unclaim",
     "POST /site-history",
     "POST /staff-inbox/bulk-resolve",
     "POST /staff-inbox/responses",
@@ -152,5 +143,5 @@
     "POST /subscriptions/subscribe-comments",
     "PUT /settings"
   ],
-  "noFailureModes": []
+  "noFailureModes": ["GET /reports/counts", "GET /reports/stats"]
 }

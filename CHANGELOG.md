@@ -76,6 +76,18 @@ All notable changes to stellar-api are documented here.
 
   The two hand-written `429`s are deleted, since both read exactly what derivation produces. **No hand-written 429 remains in the registry**, and `openapi:failure-coverage` reads 215 / 0 / 149 before and after — the interaction #553 warned about, measured at zero.
 
+- **The `/reports` surface declares the failures its handlers answer** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the first burn-down slice. `openapi:failure-coverage` moves from **215 documented / 0 verified silent / 149 unreviewed** to **222 / 2 / 140**. Purely additive: 21 response entries registered, no existing shape changed. **stellar-ui owes an `api:sync`.**
+
+  **The issue's own worked example was wrong about three of its five rows, this time by overstating.** It records a `400` fallback on `claim`, `unclaim` and `resolve`, from the `?? 400` in each route's `statusMap`. Reading the module shows every reason those functions can return is already in its map — `claimReport` returns only `not_found`/`resolved`/`already_claimed`, and so on — so **each `?? 400` is unreachable**, and no `400` from that path is registered. The reachable `400`s come from `validate`/`validateQuery`/`validateParams`, which answer `ValidationError` rather than `MsgResponse`; the two are registered as the different shapes they are.
+
+  **`GET /reports/{id}` was the blind-spot example and is now closed.** It declared a handler-thrown `403` and omitted the `404` beside it, which is exactly the case the gate cannot see: an operation declaring _some_ gate-independent 4xx counts as covered.
+
+  **`GET /reports/counts` and `GET /reports/stats` are recorded as verified silent**, not deleted from the baseline. Both are staff-gated reads with no validation and handlers that cannot fail. Dropping them outright would leave them unclassified and fail the gate — the `noFailureModes` list exists precisely so "read it, answers nothing" is distinguishable from "not yet read".
+
+  **Every code registered here has a test already asserting it** — `404`, `409`, `422` and both `400`s are in `src/reports.spec.ts` and `src/modules/reports.spec.ts` today. The contract was behind the suite, not ahead of it. Both ratchet directions were then verified by breaking them: re-adding a burned entry to `unreviewed` fails as stale, and claiming a documented operation is silent fails as a contradiction.
+
+- **The site-wide IP-ban `403` is stated once, in `info.description`**, rather than on all 364 operations ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `rejectBannedIps` runs **before routing**, so every endpoint can answer it and none owns it, including endpoints needing no session. Declaring it per-operation would be literally accurate and would drown the per-operation distinctions the derived `401`/`403` exist to draw, and OpenAPI has no top-level `responses` to say it in. This rides with the first burn-down slice, as planned.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
