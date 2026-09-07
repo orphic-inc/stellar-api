@@ -19,7 +19,11 @@ import { resolve } from 'node:path';
 import { createApp } from '../app';
 import { collectRoutes } from '../lib/expressRoutes';
 import { buildOpenApiDocument } from '../lib/openapi';
-import { isContractRoute, stripApi } from '../lib/openapiCompleteness';
+import {
+  isContractRoute,
+  stripApi,
+  type Operation
+} from '../lib/openapiCompleteness';
 import {
   checkFailureCoverage,
   formatFailureCoverageReport,
@@ -48,12 +52,22 @@ const readBaseline = (): FailureBaseline => {
   }
 };
 
-const main = (): void => {
-  const writing = process.argv.includes('--write-baseline');
+const BASELINE_COMMENT =
+  'Grandfathered operations for the OpenAPI failure-coverage gate (#517): ' +
+  'operations that do not document any 4xx beyond the 401/403 their ' +
+  'middleware already implies. TWO LISTS, TWO MEANINGS. `unreviewed` is the ' +
+  'burn-down — nobody has read the handler yet — and only ever SHRINKS: read ' +
+  'the surface, declare the codes in src/lib/openapi.ts, then delete the ' +
+  'line. `noFailureModes` is the opposite, a DURABLE record that someone read ' +
+  'the handler and found it answers no failure code at all; add to it only ' +
+  'from a real reading, never from a regeneration. An entry in either list ' +
+  'that is now documented, or no longer routed, fails the check, so neither ' +
+  'can rot into a permanent mute. Regenerate `unreviewed` with ' +
+  '`npm run openapi:failure-coverage -- --write-baseline`; that command ' +
+  'preserves `noFailureModes` and never adds to it.';
 
-  const app = createApp();
-  const routes = collectRoutes(app).filter(isContractRoute).map(stripApi);
-
+/** `METHOD /path` -> the response codes its registration declares. */
+const buildDeclaredMap = (routes: Operation[]): Map<string, Set<string>> => {
   const doc = buildOpenApiDocument(routes) as unknown as {
     paths?: Record<
       string,
@@ -69,47 +83,66 @@ const main = (): void => {
       );
     }
   }
+  return declared;
+};
 
-  if (writing) {
-    // Preserve any existing `noFailureModes` — those are human findings and
-    // regenerating the backlog must not discard them.
-    const existing = readBaseline();
-    const silent = new Set(existing.noFailureModes);
-    const unreviewed = routes
-      .filter((route) => {
-        const codes = declared.get(`${route.method} ${route.path}`);
-        if (!codes) return false;
-        return gateIndependentCodes(route, codes).length === 0;
-      })
-      .map((route) => `${route.method} ${route.path}`)
-      .filter((k) => !silent.has(k))
-      .sort();
+/**
+ * Rewrite `unreviewed` from the current contract, preserving `noFailureModes`.
+ *
+ * The asymmetry is the point: a machine can see that an operation declares
+ * nothing, but only a person reading the handler can say it ANSWERS nothing.
+ * Regeneration must never silently promote the first into the second.
+ */
+const writeBaseline = (
+  routes: Operation[],
+  declared: Map<string, Set<string>>
+): void => {
+  const silent = new Set(readBaseline().noFailureModes);
+  // Iterate the ROUTES, not their keys: `gateIndependentCodes` needs each
+  // route's own `gates` to subtract what its middleware already implies.
+  // Passing a gateless stand-in counts every 401/403 as a handler code and
+  // writes a baseline of 3 entries instead of 149 — measured, when a refactor
+  // briefly did exactly that. The failure is loud rather than silent (the next
+  // run reports 146 unclassified and exits 1), but the route is the unit here,
+  // and reducing it to a key throws away the half that makes the sum correct.
+  const unreviewed = routes
+    .filter((route) => {
+      const codes = declared.get(`${route.method} ${route.path}`);
+      return (
+        codes !== undefined && gateIndependentCodes(route, codes).length === 0
+      );
+    })
+    .map((route) => `${route.method} ${route.path}`)
+    .filter((k) => !silent.has(k))
+    .sort();
 
-    const baseline = {
-      $comment:
-        'Grandfathered operations for the OpenAPI failure-coverage gate ' +
-        '(#517): operations that do not document any 4xx beyond the 401/403 ' +
-        'their middleware already implies. TWO LISTS, TWO MEANINGS. ' +
-        '`unreviewed` is the burn-down — nobody has read the handler yet — ' +
-        'and only ever SHRINKS: read the surface, declare the codes in ' +
-        'src/lib/openapi.ts, then delete the line. `noFailureModes` is the ' +
-        'opposite, a DURABLE record that someone read the handler and found it ' +
-        'answers no failure code at all; add to it only from a real reading, ' +
-        'never from a regeneration. An entry in either list that is now ' +
-        'documented, or no longer routed, fails the check, so neither can rot ' +
-        'into a permanent mute. Regenerate `unreviewed` with ' +
-        '`npm run openapi:failure-coverage -- --write-baseline`; that command ' +
-        'preserves `noFailureModes` and never adds to it.',
-      generated: new Date().toISOString().slice(0, 10),
-      unreviewed,
-      noFailureModes: [...silent].sort()
-    };
-    writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);
-    console.log(
-      `Wrote ${unreviewed.length} unreviewed operation(s) to ` +
-        `openapi-failure-coverage-baseline.json ` +
-        `(${silent.size} noFailureModes entr(ies) preserved).`
-    );
+  writeFileSync(
+    BASELINE_PATH,
+    `${JSON.stringify(
+      {
+        $comment: BASELINE_COMMENT,
+        generated: new Date().toISOString().slice(0, 10),
+        unreviewed,
+        noFailureModes: [...silent].sort()
+      },
+      null,
+      2
+    )}\n`
+  );
+  console.log(
+    `Wrote ${unreviewed.length} unreviewed operation(s) to ` +
+      `openapi-failure-coverage-baseline.json ` +
+      `(${silent.size} noFailureModes entr(ies) preserved).`
+  );
+};
+
+const main = (): void => {
+  const app = createApp();
+  const routes = collectRoutes(app).filter(isContractRoute).map(stripApi);
+  const declared = buildDeclaredMap(routes);
+
+  if (process.argv.includes('--write-baseline')) {
+    writeBaseline(routes, declared);
     process.exit(0);
   }
 
