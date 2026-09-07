@@ -107,6 +107,22 @@ jobs:
         # openapi-auth-coverage-baseline.json and, as with completeness, a NEW
         # gap fails here and so does a stale entry — the list only shrinks.
         run: npm run openapi:auth-coverage
+      - name: OpenAPI failure coverage
+        if: ${{ !cancelled() }}
+        # The third registry axis (#517). Completeness proves a route is
+        # registered; auth-coverage proves the registration describes what the
+        # route's GATES answer. Neither can see what its HANDLER answers: 149
+        # operations declare no 4xx their middleware does not already imply,
+        # while the source emits 404 at 202 sites alone.
+        #
+        # Unlike its two siblings this gate derives nothing — 121 of 151
+        # AppError throws are in modules, a call away from the route, so there
+        # is no structure to read. The authority is a human reading the handler,
+        # and this only asserts every operation has been CLASSIFIED: documented,
+        # or recorded in openapi-failure-coverage-baseline.json as unreviewed
+        # (the shrinking burn-down) or as verified-silent. A new route is in
+        # neither list and fails on its first CI run.
+        run: npm run openapi:failure-coverage
       - name: ERD freshness
         if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md

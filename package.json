@@ -24,6 +24,7 @@
     "openapi:export": "ts-node src/scripts/export-openapi.ts",
     "openapi:completeness": "ts-node -T src/scripts/check-openapi-completeness.ts",
     "openapi:auth-coverage": "ts-node -T src/scripts/check-openapi-auth-coverage.ts",
+    "openapi:failure-coverage": "ts-node -T src/scripts/check-openapi-failure-coverage.ts",
     "version:check": "ts-node -T src/scripts/check-version-consistency.ts",
     "changelog:check": "ts-node -T src/scripts/check-changelog.ts",
     "db:generate": "prisma generate",
