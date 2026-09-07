@@ -126,6 +126,14 @@ All notable changes to stellar-api are documented here.
 
   **`openapi:failure-coverage` moves to 187 / 31 / 146, and the drop is the correction.** A 400 stops counting as handler coverage the moment its gate implies it, so 56 operations whose only declared code was that 400 leave the axis: **21 to `noFailureModes`** — the `/bookmarks` and `/users` handlers read in full during #565/#566 — and **35 to `unreviewed`**, because nobody has read those. Recording all 56 as verified-silent would be the regeneration the baseline file forbids. The axis exists for failures middleware cannot explain, and it had been counting 56 that it could.
 
+- **The contract stops restating the validation `400` the middleware already declares** ([#567](https://github.com/orphic-inc/stellar-api/issues/567)) — the second half of the derivation. **73 registrations deleted**, covering 79 operations (two of them sit in the `registerBookmark` factory, so one line each serves four segments). `openapi.json` shows **79 description changes and nothing else**: no response added, none removed, no body changed, no `security` touched, and the failure-coverage baseline untouched at **187 / 31 / 146**.
+
+  **Every one of those 79 descriptions got more specific**, which is the point rather than a side effect: `Validation error` became `Invalid request body` (29), `Invalid path parameters or request body` (24), `Invalid path parameters` (17) and `Invalid query parameters` (9). The generic string never told a caller whether to check the URL or the payload; the derived one is read off the validators the route actually mounts, so it also cannot drift.
+
+  **The 24 registrations that say something the middleware cannot are kept**, by the same REGISTERED WINS rule that protects `GET /asset/{hash}`'s bespoke 401. Five are `ValidationError`-bodied and carry real detail — `Invalid IP address, reversed bounds, or a range spanning both address families` — and 19 are `MsgResponse`-bodied 400s that are not validation failures at all, like `Invalid credentials` and `Cannot delete the default stylesheet`. Deleting those would have destroyed information, which is precisely why 404s are not derived.
+
+  This completes #567. The failure-coverage axis now measures only what handlers answer, and the remaining burn-down no longer hand-writes a code the middleware declares for it.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
