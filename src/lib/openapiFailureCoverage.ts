@@ -37,7 +37,7 @@
 // registry) instead of duplicating them here where they could drift. The
 // per-surface read catches it; the gate does not pretend to.
 
-import { expectedCodes, type GateKind } from './routeGate';
+import { expectedCodes } from './routeGate';
 import type { Operation } from './openapiCompleteness';
 
 /** The two grandfathering lists. They are NOT the same kind of thing. */
@@ -111,9 +111,7 @@ export const gateIndependentCodes = (
   op: Operation,
   declared: Set<string>
 ): string[] => {
-  const implied = new Set(
-    expectedCodes((op.gates ?? []) as GateKind[]).map(String)
-  );
+  const implied = new Set(expectedCodes(op.gates ?? []).map(String));
   return [...declared]
     .filter((code) => code.startsWith('4') && !implied.has(code))
     .sort();

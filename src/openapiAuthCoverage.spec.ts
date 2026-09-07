@@ -11,7 +11,14 @@ import {
   checkAuthCoverage,
   type AuthCoverageInput
 } from './lib/openapiAuthCoverage';
+import type { RequestHandler } from 'express';
 import { expectedCodes, markGate, readGate } from './lib/routeGate';
+import {
+  requireAdminOnly,
+  requireOwnerOrPermission,
+  requirePermission,
+  requireStrictAdmin
+} from './middleware/permissions';
 
 const declared = (
   entries: Record<string, string[]>
@@ -27,29 +34,35 @@ const input = (over: Partial<AuthCoverageInput> = {}): AuthCoverageInput => ({
 
 describe('expectedCodes', () => {
   it('maps requireAuth to 401 alone', () => {
-    expect(expectedCodes(['auth'])).toEqual([401]);
+    expect(expectedCodes([{ kind: 'auth' }])).toEqual([401]);
   });
 
   // The rule that matters: requirePermission() spreads [requireAuth, check], so
   // a permission-gated route answers 401 to an anonymous caller and 403 to an
   // authenticated one without the permission. Declaring only 403 is half a gate.
   it('maps a permission gate to BOTH 401 and 403', () => {
-    expect(expectedCodes(['permission'])).toEqual([401, 403]);
+    expect(expectedCodes([{ kind: 'permission' }])).toEqual([401, 403]);
   });
 
   it('maps the service key to 401 — a Bearer failure is authentication', () => {
-    expect(expectedCodes(['service'])).toEqual([401]);
+    expect(expectedCodes([{ kind: 'service' }])).toEqual([401]);
   });
 
   it('deduplicates when a chain carries the same gate twice', () => {
-    expect(expectedCodes(['auth', 'permission', 'auth'])).toEqual([401, 403]);
+    expect(
+      expectedCodes([
+        { kind: 'auth' },
+        { kind: 'permission' },
+        { kind: 'auth' }
+      ])
+    ).toEqual([401, 403]);
   });
 });
 
 describe('markGate / readGate', () => {
   it('round-trips a gate through a handler', () => {
     const fn = markGate(jest.fn(), 'permission');
-    expect(readGate(fn)).toBe('permission');
+    expect(readGate(fn)).toEqual({ kind: 'permission' });
   });
 
   it('returns undefined for an unmarked handler rather than guessing', () => {
@@ -85,7 +98,9 @@ describe('checkAuthCoverage', () => {
   it('passes a fully documented gated route', () => {
     const r = checkAuthCoverage(
       input({
-        routes: [{ method: 'GET', path: '/x', gates: ['permission'] }],
+        routes: [
+          { method: 'GET', path: '/x', gates: [{ kind: 'permission' }] }
+        ],
         declared: declared({ 'GET /x': ['200', '401', '403'] })
       })
     );
@@ -108,7 +123,9 @@ describe('checkAuthCoverage', () => {
   it('fails on a gap that is not baselined', () => {
     const r = checkAuthCoverage(
       input({
-        routes: [{ method: 'GET', path: '/x', gates: ['permission'] }],
+        routes: [
+          { method: 'GET', path: '/x', gates: [{ kind: 'permission' }] }
+        ],
         declared: declared({ 'GET /x': ['200'] })
       })
     );
@@ -119,7 +136,7 @@ describe('checkAuthCoverage', () => {
   it('accepts a gap that IS baselined', () => {
     const r = checkAuthCoverage(
       input({
-        routes: [{ method: 'GET', path: '/x', gates: ['auth'] }],
+        routes: [{ method: 'GET', path: '/x', gates: [{ kind: 'auth' }] }],
         declared: declared({ 'GET /x': ['200'] }),
         baseline: ['GET /x 401']
       })
@@ -132,7 +149,7 @@ describe('checkAuthCoverage', () => {
   it('fails a baselined entry that is now documented', () => {
     const r = checkAuthCoverage(
       input({
-        routes: [{ method: 'GET', path: '/x', gates: ['auth'] }],
+        routes: [{ method: 'GET', path: '/x', gates: [{ kind: 'auth' }] }],
         declared: declared({ 'GET /x': ['200', '401'] }),
         baseline: ['GET /x 401']
       })
@@ -151,7 +168,9 @@ describe('checkAuthCoverage', () => {
   // would report one fault twice and make both baselines move together.
   it('does not report a route that has no registration at all', () => {
     const r = checkAuthCoverage(
-      input({ routes: [{ method: 'GET', path: '/x', gates: ['auth'] }] })
+      input({
+        routes: [{ method: 'GET', path: '/x', gates: [{ kind: 'auth' }] }]
+      })
     );
     expect(r.ok).toBe(true);
     expect(r.allGaps).toEqual([]);
@@ -160,11 +179,62 @@ describe('checkAuthCoverage', () => {
   it('reports one gap per missing CODE, not per operation', () => {
     const r = checkAuthCoverage(
       input({
-        routes: [{ method: 'PUT', path: '/y', gates: ['permission'] }],
+        routes: [
+          { method: 'PUT', path: '/y', gates: [{ kind: 'permission' }] }
+        ],
         declared: declared({ 'PUT /y': ['200'] })
       })
     );
     expect(r.allGaps).toHaveLength(2);
     expect(r.totals.gaps).toBe(2);
+  });
+});
+
+/**
+ * A permission gate names what it enforces (#517).
+ *
+ * The kind alone answers "which codes?"; the names are what let a `403` be
+ * described as `Missing news_manage` rather than a bare `Permission denied`.
+ * Nothing consumes them until the derivation lands, so without this the stamp
+ * could be wrong — or absent — and every test would still pass.
+ */
+describe('permission gates name what they enforce', () => {
+  const gateOf = (chain: RequestHandler[]) =>
+    chain.map((h) => readGate(h)).find((g) => g?.kind === 'permission');
+
+  it('stamps the varargs of requirePermission', () => {
+    expect(gateOf(requirePermission('news_manage'))).toEqual({
+      kind: 'permission',
+      permissions: ['news_manage']
+    });
+  });
+
+  it('keeps every alternative, because any one of them passes', () => {
+    // `requirePermission` spreads into a `.some()`, so these are OR — and the
+    // derived description has to read "Missing wiki_manage or admin".
+    expect(gateOf(requirePermission('wiki_manage', 'admin'))).toEqual({
+      kind: 'permission',
+      permissions: ['wiki_manage', 'admin']
+    });
+  });
+
+  it('names admin for the two admin-only helpers', () => {
+    expect(gateOf(requireAdminOnly())).toEqual({
+      kind: 'permission',
+      permissions: ['admin']
+    });
+    expect(gateOf(requireStrictAdmin())).toEqual({
+      kind: 'permission',
+      permissions: ['admin']
+    });
+  });
+
+  it('does NOT name a permission an owner can bypass', () => {
+    // requireOwnerOrPermission admits the resource owner without the
+    // permission, so claiming it as a requirement would describe the route
+    // wrongly. Kind only — it derives the generic message instead.
+    const gate = gateOf(requireOwnerOrPermission(() => 1, 'users_edit'));
+    expect(gate).toEqual({ kind: 'permission' });
+    expect(gate).not.toHaveProperty('permissions');
   });
 });

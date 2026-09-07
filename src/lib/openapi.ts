@@ -24,6 +24,7 @@ import {
 } from '@prisma/client';
 import { appVersion } from './version';
 import type { Operation } from './openapiCompleteness';
+import type { Gate } from './routeGate';
 import {
   profileUpdateSchema,
   inviteSchema,
@@ -12869,10 +12870,11 @@ const SECURITY_SCHEMES = {
  * drift apart.
  */
 export const securityForGates = (
-  gates: readonly string[] | undefined
+  gates: readonly Gate[] | undefined
 ): { [scheme: string]: string[] }[] | undefined => {
   if (!gates || gates.length === 0) return undefined;
-  if (gates.includes('service')) return [{ serviceKey: [] }];
+  if (gates.some((gate) => gate.kind === 'service'))
+    return [{ serviceKey: [] }];
   return [{ cookieAuth: [] }];
 };
 
@@ -12919,7 +12921,7 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
   // Inject `security` from the gates. Done here rather than per registerPath so
   // there is exactly one place it can be wrong, and it is a place that reads
   // the middleware rather than restating it.
-  const gatesByOp = new Map<string, readonly string[] | undefined>(
+  const gatesByOp = new Map<string, readonly Gate[] | undefined>(
     routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.gates])
   );
   const paths = doc.paths ?? {};

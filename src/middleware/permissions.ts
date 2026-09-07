@@ -36,21 +36,25 @@ export const loadPermissions = async (
 // Use for routes that must be restricted to full admins only.
 export const requireAdminOnly = (): RequestHandler[] => [
   requireAuth,
-  markGate(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const perms = await loadPermissions(req as AuthenticatedRequest, res);
-      if (perms['admin']) return next();
-      secLog.warn('Permission denied', {
-        userId: (req as AuthenticatedRequest).user?.id,
-        required: 'admin',
-        method: req.method,
-        path: req.path
-      });
-      res.status(403).json({ msg: 'Permission denied' });
-    } catch (err) {
-      next(err);
-    }
-  }, 'permission')
+  markGate(
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const perms = await loadPermissions(req as AuthenticatedRequest, res);
+        if (perms['admin']) return next();
+        secLog.warn('Permission denied', {
+          userId: (req as AuthenticatedRequest).user?.id,
+          required: 'admin',
+          method: req.method,
+          path: req.path
+        });
+        res.status(403).json({ msg: 'Permission denied' });
+      } catch (err) {
+        next(err);
+      }
+    },
+    'permission',
+    ['admin']
+  )
 ];
 
 // Returns [requireAuth, permissionCheck] — spread into route definitions:
@@ -59,37 +63,45 @@ export const requirePermission = (
   ...permissions: Permission[]
 ): RequestHandler[] => [
   requireAuth,
-  markGate(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const perms = await loadPermissions(req as AuthenticatedRequest, res);
-      const granted = permissions.some((p) => hasPermission(perms, p));
-      if (granted) return next();
-      secLog.warn('Permission denied', {
-        userId: (req as AuthenticatedRequest).user?.id,
-        required: permissions,
-        method: req.method,
-        path: req.path
-      });
-      res.status(403).json({ msg: 'Permission denied' });
-    } catch (err) {
-      next(err);
-    }
-  }, 'permission')
+  markGate(
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const perms = await loadPermissions(req as AuthenticatedRequest, res);
+        const granted = permissions.some((p) => hasPermission(perms, p));
+        if (granted) return next();
+        secLog.warn('Permission denied', {
+          userId: (req as AuthenticatedRequest).user?.id,
+          required: permissions,
+          method: req.method,
+          path: req.path
+        });
+        res.status(403).json({ msg: 'Permission denied' });
+      } catch (err) {
+        next(err);
+      }
+    },
+    'permission',
+    permissions
+  )
 ];
 
 // Returns [requireAuth, permissionCheck] — admits only users with the literal 'admin' permission.
 // Staff alone does not pass (unlike requirePermission('admin') which treats staff ≡ admin).
 export const requireStrictAdmin = (): RequestHandler[] => [
   requireAuth,
-  markGate(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const perms = await loadPermissions(req as AuthenticatedRequest, res);
-      if (perms['admin']) return next();
-      res.status(403).json({ msg: 'Permission denied' });
-    } catch (err) {
-      next(err);
-    }
-  }, 'permission')
+  markGate(
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const perms = await loadPermissions(req as AuthenticatedRequest, res);
+        if (perms['admin']) return next();
+        res.status(403).json({ msg: 'Permission denied' });
+      } catch (err) {
+        next(err);
+      }
+    },
+    'permission',
+    ['admin']
+  )
 ];
 
 // Passes if req.user owns the resource OR has the given permission.
@@ -110,5 +122,8 @@ export const requireOwnerOrPermission = (
     } catch (err) {
       next(err);
     }
+    // Kind only, deliberately: an owner passes this gate without holding
+    // `permission`, so stamping the name would have the contract claim a
+    // requirement that is not one. It derives the generic message instead.
   }, 'permission')
 ];

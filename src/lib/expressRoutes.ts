@@ -17,7 +17,7 @@
 import type { Express, Application } from 'express';
 
 import type { Operation } from './openapiCompleteness';
-import { readGate, type GateKind } from './routeGate';
+import { readGate, type Gate } from './routeGate';
 
 interface RouteLayer {
   route?: {
@@ -73,13 +73,10 @@ const toOpenApiPath = (path: string): string =>
  * routers it is mounted under (`router.use(requireAuth, sub)` is common), read
  * off the marks `lib/routeGate.ts` stamps.
  */
-const gatesOf = (
-  layer: RouteLayer,
-  inherited: readonly GateKind[]
-): GateKind[] => {
+const gatesOf = (layer: RouteLayer, inherited: readonly Gate[]): Gate[] => {
   const own = (layer.route?.stack ?? [])
     .map((h) => readGate(h.handle))
-    .filter((g): g is GateKind => g !== undefined);
+    .filter((g): g is Gate => g !== undefined);
   return [...inherited, ...own];
 };
 
@@ -94,7 +91,7 @@ export const collectRoutes = (app: Express | Application): Operation[] => {
   const walk = (
     stack: RouteLayer[],
     base: string,
-    inherited: readonly GateKind[]
+    inherited: readonly Gate[]
   ): void => {
     // Gates applied to the router itself, ahead of any route in it.
     const mounted = [...inherited];

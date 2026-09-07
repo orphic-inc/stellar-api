@@ -24,7 +24,7 @@
 // baselined entry that is now covered (or no longer routed) fails as stale. The
 // backlog can only get smaller.
 
-import { expectedCodes, type GateKind } from './routeGate';
+import { expectedCodes } from './routeGate';
 import type { Operation } from './openapiCompleteness';
 
 export interface AuthCoverageInput {
@@ -70,7 +70,7 @@ export const checkAuthCoverage = (
   let covered = 0;
 
   for (const route of routes) {
-    const gates = (route.gates ?? []) as GateKind[];
+    const gates = route.gates ?? [];
     if (gates.length === 0) continue;
     gated++;
 

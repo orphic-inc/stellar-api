@@ -22,12 +22,15 @@
 // missing, and openapi.json asserts a contract narrower than what ships.
 
 /** One HTTP operation, as `METHOD /path` with `{param}` placeholders. */
+import type { Gate } from './routeGate';
+
 export interface Operation {
   method: string;
   path: string;
-  /** Auth gates the route's middleware chain enforces (#494). Optional: the
-   *  registered side of a comparison has no middleware to read. */
-  gates?: string[];
+  /** Auth gates the route's middleware chain enforces (#494), each carrying
+   *  the parameters that describe it (#517). Optional: the registered side of
+   *  a comparison has no middleware to read. */
+  gates?: Gate[];
 }
 
 /**
