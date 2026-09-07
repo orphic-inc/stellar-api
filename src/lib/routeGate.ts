@@ -61,7 +61,13 @@ export const markGate = <T extends RequestHandler>(
 ): T => {
   Object.defineProperty(fn, GATE, {
     value:
-      permissions && permissions.length > 0 ? { kind, permissions } : { kind },
+      permissions && permissions.length > 0
+        ? // COPIED, not aliased. `requirePermission` passes the same array its
+          // closure evaluates on every request, so storing the reference would
+          // let anything holding the stamp mutate a live authorization check.
+          // Nothing does today, and this makes sure nothing can.
+          { kind, permissions: Object.freeze([...permissions]) }
+        : { kind },
     enumerable: false,
     configurable: true
   });

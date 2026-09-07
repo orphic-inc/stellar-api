@@ -122,8 +122,9 @@ export const requireOwnerOrPermission = (
     } catch (err) {
       next(err);
     }
-    // Kind only, deliberately: an owner passes this gate without holding
-    // `permission`, so stamping the name would have the contract claim a
-    // requirement that is not one. It derives the generic message instead.
+    // Kind only, deliberately — no permission name. An owner passes this gate
+    // WITHOUT holding `permission`, so stamping the name would have the
+    // contract claim a requirement that is not one. It derives the generic
+    // message its middleware actually sends instead.
   }, 'permission')
 ];
