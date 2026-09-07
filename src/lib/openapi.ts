@@ -1089,7 +1089,8 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1112,7 +1113,8 @@ registry.registerPath({
           )
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1133,7 +1135,8 @@ registry.registerPath({
           schema: z.array(z.object({ ip: z.string(), seenAt: z.string() }))
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1189,7 +1192,8 @@ registry.registerPath({
     200: {
       description: 'Snatch list',
       content: { 'application/json': { schema: z.array(SnatchItem) } }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1380,7 +1384,8 @@ registry.registerPath({
     200: {
       description: 'Warnings',
       content: { 'application/json': { schema: z.array(UserWarning) } }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1445,7 +1450,8 @@ registry.registerPath({
       content: {
         'application/json': { schema: z.array(UserModerationNote) }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1716,7 +1722,8 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1766,7 +1773,8 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -1950,7 +1958,8 @@ registry.registerPath({
     200: {
       description: 'Unfiltered reputation, including the moderation signal',
       content: { 'application/json': { schema: CrsView } }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -7940,7 +7949,8 @@ registry.registerPath({
           schema: z.object({ data: z.array(SessionItem), meta: PaginationMeta })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -7976,7 +7986,8 @@ registry.registerPath({
           schema: z.object({ data: z.array(InviteItem), meta: PaginationMeta })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -8012,7 +8023,8 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 
@@ -8108,7 +8120,8 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    400: validationResponse('Validation error')
   }
 });
 

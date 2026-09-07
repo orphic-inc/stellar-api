@@ -9139,6 +9139,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -9210,6 +9220,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -9277,6 +9297,16 @@
                       "seenAt"
                     ]
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -9514,6 +9544,16 @@
                   "items": {
                     "$ref": "#/components/schemas/SnatchItem"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -10129,6 +10169,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -10377,6 +10427,16 @@
                   "items": {
                     "$ref": "#/components/schemas/UserModerationNote"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -11345,6 +11405,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -11502,6 +11572,16 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -12012,6 +12092,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CrsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -30612,6 +30702,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -30694,6 +30794,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authenticated",
             "content": {
@@ -30759,6 +30869,16 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }
@@ -30897,6 +31017,16 @@
                     "data",
                     "meta"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
                 }
               }
             }

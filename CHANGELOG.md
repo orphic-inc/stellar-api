@@ -104,6 +104,16 @@ All notable changes to stellar-api are documented here.
 
   **A 404 was deliberately NOT declared**, though it is the code a reader would expect. A `post` naming a well-formed but nonexistent id hits a foreign-key violation, which carries no `statusCode` and so surfaces as a **500** through `err.statusCode ?? 500` — filed as [#564](https://github.com/orphic-inc/stellar-api/issues/564). This axis records what a handler answers today, so declaring a 404 would have documented an intention. It becomes declarable when #564 is fixed.
 
+- **The `/users` surface declares the failures its handlers answer** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the third burn-down slice, and the largest. `openapi:failure-coverage` moves from **230 documented / 7 verified silent / 127 unreviewed** to **243 / 10 / 111**. Purely additive: `openapi.json` gains 130 lines and loses none.
+
+  **Thirteen of the sixteen answer a 400, all from the same source.** Seven run `validateQuery` over a pagination or filter schema and six run `validateParams` over the path id. As on `/bookmarks`, that code is gate-independent — `middleware/validate.ts` does not call `markGate` — so it is exactly what this axis exists to catch. Across two slices the validation 400 is now the dominant undeclared failure, which is worth knowing before the remaining 111.
+
+  **The three that answer nothing genuinely answer nothing**: `GET /users/donor-ranks`, `GET /users/duplicate-ips` and `GET /users/me/snatch-list` take no parameter to validate, and `getDuplicateIps`/`getSnatchList` contain no throw.
+
+  **No 404 is declared, and that is a finding rather than an omission.** Six of these read a user by path id, and none of them 404 for a user that does not exist: `getReputation` returns `{ score: 0, dimensions: [], suspect: false }` explicitly (`modules/reputation.ts:591`), and the warnings, notes, IP-history, email-history and snatch-list readers all return an empty list from a `findMany` that simply matches nothing. That is consistent behaviour rather than five separate oversights, so it is recorded as the contract instead of being "fixed" into a 404 by a later reader.
+
+  **#517's per-surface tally is not reliable and should not be batch-applied.** It counts `/users` at 17 against an actual 16, having already claimed twelve no-4xx operations on `/bookmarks` where there are thirteen and eight answer a 400. Each slice re-derives its list from `openapi-failure-coverage-baseline.json` and reads the handlers.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
