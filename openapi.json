@@ -13718,6 +13718,7 @@
         "tags": [
           "Stylesheets"
         ],
+        "description": "Two further conditions answer 400 beyond body validation, and the declared schema shows only the validator's. Exceeding the caller's rank quota answers `{ msg }`; CSS that violates the ADR-0031 boundary answers `{ errors: { source: [...] } }`, one entry per violation with its location — the same envelope a validation failure uses.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -14432,6 +14433,7 @@
         "tags": [
           "Stylesheets"
         ],
+        "description": "A `cssUrl` naming a `/css` delivery target that does not resolve to an existing authored stylesheet answers 400 with `{ msg }`, beyond the body validation the declared schema covers.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -18629,6 +18631,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Not a member of this community",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Community not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18792,6 +18814,16 @@
           },
           "403": {
             "description": "Missing communities_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Community not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -36228,6 +36260,16 @@
               }
             }
           },
+          "404": {
+            "description": "Community not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -36295,6 +36337,16 @@
           },
           "403": {
             "description": "Missing dnc_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No DNC entry with that id in this community",
             "content": {
               "application/json": {
                 "schema": {

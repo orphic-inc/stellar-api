@@ -2589,6 +2589,12 @@ registry.registerPath({
       content: { 'application/json': { schema: authorStylesheetSchema } }
     }
   },
+  description:
+    'Two further conditions answer 400 beyond body validation, and the ' +
+    "declared schema shows only the validator's. Exceeding the caller's " +
+    'rank quota answers `{ msg }`; CSS that violates the ADR-0031 boundary ' +
+    'answers `{ errors: { source: [...] } }`, one entry per violation with ' +
+    'its location — the same envelope a validation failure uses.',
   responses: {
     201: {
       description: 'Author stylesheet created',
@@ -2802,6 +2808,10 @@ registry.registerPath({
   request: {
     body: { content: { 'application/json': { schema: stylesheetSchema } } }
   },
+  description:
+    'A `cssUrl` naming a `/css` delivery target that does not resolve to an ' +
+    'existing authored stylesheet answers 400 with `{ msg }`, beyond the ' +
+    'body validation the declared schema covers.',
   responses: {
     201: {
       description: 'Stylesheet created',
@@ -4200,7 +4210,9 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    403: msgResponse('Not a member of this community'),
+    404: msgResponse('Community not found')
   }
 });
 
@@ -4400,7 +4412,8 @@ registry.registerPath({
     201: {
       description: 'Release created',
       content: { 'application/json': { schema: Release } }
-    }
+    },
+    404: msgResponse('Community not found')
   }
 });
 
@@ -9188,7 +9201,8 @@ registry.registerPath({
     201: {
       description: 'Created DNC entry',
       content: { 'application/json': { schema: DncEntrySchema } }
-    }
+    },
+    404: msgResponse('Community not found')
   }
 });
 
@@ -9206,7 +9220,8 @@ registry.registerPath({
     { name: 'dncId', in: 'path', required: true, schema: { type: 'integer' } }
   ],
   responses: {
-    204: { description: 'Deleted' }
+    204: { description: 'Deleted' },
+    404: msgResponse('No DNC entry with that id in this community')
   }
 });
 
