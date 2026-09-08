@@ -23,7 +23,7 @@ import {
   withPrimaryArtist
 } from '../../modules/releaseCredits';
 import { sanitizeHtml } from '../../lib/sanitize';
-import { renderSiteBBCode } from '../../modules/bbcodeRender';
+import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import {
   parsedPage,
   paginatedResponse,
@@ -163,10 +163,13 @@ router.get(
       prisma.collage.count({ where })
     ]);
 
+    // Resolved ONCE for the request: this list renders in a loop, so a per-row
+    // lookup would issue one identical settings query per row (#400).
+    const bbViewer = await resolveViewer(req);
     const mapped = await Promise.all(
       collages.map(async (collage) => ({
         ...collage,
-        descriptionHtml: await renderSiteBBCode(collage.description)
+        descriptionHtml: await renderSiteBBCode(collage.description, bbViewer)
       }))
     );
     paginatedResponse(res, mapped, total, pg);
@@ -241,7 +244,10 @@ router.get(
 
     res.json({
       ...collage,
-      descriptionHtml: await renderSiteBBCode(collage.description),
+      descriptionHtml: await renderSiteBBCode(
+        collage.description,
+        await resolveViewer(req)
+      ),
       entries: collage.entries.map((entry) => ({
         ...entry,
         release: withPrimaryArtist(entry.release)
@@ -313,7 +319,10 @@ router.post(
 
     res.status(201).json({
       ...collage,
-      descriptionHtml: await renderSiteBBCode(collage.description)
+      descriptionHtml: await renderSiteBBCode(
+        collage.description,
+        await resolveViewer(req)
+      )
     });
   })
 );
@@ -402,7 +411,10 @@ router.put(
 
     res.json({
       ...updated,
-      descriptionHtml: await renderSiteBBCode(updated.description)
+      descriptionHtml: await renderSiteBBCode(
+        updated.description,
+        await resolveViewer(req)
+      )
     });
   })
 );
@@ -470,7 +482,10 @@ router.post(
 
     res.json({
       ...updated,
-      descriptionHtml: await renderSiteBBCode(updated.description)
+      descriptionHtml: await renderSiteBBCode(
+        updated.description,
+        await resolveViewer(req)
+      )
     });
   })
 );

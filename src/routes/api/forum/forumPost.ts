@@ -31,7 +31,7 @@ import {
   paginatedResponse,
   paginationBase
 } from '../../../lib/pagination';
-import { renderSiteBBCode } from '../../../modules/bbcodeRender';
+import { renderSiteBBCode, resolveViewer } from '../../../modules/bbcodeRender';
 import {
   publicPostInclude,
   serializeForumPost
@@ -93,9 +93,14 @@ router.get(
         }
       })
     ]);
+    // Resolved ONCE for the request: this list renders in a loop, so a per-row
+    // lookup would issue one identical settings query per row (#400).
+    const bbViewer = await resolveViewer(req);
     paginatedResponse(
       res,
-      await Promise.all(posts.map((post) => serializeForumPost(post))),
+      await Promise.all(
+        posts.map((post) => serializeForumPost(post, bbViewer))
+      ),
       total,
       pg
     );
@@ -126,7 +131,7 @@ router.get(
       include: publicPostInclude
     });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    res.json(await serializeForumPost(post));
+    res.json(await serializeForumPost(post, await resolveViewer(req)));
   })
 );
 
@@ -188,9 +193,10 @@ router.post(
     };
 
     const post = await replyToTopic(forumId, topicId, actor, body);
-    res
-      .status(201)
-      .json({ ...post, bodyHtml: await renderSiteBBCode(post.body) });
+    res.status(201).json({
+      ...post,
+      bodyHtml: await renderSiteBBCode(post.body, await resolveViewer(req))
+    });
   })
 );
 
@@ -236,7 +242,7 @@ router.put(
       include: publicPostInclude
     });
     if (!updated) return res.status(404).json({ msg: 'Post not found' });
-    res.json(await serializeForumPost(updated));
+    res.json(await serializeForumPost(updated, await resolveViewer(req)));
   })
 );
 

@@ -34,7 +34,7 @@ import {
 } from '../../../schemas/contribution';
 import { getSettings } from '../../../modules/settings';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
-import { renderSiteBBCode } from '../../../modules/bbcodeRender';
+import { renderSiteBBCode, resolveViewer } from '../../../modules/bbcodeRender';
 
 const router = express.Router();
 const contributionIdParamsSchema = z.object({
@@ -118,6 +118,9 @@ router.get(
   validateParams(contributionIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
+    // Resolved ONCE for the request: the comment map below would otherwise issue
+    // one identical settings query per comment (#400).
+    const bbViewer = await resolveViewer(req);
     const contribution = await prisma.contribution.findUnique({
       where: { id },
       select: {
@@ -166,7 +169,7 @@ router.get(
         contribution.comments.map(async (comment) => ({
           ...comment,
           author: toAuthorRefOrNull(comment.author),
-          bodyHtml: await renderSiteBBCode(comment.body)
+          bodyHtml: await renderSiteBBCode(comment.body, bbViewer)
         }))
       )
     });

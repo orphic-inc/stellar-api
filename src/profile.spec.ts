@@ -97,7 +97,9 @@ describe('GET /api/profile/user/:userId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.username).toBe('testuser');
-    expect(getProfileByLookupMock).toHaveBeenCalledWith('testuser', 7);
+    expect(getProfileByLookupMock).toHaveBeenCalledWith('testuser', 7, {
+      showMature: false
+    });
   });
 
   it('returns 404 when user not found', async () => {
@@ -126,9 +128,13 @@ describe('PUT /api/profile/me', () => {
       .send({ profileTitle: 'Jazz fan' });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, {
-      profileTitle: 'Jazz fan'
-    });
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      {
+        profileTitle: 'Jazz fan'
+      },
+      { showMature: false }
+    );
   });
 
   it('returns 404 when user not found', async () => {
@@ -153,7 +159,11 @@ describe('PUT /api/profile/me', () => {
     const res = await request(app).put('/api/profile/me').send({ avatar });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, { avatar });
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      { avatar },
+      { showMature: false }
+    );
   });
 
   it.each([
@@ -177,9 +187,13 @@ describe('PUT /api/profile/me', () => {
       .send({ externalStylesheet: 'https://cdn.example.com/theme.css' });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, {
-      externalStylesheet: 'https://cdn.example.com/theme.css'
-    });
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      {
+        externalStylesheet: 'https://cdn.example.com/theme.css'
+      },
+      { showMature: false }
+    );
   });
 
   it.each([
@@ -204,9 +218,13 @@ describe('PUT /api/profile/me', () => {
       .send({ externalStylesheet: '' });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, {
-      externalStylesheet: ''
-    });
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      {
+        externalStylesheet: ''
+      },
+      { showMature: false }
+    );
   });
 });
 

@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { authorRefSelect, toAuthorRefOrNull } from './authorRef';
-import { renderSiteBBCode } from './bbcodeRender';
+import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
 
 /**
  * The read shape every forum-post surface returns.
@@ -48,10 +48,13 @@ export type RawForumPost = Awaited<
  * newest edit is lifted to `lastEdit` and the `edits` array dropped, so callers
  * never have to know the include took `take: 1`.
  */
-export const serializeForumPost = async (post: RawForumPost) => ({
+export const serializeForumPost = async (
+  post: RawForumPost,
+  viewer: BBViewer
+) => ({
   ...post,
   author: toAuthorRefOrNull(post.author),
-  bodyHtml: await renderSiteBBCode(post.body),
+  bodyHtml: await renderSiteBBCode(post.body, viewer),
   ...(post.edits?.[0] ? { lastEdit: post.edits[0] } : {}),
   edits: undefined
 });

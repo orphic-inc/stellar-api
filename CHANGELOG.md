@@ -6,6 +6,53 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`[mature]` BBCode gains a per-viewer gate**
+  ([#400](https://github.com/orphic-inc/stellar-api/issues/400)) —
+  `UserSettings.showMatureContent` decides whether the tag renders its content
+  or a fixed notice. Rendering is now viewer-dependent, so `BBCtx.viewer` is
+  **required** rather than optional: a call site that forgets to thread it is a
+  compile error, not a silently ungated render. All 21 render sites were updated
+  in one pass for that reason.
+
+  **The issue was wrong on two counts and both are corrected on it.** It asked
+  for the column on `User` "matching the existing `show*` convention", but all
+  five `show*` fields live on `UserSettings`. And it specified
+  `@default(false)`, which would have hidden every `[mature]` block from every
+  member with no way to re-enable it, because stellar-ui has no control for this
+  setting yet. The default is **`true`**, so members opt out and today's
+  rendering is preserved.
+
+  **This is a display preference, not an access control**, and the contract now
+  says so. `bodyHtml` omits the gated content, but the raw `body` still ships in
+  the same response so the editor round-trips (#402). Making it a real control
+  means withholding `body`, which is a response-shape change and belongs in its
+  own issue.
+
+  **The author's `[mature=...]` argument is discarded when the gate is closed.**
+  Passing the summary through would leak the payload for exactly the content
+  most likely to need gating, since the label is written by the same person as
+  the content. The replacement notice is a `<div>`, not a `<p>`: `p` is absent
+  from the sanitizer's allowlist, so DOMPurify would have stripped the wrapper
+  and taken the class stellar-ui needs with it.
+
+  **The render cache varies on the viewer only when the content actually
+  contains a `[mature]` tag.** Ordinary prose renders identically for both
+  viewers, so keying it per viewer would store two copies and double a cache
+  that has no eviction bound. The predicate is case-insensitive because the
+  tokenizer lowercases tags, and deliberately conservative: a false positive
+  costs one cache entry, a false negative lets two viewers share one.
+
+  Six unit tests and four integration tests cover it, and each was **proved by
+  breaking it** — disabling the gate fails four, collapsing the cache key fails
+  three. One integration assertion pins the query count at one per request
+  rather than one per row, which is the regression a later refactor would
+  otherwise introduce silently.
+
+  The stellar-ui half is
+  [ui#311](https://github.com/orphic-inc/stellar-ui/issues/311).
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

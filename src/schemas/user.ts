@@ -28,7 +28,8 @@ export const userSettingsSchema = z.object({
   showLastSeen: z.boolean().optional(),
   showContributedStats: z.boolean().optional(),
   showConsumedStats: z.boolean().optional(),
-  showRatioStats: z.boolean().optional()
+  showRatioStats: z.boolean().optional(),
+  showMatureContent: z.boolean().optional()
 });
 
 export const warnUserSchema = z.object({

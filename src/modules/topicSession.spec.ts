@@ -159,7 +159,9 @@ describe('getTopicSession', () => {
   });
 
   it('returns the session view model with forum, topic, posts, poll, subscription, affordances, and readState', async () => {
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.forum.name).toBe('Open Forum');
     expect(result.topic.title).toBe('Test Topic');
@@ -181,7 +183,7 @@ describe('getTopicSession', () => {
     prismaMock.forum.findUnique.mockResolvedValue(null);
 
     await expect(
-      getTopicSession(99, 44, baseActor, basePg)
+      getTopicSession(99, 44, baseActor, basePg, { showMature: true })
     ).rejects.toMatchObject({
       statusCode: 404,
       message: 'Forum not found'
@@ -195,7 +197,9 @@ describe('getTopicSession', () => {
     });
 
     await expect(
-      getTopicSession(9, 44, { ...baseActor, userRankLevel: 10 }, basePg)
+      getTopicSession(9, 44, { ...baseActor, userRankLevel: 10 }, basePg, {
+        showMature: true
+      })
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
@@ -203,7 +207,7 @@ describe('getTopicSession', () => {
     prismaMock.forumTopic.findFirst.mockResolvedValue(null);
 
     await expect(
-      getTopicSession(9, 99, baseActor, basePg)
+      getTopicSession(9, 99, baseActor, basePg, { showMature: true })
     ).rejects.toMatchObject({
       statusCode: 404,
       message: 'Topic not found'
@@ -217,7 +221,9 @@ describe('getTopicSession', () => {
       topicId: 44
     });
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.subscription.isSubscribed).toBe(true);
   });
@@ -247,7 +253,9 @@ describe('getTopicSession', () => {
     ] as never);
     prismaMock.forumPost.count.mockResolvedValue(2);
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.readState.lastVisiblePostId).toBe(22);
   });
@@ -262,7 +270,9 @@ describe('getTopicSession', () => {
       votes: []
     });
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.affordances.canVoteInPoll).toBe(true);
   });
@@ -277,7 +287,9 @@ describe('getTopicSession', () => {
       votes: []
     });
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.affordances.canVoteInPoll).toBe(false);
   });
@@ -292,7 +304,9 @@ describe('getTopicSession', () => {
       votes: [{ id: 1, forumPollId: 1, userId: 7, vote: 0 }]
     });
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.affordances.canVoteInPoll).toBe(false);
   });
@@ -303,7 +317,9 @@ describe('getTopicSession', () => {
       isLocked: true
     });
 
-    const result = await getTopicSession(9, 44, baseActor, basePg);
+    const result = await getTopicSession(9, 44, baseActor, basePg, {
+      showMature: true
+    });
 
     expect(result.affordances.canReply).toBe(false);
   });
@@ -318,7 +334,8 @@ describe('getTopicSession', () => {
       9,
       44,
       { ...baseActor, canModerateForums: true },
-      basePg
+      basePg,
+      { showMature: true }
     );
 
     expect(result.affordances.canReply).toBe(true);

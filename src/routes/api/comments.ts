@@ -29,7 +29,7 @@ import {
   type UpdateCommentInput
 } from '../../schemas/comment';
 import { deleteComment } from '../../modules/comment';
-import { renderSiteBBCode } from '../../modules/bbcodeRender';
+import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
 const router = express.Router();
@@ -75,11 +75,14 @@ router.get(
       }),
       prisma.comment.count({ where: { ...where, deletedAt: null } })
     ]);
+    // Resolved ONCE for the request: this list renders in a loop, so a per-row
+    // lookup would issue one identical settings query per row (#400).
+    const bbViewer = await resolveViewer(req);
     const mapped = await Promise.all(
       comments.map(async (comment) => ({
         ...comment,
         author: toAuthorRefOrNull(comment.author),
-        bodyHtml: await renderSiteBBCode(comment.body)
+        bodyHtml: await renderSiteBBCode(comment.body, bbViewer)
       }))
     );
     paginatedResponse(res, mapped, total, pg);
@@ -113,7 +116,7 @@ router.get(
     res.json({
       ...comment,
       author: toAuthorRefOrNull(comment.author),
-      bodyHtml: await renderSiteBBCode(comment.body)
+      bodyHtml: await renderSiteBBCode(comment.body, await resolveViewer(req))
     });
   })
 );
@@ -212,7 +215,7 @@ router.post(
     res.status(201).json({
       ...comment,
       author: toAuthorRefOrNull(comment.author),
-      bodyHtml: await renderSiteBBCode(comment.body)
+      bodyHtml: await renderSiteBBCode(comment.body, await resolveViewer(req))
     });
   })
 );
@@ -295,7 +298,10 @@ router.put(
       return result;
     });
 
-    res.json({ ...updated, bodyHtml: await renderSiteBBCode(updated.body) });
+    res.json({
+      ...updated,
+      bodyHtml: await renderSiteBBCode(updated.body, await resolveViewer(req))
+    });
   })
 );
 

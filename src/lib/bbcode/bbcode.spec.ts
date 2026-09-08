@@ -26,7 +26,8 @@ const emptyMaps = (): ResolveMaps => ({
 const bb = (src: string): string =>
   render(parse(tokenize(src)), emptyMaps(), {
     db: {} as BBCtx['db'],
-    siteUrl: SITE
+    siteUrl: SITE,
+    viewer: { showMature: true }
   });
 
 describe('bbcode — inline formatting', () => {
@@ -254,7 +255,7 @@ describe('bbcode — DB-resolved tags', () => {
       ]
     }
   } as unknown as BBCtx['db'];
-  const ctx: BBCtx = { db, siteUrl: SITE };
+  const ctx: BBCtx = { db, siteUrl: SITE, viewer: { showMature: true } };
 
   it('resolves [user] by name to a profile link', async () => {
     expect(await renderBBCode('[user]WhatMan[/user]', ctx)).toBe(
@@ -294,7 +295,8 @@ describe('bbcode — DB-resolved tags', () => {
     expect(
       await renderBBCode('[artist]Nobody[/artist]', {
         db: emptyDb,
-        siteUrl: SITE
+        siteUrl: SITE,
+        viewer: { showMature: true }
       })
     ).toBe('Nobody');
   });
@@ -314,8 +316,85 @@ describe('bbcode — rule links (pure, no DB)', () => {
 
 describe('bbcode — full render entry', () => {
   it('sanitizes and returns html, empty for empty input', async () => {
-    const ctx: BBCtx = { db: {} as BBCtx['db'], siteUrl: SITE };
+    const ctx: BBCtx = {
+      db: {} as BBCtx['db'],
+      siteUrl: SITE,
+      viewer: { showMature: true }
+    };
     expect(await renderBBCode('', ctx)).toBe('');
     expect(await renderBBCode('[b]hi[/b]', ctx)).toBe('<strong>hi</strong>');
+  });
+});
+
+// ─── [mature] viewer gate (#400) ─────────────────────────────────────────────
+//
+// These assert the gate by BREAKING it, not by asserting the helper works. A
+// mocked-Prisma unit test passes against an inert control -- five shipped in this
+// codebase before anyone noticed -- so every case below fails if the gate stops
+// filtering, rather than merely exercising the code path.
+describe('bbcode — the [mature] viewer gate', () => {
+  const ctxFor = (showMature: boolean): BBCtx => ({
+    db: {} as BBCtx['db'],
+    siteUrl: SITE,
+    viewer: { showMature }
+  });
+
+  const SECRET = 'the gated payload';
+
+  it('renders the content when the viewer opted in', async () => {
+    const html = await renderBBCode(`[mature]${SECRET}[/mature]`, ctxFor(true));
+    expect(html).toContain(SECRET);
+    expect(html).toContain('bbcode-mature');
+  });
+
+  it('OMITS the content when the viewer opted out', async () => {
+    const html = await renderBBCode(
+      `[mature]${SECRET}[/mature]`,
+      ctxFor(false)
+    );
+    expect(html).not.toContain(SECRET);
+    expect(html).toContain('bbcode-mature-hidden');
+    // Not a disclosure: there is nothing to disclose.
+    expect(html).not.toContain('<details');
+  });
+
+  it("discards the author's summary, which can itself be the gated content", async () => {
+    // The payload lives entirely in the tag argument. Passing the summary through
+    // would defeat the gate for exactly the content most likely to need it.
+    const html = await renderBBCode(
+      `[mature=${SECRET}]something else[/mature]`,
+      ctxFor(false)
+    );
+    expect(html).not.toContain(SECRET);
+  });
+
+  it('does not serve one viewer the other viewer’s cached render', async () => {
+    // The ordering is the point: render hidden FIRST, then opted-in. Without the
+    // cache-key dimension the second call returns the first call's HTML, and each
+    // render looks correct in isolation.
+    const raw = `[mature]${SECRET}[/mature]`;
+    const hidden = await renderBBCode(raw, ctxFor(false));
+    const shown = await renderBBCode(raw, ctxFor(true));
+    expect(hidden).not.toContain(SECRET);
+    expect(shown).toContain(SECRET);
+  });
+
+  it('varies on an uppercase [MATURE] tag too', async () => {
+    // Tags are lowercased by the tokenizer, so [MATURE] is a real tag. A
+    // case-sensitive cache-key predicate would let both viewers share one entry.
+    const raw = `[MATURE]${SECRET}[/MATURE]`;
+    const hidden = await renderBBCode(raw, ctxFor(false));
+    const shown = await renderBBCode(raw, ctxFor(true));
+    expect(hidden).not.toContain(SECRET);
+    expect(shown).toContain(SECRET);
+  });
+
+  it('still shares one cache entry for prose with no mature tag', async () => {
+    // The gate must not double the cache for content that renders identically for
+    // both viewers -- TtlCache has no eviction bound (#575).
+    const raw = '[b]ordinary prose[/b]';
+    expect(await renderBBCode(raw, ctxFor(true))).toBe(
+      await renderBBCode(raw, ctxFor(false))
+    );
   });
 });

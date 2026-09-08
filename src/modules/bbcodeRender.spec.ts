@@ -23,22 +23,22 @@ import { renderSiteBBCode, withBodyHtml } from './bbcodeRender';
 
 describe('renderSiteBBCode', () => {
   it('transcribes BBCode to HTML at read time', async () => {
-    expect(await renderSiteBBCode('[b]hello[/b]')).toBe(
+    expect(await renderSiteBBCode('[b]hello[/b]', { showMature: true })).toBe(
       '<strong>hello</strong>'
     );
   });
 
   it('returns empty string for null/empty input (no store-time value)', async () => {
-    expect(await renderSiteBBCode(null)).toBe('');
-    expect(await renderSiteBBCode('')).toBe('');
-    expect(await renderSiteBBCode(undefined)).toBe('');
+    expect(await renderSiteBBCode(null, { showMature: true })).toBe('');
+    expect(await renderSiteBBCode('', { showMature: true })).toBe('');
+    expect(await renderSiteBBCode(undefined, { showMature: true })).toBe('');
   });
 });
 
 describe('withBodyHtml', () => {
   it('attaches a rendered bodyHtml while leaving the raw body unchanged', async () => {
     const row = { id: 7, body: '[i]note[/i]' };
-    const result = await withBodyHtml(row);
+    const result = await withBodyHtml(row, { showMature: true });
     expect(result.body).toBe('[i]note[/i]');
     expect(result.bodyHtml).toBe('<em>note</em>');
     expect(result.id).toBe(7);

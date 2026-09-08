@@ -54,13 +54,13 @@ beforeEach(async () => {
 describe('standing on the profile read path', () => {
   it('is pristine for a long-tenured, never-warned user', async () => {
     const u = await createUser('clean-vet', { dateRegistered: YEAR_AGO });
-    const view = await getProfileById(u.id, u.id);
+    const view = await getProfileById(u.id, u.id, { showMature: true });
     expect(view?.standing).toBe('pristine');
   });
 
   it('is clean for a fresh, never-warned user', async () => {
     const u = await createUser('newbie');
-    const view = await getProfileById(u.id, u.id);
+    const view = await getProfileById(u.id, u.id, { showMature: true });
     expect(view?.standing).toBe('clean');
   });
 
@@ -68,7 +68,7 @@ describe('standing on the profile read path', () => {
     const u = await createUser('two-strikes', { dateRegistered: YEAR_AGO });
     await warn(u.id, null);
     await warn(u.id, NEXT_YEAR);
-    const view = await getProfileById(u.id, u.id);
+    const view = await getProfileById(u.id, u.id, { showMature: true });
     expect(view?.standing).toBe('poor');
   });
 
@@ -76,7 +76,7 @@ describe('standing on the profile read path', () => {
     const u = await createUser('reformed', { dateRegistered: YEAR_AGO });
     await warn(u.id, LAST_YEAR); // expired
     await warn(u.id, LAST_YEAR); // expired
-    const view = await getProfileById(u.id, u.id);
+    const view = await getProfileById(u.id, u.id, { showMature: true });
     expect(view?.standing).toBe('pristine');
   });
 
@@ -85,7 +85,7 @@ describe('standing on the profile read path', () => {
       dateRegistered: YEAR_AGO,
       banDate: new Date()
     });
-    const view = await getProfileById(u.id, u.id);
+    const view = await getProfileById(u.id, u.id, { showMature: true });
     expect(view?.standing).toBe('hammer');
   });
 });

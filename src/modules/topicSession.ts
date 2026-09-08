@@ -11,6 +11,7 @@ import {
 import { authorRefSelect, toAuthorRefOrNull } from './authorRef';
 import type { PageParams } from '../lib/pagination';
 import { publicPostInclude, serializeForumPost } from './forumPostView';
+import type { BBViewer } from './bbcodeRender';
 
 // ─── Actor ───────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,8 @@ export const getTopicSession = async (
   forumId: number,
   topicId: number,
   actor: TopicSessionActor,
-  pg: PageParams
+  pg: PageParams,
+  bbViewer: BBViewer
 ) => {
   // Forum — existence + class access
   const forum = await prisma.forum.findUnique({
@@ -108,7 +110,9 @@ export const getTopicSession = async (
     })
   ]);
 
-  const serializedPosts = await Promise.all(posts.map(serializeForumPost));
+  const serializedPosts = await Promise.all(
+    posts.map((post) => serializeForumPost(post, bbViewer))
+  );
   const lastVisiblePostId =
     serializedPosts.length > 0
       ? serializedPosts[serializedPosts.length - 1].id

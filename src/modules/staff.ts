@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
-import { renderSiteBBCode } from './bbcodeRender';
+import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
 
-export async function getStaffList() {
+export async function getStaffList(viewer: BBViewer) {
   const [groups, staffUsers] = await Promise.all([
     prisma.staffGroup.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }]
@@ -39,7 +39,7 @@ export async function getStaffList() {
     rankColor: u.userRank.color,
     lastSeen: u.lastLogin?.toISOString() ?? null,
     staffBio: u.staffBio ?? null,
-    staffBioHtml: await renderSiteBBCode(u.staffBio)
+    staffBioHtml: await renderSiteBBCode(u.staffBio, viewer)
   });
 
   type StaffGroupRow = {

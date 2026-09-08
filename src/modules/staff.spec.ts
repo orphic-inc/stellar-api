@@ -48,7 +48,7 @@ describe('getStaffList', () => {
     mockStaffGroupFindMany.mockResolvedValue([]);
     mockUserFindMany.mockResolvedValue([]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result).toEqual({ groups: [] });
   });
 
@@ -56,7 +56,7 @@ describe('getStaffList', () => {
     mockStaffGroupFindMany.mockResolvedValue([makeGroup(1, 'Mods', 1)]);
     mockUserFindMany.mockResolvedValue([]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0]).toMatchObject({
       id: 1,
@@ -69,7 +69,7 @@ describe('getStaffList', () => {
     mockStaffGroupFindMany.mockResolvedValue([makeGroup(1, 'Mods', 1)]);
     mockUserFindMany.mockResolvedValue([makeStaffUser(10, 'alice', 1)]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result.groups[0].members).toHaveLength(1);
     expect(result.groups[0].members[0].username).toBe('alice');
   });
@@ -80,7 +80,7 @@ describe('getStaffList', () => {
       makeStaffUser(10, 'alice', 1, 100, { staffBio: 'Forum moderator' })
     ]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     const member = result.groups[0].members[0];
     expect(member).toMatchObject({
       userId: 10,
@@ -96,7 +96,7 @@ describe('getStaffList', () => {
     mockStaffGroupFindMany.mockResolvedValue([makeGroup(1, 'Mods', 1)]);
     mockUserFindMany.mockResolvedValue([makeStaffUser(20, 'bob', null)]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result.groups).toHaveLength(2);
     const ungrouped = result.groups.find((g) => g.id === null);
     expect(ungrouped?.name).toBe('Ungrouped');
@@ -107,7 +107,7 @@ describe('getStaffList', () => {
     mockStaffGroupFindMany.mockResolvedValue([makeGroup(1, 'Mods', 1)]);
     mockUserFindMany.mockResolvedValue([makeStaffUser(10, 'alice', 1)]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result.groups.every((g) => g.id !== null)).toBe(true);
   });
 
@@ -117,7 +117,7 @@ describe('getStaffList', () => {
       makeStaffUser(10, 'alice', 1, 100, { lastLogin: null })
     ]);
 
-    const result = await getStaffList();
+    const result = await getStaffList({ showMature: true });
     expect(result.groups[0].members[0].lastSeen).toBeNull();
   });
 });

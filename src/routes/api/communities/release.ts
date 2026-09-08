@@ -39,7 +39,11 @@ import {
   deleteCommunityRelease
 } from '../../../modules/releaseLifecycle';
 import { listCommunityReleases } from '../../../modules/releaseBrowse';
-import { renderSiteBBCode } from '../../../modules/bbcodeRender';
+import {
+  renderSiteBBCode,
+  resolveViewer,
+  type BBViewer
+} from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
 const communityIdParamsSchema = z.object({
@@ -52,12 +56,15 @@ const releaseParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive()
 });
 
-const serializeReleaseWorkbenchView = async (view: ReleaseWorkbenchView) => {
+const serializeReleaseWorkbenchView = async (
+  view: ReleaseWorkbenchView,
+  bbViewer: BBViewer
+) => {
   return {
     ...view.release,
     // Additive render-at-read: raw `description` is unchanged; `descriptionHtml`
     // is the server-rendered BBCode transcription the detail view consumes (#402).
-    descriptionHtml: await renderSiteBBCode(view.release.description),
+    descriptionHtml: await renderSiteBBCode(view.release.description, bbViewer),
     tags: view.tags,
     myVote: view.myVote,
     releaseTags: view.releaseTags,
@@ -145,7 +152,9 @@ router.post(
       permissions: req.user.permissions
     });
     const view = await session.revertHistory({ historyId });
-    res.json(await serializeReleaseWorkbenchView(view));
+    res.json(
+      await serializeReleaseWorkbenchView(view, await resolveViewer(req))
+    );
   })
 );
 
@@ -165,7 +174,12 @@ router.get(
       releaseId,
       permissions: req.user.permissions
     });
-    res.json(await serializeReleaseWorkbenchView(await session.getView()));
+    res.json(
+      await serializeReleaseWorkbenchView(
+        await session.getView(),
+        await resolveViewer(req)
+      )
+    );
   })
 );
 
@@ -212,7 +226,9 @@ router.put(
       year,
       editSummary
     });
-    res.json(await serializeReleaseWorkbenchView(view));
+    res.json(
+      await serializeReleaseWorkbenchView(view, await resolveViewer(req))
+    );
   })
 );
 

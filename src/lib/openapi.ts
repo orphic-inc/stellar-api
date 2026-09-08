@@ -687,6 +687,10 @@ const UserSettings = registry.register(
     showContributedStats: z.boolean(),
     showConsumedStats: z.boolean(),
     showRatioStats: z.boolean(),
+    // Whether [mature] BBCode renders its content for this viewer (#400).
+    // Defaults TRUE: members opt OUT. A DISPLAY PREFERENCE, not an access
+    // control -- see the note on `bodyHtml`.
+    showMatureContent: z.boolean(),
     // Verified IRC nick (ADR-0015, #201) — self-only read path for the UI's
     // "currently linked: X" display. Non-null ⇒ verified; null ⇒ unlinked.
     ircNick: z.string().nullable().optional()
@@ -3086,6 +3090,12 @@ const ForumPost = registry.register(
     forumTopicId: z.number(),
     authorId: z.number(),
     // Raw BBCode; `bodyHtml` is the render-time transcription (#402).
+    //
+    // `bodyHtml` is VIEWER-DEPENDENT since #400: a `[mature]` block renders its
+    // content only when the reader's `showMatureContent` is true, and is replaced
+    // by a fixed notice otherwise. `body` is NOT filtered -- it still carries the
+    // raw source so the editor round-trips -- so this is a display preference, not
+    // an access control. Never cache a response carrying `bodyHtml` across viewers.
     body: z.string(),
     bodyHtml: z.string().optional(),
     lastEdit: ForumPostLastEdit.optional(),
