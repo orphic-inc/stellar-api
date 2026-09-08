@@ -53,6 +53,51 @@ All notable changes to stellar-api are documented here.
   The stellar-ui half is
   [ui#311](https://github.com/orphic-inc/stellar-ui/issues/311).
 
+- **A gate for the 500-on-a-well-formed-request class**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) —
+  `npm run prisma:guard-coverage`. The global handler is `err.statusCode ?? 500`
+  with `FieldError` its only special case, so no Prisma error code is mapped
+  anywhere: a constraint violation reports a **client** mistake as a **server**
+  error, logged at `log.error('Unhandled error')` rather than `log.warn`.
+
+  **The issue published four counts — 8, 12, 15, 18 — and every one was wrong**,
+  because the rule lived in prose and each hand-application missed a different
+  half. This ships the rule as code so the number is re-derived instead of
+  quoted. It changes no behaviour; it establishes the measurement.
+
+  **The rule has two arms, and every earlier tally described only the first.**
+  Arm A is `create`/`upsert` where the model owns an FK or a `@unique`
+  (P2003/P2002). Arm B is `update`/`delete` addressed by id, which throws
+  **P2025 for a missing row on ANY model** — which is why `PUT /announcements/{id}`
+  500s on `News`, a model with neither constraint. The `*Many` variants are
+  excluded: they no-op on zero rows rather than throwing.
+
+  **Three things a regex could not see, and each maps to a specific miscount.**
+  Mutations inside `$transaction(async tx => ...)` are `tx.*` and appeared in no
+  previous tally. A client held under another name is invisible to a
+  receiver-keyed scan — `lib/audit.ts` writes through
+  `(client as PrismaClient).auditLog.create`, and keying on the model name
+  instead found 26 further sites. And whether a call sits inside a `try` whose
+  `catch` translates a Prisma code is a question about block nesting. It uses
+  the TypeScript compiler API, already a dependency, so this adds none.
+
+  **Current reading: 577 mutation sites, 423 needing a guard, 9 already guarded,
+  116 unreviewed in `src/routes/`, 300 counted in `src/modules/` + `src/lib/`.**
+  Only `src/routes/` is gated — a module takes its ids as function arguments, so
+  request-supplied cannot be told from internally-read without inter-procedural
+  analysis, and gating on a rule that cannot discriminate is noise rather than a
+  gate. Reporting that remainder as a number retires the "unmeasured" caveat the
+  issue carried.
+
+  The baseline is a ratchet on `openapiCompleteness`'s three rules, and all
+  three are asserted by constructing the state they must reject. `unreviewed` is
+  a burn-down; `internallyDerived` records sites whose constrained ids cannot
+  dangle, **each with its reason** — a prior `findUnique` is explicitly not a
+  reason, since it leaves the TOCTOU window the original report observed on
+  `/bookmarks`. Entries key on the semantic owner rather than `file:line`:
+  keying on `file::model.op` would collapse 116 of the sites into 54 entries,
+  so clearing one would silently clear up to nine others.
+
 ### Fixed
 
 - **`showMatureContent` was unreachable from the settings UI it was built for**
