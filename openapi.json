@@ -36530,6 +36530,9 @@
               }
             }
           },
+          "404": {
+            "description": "No artist with that id"
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -36755,6 +36758,9 @@
               }
             }
           },
+          "404": {
+            "description": "No release with that id"
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -36959,6 +36965,9 @@
               }
             }
           },
+          "404": {
+            "description": "No communitie with that id"
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -37158,6 +37167,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No request with that id"
           },
           "429": {
             "description": "Rate limited",

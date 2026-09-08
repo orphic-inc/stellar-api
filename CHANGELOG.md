@@ -126,6 +126,39 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   Additive to the contract: one optional boolean on the `PUT /profile/me` request
   body. No shape narrows and coupling stays at `0.9`.
 
+- **Bookmarking a nonexistent artist, release, community or request answered 500**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — the four
+  `POST /api/bookmarks/{segment}/{id}` toggles wrote a path id straight into a
+  `create`. `validateParams` proves only that it is a positive integer, and the
+  relation is a hard foreign key, so a well-formed request naming nothing raised
+  a Prisma P2003. That error carries no `statusCode`, so the global handler
+  reported a **client** mistake as a **server** error and logged it at
+  `log.error('Unhandled error')`. They now answer **404**.
+
+  **The remove arm was a second, quieter instance.** It used `delete`, which
+  throws P2025 when the row disappears between the toggle's read and its write —
+  the concurrent-double-click race the issue's original report named. It now uses
+  `deleteMany`, which no-ops on zero rows, so that arm cannot 500 by
+  construction rather than by catching.
+
+  **A lost unique race answers `200`, not `409`.** Two concurrent POSTs on the
+  same pair leave one losing P2002, but its caller asked to bookmark and the
+  bookmark exists: a toggle reports what is true now rather than that someone
+  else got there first. This is a deliberate exception to the P2002 → 409 rule
+  in `AGENTS.md`, which is written for creates that assert novelty.
+
+  Contract: the four `post` operations gain a `404`, and the comment on
+  `registerBookmark` that recorded why one could not be declared is now the
+  explanation of why it can. `delete` still declares none — `deleteMany` answers
+  `204` whether or not a bookmark was there. Four entries move out of
+  `noFailureModes` (154 → 150) and eight out of the guard-coverage baseline
+  (116 → 108), four of them because the write is no longer a candidate at all.
+
+  Tests are parametrised across all four segments rather than covering one as
+  representative: the guard is hand-written four times, since extracting it into
+  a helper would put the `try` outside the handler where the lexical
+  guard-coverage checker cannot see it.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added
