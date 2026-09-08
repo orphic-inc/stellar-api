@@ -27630,6 +27630,26 @@
               }
             }
           },
+          "404": {
+            "description": "No such ticket, or it is not the caller's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ticket already resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -27689,6 +27709,26 @@
           },
           "403": {
             "description": "Missing staff_inbox_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ticket is not resolved",
             "content": {
               "application/json": {
                 "schema": {
@@ -27778,6 +27818,26 @@
           },
           "403": {
             "description": "Missing staff_inbox_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ticket, or no such assignee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The named assignee lacks staff_inbox_manage",
             "content": {
               "application/json": {
                 "schema": {
@@ -28080,6 +28140,16 @@
           },
           "403": {
             "description": "Missing staff_inbox_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Response not found",
             "content": {
               "application/json": {
                 "schema": {
