@@ -61,7 +61,15 @@ export const profileUpdateSchema = z.object({
   showLastSeen: z.boolean().optional(),
   showContributedStats: z.boolean().optional(),
   showConsumedStats: z.boolean().optional(),
-  showRatioStats: z.boolean().optional()
+  showRatioStats: z.boolean().optional(),
+  // The viewer's own `[mature]` preference (#400). It belongs on BOTH settings
+  // doors: `updateProfile` has always written it, but this schema omitted it, so
+  // `validate()` stripped the key and the write was unreachable — a 200 with the
+  // old value. `settingsParity.spec.ts` pins the invariant that let that happen.
+  //
+  // Unlike the five above it is NOT touched by `paranoiaToVisibility`: paranoia
+  // governs what others see of you, this governs what you see.
+  showMatureContent: z.boolean().optional()
 });
 
 export const inviteSchema = z.object({

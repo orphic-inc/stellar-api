@@ -41,6 +41,21 @@ Before changing:
 
 assume downstream consumers may depend on current behavior.
 
+### Every member surface is behind a session
+
+stellar-ui exposes only `/install`, `/login`, `/register`, `/recovery` and the
+public landing page to an anonymous visitor; every other route requires one.
+**No member prose surface renders for a logged-out viewer.** The canonical
+statement, with the routes to verify it against, is in stellar-ui's `AGENTS.md`
+under Architecture.
+
+The consequence here: a read-time gate keyed on `req.user` may fail **closed**
+for an anonymous caller with no member-visible effect, because no member-facing
+UI reaches it that way. `resolveViewer` in `modules/bbcodeRender.ts` does exactly
+this. Do not reason about anonymous UX from an api route in isolation — and do
+not treat "an anonymous caller sees less" as a regression without checking
+whether any UI can reach that surface anonymously at all.
+
 ## Commands
 
 ```bash
