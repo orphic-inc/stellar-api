@@ -323,11 +323,11 @@ describe('GET /api/collages/:id', () => {
     const res = await request(app).get('/api/collages/1');
 
     expect(res.status).toBe(200);
-    expect(prismaMock.collageSubscription.update).toHaveBeenCalledWith(
+    // updateMany since #564: `update` raised P2025 if the subscription went away
+    // between the read and this write, failing a request that only asked to read.
+    expect(prismaMock.collageSubscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          userId_collageId: { userId: COLLAGE_USER_ID, collageId: 1 }
-        },
+        where: { userId: COLLAGE_USER_ID, collageId: 1 },
         data: { lastVisit: expect.any(Date) }
       })
     );

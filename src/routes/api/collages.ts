@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { AppError } from '../../lib/errors';
 import { getUserRankQuotas } from '../../lib/userRankAccess';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { emitNotifications } from '../../lib/notifications';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
@@ -71,6 +72,194 @@ const loadActiveCollage = async (id: number) => {
   if (!collage || collage.isDeleted)
     throw new AppError(404, 'Collage not found');
   return collage;
+};
+
+/**
+ * The three staff-gated fields, written into `data` in place. Returns the
+ * refusal when a non-staff caller sends one, else `null`. Split out of
+ * `buildCollageUpdate` purely to keep both inside Codacy's per-function limits.
+ */
+const applyStaffOnlyFields = (
+  updates: UpdateCollageInput,
+  staff: boolean,
+  data: Record<string, unknown>
+): { status: number; msg: string } | null => {
+  const gated = [
+    ['isLocked', 'Only staff can lock collages'],
+    ['maxEntries', 'Only staff can set entry limits'],
+    ['maxEntriesPerUser', 'Only staff can set per-user limits']
+  ] as const;
+
+  for (const [field, msg] of gated) {
+    const value = updates[field];
+    if (value === undefined) continue;
+    if (!staff) return { status: 403, msg };
+    data[field] = value;
+  }
+  return null;
+};
+
+/**
+ * Build the `data` for a collage update, or the refusal that stops it.
+ *
+ * A pure move of the handler's field-by-field gating — same conditions, same
+ * order, same messages. Extracted because adding the #564 guard took the
+ * handler to nloc 81 / ccn 22, well past Codacy's 50/10, and the guard itself
+ * cannot move: it has to sit lexically in the handler for the guard-coverage
+ * checker to see it.
+ */
+const buildCollageUpdate = async (args: {
+  updates: UpdateCollageInput;
+  collage: { categoryId: number };
+  id: number;
+  userId: number;
+  staff: boolean;
+}): Promise<
+  { error: { status: number; msg: string } } | { data: Record<string, unknown> }
+> => {
+  const { updates, collage, id, userId, staff } = args;
+  const data: Record<string, unknown> = {};
+
+  // Name: owner of personal collage or staff only
+  if (updates.name !== undefined) {
+    if (!staff && !isPersonal(collage.categoryId)) {
+      return {
+        error: { status: 403, msg: 'Only staff can rename public collages' }
+      };
+    }
+    const conflict = await prisma.collage.findFirst({
+      where: { name: updates.name, isDeleted: false, id: { not: id } }
+    });
+    if (conflict) {
+      return { error: { status: 409, msg: 'Collage name already taken' } };
+    }
+    data.name = updates.name;
+  }
+
+  if (updates.description !== undefined)
+    data.description = sanitizeHtml(updates.description);
+  if (updates.tags !== undefined) data.tags = updates.tags;
+
+  // isFeatured: only for personal collages, mutually exclusive
+  if (updates.isFeatured !== undefined) {
+    if (!isPersonal(collage.categoryId))
+      return {
+        error: {
+          status: 400,
+          msg: 'Featured only applies to personal collages'
+        }
+      };
+    if (updates.isFeatured) {
+      // Unset featured on all other personal collages by this user
+      await prisma.collage.updateMany({
+        where: { userId, categoryId: 0, isFeatured: true, id: { not: id } },
+        data: { isFeatured: false }
+      });
+    }
+    data.isFeatured = updates.isFeatured;
+  }
+
+  // Staff-only fields
+  const refusal = applyStaffOnlyFields(updates, staff, data);
+  if (refusal) return { error: refusal };
+
+  return { data };
+};
+
+/**
+ * Everything that can refuse an entry add, as a status + message, or `null` when
+ * the add may proceed. Extracted from the handler so it stays inside Codacy's
+ * per-function limits once its #564 guard is added: a guard must sit lexically
+ * in the handler for the guard-coverage checker to see it, so the room has to
+ * come from elsewhere.
+ *
+ * These are READS, so each leaves a window the guard still has to close — they
+ * make the common answers precise, they do not make the write safe.
+ */
+const entryAddBlocked = async (args: {
+  collage: {
+    id: number;
+    maxEntries: number;
+    numEntries: number;
+    maxEntriesPerUser: number;
+  };
+  releaseId: number;
+  userId: number;
+  staff: boolean;
+}): Promise<{ status: number; msg: string } | null> => {
+  const { collage, releaseId, userId, staff } = args;
+
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    select: { id: true }
+  });
+  if (!release) return { status: 404, msg: 'Release not found' };
+
+  const existing = await prisma.collageEntry.findUnique({
+    where: { collageId_releaseId: { collageId: collage.id, releaseId } },
+    select: { id: true }
+  });
+  if (existing) return { status: 409, msg: 'Release already in collage' };
+
+  if (staff) return null;
+
+  if (collage.maxEntries > 0 && collage.numEntries >= collage.maxEntries) {
+    return { status: 400, msg: 'Collage has reached its maximum entry count' };
+  }
+
+  if (collage.maxEntriesPerUser > 0) {
+    const userCount = await prisma.collageEntry.count({
+      where: { collageId: collage.id, userId }
+    });
+    if (userCount >= collage.maxEntriesPerUser) {
+      return { status: 400, msg: 'You have reached your per-user entry limit' };
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Is an ACTIVE collage already using this name? Soft-deleted rows keep their
+ * name, so this is deliberately narrower than the unique constraint the #564
+ * guard catches — the two answer different questions and both are wanted.
+ */
+const nameTaken = async (name: string): Promise<boolean> =>
+  // Truthiness, not `!== null`: an absent row is undefined, and treating that as
+  // "taken" refuses every create. A test caught it; the original was truthy too.
+  !!(await prisma.collage.findFirst({
+    where: { name, isDeleted: false },
+    select: { id: true }
+  }));
+
+/**
+ * The personal-collage cap, as a message when it is exceeded and `null` when it
+ * is not. Extracted from the create handler rather than inlined so that handler
+ * stays inside Codacy's per-function nloc/ccn limits once its #564 guard is
+ * added — a guard has to sit lexically in the handler for the guard-coverage
+ * checker to see it, so the room has to come from somewhere else.
+ *
+ * The limit is resolved across primary + secondary ranks with 0 meaning
+ * unlimited — the same resolver the auth payload advertises with, so the number
+ * a member is shown is the number enforced (#369, ADR-0032 §4).
+ */
+const personalCollageQuotaExceeded = async (
+  categoryId: number,
+  perms: Record<string, boolean>,
+  userId: number
+): Promise<string | null> => {
+  if (!isPersonal(categoryId)) return null;
+  if (perms['staff'] || perms['admin']) return null;
+
+  const { personalCollageLimit } = await getUserRankQuotas(userId);
+  if (personalCollageLimit === null) return null;
+
+  const count = await prisma.collage.count({
+    where: { userId, categoryId: 0, isDeleted: false }
+  });
+  return count >= personalCollageLimit
+    ? `Personal collage limit reached (${personalCollageLimit})`
+    : null;
 };
 
 const router = express.Router();
@@ -236,8 +425,12 @@ router.get(
 
     // Update lastVisit if subscribed
     if (subscription) {
-      await prisma.collageSubscription.update({
-        where: { userId_collageId: { userId: authReq.user.id, collageId: id } },
+      // updateMany, not update: this is a best-effort side effect on a READ. If
+      // the subscription is removed between the findUnique above and here,
+      // `update` raises P2025 and the whole GET 500s (#564, arm B). No-opping is
+      // the right answer — the caller asked for the collage, not the marker.
+      await prisma.collageSubscription.updateMany({
+        where: { userId: authReq.user.id, collageId: id },
         data: { lastVisit: new Date() }
       });
     }
@@ -277,45 +470,45 @@ router.post(
       return res.status(403).json({ msg: 'Permission denied' });
     }
 
-    const existingName = await prisma.collage.findFirst({
-      where: { name, isDeleted: false }
-    });
-    if (existingName) {
+    if (await nameTaken(name)) {
       return res
         .status(409)
         .json({ msg: 'A collage with this name already exists' });
     }
 
-    if (isPersonal(categoryId)) {
-      const isSiteStaff = !!(perms['staff'] || perms['admin']);
-      if (!isSiteStaff) {
-        // Resolved across primary + secondary ranks, 0 meaning unlimited —
-        // the same resolver the auth payload advertises with, so the number a
-        // member is shown is the number enforced (#369, ADR-0032 §4).
-        const { personalCollageLimit } = await getUserRankQuotas(userId);
-        if (personalCollageLimit !== null) {
-          const count = await prisma.collage.count({
-            where: { userId, categoryId: 0, isDeleted: false }
-          });
-          if (count >= personalCollageLimit) {
-            return res.status(400).json({
-              msg: `Personal collage limit reached (${personalCollageLimit})`
-            });
-          }
-        }
-      }
+    const overQuota = await personalCollageQuotaExceeded(
+      categoryId,
+      perms,
+      userId
+    );
+    if (overQuota !== null) {
+      return res.status(400).json({ msg: overQuota });
     }
 
-    const collage = await prisma.collage.create({
-      data: {
-        name,
-        description: sanitizeHtml(description),
-        userId,
-        categoryId,
-        tags
-      },
-      include: collageInclude
-    });
+    let collage;
+    try {
+      collage = await prisma.collage.create({
+        data: {
+          name,
+          description: sanitizeHtml(description),
+          userId,
+          categoryId,
+          tags
+        },
+        include: collageInclude
+      });
+    } catch (err) {
+      // `Collage.name` carries a unique constraint, so a duplicate name raised
+      // P2002 and answered 500 (#564, arm A). The only foreign key is `userId`,
+      // taken from the session, so P2003 is unreachable here.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new AppError(409, 'A collage with that name already exists');
+      }
+      throw err;
+    }
 
     res.status(201).json({
       ...collage,
@@ -347,67 +540,36 @@ router.put(
     if (!isOwner && !staff)
       return res.status(403).json({ msg: 'Permission denied' });
 
-    const data: Record<string, unknown> = {};
-
-    // Name: owner of personal collage or staff only
-    if (updates.name !== undefined) {
-      if (!staff && !isPersonal(collage.categoryId)) {
-        return res
-          .status(403)
-          .json({ msg: 'Only staff can rename public collages' });
-      }
-      const conflict = await prisma.collage.findFirst({
-        where: { name: updates.name, isDeleted: false, id: { not: id } }
-      });
-      if (conflict)
-        return res.status(409).json({ msg: 'Collage name already taken' });
-      data.name = updates.name;
-    }
-
-    if (updates.description !== undefined)
-      data.description = sanitizeHtml(updates.description);
-    if (updates.tags !== undefined) data.tags = updates.tags;
-
-    // isFeatured: only for personal collages, mutually exclusive
-    if (updates.isFeatured !== undefined) {
-      if (!isPersonal(collage.categoryId))
-        return res
-          .status(400)
-          .json({ msg: 'Featured only applies to personal collages' });
-      if (updates.isFeatured) {
-        // Unset featured on all other personal collages by this user
-        await prisma.collage.updateMany({
-          where: { userId, categoryId: 0, isFeatured: true, id: { not: id } },
-          data: { isFeatured: false }
-        });
-      }
-      data.isFeatured = updates.isFeatured;
-    }
-
-    // Staff-only fields
-    if (updates.isLocked !== undefined) {
-      if (!staff)
-        return res.status(403).json({ msg: 'Only staff can lock collages' });
-      data.isLocked = updates.isLocked;
-    }
-    if (updates.maxEntries !== undefined) {
-      if (!staff)
-        return res.status(403).json({ msg: 'Only staff can set entry limits' });
-      data.maxEntries = updates.maxEntries;
-    }
-    if (updates.maxEntriesPerUser !== undefined) {
-      if (!staff)
-        return res
-          .status(403)
-          .json({ msg: 'Only staff can set per-user limits' });
-      data.maxEntriesPerUser = updates.maxEntriesPerUser;
-    }
-
-    const updated = await prisma.collage.update({
-      where: { id },
-      data,
-      include: collageInclude
+    const built = await buildCollageUpdate({
+      updates,
+      collage,
+      id,
+      userId,
+      staff
     });
+    if ('error' in built) {
+      return res.status(built.error.status).json({ msg: built.error.msg });
+    }
+    const data = built.data;
+
+    let updated;
+    try {
+      updated = await prisma.collage.update({
+        where: { id },
+        data,
+        include: collageInclude
+      });
+    } catch (err) {
+      // loadActiveCollage above is a READ, so it leaves the window this closes.
+      // #564 treats a prior read as insufficient for exactly this reason.
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === 'P2025') throw new AppError(404, 'Collage not found');
+        if (err.code === 'P2002') {
+          throw new AppError(409, 'A collage with that name already exists');
+        }
+      }
+      throw err;
+    }
 
     res.json({
       ...updated,
@@ -437,19 +599,35 @@ router.delete(
     if (!isOwner && !staff)
       return res.status(403).json({ msg: 'Permission denied' });
 
-    if (isPersonal(collage.categoryId) && (isOwner || staff)) {
-      // Hard delete personal collages
-      await prisma.collage.delete({ where: { id } });
-    } else {
-      // Soft delete public collages (staff only)
-      if (!staff)
-        return res
-          .status(403)
-          .json({ msg: 'Only staff can delete public collages' });
-      await prisma.collage.update({
-        where: { id },
-        data: { isDeleted: true, deletedAt: new Date() }
-      });
+    // Soft delete public collages (staff only); personal ones are hard deleted.
+    // `isOwner || staff` is already guaranteed by the 403 above, so the personal
+    // check alone decides the arm.
+    const hardDelete = isPersonal(collage.categoryId);
+    if (!hardDelete && !staff)
+      return res
+        .status(403)
+        .json({ msg: 'Only staff can delete public collages' });
+
+    // One try over both arms: loadActiveCollage above is a READ, so either write
+    // can meet a row that has since gone, and P2025 would reach the global
+    // handler as a 500 (#564).
+    try {
+      if (hardDelete) {
+        await prisma.collage.delete({ where: { id } });
+      } else {
+        await prisma.collage.update({
+          where: { id },
+          data: { isDeleted: true, deletedAt: new Date() }
+        });
+      }
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Collage not found');
+      }
+      throw err;
     }
 
     res.status(204).send();
@@ -474,11 +652,24 @@ router.post(
         .status(400)
         .json({ msg: 'Personal collages cannot be recovered' });
 
-    const updated = await prisma.collage.update({
-      where: { id },
-      data: { isDeleted: false, deletedAt: null },
-      include: collageInclude
-    });
+    let updated;
+    try {
+      updated = await prisma.collage.update({
+        where: { id },
+        data: { isDeleted: false, deletedAt: null },
+        include: collageInclude
+      });
+    } catch (err) {
+      // loadActiveCollage above is a READ; this closes the window it leaves,
+      // where P2025 would otherwise reach the global handler as a 500 (#564).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Collage not found');
+      }
+      throw err;
+    }
 
     res.json({
       ...updated,
@@ -516,41 +707,13 @@ router.post(
         .status(403)
         .json({ msg: 'Only the owner can add to a personal collage' });
 
-    // Release existence check
-    const release = await prisma.release.findUnique({
-      where: { id: releaseId }
+    const blocked = await entryAddBlocked({
+      collage,
+      releaseId,
+      userId,
+      staff
     });
-    if (!release) return res.status(404).json({ msg: 'Release not found' });
-
-    // Duplicate check
-    const existing = await prisma.collageEntry.findUnique({
-      where: { collageId_releaseId: { collageId: id, releaseId } }
-    });
-    if (existing)
-      return res.status(409).json({ msg: 'Release already in collage' });
-
-    // MaxEntries check (staff bypass)
-    if (
-      !staff &&
-      collage.maxEntries > 0 &&
-      collage.numEntries >= collage.maxEntries
-    ) {
-      return res
-        .status(400)
-        .json({ msg: 'Collage has reached its maximum entry count' });
-    }
-
-    // MaxEntriesPerUser check (staff bypass)
-    if (!staff && collage.maxEntriesPerUser > 0) {
-      const userCount = await prisma.collageEntry.count({
-        where: { collageId: id, userId }
-      });
-      if (userCount >= collage.maxEntriesPerUser) {
-        return res
-          .status(400)
-          .json({ msg: 'You have reached your per-user entry limit' });
-      }
-    }
+    if (blocked) return res.status(blocked.status).json({ msg: blocked.msg });
 
     // Get max sort value for new entry
     const maxSort = await prisma.collageEntry.aggregate({
@@ -559,42 +722,61 @@ router.post(
     });
     const nextSort = (maxSort._max.sort ?? 0) + 10;
 
-    const entry = await prisma.$transaction(async (tx) => {
-      const created = await tx.collageEntry.create({
-        data: { collageId: id, releaseId, userId, sort: nextSort },
-        include: {
-          release: {
-            select: {
-              id: true,
-              title: true,
-              image: true,
-              year: true,
-              releaseType: true,
-              credits: releaseCreditsSelect
-            }
-          },
-          user: { select: { id: true, username: true } }
+    let entry;
+    try {
+      entry = await prisma.$transaction(async (tx) => {
+        const created = await tx.collageEntry.create({
+          data: { collageId: id, releaseId, userId, sort: nextSort },
+          include: {
+            release: {
+              select: {
+                id: true,
+                title: true,
+                image: true,
+                year: true,
+                releaseType: true,
+                credits: releaseCreditsSelect
+              }
+            },
+            user: { select: { id: true, username: true } }
+          }
+        });
+        await tx.collage.update({
+          where: { id },
+          data: { numEntries: { increment: 1 } }
+        });
+
+        const subs = await tx.collageSubscription.findMany({
+          where: { collageId: id },
+          select: { userId: true }
+        });
+        await emitNotifications(tx, {
+          userIds: subs.map((s) => s.userId),
+          type: 'collage_updated',
+          actorId: userId,
+          page: 'collages',
+          pageId: id
+        });
+
+        return created;
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The release and duplicate checks above are reads; both windows stay
+        // open until the write lands (#564). `collageId` and `releaseId` are
+        // path/body ids, `userId` is session-derived.
+        if (err.code === 'P2003') {
+          throw new AppError(404, 'Collage or release not found');
         }
-      });
-      await tx.collage.update({
-        where: { id },
-        data: { numEntries: { increment: 1 } }
-      });
-
-      const subs = await tx.collageSubscription.findMany({
-        where: { collageId: id },
-        select: { userId: true }
-      });
-      await emitNotifications(tx, {
-        userIds: subs.map((s) => s.userId),
-        type: 'collage_updated',
-        actorId: userId,
-        page: 'collages',
-        pageId: id
-      });
-
-      return created;
-    });
+        if (err.code === 'P2002') {
+          throw new AppError(409, 'Release already in collage');
+        }
+        if (err.code === 'P2025') {
+          throw new AppError(404, 'Collage not found');
+        }
+      }
+      throw err;
+    }
 
     res.status(201).json({
       ...entry,
@@ -632,15 +814,28 @@ router.delete(
     if (!isOwner && !isAdder && !staff)
       return res.status(403).json({ msg: 'Permission denied' });
 
-    await prisma.$transaction([
-      prisma.collageEntry.delete({
-        where: { collageId_releaseId: { collageId: id, releaseId } }
-      }),
-      prisma.collage.update({
-        where: { id },
-        data: { numEntries: { decrement: 1 } }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.collageEntry.delete({
+          where: { collageId_releaseId: { collageId: id, releaseId } }
+        }),
+        prisma.collage.update({
+          where: { id },
+          data: { numEntries: { decrement: 1 } }
+        })
+      ]);
+    } catch (err) {
+      // Both writes are addressed by id after reads, so either can meet a row
+      // that has since gone. Rolling back leaves the counter consistent; the
+      // 500 it used to answer did not (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Collage entry not found');
+      }
+      throw err;
+    }
 
     res.status(204).send();
   })
@@ -668,14 +863,26 @@ router.put(
         .status(403)
         .json({ msg: 'Only the collage owner or staff can reorder entries' });
 
-    await prisma.$transaction(
-      entries.map(({ id: entryId, sort }) =>
-        prisma.collageEntry.update({
-          where: { id: entryId },
-          data: { sort }
-        })
-      )
-    );
+    try {
+      await prisma.$transaction(
+        entries.map(({ id: entryId, sort }) =>
+          prisma.collageEntry.update({
+            where: { id: entryId },
+            data: { sort }
+          })
+        )
+      );
+    } catch (err) {
+      // The entry ids come from the BODY and none is read first, so a reorder
+      // naming an entry that does not exist answered 500 (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(400, 'One or more entries not found');
+      }
+      throw err;
+    }
 
     res.status(204).send();
   })
@@ -700,28 +907,52 @@ router.post(
 
     if (existing) {
       // Unsubscribe
-      await prisma.$transaction([
-        prisma.collageSubscription.delete({
-          where: { userId_collageId: { userId, collageId: id } }
-        }),
-        prisma.collage.update({
-          where: { id },
-          data: { numSubscribers: { decrement: 1 } }
-        })
-      ]);
+      try {
+        await prisma.$transaction([
+          prisma.collageSubscription.delete({
+            where: { userId_collageId: { userId, collageId: id } }
+          }),
+          prisma.collage.update({
+            where: { id },
+            data: { numSubscribers: { decrement: 1 } }
+          })
+        ]);
+      } catch (err) {
+        // A concurrent unsubscribe already did what this caller asked for, so
+        // report the resulting state rather than a conflict — the same reading
+        // as the /bookmarks toggle (#564).
+        if (!(
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2025'
+        )) {
+          throw err;
+        }
+      }
       return res.json({ subscribed: false });
     }
 
     // Subscribe
-    await prisma.$transaction([
-      prisma.collageSubscription.create({
-        data: { userId, collageId: id }
-      }),
-      prisma.collage.update({
-        where: { id },
-        data: { numSubscribers: { increment: 1 } }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.collageSubscription.create({
+          data: { userId, collageId: id }
+        }),
+        prisma.collage.update({
+          where: { id },
+          data: { numSubscribers: { increment: 1 } }
+        })
+      ]);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // A concurrent subscribe won: the caller is subscribed either way.
+        if (err.code === 'P2002') return res.json({ subscribed: true });
+        // The collage went away between loadActiveCollage and here.
+        if (err.code === 'P2003' || err.code === 'P2025') {
+          throw new AppError(404, 'Collage not found');
+        }
+      }
+      throw err;
+    }
 
     res.json({ subscribed: true });
   })
@@ -745,15 +976,29 @@ router.post(
     });
 
     if (existing) {
-      await prisma.bookmarkCollage.delete({
-        where: { userId_collageId: { userId, collageId: id } }
+      // deleteMany, not delete: no-ops if a concurrent request already removed
+      // it, where `delete` would raise P2025 and 500 (#564, arm B). Same shape
+      // as the /bookmarks toggles.
+      await prisma.bookmarkCollage.deleteMany({
+        where: { userId, collageId: id }
       });
       return res.json({ bookmarked: false });
     }
 
-    await prisma.bookmarkCollage.create({
-      data: { userId, collageId: id }
-    });
+    try {
+      await prisma.bookmarkCollage.create({
+        data: { userId, collageId: id }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // A concurrent POST won the race; the bookmark exists either way.
+        if (err.code === 'P2002') return res.json({ bookmarked: true });
+        if (err.code === 'P2003') {
+          throw new AppError(404, 'Collage not found');
+        }
+      }
+      throw err;
+    }
 
     res.json({ bookmarked: true });
   })
