@@ -13025,7 +13025,7 @@
             }
           },
           "404": {
-            "description": "Not found",
+            "description": "No announcement with that id",
             "content": {
               "application/json": {
                 "schema": {
@@ -13100,7 +13100,7 @@
             }
           },
           "404": {
-            "description": "Not found",
+            "description": "No announcement with that id",
             "content": {
               "application/json": {
                 "schema": {
@@ -13264,7 +13264,7 @@
             }
           },
           "404": {
-            "description": "Not found",
+            "description": "No blog post with that id",
             "content": {
               "application/json": {
                 "schema": {
@@ -13479,7 +13479,7 @@
             }
           },
           "404": {
-            "description": "Not found",
+            "description": "No global notice with that id",
             "content": {
               "application/json": {
                 "schema": {

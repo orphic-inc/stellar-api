@@ -1,12 +1,11 @@
 {
   "$comment": "Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, not a mute button: a new unguarded site fails, and an entry that becomes guarded or disappears fails as stale. `internallyDerived` records sites whose constrained ids cannot dangle (session- or internally-sourced), each with the reason — a prior read is NOT a reason, it leaves a TOCTOU window. Regenerate with: npm run prisma:guard-coverage -- --write",
   "generated": "2026-09-08",
-  "internallyDerived": {},
+  "internallyDerived": {
+    "POST /announcements/blog::blog.create": "Blog's only foreign key is userId, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
+    "POST /announcements/global-notice::globalNotice.create": "GlobalNotice's only foreign key is createdById, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint."
+  },
   "unreviewed": [
-    "DELETE /announcements/album-of-month/{albumId}::featuredAlbum.delete",
-    "DELETE /announcements/blog/{id}::blog.delete",
-    "DELETE /announcements/global-notice/{id}::globalNotice.delete",
-    "DELETE /announcements/{id}::news.delete",
     "DELETE /artists/{id}::artist.update",
     "DELETE /auth/sessions/{id}::userSession.update",
     "DELETE /bad-passwords/{id}::badPassword.delete",
@@ -44,8 +43,6 @@
     "DELETE /wiki/{id}/aliases/{alias}::wikiAlias.delete",
     "DELETE /wiki/{id}::wikiPage.update",
     "GET /collages/{id}::collageSubscription.update",
-    "POST /announcements/blog::blog.create",
-    "POST /announcements/global-notice::globalNotice.create",
     "POST /artists/alias::artistAlias.create",
     "POST /artists/similar::similarArtist.upsert",
     "POST /artists/tag::artistTag.upsert",
@@ -95,7 +92,6 @@
     "POST /wiki/{id}/rollback/{rev}::wikiRevision.create",
     "POST /wiki::wikiAlias.create",
     "POST /wiki::wikiPage.create",
-    "PUT /announcements/{id}::news.update",
     "PUT /artists/{id}/vanity-house::artist.update",
     "PUT /collages/{id}/entries::collageEntry.update",
     "PUT /collages/{id}::collage.update",

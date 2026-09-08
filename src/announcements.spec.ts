@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -337,5 +338,92 @@ describe('DELETE /api/announcements/global-notice/:id', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── #564 arm B: a missing row must not answer 500 ───────────────────────────
+//
+// The contract has always DECLARED a 404 on these four operations. Until now it
+// could not fire: Prisma raises P2025 for a missing row, that error carries no
+// statusCode, and the global handler answered 500. So the contract asserted a
+// code the handler could not emit — stellar-ui could carry a 404 branch that
+// never ran while the 500 that did arrive went unhandled.
+//
+// `News` is the clearest case in the codebase: no foreign key and no unique
+// constraint at all, so the constraint-only reading of #564 classified it safe.
+const p2025 = () =>
+  new Prisma.PrismaClientKnownRequestError('missing', {
+    code: 'P2025',
+    clientVersion: 'test'
+  });
+
+describe('announcements — missing rows answer the declared 404 (#564)', () => {
+  beforeEach(() => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('PUT /api/announcements/:id', async () => {
+    prismaMock.news.update.mockRejectedValue(p2025());
+
+    const res = await request(app)
+      .put('/api/announcements/999999')
+      .send({ title: 'x', body: 'y' });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Announcement not found' });
+  });
+
+  it('DELETE /api/announcements/:id', async () => {
+    prismaMock.news.delete.mockRejectedValue(p2025());
+
+    const res = await request(app).delete('/api/announcements/999999');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Announcement not found' });
+  });
+
+  it('DELETE /api/announcements/blog/:id', async () => {
+    prismaMock.blog.delete.mockRejectedValue(p2025());
+
+    const res = await request(app).delete('/api/announcements/blog/999999');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Blog post not found' });
+  });
+
+  it('DELETE /api/announcements/global-notice/:id', async () => {
+    prismaMock.globalNotice.delete.mockRejectedValue(p2025());
+
+    const res = await request(app).delete(
+      '/api/announcements/global-notice/999999'
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Global notice not found' });
+  });
+
+  it('DELETE /api/announcements/album-of-month/:albumId closes the read-write race', async () => {
+    // This one already answered 404 from a prior findUnique. The catch covers
+    // the window between that read and the delete — #564 treats a read alone as
+    // insufficient, since the row can go in between.
+    prismaMock.featuredAlbum.findUnique.mockResolvedValue({ id: 5 } as never);
+    prismaMock.featuredAlbum.delete.mockRejectedValue(p2025());
+
+    const res = await request(app).delete(
+      '/api/announcements/album-of-month/5'
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Featured album not found' });
+  });
+
+  it('still propagates an error that is not P2025', async () => {
+    prismaMock.news.delete.mockRejectedValue(new Error('connection lost'));
+
+    const res = await request(app).delete('/api/announcements/1');
+
+    expect(res.status).toBe(500);
   });
 });

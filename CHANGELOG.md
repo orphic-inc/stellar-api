@@ -159,6 +159,39 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   a helper would put the `try` outside the handler where the lexical
   guard-coverage checker cannot see it.
 
+- **`/announcements` declared a 404 that could not fire**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — `PUT`/`DELETE
+/announcements/{id}`, `DELETE /announcements/blog/{id}` and `DELETE
+/announcements/global-notice/{id}` addressed a row by id with no existence
+  check. Prisma raises **P2025** for a missing row, that error carries no
+  `statusCode`, and so the handler answered **500** while the contract asserted
+  a `404`. stellar-ui could hold a 404 branch that never ran while the 500 that
+  actually arrived went unhandled. **Fixing the handlers makes the existing
+  contract true rather than changing it** — no operation gains a code, and
+  nothing moves in `openapi-failure-coverage-baseline.json`.
+
+  **`News` carries neither a foreign key nor a unique constraint**, which is why
+  the constraint-only reading of #564 filed these four as safe. That is the
+  whole of arm B, and an integration test now pins it against a real database —
+  including a guard on the premise itself, so that adding a constraint to `News`
+  later cannot make the assertion pass for the wrong reason.
+
+  **Three more on the same surface that the issue's queue did not list.**
+  `DELETE /announcements/album-of-month/{albumId}` was called out on the issue as
+  the _correct_ sibling because it reads before deleting; it keeps that read for
+  the message and gains a catch, since a read alone leaves the window between it
+  and the write. `POST /announcements/blog` and `POST /announcements/global-notice`
+  are recorded as internally derived: each model's only foreign key is the
+  author, taken from `req.user.id`, and a session-derived id cannot dangle.
+
+  Guard-coverage baseline: **108 → 101 unreviewed**, 13 → 18 guarded, and the
+  first two `internallyDerived` entries, each with its reason. The four declared
+  404s also stop saying `Not found` and say which thing was not found.
+
+  Fixes the checker's own `--write` log, which reported the count **before**
+  filtering out `internallyDerived` and so printed a total the next run
+  contradicted.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added
