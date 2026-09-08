@@ -148,6 +148,18 @@ All notable changes to stellar-api are documented here.
 
   **The `404` on `PUT /staff-inbox/responses/{id}` still reads `Not found` and was left alone.** Its `DELETE` sibling, in scope here, declares the handler's actual `Response not found`. Rewording an operation already off this axis is out of a slice's scope, and the inconsistency is recorded rather than quietly fixed.
 
+- **The `/forums` surface declares the failures its handlers answer** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the fifth burn-down slice. `openapi:failure-coverage` moves from **191 documented / 39 verified silent / 134 unreviewed** to **197 / 45 / 122**. Purely additive: `openapi.json` gains 111 lines and loses none.
+
+  **Six of the twelve declare something, and five of those six answer the same pair.** `404 Forum not found` beside `403 Insufficient class to read this forum` is the forum-class read gate, and it is a _handler_ check rather than middleware: `modules/forumAccess.ts` throws both codes as `AppError`s, and `GET /forums/{forumId}/topics` and `GET /forums/{forumId}/topics/{topicId}/posts` call it. The other three open-code the same shape against their own floor — `POST /forums/{forumId}/topics` against `minClassCreate`, `POST /forums/last-read` against the post's forum, `POST /forums/polls` against topic authorship plus `forums_moderate`.
+
+  **`GET /forums/categories` enforces a permission that no gate can express.** Its only middleware is `requireAuth`, so the contract derived a `401` and nothing else — but the handler answers `403` when `?all=true` arrives without `forums_manage`, `rank_permissions_manage` or `admin`. The permission is conditional on a query parameter, which is not something `requirePermission` can mount, so this `403` was invisible to every derived axis and is exactly what axis 7 exists to catch. It is the first conditional-permission `403` the burn-down has found.
+
+  **The six silent ones split two ways.** `GET /forums`, `GET /forums/last-read` and `GET /forums/topic-notes/{topicId}` are a `findMany` with no `throw` on any path — the first filters by class in memory after the query rather than failing. The other three are bare `create` calls: `POST /forums`, `POST /forums/categories` and `POST /forums/topic-notes`.
+
+  **Two of those creates are further instances of [#564](https://github.com/orphic-inc/stellar-api/issues/564), and one declared operation has a third.** `POST /forums` with a nonexistent `forumCategoryId` and `POST /forums/topic-notes` with a nonexistent `forumTopicId` both hit a foreign-key violation that carries no `statusCode` and surfaces as a **500**; `ForumPoll.forumTopicId` is `@unique`, so a second `POST /forums/polls` on a topic that already has a poll is the unique-constraint half of the same defect. `ForumCategory.name` carries no unique constraint, so `POST /forums/categories` genuinely cannot fail. #564 is now a five-surface pattern rather than a `/bookmarks` quirk.
+
+  **`GET /forums/{forumId}/topics/{topicId}/posts` 404s for a missing forum but not a missing topic**, and that is recorded rather than corrected. The forum is checked by `assertForumReadAccess`; the topic is only a `where` clause, so a nonexistent `topicId` returns an empty page with `total: 0`. Declaring a topic `404` would have documented an intention.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
