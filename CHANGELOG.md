@@ -228,6 +228,18 @@ All notable changes to stellar-api are documented here.
 
   **The two subscription writes branch on `action` with `if`/`else if` and no `else`.** The Zod enum is exactly `['subscribe', 'unsubscribe']`, so the branch is exhaustive and no request can fall through unanswered — but that safety lives entirely in the schema, not in the handler.
 
+- **The first half of the tail — twenty-two operations across nine surfaces** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the thirteenth burn-down slice. `openapi:failure-coverage` moves from **206 documented / 115 verified silent / 43 unreviewed** to **209 / 134 / 21**. One description corrected, five responses added, nothing removed.
+
+  **`POST /contributions/{id}/access` is the richest operation the burn-down has found, and it declared none of it.** Granting download access debits the ratio ledger, so `grantDownloadAccess` answers **404** twice (no such contribution, no such consumer), **403** twice (consuming your own contribution, download access disabled), **409** once (a concurrent balance drain losing the compare-and-set), and **400** twice (no approved accounting size, insufficient contributed balance). The contract declared 200/400/401/429. The 403, 404 and 409 are now registered; the two 400 causes go in the operation `description`, since a validator gate already implies that code — and the description also records that a FREEPASS or NEUTRALPASS exemption skips the balance check, and that repeating the call inside the idempotency window returns the existing grant rather than charging twice.
+
+  **`POST /install` declared its `409` as a `400`, and called it `Already installed or validation error`.** The handler answers **409** `Application already installed` and **400** `User already exists` — two different conditions the one description had merged, filed under the wrong code. This is the same species as the `Validation error` mislabel on `POST /messages` that [#574](https://github.com/orphic-inc/stellar-api/issues/574) fixed: a `MsgResponse` 400 whose description names something other than what the handler sends. **Two instances now, and neither was findable by any gate**, because a registered code suppresses the derived one and nothing compares the description to the source.
+
+  **`PUT /contributions/{id}/ratio-exempt` answers a `404` from `setContributionRatioExempt`** and declared 200/400/401/403/429.
+
+  **`POST /users/irc-nick/verify` reports failure in a `200` body.** `verifyIrcNick` returns `{ verified: false, reason }` for a nick with no pending claim, an expired code, or a nick another account won in the race — never a 4xx. That is a third answer-shape beside _assert_ and _filter_, and it is correct here: korin is the caller, and the reasons are operational rather than client errors. Recorded so the operation's place in `noFailureModes` is not read as "cannot fail".
+
+  **Three more [#564](https://github.com/orphic-inc/stellar-api/issues/564) instances, all in this slice's silent set.** `POST /comments` writes six optional entity foreign keys; `POST /users` writes `userRankId`; and `DonorRank.name` is `@unique`, so `POST /users/donor-ranks` with a duplicate name is the unique-violation half. All three answer **500** for a well-formed request, so none is a 4xx and none is visible to this axis.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
