@@ -75,6 +75,33 @@ const loadActiveCollage = async (id: number) => {
 };
 
 /**
+ * The rename gate: staff-only on public collages, and no clash with another
+ * ACTIVE collage's name. Writes into `data` in place, returning the refusal or
+ * `null`. Split out of `buildCollageUpdate` to keep that function's cyclomatic
+ * complexity inside Codacy's limit of 10.
+ */
+const applyNameChange = async (
+  name: string | undefined,
+  ctx: { categoryId: number; id: number; staff: boolean },
+  data: Record<string, unknown>
+): Promise<{ status: number; msg: string } | null> => {
+  if (name === undefined) return null;
+
+  if (!ctx.staff && !isPersonal(ctx.categoryId)) {
+    return { status: 403, msg: 'Only staff can rename public collages' };
+  }
+
+  const conflict = await prisma.collage.findFirst({
+    where: { name, isDeleted: false, id: { not: ctx.id } },
+    select: { id: true }
+  });
+  if (conflict) return { status: 409, msg: 'Collage name already taken' };
+
+  data.name = name;
+  return null;
+};
+
+/**
  * The three staff-gated fields, written into `data` in place. Returns the
  * refusal when a non-staff caller sends one, else `null`. Split out of
  * `buildCollageUpdate` purely to keep both inside Codacy's per-function limits.
@@ -120,21 +147,12 @@ const buildCollageUpdate = async (args: {
   const { updates, collage, id, userId, staff } = args;
   const data: Record<string, unknown> = {};
 
-  // Name: owner of personal collage or staff only
-  if (updates.name !== undefined) {
-    if (!staff && !isPersonal(collage.categoryId)) {
-      return {
-        error: { status: 403, msg: 'Only staff can rename public collages' }
-      };
-    }
-    const conflict = await prisma.collage.findFirst({
-      where: { name: updates.name, isDeleted: false, id: { not: id } }
-    });
-    if (conflict) {
-      return { error: { status: 409, msg: 'Collage name already taken' } };
-    }
-    data.name = updates.name;
-  }
+  const nameRefusal = await applyNameChange(
+    updates.name,
+    { categoryId: collage.categoryId, id, staff },
+    data
+  );
+  if (nameRefusal) return { error: nameRefusal };
 
   if (updates.description !== undefined)
     data.description = sanitizeHtml(updates.description);
