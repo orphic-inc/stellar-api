@@ -226,6 +226,55 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   Guard coverage: **101 → 82 unreviewed**, 18 → 36 guarded, 2 → 3 internally
   derived. Failure coverage: 214 → 216 declaring, 150 → 148 verified silent.
 
+- **`/collages` and `/users`: 27 constraint violations that answered 500**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — and
+  `/collages` is the surface the issue names as its **negative control**: _"nine
+  candidates that are all guarded by `loadActiveCollage`, so `/collages` is NOT
+  affected."_
+
+  That was true under the rule it replaced. `loadActiveCollage` is `findUnique` +
+  `throw new AppError(404)` — a **read**. It answers the ordinary case and leaves
+  the window between itself and the write, which is the race #564's own report
+  observed. Under the corrected rule the surface has **seventeen** affected
+  sites, not zero, and `/users` has ten more that appear in no tally at all
+  because every one of them is the same read-then-write shape.
+
+  **Two sites are fixed by construction rather than by catching.**
+  `GET /collages/{id}` touches a subscription's `lastVisit` as a side effect of a
+  READ; `update` raised P2025 if the subscription went away, failing a request
+  that only asked to read, so it is now `updateMany`. The bookmark toggle's
+  remove arm is now `deleteMany`, matching `/bookmarks`.
+
+  **Toggles report the resulting state.** A lost race on subscribe or bookmark
+  answers `200` with what is now true, not `409` — the caller asked to be
+  subscribed and they are. `POST /collages/{id}/entries` keeps `409`, because
+  there the duplicate is the answer rather than a race artefact.
+
+  **`Collage.name` and `DonorRank.name` carry unique constraints**, so a
+  duplicate name answered 500 on create. Both now answer `409`.
+
+  **Nineteen affected operations, and fifteen already declared the code they
+  could not emit** — the third surface-set in a row where that holds. Only four
+  declarations are new: `409` on `POST /collages`, `POST /users/donor-ranks` and
+  `PUT /users/donor-ranks/{rankId}`, and `404` on `PUT /collages/{id}`.
+
+  Guard coverage: **82 → 55 unreviewed**, 36 → 61 guarded — 25 sites gained a
+  guard and two stopped being candidates at all. Failure coverage:
+  216 → 217 declaring, 148 → 147 verified silent.
+
+  **`collages.ts` gains four small helpers, and that is a consequence of the
+  guard rather than a tidy-up.** A guard must sit _lexically_ inside its handler
+  for the guard-coverage checker to see it, and each is about ten lines — enough
+  to push three handlers past Codacy's per-function limits. The room came from
+  moving logic the guard does not touch: `nameTaken`,
+  `personalCollageQuotaExceeded`, `entryAddBlocked`, and
+  `buildCollageUpdate`/`applyStaffOnlyFields`. Every function in the file now
+  measures at or below what it did before this change — 60/8, 48/11, 47/12
+  against 60/8, 70/18, 52/14 on `main`.
+
+  Tests live in new spec files rather than appended, and `src/collages.spec.ts`
+  measures 858 non-comment lines, under the 1000 limit.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

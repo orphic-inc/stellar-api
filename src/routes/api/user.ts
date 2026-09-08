@@ -140,16 +140,29 @@ router.post(
   authHandler(async (_req, res) => {
     const { name, minDonation, expiresAfterDays, perks, color, badge } =
       parsedBody<DonorRankInput>(res);
-    const rank = await prisma.donorRank.create({
-      data: {
-        name,
-        minDonation,
-        ...(expiresAfterDays !== undefined && { expiresAfterDays }),
-        ...(perks !== undefined && { perks: perks as Prisma.InputJsonValue }),
-        ...(color !== undefined && { color }),
-        ...(badge !== undefined && { badge })
+    let rank;
+    try {
+      rank = await prisma.donorRank.create({
+        data: {
+          name,
+          minDonation,
+          ...(expiresAfterDays !== undefined && { expiresAfterDays }),
+          ...(perks !== undefined && { perks: perks as Prisma.InputJsonValue }),
+          ...(color !== undefined && { color }),
+          ...(badge !== undefined && { badge })
+        }
+      });
+    } catch (err) {
+      // DonorRank.name carries a unique constraint and the model has no foreign
+      // key, so P2002 on a duplicate name is the only reachable code (#564).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new AppError(409, 'A donor rank with that name already exists');
       }
-    });
+      throw err;
+    }
     res.status(201).json(rank);
   })
 );
@@ -168,17 +181,31 @@ router.put(
       where: { id: rankId }
     });
     if (!existing) return res.status(404).json({ msg: 'Donor rank not found' });
-    const rank = await prisma.donorRank.update({
-      where: { id: rankId },
-      data: {
-        name,
-        minDonation,
-        ...(expiresAfterDays !== undefined && { expiresAfterDays }),
-        ...(perks !== undefined && { perks: perks as Prisma.InputJsonValue }),
-        ...(color !== undefined && { color }),
-        ...(badge !== undefined && { badge })
+    let rank;
+    try {
+      rank = await prisma.donorRank.update({
+        where: { id: rankId },
+        data: {
+          name,
+          minDonation,
+          ...(expiresAfterDays !== undefined && { expiresAfterDays }),
+          ...(perks !== undefined && { perks: perks as Prisma.InputJsonValue }),
+          ...(color !== undefined && { color }),
+          ...(badge !== undefined && { badge })
+        }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The findUnique above is a read; both windows stay open (#564).
+        if (err.code === 'P2025') {
+          throw new AppError(404, 'Donor rank not found');
+        }
+        if (err.code === 'P2002') {
+          throw new AppError(409, 'A donor rank with that name already exists');
+        }
       }
-    });
+      throw err;
+    }
     res.json(rank);
   })
 );
@@ -194,7 +221,19 @@ router.delete(
       where: { id: rankId }
     });
     if (!existing) return res.status(404).json({ msg: 'Donor rank not found' });
-    await prisma.donorRank.delete({ where: { id: rankId } });
+    try {
+      await prisma.donorRank.delete({ where: { id: rankId } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Donor rank not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -332,7 +371,19 @@ router.delete(
       return res
         .status(409)
         .json({ msg: 'Cannot revoke a used recovery token' });
-    await prisma.accountRecovery.delete({ where: { id: reqId } });
+    try {
+      await prisma.accountRecovery.delete({ where: { id: reqId } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Recovery request not found');
+      }
+      throw err;
+    }
     await audit(
       prisma,
       req.user.id,
@@ -753,9 +804,21 @@ router.post(
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const note = await prisma.userModerationNote.create({
-      data: { userId: id, authorId: req.user.id, body }
-    });
+    let note;
+    try {
+      note = await prisma.userModerationNote.create({
+        data: { userId: id, authorId: req.user.id, body }
+      });
+    } catch (err) {
+      // `authorId` is session-derived, so only the PATH user id can dangle.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new AppError(404, 'User not found');
+      }
+      throw err;
+    }
     res.status(201).json({ note });
   })
 );
@@ -771,7 +834,19 @@ router.delete(
       where: { id: noteId, userId: id }
     });
     if (!note) return res.status(404).json({ msg: 'Note not found' });
-    await prisma.userModerationNote.delete({ where: { id: noteId } });
+    try {
+      await prisma.userModerationNote.delete({ where: { id: noteId } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Note not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -785,7 +860,19 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
-    await prisma.user.update({ where: { id }, data: { disabled: true } });
+    try {
+      await prisma.user.update({ where: { id }, data: { disabled: true } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'User not found');
+      }
+      throw err;
+    }
     await audit(prisma, req.user.id, 'user.disabled', 'User', id);
     res.json({ msg: 'User disabled' });
   })
@@ -800,7 +887,19 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
-    await prisma.user.update({ where: { id }, data: { disabled: false } });
+    try {
+      await prisma.user.update({ where: { id }, data: { disabled: false } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'User not found');
+      }
+      throw err;
+    }
     await audit(prisma, req.user.id, 'user.enabled', 'User', id);
     res.json({ msg: 'User enabled' });
   })
@@ -867,7 +966,19 @@ router.put(
       select: { id: true }
     });
     if (!target) return res.status(404).json({ msg: 'User not found' });
-    await prisma.user.update({ where: { id }, data: { rankLocked } });
+    try {
+      await prisma.user.update({ where: { id }, data: { rankLocked } });
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'User not found');
+      }
+      throw err;
+    }
     await audit(prisma, req.user.id, 'user.rank_lock_changed', 'User', id, {
       rankLocked
     });
@@ -899,10 +1010,22 @@ router.delete(
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    await prisma.$transaction([
-      prisma.userDonorRank.deleteMany({ where: { userId: id } }),
-      prisma.user.update({ where: { id }, data: { isDonor: false } })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.userDonorRank.deleteMany({ where: { userId: id } }),
+        prisma.user.update({ where: { id }, data: { isDonor: false } })
+      ]);
+    } catch (err) {
+      // The findUnique above is a READ; #564 treats it as insufficient because
+      // the row can go between it and the write, where P2025 would 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'User not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );

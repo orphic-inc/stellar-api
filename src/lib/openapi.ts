@@ -1276,7 +1276,8 @@ registry.registerPath({
     201: {
       description: 'Donor rank created',
       content: { 'application/json': { schema: DonorRank } }
-    }
+    },
+    409: msgResponse('A donor rank with that name already exists')
   }
 });
 
@@ -1298,7 +1299,8 @@ registry.registerPath({
       description: 'Updated donor rank',
       content: { 'application/json': { schema: DonorRank } }
     },
-    404: msgResponse('Donor rank not found')
+    404: msgResponse('Donor rank not found'),
+    409: msgResponse('A donor rank with that name already exists')
   }
 });
 
@@ -8388,7 +8390,8 @@ registry.registerPath({
     400: validationResponse(
       'Validation error, or a creation rule rejected the request'
     ),
-    403: msgResponse('Not permitted to create collages')
+    403: msgResponse('Not permitted to create collages'),
+    409: msgResponse('A collage with that name already exists')
   }
 });
 
@@ -8436,6 +8439,7 @@ registry.registerPath({
     403: msgResponse(
       'Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)'
     ),
+    404: msgResponse('Collage not found'),
     409: msgResponse('Collage name already taken')
   }
 });

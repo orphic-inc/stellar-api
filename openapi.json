@@ -9807,6 +9807,16 @@
               }
             }
           },
+          "409": {
+            "description": "A donor rank with that name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -9926,6 +9936,16 @@
           },
           "404": {
             "description": "Donor rank not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A donor rank with that name already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -33586,6 +33606,16 @@
               }
             }
           },
+          "409": {
+            "description": "A collage with that name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -33772,6 +33802,16 @@
           },
           "403": {
             "description": "Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collage not found",
             "content": {
               "application/json": {
                 "schema": {
