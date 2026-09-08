@@ -112,6 +112,22 @@ jobs:
         # (the shrinking burn-down) or as verified-silent. A new route is in
         # neither list and fails on its first CI run.
         run: npm run openapi:failure-coverage
+      - name: Prisma guard coverage
+        if: ${{ !cancelled() }}
+        # #564 — the global handler is `err.statusCode ?? 500` with FieldError
+        # its only special case, so a Prisma constraint violation reports a
+        # CLIENT mistake as a SERVER error, logged at error rather than warn.
+        #
+        # Two arms, and every count published for the issue described only the
+        # first: create/upsert can violate an FK or @unique the model owns
+        # (P2003/P2002), and update/delete addressed by id throw P2025 for a
+        # missing row on ANY model, constrained or not.
+        #
+        # Gates src/routes only. src/modules is counted and reported: a module
+        # takes ids as arguments, so request-supplied cannot be distinguished
+        # from internally-read without inter-procedural analysis, and gating on
+        # a rule that cannot discriminate would be noise, not a gate.
+        run: npm run prisma:guard-coverage
       - name: ERD freshness
         if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md

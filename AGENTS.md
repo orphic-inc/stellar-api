@@ -69,6 +69,7 @@ npm run test:watch       # jest --watch
 npm run test:integration # integration tests (requires .env.test)
 npm run openapi:export   # generate openapi spec via ts-node src/scripts/export-openapi.ts
 npm run openapi:completeness # are all mounted routes registered in lib/openapi.ts? (#474; CI gates it)
+npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
 npm run db:seed          # recreate default user ranks after a DB reset; then go to /install
@@ -450,6 +451,35 @@ router.get(
 ### Typed errors
 
 Throw `new AppError(statusCode, 'message')` from modules; the global handler in `app.ts` catches it and sends `{ msg }` with the correct status.
+
+### Prisma constraint violations must be translated (#564)
+
+The global handler is `err.statusCode ?? 500` and maps **no** Prisma error code, so an unhandled constraint violation reports a client mistake as a server error. `npm run prisma:guard-coverage` gates `src/routes/`.
+
+Two arms, and the second is the one that gets missed:
+
+- **A** — `create` / `upsert` on a model owning an FK or a `@unique` → P2003 / P2002
+- **B** — `update` / `delete` addressed by id → **P2025 on ANY model**, constrained or not
+
+Catch and translate, per `routes/api/friends.ts:195`:
+
+```ts
+try {
+  created = await prisma.friendRelationship.create({ data });
+} catch (err) {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') throw new AppError(409, '...');
+    if (err.code === 'P2003') throw new AppError(404, '...');
+  }
+  throw err;
+}
+```
+
+**Status codes:** P2025 → `404`. P2002 → `409`. P2003 → `404` when the missing id came from the **path**, `400` when it came from the **body** (the route exists; the payload references something that does not).
+
+**A prior `findUnique` is not a guard.** It leaves a TOCTOU window — the row can vanish between the read and the write, which is the race the original report observed on `/bookmarks`. Read first only when the message must name _which_ id was wrong; P2003 does not say. The catch is still required.
+
+Adding a 404/409 to an operation is a **contract change**: it needs a `CHANGELOG` entry and moves an entry out of `noFailureModes` in `openapi-failure-coverage-baseline.json`.
 
 ### Soft delete
 
