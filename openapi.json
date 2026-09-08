@@ -39687,6 +39687,26 @@
               }
             }
           },
+          "404": {
+            "description": "Grant not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Grant is not in COMPLETED state — already reversed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
