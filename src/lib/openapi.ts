@@ -591,7 +591,12 @@ registry.registerPath({
         }
       }
     },
-    400: msgResponse('Already installed or validation error')
+    400: msgResponse(
+      'A user with that username or email already exists. A request-body ' +
+        'validation failure also answers 400, carrying an `errors` object ' +
+        'this schema does not show'
+    ),
+    409: msgResponse('Application already installed')
   }
 });
 
@@ -4803,7 +4808,8 @@ registry.registerPath({
     200: {
       description: 'Updated contribution',
       content: { 'application/json': { schema: Contribution } }
-    }
+    },
+    404: msgResponse('Contribution not found')
   }
 });
 
@@ -9629,11 +9635,24 @@ registry.registerPath({
       }
     }
   },
+  description:
+    'Grants download access and debits the ratio ledger, so most of what can ' +
+    'go wrong is accounting rather than addressing. Two conditions answer ' +
+    '400 beyond body validation, both `{ msg }`: the contribution has no ' +
+    'approved accounting size, and the caller has insufficient contributed ' +
+    'balance. A FREEPASS or NEUTRALPASS exemption skips the balance check ' +
+    'entirely. Repeating the call inside the idempotency window returns the ' +
+    'existing grant rather than charging twice.',
   responses: {
     200: {
       description: 'Download access granted',
       content: { 'application/json': { schema: grantResult } }
-    }
+    },
+    403: msgResponse(
+      'Cannot consume your own contribution, or download access is disabled'
+    ),
+    404: msgResponse('Contribution not found'),
+    409: msgResponse('Balance changed concurrently — retry')
   }
 });
 
