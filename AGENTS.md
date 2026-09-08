@@ -452,14 +452,18 @@ router.get(
 
 Throw `new AppError(statusCode, 'message')` from modules; the global handler in `app.ts` catches it and sends `{ msg }` with the correct status.
 
-### Prisma constraint violations must be translated (#564)
+### Translating Prisma constraint violations (#564)
 
-The global handler is `err.statusCode ?? 500` and maps **no** Prisma error code, so an unhandled constraint violation reports a client mistake as a server error. `npm run prisma:guard-coverage` gates `src/routes/`.
+The global handler is `err.statusCode ?? 500` and maps no Prisma error code.
+An unhandled constraint violation therefore reports a client mistake as a
+server error. `npm run prisma:guard-coverage` gates `src/routes/`.
 
 Two arms, and the second is the one that gets missed:
 
-- **A** — `create` / `upsert` on a model owning an FK or a `@unique` → P2003 / P2002
-- **B** — `update` / `delete` addressed by id → **P2025 on ANY model**, constrained or not
+- **A** — `create` / `upsert` on a model owning a foreign key (FK) or a
+  `@unique` → P2003 / P2002
+- **B** — `update` / `delete` addressed by id → P2025 on _every_ model,
+  constrained or not
 
 Catch and translate, per `routes/api/friends.ts:195`:
 
@@ -475,11 +479,27 @@ try {
 }
 ```
 
-**Status codes:** P2025 → `404`. P2002 → `409`. P2003 → `404` when the missing id came from the **path**, `400` when it came from the **body** (the route exists; the payload references something that does not).
+Status codes:
 
-**A prior `findUnique` is not a guard.** It leaves a TOCTOU window — the row can vanish between the read and the write, which is the race the original report observed on `/bookmarks`. Read first only when the message must name _which_ id was wrong; P2003 does not say. The catch is still required.
+- P2025 → `404`
+- P2002 → `409`
+- P2003 → `404` when the missing id came from the path
+- P2003 → `400` when it came from the body, since the route itself exists
 
-Adding a 404/409 to an operation is a **contract change**: it needs a `CHANGELOG` entry and moves an entry out of `noFailureModes` in `openapi-failure-coverage-baseline.json`.
+A prior `findUnique` does not replace the catch. It leaves a TOCTOU window:
+the row can vanish between the read and the write. That is the race the
+original report observed on `/bookmarks`.
+
+Read first when the message must name _which_ id was wrong, because P2003
+does not say. Keep the catch as well.
+
+The exception is a constrained id that cannot dangle, such as one taken from
+the session. Record those in `prisma-guard-coverage-baseline.json` under
+`internallyDerived`, with the reason.
+
+Adding a 404 or 409 to an operation is a contract change. It needs a
+`CHANGELOG` entry. It also moves an entry out of `noFailureModes` in
+`openapi-failure-coverage-baseline.json`.
 
 ### Soft delete
 
