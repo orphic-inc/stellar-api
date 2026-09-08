@@ -165,6 +165,13 @@ const writeBaseline = (sites: MutationSite[]): void => {
     .map((s) => s.key)
     .sort();
   const existing = loadBaseline();
+  // Filter BEFORE reporting: a site recorded as internally derived is not
+  // unreviewed, and logging the pre-filter total contradicts what the very next
+  // check prints. This series is about numbers being re-derivable, so its own
+  // tooling should not publish two.
+  const stillUnreviewed = unreviewed.filter(
+    (k) => !(k in existing.internallyDerived)
+  );
   const body = {
     $comment:
       'Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, ' +
@@ -175,10 +182,13 @@ const writeBaseline = (sites: MutationSite[]): void => {
       'window. Regenerate with: npm run prisma:guard-coverage -- --write',
     generated: new Date().toISOString().slice(0, 10),
     internallyDerived: existing.internallyDerived,
-    unreviewed: unreviewed.filter((k) => !(k in existing.internallyDerived))
+    unreviewed: stillUnreviewed
   };
   writeFileSync(BASELINE, `${JSON.stringify(body, null, 2)}\n`);
-  console.log(`Baseline written: ${unreviewed.length} unreviewed`);
+  console.log(
+    `Baseline written: ${stillUnreviewed.length} unreviewed, ` +
+      `${Object.keys(existing.internallyDerived).length} internally derived`
+  );
 };
 
 const main = (): void => {

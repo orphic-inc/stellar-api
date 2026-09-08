@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../lib/errors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -127,7 +129,21 @@ router.delete(
     });
     if (!existing)
       return res.status(404).json({ msg: 'Featured album not found' });
-    await prisma.featuredAlbum.delete({ where: { id: albumId } });
+    try {
+      await prisma.featuredAlbum.delete({ where: { id: albumId } });
+    } catch (err) {
+      // The findUnique above answers the common case with a clear message.
+      // This closes the window between that read and this write: #564 treats a
+      // prior read as insufficient on its own, because the row can go in
+      // between and P2025 would then 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Featured album not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -141,13 +157,29 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { title, body } = parsedBody<AnnouncementInput>(res);
-    const news = await prisma.news.update({
-      where: { id },
-      data: {
-        ...(title && { title: sanitizePlain(title) }),
-        ...(body && { body: sanitizePlain(body) })
+    let news;
+    try {
+      news = await prisma.news.update({
+        where: { id },
+        data: {
+          ...(title && { title: sanitizePlain(title) }),
+          ...(body && { body: sanitizePlain(body) })
+        }
+      });
+    } catch (err) {
+      // P2025: the row is gone. Prisma raises it for a missing row on ANY
+      // model, and `News` carries neither a foreign key nor a unique
+      // constraint — which is why the constraint-only reading of #564
+      // classified this as safe. The contract has always declared this 404;
+      // until now it could not fire.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Announcement not found');
       }
-    });
+      throw err;
+    }
     res.json(news);
   })
 );
@@ -159,7 +191,22 @@ router.delete(
   validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    await prisma.news.delete({ where: { id } });
+    try {
+      await prisma.news.delete({ where: { id } });
+    } catch (err) {
+      // P2025: the row is gone. Prisma raises it for a missing row on ANY
+      // model, and `News` carries neither a foreign key nor a unique
+      // constraint — which is why the constraint-only reading of #564
+      // classified this as safe. The contract has always declared this 404;
+      // until now it could not fire.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Announcement not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -190,7 +237,19 @@ router.delete(
   validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    await prisma.blog.delete({ where: { id } });
+    try {
+      await prisma.blog.delete({ where: { id } });
+    } catch (err) {
+      // P2025 on a missing row (#564, arm B). `Blog` has no unique constraint
+      // and its only foreign key is the author, so nothing else can raise here.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Blog post not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -248,7 +307,18 @@ router.delete(
   validateParams(idParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    await prisma.globalNotice.delete({ where: { id } });
+    try {
+      await prisma.globalNotice.delete({ where: { id } });
+    } catch (err) {
+      // P2025 on a missing row (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Global notice not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );

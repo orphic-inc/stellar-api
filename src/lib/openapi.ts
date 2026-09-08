@@ -2428,7 +2428,7 @@ registry.registerPath({
       description: 'Updated news item',
       content: { 'application/json': { schema: Announcement } }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('No announcement with that id')
   }
 });
 
@@ -2441,7 +2441,7 @@ registry.registerPath({
     204: {
       description: 'Announcement deleted'
     },
-    404: msgResponse('Not found')
+    404: msgResponse('No announcement with that id')
   }
 });
 
@@ -2471,7 +2471,7 @@ registry.registerPath({
     204: {
       description: 'Blog post deleted'
     },
-    404: msgResponse('Not found')
+    404: msgResponse('No blog post with that id')
   }
 });
 
@@ -2525,7 +2525,7 @@ registry.registerPath({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     204: { description: 'Notice deleted' },
-    404: msgResponse('Not found')
+    404: msgResponse('No global notice with that id')
   }
 });
 
