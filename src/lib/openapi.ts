@@ -6643,7 +6643,9 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    204: { description: 'Resolved' }
+    204: { description: 'Resolved' },
+    404: msgResponse("No such ticket, or it is not the caller's"),
+    422: msgResponse('Ticket already resolved')
   }
 });
 
@@ -6653,7 +6655,9 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    204: { description: 'Unresolved' }
+    204: { description: 'Unresolved' },
+    404: msgResponse('No such ticket'),
+    422: msgResponse('Ticket is not resolved')
   }
 });
 
@@ -6666,7 +6670,9 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: assignSchema } } }
   },
   responses: {
-    204: { description: 'Assigned' }
+    204: { description: 'Assigned' },
+    404: msgResponse('No such ticket, or no such assignee'),
+    422: msgResponse('The named assignee lacks staff_inbox_manage')
   }
 });
 
@@ -6731,7 +6737,8 @@ registry.registerPath({
   tags: ['StaffInbox'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    204: { description: 'Response deleted' }
+    204: { description: 'Response deleted' },
+    404: msgResponse('Response not found')
   }
 });
 

@@ -134,6 +134,20 @@ All notable changes to stellar-api are documented here.
 
   This completes #567. The failure-coverage axis now measures only what handlers answer, and the remaining burn-down no longer hand-writes a code the middleware declares for it.
 
+- **The `/staff-inbox` surface declares the failures its handlers answer** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the fourth burn-down slice, and the first taken after the validation `400` became derived. `openapi:failure-coverage` moves from **187 documented / 31 verified silent / 146 unreviewed** to **191 / 39 / 134**. Purely additive: `openapi.json` gains 70 lines and loses none.
+
+  **Only four of the twelve answer anything, and that ratio is the new normal.** `/bookmarks` and `/users` looked productive because thirteen of their twenty-nine operations answered a derivable `400`; now that [#568](https://github.com/orphic-inc/stellar-api/issues/568) declares it for all 299 validated routes, a slice sees only genuinely handler-thrown codes. Eight of these twelve therefore go to `noFailureModes` rather than gaining a registration.
+
+  **The three ticket-state transitions share one shape: `404` for the ticket, `422` for the state.** `POST /staff-inbox/tickets/{id}/resolve` answers `already_resolved`, `/unresolve` answers `not_resolved`, and `/assign` answers `assignee_not_staff` — each a 422 beside a 404, decided by `result.reason` in the route. That `422`-for-state convention was already documented on `POST /staff-inbox/tickets/{id}/reply` (`Ticket resolved`); these three were answering it undeclared.
+
+  **`resolve` masks a non-owner as `404`; `unresolve` has nothing to mask.** `resolveTicket` runs for any authenticated member and returns `not_found` when the caller is neither owner nor staff, so its description matches the reply route's — _"No such ticket, or it is not the caller's"_. `unresolveTicket` is behind `staff_inbox_manage` and reads no `userId`, so its `404` means only that no such ticket exists. The two are deliberately not worded alike.
+
+  **`assign`'s `404` has three sources and one description.** The ticket may not exist, `assignedUsername` may name nobody (`{ msg: 'User not found' }`, raised in the route), or `assignedUserId` may name nobody (`assignee_not_found`, raised in the module). _"No such ticket, or no such assignee"_ covers all three; splitting them would need a code the route does not send.
+
+  **The eight silent ones are reads and unconditional writes.** `GET /staff-inbox/queue`, `/queue/count`, `/responses`, `/tickets` and `/tickets/count` are a `count` or a `findMany` with no `throw` on any path. `POST /staff-inbox/bulk-resolve` never returns `ok: false` — ids matching nothing simply resolve zero tickets. `POST /staff-inbox/tickets` and `POST /staff-inbox/responses` are bare `create` calls whose only foreign key is the authenticated caller, and `StaffInboxResponse.name` carries no unique constraint, so neither can hit the `?? 500` unique-violation class filed as [#564](https://github.com/orphic-inc/stellar-api/issues/564).
+
+  **The `404` on `PUT /staff-inbox/responses/{id}` still reads `Not found` and was left alone.** Its `DELETE` sibling, in scope here, declares the handler's actual `Response not found`. Rewording an operation already off this axis is out of a slice's scope, and the inconsistency is recorded rather than quietly fixed.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
