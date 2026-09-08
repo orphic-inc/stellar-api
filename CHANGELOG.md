@@ -53,6 +53,34 @@ All notable changes to stellar-api are documented here.
   The stellar-ui half is
   [ui#311](https://github.com/orphic-inc/stellar-ui/issues/311).
 
+### Fixed
+
+- **`showMatureContent` was unreachable from the settings UI it was built for**
+  ([#400](https://github.com/orphic-inc/stellar-api/issues/400)) — #400 added the
+  field to `userSettingsSchema` and taught `updateProfile` to write it, but not
+  to `profileUpdateSchema`. `validate()` assigns the **parsed** body (`req.body =
+data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
+  `showMatureContent` answered `200` having written nothing — and the settings UI
+  submits through that door, not `PUT /api/users/settings`. The control was inert
+  before any UI existed to expose it.
+
+  **A silent strip has no failing surface**, so the fix ships with one:
+  `schemas/settingsParity.spec.ts` asserts every `userSettingsSchema` field is
+  writable through `/profile/me` too, and that the profile door's only extra
+  fields are the four `Profile` columns. It fails on the pre-fix schema, which
+  was verified rather than assumed.
+
+  `lib/bbcode/bbcode.spec.ts` now also pins the gated notice as an **exact**
+  string rather than a `toContain`. stellar-ui injects a settings link into that
+  markup keyed on its class ([ui#311](https://github.com/orphic-inc/stellar-ui/issues/311)),
+  and the API deliberately embeds no UI route of its own, so the two ends are
+  coupled through this markup and nothing else. A `toContain` would let the
+  wrapper, class or copy drift while passing, and the ui failure is silent — the
+  transform stops matching and the notice renders as unlinked text.
+
+  Additive to the contract: one optional boolean on the `PUT /profile/me` request
+  body. No shape narrows and coupling stays at `0.9`.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

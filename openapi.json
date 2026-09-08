@@ -12002,6 +12002,9 @@
                   },
                   "showRatioStats": {
                     "type": "boolean"
+                  },
+                  "showMatureContent": {
+                    "type": "boolean"
                   }
                 }
               }

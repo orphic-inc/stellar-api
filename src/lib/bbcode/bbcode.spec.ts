@@ -358,6 +358,26 @@ describe('bbcode — the [mature] viewer gate', () => {
     expect(html).not.toContain('<details');
   });
 
+  it('emits the notice VERBATIM — stellar-ui pattern-matches this markup', async () => {
+    // Pinned as an exact string, not a `toContain`, because ui#311 transforms it:
+    // stellar-ui injects an <a> into this element to link the member at their own
+    // settings, keyed on the class. The API deliberately embeds no route of its
+    // own (it does not own ui's routing), so the two ends are coupled through
+    // this markup and nothing else.
+    //
+    // Change either half and BOTH tests must change together. A `toContain` would
+    // have let the wrapper, the class or the copy drift while still passing, and
+    // the ui failure mode is silent: the transform simply stops matching and the
+    // notice renders as unlinked text.
+    const html = await renderBBCode(
+      `[mature]${SECRET}[/mature]`,
+      ctxFor(false)
+    );
+    expect(html).toBe(
+      '<div class="bbcode-mature-hidden">Mature content hidden.</div>'
+    );
+  });
+
   it("discards the author's summary, which can itself be the gated content", async () => {
     // The payload lives entirely in the tag argument. Passing the summary through
     // would defeat the gate for exactly the content most likely to need it.
