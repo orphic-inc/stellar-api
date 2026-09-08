@@ -1,5 +1,7 @@
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { AppError } from '../../../lib/errors';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
@@ -60,11 +62,25 @@ router.post(
         .json({ msg: 'Insufficient class to read this forum' });
     }
 
-    const record = await prisma.forumLastReadTopic.upsert({
-      where: { userId_forumTopicId: { userId, forumTopicId } },
-      create: { userId, forumTopicId, forumPostId },
-      update: { forumPostId }
-    });
+    let record;
+    try {
+      record = await prisma.forumLastReadTopic.upsert({
+        where: { userId_forumTopicId: { userId, forumTopicId } },
+        create: { userId, forumTopicId, forumPostId },
+        update: { forumPostId }
+      });
+    } catch (err) {
+      // Both foreign keys come from the BODY, so 400 rather than 404: the route
+      // exists and the payload is what names something absent. The read above
+      // validates the post, not the topic id (#564).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new AppError(400, 'Forum topic or post not found');
+      }
+      throw err;
+    }
     res.json(record);
   })
 );

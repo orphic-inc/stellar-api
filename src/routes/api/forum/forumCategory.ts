@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { AppError } from '../../../lib/errors';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import {
@@ -120,10 +122,24 @@ router.put(
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     const { name, sort } = parsedBody<UpdateForumCategoryInput>(res);
-    const category = await prisma.forumCategory.update({
-      where: { id },
-      data: { name, ...(sort !== undefined && { sort }) }
-    });
+    let category;
+    try {
+      category = await prisma.forumCategory.update({
+        where: { id },
+        data: { name, ...(sort !== undefined && { sort }) }
+      });
+    } catch (err) {
+      // ForumCategory carries no foreign key and no unique constraint, so P2025
+      // on a vanished row is the only code reachable here (#564, arm B). The
+      // findUnique above covers the ordinary case; this covers the window.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Category not found');
+      }
+      throw err;
+    }
     res.json(category);
   })
 );
@@ -137,7 +153,17 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
-    await prisma.forumCategory.delete({ where: { id } });
+    try {
+      await prisma.forumCategory.delete({ where: { id } });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Category not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );

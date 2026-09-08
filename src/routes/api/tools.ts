@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../lib/errors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -346,17 +347,31 @@ router.delete(
       });
     }
 
-    await prisma.$transaction([
-      prisma.userRank.delete({ where: { id } }),
-      prisma.auditLog.create({
-        data: {
-          actorId: req.user.id,
-          action: 'rank.delete',
-          targetType: 'UserRank',
-          targetId: id
-        }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.userRank.delete({ where: { id } }),
+        prisma.auditLog.create({
+          data: {
+            actorId: req.user.id,
+            action: 'rank.delete',
+            targetType: 'UserRank',
+            targetId: id
+          }
+        })
+      ]);
+    } catch (err) {
+      // The counts above are dependency checks, not an existence check — the
+      // rank itself is never read. P2025 on a missing row was reaching the
+      // global handler as a 500 (#564, arm B). The audit write in the same
+      // transaction takes actorId from the session and cannot dangle.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Rank not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -581,17 +596,29 @@ router.delete(
       return res.status(404).json({ msg: 'Promotion rule not found' });
     }
 
-    await prisma.$transaction([
-      prisma.rankPromotionRule.delete({ where: { id } }),
-      prisma.auditLog.create({
-        data: {
-          actorId: req.user.id,
-          action: 'promotionRule.delete',
-          targetType: 'RankPromotionRule',
-          targetId: id
-        }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.rankPromotionRule.delete({ where: { id } }),
+        prisma.auditLog.create({
+          data: {
+            actorId: req.user.id,
+            action: 'promotionRule.delete',
+            targetType: 'RankPromotionRule',
+            targetId: id
+          }
+        })
+      ]);
+    } catch (err) {
+      // The findUnique above covers the ordinary case; this covers its removal
+      // in between, where P2025 would otherwise 500 (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Promotion rule not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );
@@ -729,17 +756,29 @@ router.delete(
       });
     }
 
-    await prisma.$transaction([
-      prisma.staffGroup.delete({ where: { id } }),
-      prisma.auditLog.create({
-        data: {
-          actorId: req.user.id,
-          action: 'staffGroup.delete',
-          targetType: 'StaffGroup',
-          targetId: id
-        }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.staffGroup.delete({ where: { id } }),
+        prisma.auditLog.create({
+          data: {
+            actorId: req.user.id,
+            action: 'staffGroup.delete',
+            targetType: 'StaffGroup',
+            targetId: id
+          }
+        })
+      ]);
+    } catch (err) {
+      // The findUnique above covers the ordinary case; this covers its removal
+      // in between, where P2025 would otherwise 500 (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Staff group not found');
+      }
+      throw err;
+    }
     res.status(204).send();
   })
 );

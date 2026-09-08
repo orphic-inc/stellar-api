@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -1194,5 +1195,123 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/session', () => {
       expect.any(Object),
       { showMature: false }
     );
+  });
+});
+
+// ─── #564: constraint violations must not answer 500 ─────────────────────────
+//
+// Five sites on this surface, against a queue entry of three — and a DIFFERENT
+// three: the queue named POST /forums, topic-notes and polls, where the checker
+// finds the two category writes, the forum update and the last-read upsert.
+describe('forums — constraint handling (#564)', () => {
+  const prismaErr = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('boom', {
+      code,
+      clientVersion: 'test'
+    });
+
+  beforeEach(() => {
+    resetApiTestState();
+    setCurrentUserPermissions({ forums_manage: true });
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+  });
+
+  describe('a PATH id that names nothing answers 404', () => {
+    it('PUT /forums/:id', async () => {
+      // The prior read must be mocked, or this 404s before reaching the guard
+      // and passes for the wrong reason — which it did until the negative test
+      // below caught it.
+      prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 1 }));
+      prismaMock.forum.update.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app)
+        .put('/api/forums/999999')
+        .send({ name: 'x' });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Forum not found' });
+    });
+
+    it('PUT /forums/categories/:id', async () => {
+      prismaMock.forumCategory.findUnique.mockResolvedValue({ id: 1 } as never);
+      prismaMock.forumCategory.update.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app)
+        .put('/api/forums/categories/1')
+        .send({ name: 'x' });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Category not found' });
+    });
+
+    it('DELETE /forums/categories/:id', async () => {
+      prismaMock.forumCategory.findUnique.mockResolvedValue({ id: 1 } as never);
+      prismaMock.forumCategory.delete.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app).delete('/api/forums/categories/1');
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Category not found' });
+    });
+
+    it('DELETE /forums/topic-notes/:id closes the read-write race', async () => {
+      prismaMock.forumTopicNote.findUnique.mockResolvedValue(
+        makeForumTopicNote({ id: 77, authorId: 7 })
+      );
+      prismaMock.forumTopicNote.delete.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app).delete('/api/forums/topic-notes/77');
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Note not found' });
+    });
+  });
+
+  describe('a BODY id that names nothing answers 400', () => {
+    it('POST /forums — forumCategoryId comes from the payload', async () => {
+      prismaMock.forum.create.mockRejectedValue(prismaErr('P2003'));
+
+      const res = await request(app).post('/api/forums').send({
+        forumCategoryId: 999999,
+        sort: 2,
+        name: 'New Forum',
+        minClassRead: 0,
+        minClassWrite: 0,
+        minClassCreate: 0
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ msg: 'Forum category not found' });
+    });
+
+    it('POST /forums/last-read — both ids come from the payload', async () => {
+      // The prior read validates the POST id and its topic together, so it does
+      // catch most bad pairs — but it is a read, and #564 treats a read alone as
+      // insufficient. Mock it as succeeding so the guard is actually exercised.
+      prismaMock.forumPost.findFirst.mockResolvedValue({
+        id: 3,
+        forumTopicId: 2,
+        forumTopic: { forumId: 1, forum: { minClassRead: 0 } }
+      } as never);
+      prismaMock.forumLastReadTopic.upsert.mockRejectedValue(
+        prismaErr('P2003')
+      );
+
+      const res = await request(app)
+        .post('/api/forums/last-read')
+        .send({ forumTopicId: 2, forumPostId: 3 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ msg: 'Forum topic or post not found' });
+    });
+  });
+
+  it('still propagates an error that is not a constraint violation', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 1 }));
+    prismaMock.forum.update.mockRejectedValue(new Error('connection lost'));
+
+    const res = await request(app).put('/api/forums/1').send({ name: 'x' });
+
+    expect(res.status).toBe(500);
   });
 });

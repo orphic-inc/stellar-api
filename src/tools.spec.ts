@@ -611,3 +611,68 @@ describe('DELETE /api/tools/promotion-rules/:id', () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ─── #564 arm B: the three deletes ───────────────────────────────────────────
+//
+// Each sits in a $transaction alongside its audit write, so the guard covers
+// both. DELETE /user-ranks/{id} is the notable one: it DOES read first, but
+// only to count dependants — the rank itself is never read, so a "does this
+// handler read anything?" heuristic clears it wrongly.
+describe('tools deletes — missing rows answer 404 (#564)', () => {
+  const p2025 = () =>
+    new Prisma.PrismaClientKnownRequestError('missing', {
+      code: 'P2025',
+      clientVersion: 'test'
+    });
+
+  beforeEach(() => {
+    setCurrentUserPermissions({
+      rank_permissions_manage: true,
+      staff_groups_manage: true
+    });
+  });
+
+  it('DELETE /tools/user-ranks/:id', async () => {
+    prismaMock.user.count.mockResolvedValue(0 as never);
+    prismaMock.userSecondaryRank.count.mockResolvedValue(0 as never);
+    prismaMock.$transaction.mockRejectedValue(p2025());
+
+    const res = await request(app).delete('/api/tools/user-ranks/999999');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Rank not found' });
+  });
+
+  it('DELETE /tools/promotion-rules/:id', async () => {
+    prismaMock.rankPromotionRule.findUnique.mockResolvedValue({
+      id: 1
+    } as never);
+    prismaMock.$transaction.mockRejectedValue(p2025());
+
+    const res = await request(app).delete('/api/tools/promotion-rules/1');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Promotion rule not found' });
+  });
+
+  it('DELETE /tools/staff-groups/:id', async () => {
+    prismaMock.staffGroup.findUnique.mockResolvedValue({ id: 1 } as never);
+    prismaMock.userRank.count.mockResolvedValue(0 as never);
+    prismaMock.$transaction.mockRejectedValue(p2025());
+
+    const res = await request(app).delete('/api/tools/staff-groups/1');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Staff group not found' });
+  });
+
+  it('still propagates an error that is not P2025', async () => {
+    prismaMock.user.count.mockResolvedValue(0 as never);
+    prismaMock.userSecondaryRank.count.mockResolvedValue(0 as never);
+    prismaMock.$transaction.mockRejectedValue(new Error('connection lost'));
+
+    const res = await request(app).delete('/api/tools/user-ranks/1');
+
+    expect(res.status).toBe(500);
+  });
+});

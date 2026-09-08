@@ -118,8 +118,6 @@
     "POST /announcements/global-notice",
     "POST /artists",
     "POST /artists/alias",
-    "POST /artists/similar",
-    "POST /artists/tag",
     "POST /asset",
     "POST /auth/logout",
     "POST /auth/password",

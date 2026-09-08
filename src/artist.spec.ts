@@ -1,4 +1,4 @@
-import { RegistrationStatus } from '@prisma/client';
+import { Prisma, RegistrationStatus } from '@prisma/client';
 import {
   request,
   app,
@@ -7,7 +7,8 @@ import {
   makeUserRank,
   createArtistMock,
   updateArtistMock,
-  revertArtistFromHistoryMock
+  revertArtistFromHistoryMock,
+  setCurrentUserPermissions
 } from './test/apiTestHarness';
 import { communityRoleUnion } from './modules/communityAccess';
 
@@ -593,5 +594,141 @@ describe('DELETE /api/artists/:id', () => {
   it('returns 400 for a non-numeric id', async () => {
     const res = await request(app).delete('/api/artists/abc');
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── #564: constraint violations must not answer 500 ─────────────────────────
+//
+// Six sites on this surface, against a queue entry of three. The three the
+// issue named are here; so are the vanity-house update, the subscribe upsert
+// and the soft delete, none of which it listed.
+const prismaErr = (code: string) =>
+  new Prisma.PrismaClientKnownRequestError('boom', {
+    code,
+    clientVersion: 'test'
+  });
+
+describe('artists — constraint handling (#564)', () => {
+  beforeEach(() => {
+    setCurrentUserPermissions({
+      news_manage: true,
+      communities_manage: true,
+      admin: true
+    });
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true, communities_manage: true, admin: true })
+    );
+  });
+
+  describe('a PATH id that names nothing answers 404', () => {
+    it('PUT /artists/:id/vanity-house', async () => {
+      prismaMock.artist.findUnique.mockResolvedValue({ id: 1 } as never);
+      prismaMock.artist.update.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app)
+        .put('/api/artists/1/vanity-house')
+        .send({ vanityHouse: true });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Artist not found' });
+    });
+
+    it('POST /artists/:id/subscribe', async () => {
+      prismaMock.artist.findUnique.mockResolvedValue({ id: 1 } as never);
+      prismaMock.artistSubscription.upsert.mockRejectedValue(
+        prismaErr('P2003')
+      );
+
+      const res = await request(app).post('/api/artists/1/subscribe');
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Artist not found' });
+    });
+
+    it('DELETE /artists/:id', async () => {
+      prismaMock.artist.findUnique.mockResolvedValue({
+        id: 1,
+        name: 'x'
+      } as never);
+      prismaMock.artist.update.mockRejectedValue(prismaErr('P2025'));
+
+      const res = await request(app).delete('/api/artists/1');
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: 'Artist not found' });
+    });
+  });
+
+  describe('a BODY id that names nothing answers 400', () => {
+    // 400 rather than 404: the route exists, and the payload is what refers to
+    // something absent. P2003 does not say WHICH foreign key failed, so each
+    // message names both candidates rather than guessing.
+    it('POST /artists/similar', async () => {
+      prismaMock.similarArtist.upsert.mockRejectedValue(prismaErr('P2003'));
+
+      const res = await request(app)
+        .post('/api/artists/similar')
+        .send({ artistId: 1, similarArtistId: 999999 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ msg: 'Artist or similar artist not found' });
+    });
+
+    it('POST /artists/alias', async () => {
+      prismaMock.artistAlias.create.mockRejectedValue(prismaErr('P2003'));
+
+      const res = await request(app)
+        .post('/api/artists/alias')
+        .send({ artistId: 1, redirectId: 999999 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ msg: 'Artist or redirect target not found' });
+    });
+
+    it('POST /artists/tag', async () => {
+      prismaMock.artistTag.upsert.mockRejectedValue(prismaErr('P2003'));
+
+      const res = await request(app)
+        .post('/api/artists/tag')
+        .send({ artistId: 1, tagId: 999999 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ msg: 'Artist or tag not found' });
+    });
+  });
+
+  describe('a lost unique race answers 409', () => {
+    // Unlike the /bookmarks toggle, these are not idempotent: the tag upsert
+    // increments a vote, so a lost race silently under-counts. 409 tells the
+    // caller to retry rather than reporting a success that did not happen.
+    it('POST /artists/similar', async () => {
+      prismaMock.similarArtist.upsert.mockRejectedValue(prismaErr('P2002'));
+
+      const res = await request(app)
+        .post('/api/artists/similar')
+        .send({ artistId: 1, similarArtistId: 2 });
+
+      expect(res.status).toBe(409);
+    });
+
+    it('POST /artists/tag', async () => {
+      prismaMock.artistTag.upsert.mockRejectedValue(prismaErr('P2002'));
+
+      const res = await request(app)
+        .post('/api/artists/tag')
+        .send({ artistId: 1, tagId: 2 });
+
+      expect(res.status).toBe(409);
+    });
+  });
+
+  it('still propagates an error that is not a constraint violation', async () => {
+    prismaMock.artistTag.upsert.mockRejectedValue(new Error('connection lost'));
+
+    const res = await request(app)
+      .post('/api/artists/tag')
+      .send({ artistId: 1, tagId: 2 });
+
+    expect(res.status).toBe(500);
   });
 });
