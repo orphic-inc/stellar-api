@@ -6297,7 +6297,8 @@ registry.registerPath({
     201: {
       description: 'Draft created',
       content: { 'application/json': { schema: PmDraft } }
-    }
+    },
+    404: msgResponse('No user with that username')
   }
 });
 
@@ -6410,7 +6411,14 @@ registry.registerPath({
       description: 'Conversation created',
       content: { 'application/json': { schema: PrivateConversation } }
     },
-    400: msgResponse('Validation error')
+    400: msgResponse(
+      'Cannot message yourself. A request-body validation failure also ' +
+        'answers 400, carrying an `errors` object this schema does not show'
+    ),
+    404: msgResponse('No such recipient'),
+    422: msgResponse(
+      'Recipient is disabled, or has private messages turned off'
+    )
   }
 });
 
@@ -6456,7 +6464,11 @@ registry.registerPath({
     }
   },
   responses: {
-    204: { description: 'Flags updated' }
+    204: { description: 'Flags updated' },
+    404: msgResponse(
+      "No such conversation, or it is not the caller's, or the caller has " +
+        'already deleted it from both boxes'
+    )
   }
 });
 
@@ -6466,7 +6478,8 @@ registry.registerPath({
   tags: ['Messages'],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    204: { description: 'Conversation soft-deleted' }
+    204: { description: 'Conversation soft-deleted' },
+    404: msgResponse("No such conversation, or it is not the caller's")
   }
 });
 
