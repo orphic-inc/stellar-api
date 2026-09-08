@@ -146,3 +146,57 @@ describe('removeConsumedReleaseBookmarks', () => {
     expect(count).toBe(1);
   });
 });
+
+// ─── #564: the error codes the handler translates ────────────────────────────
+//
+// The route-level tests mock these errors, so they would pass even if Prisma
+// raised something else — the mock asserts the translation, not the trigger.
+// These pin the trigger against a real database, which is the half a mock
+// cannot cover.
+describe('bookmark constraint behaviour (#564)', () => {
+  it('raises P2003 when the artistId names no artist', async () => {
+    const user = await createUser('fk');
+
+    await expect(
+      testPrisma.bookmarkArtist.create({
+        data: { userId: user.id, artistId: 2_000_000_000 }
+      })
+    ).rejects.toMatchObject({ code: 'P2003' });
+  });
+
+  it('raises P2002 when the same pair is bookmarked twice', async () => {
+    const user = await createUser('uniq');
+    const artist = await testPrisma.artist.create({
+      data: { name: `a-${Date.now()}` }
+    });
+    await testPrisma.bookmarkArtist.create({
+      data: { userId: user.id, artistId: artist.id }
+    });
+
+    await expect(
+      testPrisma.bookmarkArtist.create({
+        data: { userId: user.id, artistId: artist.id }
+      })
+    ).rejects.toMatchObject({ code: 'P2002' });
+  });
+
+  it('delete raises P2025 on a missing row, while deleteMany no-ops', async () => {
+    // This is why the toggle's remove arm uses deleteMany: `delete` throwing
+    // here is the concurrent-un-bookmark race the original report described.
+    const user = await createUser('p2025');
+
+    await expect(
+      testPrisma.bookmarkArtist.delete({
+        where: {
+          userId_artistId: { userId: user.id, artistId: 2_000_000_000 }
+        }
+      })
+    ).rejects.toMatchObject({ code: 'P2025' });
+
+    await expect(
+      testPrisma.bookmarkArtist.deleteMany({
+        where: { userId: user.id, artistId: 2_000_000_000 }
+      })
+    ).resolves.toEqual({ count: 0 });
+  });
+});

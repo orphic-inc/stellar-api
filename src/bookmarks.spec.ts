@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -48,13 +49,14 @@ describe('POST /api/bookmarks/artists/:artistId', () => {
       artistId: 5,
       createdAt: new Date()
     } as never);
-    prismaMock.bookmarkArtist.delete.mockResolvedValue({} as never);
+    prismaMock.bookmarkArtist.deleteMany.mockResolvedValue({} as never);
 
     const res = await request(app).post('/api/bookmarks/artists/5');
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ bookmarked: false });
-    expect(prismaMock.bookmarkArtist.delete).toHaveBeenCalled();
+    // deleteMany, not delete: see the arm-B case below.
+    expect(prismaMock.bookmarkArtist.deleteMany).toHaveBeenCalled();
   });
 
   it('rejects non-numeric artistId with 400', async () => {
@@ -266,3 +268,81 @@ describe('DELETE /api/bookmarks/requests/:requestId', () => {
     });
   });
 });
+
+// ─── #564: a well-formed request must not answer 500 ─────────────────────────
+//
+// Parametrised across all four segments on purpose. The guard is hand-written
+// four times, because extracting it into a helper would put the `try` outside
+// the handler where the lexical guard-coverage checker cannot see it. Four
+// copies means four chances to mistype one, so each is asserted rather than
+// one being taken as representative.
+const prismaError = (code: string) =>
+  new Prisma.PrismaClientKnownRequestError('boom', {
+    code,
+    clientVersion: 'test'
+  });
+
+describe.each([
+  ['artists', 'artistId', 'bookmarkArtist', 'Artist'],
+  ['releases', 'releaseId', 'bookmarkRelease', 'Release'],
+  ['communities', 'communityId', 'bookmarkCommunity', 'Community'],
+  ['requests', 'requestId', 'bookmarkRequest', 'Request']
+] as const)(
+  'POST /api/bookmarks/%s/:id — constraint handling (#564)',
+  (segment, _param, model, label) => {
+    const mock = () =>
+      prismaMock[model as keyof typeof prismaMock] as never as {
+        findUnique: jest.Mock;
+        create: jest.Mock;
+        deleteMany: jest.Mock;
+      };
+
+    it('answers 404, not 500, when the path id names nothing', async () => {
+      // Arm A: a foreign-key violation carries no statusCode, so before #564
+      // this surfaced as a 500 and was logged as an unhandled error.
+      mock().findUnique.mockResolvedValue(null);
+      mock().create.mockRejectedValue(prismaError('P2003'));
+
+      const res = await request(app).post(`/api/bookmarks/${segment}/999999`);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ msg: `${label} not found` });
+    });
+
+    it('reports the resulting state when a concurrent POST wins the race', async () => {
+      // The caller asked to bookmark and the bookmark exists, so a toggle
+      // reports what is true now rather than a conflict.
+      mock().findUnique.mockResolvedValue(null);
+      mock().create.mockRejectedValue(prismaError('P2002'));
+
+      const res = await request(app).post(`/api/bookmarks/${segment}/5`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ bookmarked: true });
+    });
+
+    it('removes with deleteMany, so a concurrent un-bookmark cannot 500', async () => {
+      // Arm B: `delete` throws P2025 when the row went away between the read
+      // and the write. deleteMany no-ops instead.
+      mock().findUnique.mockResolvedValue({ userId: 7 } as never);
+      mock().deleteMany.mockResolvedValue({ count: 0 } as never);
+
+      const res = await request(app).post(`/api/bookmarks/${segment}/5`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ bookmarked: false });
+      expect(mock().deleteMany).toHaveBeenCalled();
+    });
+
+    it('still propagates an error that is not a constraint violation', async () => {
+      // The catch translates two codes and rethrows everything else; a guard
+      // that swallowed the rest would hide real faults behind a 404.
+      mock().findUnique.mockResolvedValue(null);
+      mock().create.mockRejectedValue(new Error('connection lost'));
+
+      const res = await request(app).post(`/api/bookmarks/${segment}/5`);
+
+      expect(res.status).toBe(500);
+    });
+  }
+);

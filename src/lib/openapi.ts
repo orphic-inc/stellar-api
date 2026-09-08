@@ -9292,11 +9292,21 @@ const requestBookmark = z.object({
  * The `get` has no param to validate and answers nothing beyond its gate, so it
  * sits in `noFailureModes` rather than declaring a code it cannot emit.
  *
- * NOT declared, because the handlers do not answer it: a `post` naming a
- * well-formed but nonexistent id hits a foreign-key violation, which carries no
- * `statusCode` and so surfaces as a **500** (#564). Declaring a 404 here would
- * document an intent rather than the behaviour, and this axis records what the
- * handler answers today.
+ * The `404` on `post` is new (#564). It used to be absent, and this comment used
+ * to explain why: a `post` naming a well-formed but nonexistent id hit a
+ * foreign-key violation, which carries no `statusCode` and so surfaced as a
+ * **500**. The handler now translates P2003, so the code is declarable — the
+ * declaration follows the behaviour rather than documenting an intent.
+ *
+ * `delete` still declares no `404`, and that is not an oversight: it uses
+ * `deleteMany`, which no-ops on zero rows and answers `204` whether or not a
+ * bookmark was there. The `post` toggle's remove arm uses `deleteMany` for the
+ * same reason.
+ *
+ * No `409` either. A concurrent `post` losing the unique race answers `200`
+ * with the resulting state, because the caller asked to bookmark and the
+ * bookmark exists — a toggle reports what is true now, not that someone else
+ * got there first.
  */
 const registerBookmark = (
   segment: string,
@@ -9323,7 +9333,8 @@ const registerBookmark = (
       200: {
         description: 'Toggled bookmark',
         content: { 'application/json': { schema: bookmarkToggle } }
-      }
+      },
+      404: { description: `No ${segment.replace(/s$/, '')} with that id` }
     }
   });
   registry.registerPath({

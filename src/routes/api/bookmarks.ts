@@ -1,6 +1,8 @@
 import express from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../lib/errors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validateParams, parsedParams } from '../../middleware/validate';
@@ -50,14 +52,31 @@ router.post(
       where: { userId_artistId: { userId: req.user.id, artistId } }
     });
     if (existing) {
-      await prisma.bookmarkArtist.delete({
-        where: { userId_artistId: { userId: req.user.id, artistId } }
+      // deleteMany, not delete: a concurrent un-bookmark between the read above
+      // and this write makes `delete` throw P2025, which carries no statusCode
+      // and so 500s. deleteMany no-ops on zero rows (#564, arm B).
+      await prisma.bookmarkArtist.deleteMany({
+        where: { userId: req.user.id, artistId }
       });
       return res.json({ bookmarked: false });
     }
-    await prisma.bookmarkArtist.create({
-      data: { userId: req.user.id, artistId }
-    });
+    try {
+      await prisma.bookmarkArtist.create({
+        data: { userId: req.user.id, artistId }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The path id names nothing. A foreign-key violation here is a CLIENT
+        // mistake, and answering 500 both misreports it and logs it as an
+        // unhandled error (#564, arm A).
+        if (err.code === 'P2003') throw new AppError(404, 'Artist not found');
+        // A concurrent POST created the row first. Its intent was to bookmark
+        // and the bookmark now exists, so report the resulting state rather
+        // than a conflict — this endpoint answers "what is the state now?".
+        if (err.code === 'P2002') return res.json({ bookmarked: true });
+      }
+      throw err;
+    }
     res.json({ bookmarked: true });
   })
 );
@@ -114,14 +133,31 @@ router.post(
       where: { userId_releaseId: { userId: req.user.id, releaseId } }
     });
     if (existing) {
-      await prisma.bookmarkRelease.delete({
-        where: { userId_releaseId: { userId: req.user.id, releaseId } }
+      // deleteMany, not delete: a concurrent un-bookmark between the read above
+      // and this write makes `delete` throw P2025, which carries no statusCode
+      // and so 500s. deleteMany no-ops on zero rows (#564, arm B).
+      await prisma.bookmarkRelease.deleteMany({
+        where: { userId: req.user.id, releaseId }
       });
       return res.json({ bookmarked: false });
     }
-    await prisma.bookmarkRelease.create({
-      data: { userId: req.user.id, releaseId }
-    });
+    try {
+      await prisma.bookmarkRelease.create({
+        data: { userId: req.user.id, releaseId }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The path id names nothing. A foreign-key violation here is a CLIENT
+        // mistake, and answering 500 both misreports it and logs it as an
+        // unhandled error (#564, arm A).
+        if (err.code === 'P2003') throw new AppError(404, 'Release not found');
+        // A concurrent POST created the row first. Its intent was to bookmark
+        // and the bookmark now exists, so report the resulting state rather
+        // than a conflict — this endpoint answers "what is the state now?".
+        if (err.code === 'P2002') return res.json({ bookmarked: true });
+      }
+      throw err;
+    }
     res.json({ bookmarked: true });
   })
 );
@@ -175,14 +211,32 @@ router.post(
       where: { userId_communityId: { userId: req.user.id, communityId } }
     });
     if (existing) {
-      await prisma.bookmarkCommunity.delete({
-        where: { userId_communityId: { userId: req.user.id, communityId } }
+      // deleteMany, not delete: a concurrent un-bookmark between the read above
+      // and this write makes `delete` throw P2025, which carries no statusCode
+      // and so 500s. deleteMany no-ops on zero rows (#564, arm B).
+      await prisma.bookmarkCommunity.deleteMany({
+        where: { userId: req.user.id, communityId }
       });
       return res.json({ bookmarked: false });
     }
-    await prisma.bookmarkCommunity.create({
-      data: { userId: req.user.id, communityId }
-    });
+    try {
+      await prisma.bookmarkCommunity.create({
+        data: { userId: req.user.id, communityId }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The path id names nothing. A foreign-key violation here is a CLIENT
+        // mistake, and answering 500 both misreports it and logs it as an
+        // unhandled error (#564, arm A).
+        if (err.code === 'P2003')
+          throw new AppError(404, 'Community not found');
+        // A concurrent POST created the row first. Its intent was to bookmark
+        // and the bookmark now exists, so report the resulting state rather
+        // than a conflict — this endpoint answers "what is the state now?".
+        if (err.code === 'P2002') return res.json({ bookmarked: true });
+      }
+      throw err;
+    }
     res.json({ bookmarked: true });
   })
 );
@@ -225,14 +279,31 @@ router.post(
       where: { userId_requestId: { userId: req.user.id, requestId } }
     });
     if (existing) {
-      await prisma.bookmarkRequest.delete({
-        where: { userId_requestId: { userId: req.user.id, requestId } }
+      // deleteMany, not delete: a concurrent un-bookmark between the read above
+      // and this write makes `delete` throw P2025, which carries no statusCode
+      // and so 500s. deleteMany no-ops on zero rows (#564, arm B).
+      await prisma.bookmarkRequest.deleteMany({
+        where: { userId: req.user.id, requestId }
       });
       return res.json({ bookmarked: false });
     }
-    await prisma.bookmarkRequest.create({
-      data: { userId: req.user.id, requestId }
-    });
+    try {
+      await prisma.bookmarkRequest.create({
+        data: { userId: req.user.id, requestId }
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // The path id names nothing. A foreign-key violation here is a CLIENT
+        // mistake, and answering 500 both misreports it and logs it as an
+        // unhandled error (#564, arm A).
+        if (err.code === 'P2003') throw new AppError(404, 'Request not found');
+        // A concurrent POST created the row first. Its intent was to bookmark
+        // and the bookmark now exists, so report the resulting state rather
+        // than a conflict — this endpoint answers "what is the state now?".
+        if (err.code === 'P2002') return res.json({ bookmarked: true });
+      }
+      throw err;
+    }
     res.json({ bookmarked: true });
   })
 );
