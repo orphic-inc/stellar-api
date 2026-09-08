@@ -9692,7 +9692,9 @@ registry.registerPath({
           schema: z.object({ grantId: z.number(), status: z.string() })
         }
       }
-    }
+    },
+    404: msgResponse('Grant not found'),
+    409: msgResponse('Grant is not in COMPLETED state — already reversed')
   }
 });
 
