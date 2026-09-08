@@ -190,6 +190,18 @@ All notable changes to stellar-api are documented here.
 
   **`POST /auth/register` sends `201` and the contract says `200`** — found in the same read, recorded on [#575](https://github.com/orphic-inc/stellar-api/issues/575) rather than corrected here. The handler is right and the contract is wrong, so fixing it is a contract correction rather than an API change, but it removes a declared response instead of adding one and sits outside this axis.
 
+- **The `/stats` surface is verified silent, all eight operations** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — the ninth burn-down slice, and the second after `/artists` to register nothing. `openapi:failure-coverage` moves from **202 documented / 68 verified silent / 94 unreviewed** to **202 / 76 / 86**. `openapi.json` does not change at all.
+
+  **It is a pure read surface.** Seven `GET`s are a `count`, a `groupBy` or a `findMany` with no `throw` on any path, and the one write — `POST /stats/snapshot` — is an idempotent `upsert` keyed on the hour bucket, so triggering it twice in an hour is a no-op rather than a conflict.
+
+  **No route on the surface validates anything**, which is unusual enough to state: not one of the eight mounts `validate`, `validateQuery` or `validateParams`, so none carries even a derived `400`. The derived axes contribute only 401, 403 and 429 here, and this axis's answer is therefore the whole of what the contract can say about failure.
+
+  **The one `AppError(403)` in the module belongs to a different surface, and grepping would have mis-attributed it.** `statsHistory.ts` throws `AppError(403, 'Stats are private')` — but from `getUserStatHistory`, which only a `/users` route calls. `GET /stats/history` calls `getSiteStatHistory`, a bare `findMany` with no throw. Reading the call graph rather than the file is what separates them.
+
+  **`getSettings()` cannot fail on a missing settings row**, which is what `GET /stats` and `POST /stats/snapshot` would otherwise depend on: it is an `upsert` against `DEFAULTS` on `id: 1`, so it self-heals rather than throwing.
+
+  **A data point for [#515](https://github.com/orphic-inc/stellar-api/issues/515):** `GET /stats/site-info` is the surface's only `requireAdminOnly()` mount, and it derives byte-identically to the five `requirePermission('admin')` siblings — same `401`, same `403 Missing admin`. From the contract's side the two helpers are already indistinguishable.
+
 ### Fixed
 
 - **A gate's stamp could reach back into the authorization check it describes** ([#517](https://github.com/orphic-inc/stellar-api/issues/517)) — `requirePermission` passes the very array its closure evaluates on every request (`permissions.some((p) => hasPermission(perms, p))`), and `markGate` stored that reference as metadata. Anything holding the stamp could have mutated a live permission check.
