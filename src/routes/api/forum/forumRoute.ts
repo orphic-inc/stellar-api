@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { AppError } from '../../../lib/errors';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { deleteForum } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
@@ -134,19 +136,32 @@ router.post(
       autoLockWeeks
     } = parsedBody<CreateForumInput>(res);
 
-    const forum = await prisma.forum.create({
-      data: {
-        forumCategoryId,
-        sort,
-        name,
-        description: description ?? '',
-        minClassRead,
-        minClassWrite,
-        minClassCreate,
-        autoLock,
-        autoLockWeeks
+    let forum;
+    try {
+      forum = await prisma.forum.create({
+        data: {
+          forumCategoryId,
+          sort,
+          name,
+          description: description ?? '',
+          minClassRead,
+          minClassWrite,
+          minClassCreate,
+          autoLock,
+          autoLockWeeks
+        }
+      });
+    } catch (err) {
+      // `forumCategoryId` comes from the BODY, so 400 rather than 404: the route
+      // exists and the payload names a category that does not (#564, arm A).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new AppError(400, 'Forum category not found');
       }
-    });
+      throw err;
+    }
     res.status(201).json(forum);
   })
 );
@@ -172,19 +187,32 @@ router.put(
       autoLock,
       autoLockWeeks
     } = parsedBody<UpdateForumInput>(res);
-    const forum = await prisma.forum.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(description !== undefined && { description }),
-        ...(sort !== undefined && { sort }),
-        ...(minClassRead !== undefined && { minClassRead }),
-        ...(minClassWrite !== undefined && { minClassWrite }),
-        ...(minClassCreate !== undefined && { minClassCreate }),
-        ...(autoLock !== undefined && { autoLock }),
-        ...(autoLockWeeks !== undefined && { autoLockWeeks })
+    let forum;
+    try {
+      forum = await prisma.forum.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(sort !== undefined && { sort }),
+          ...(minClassRead !== undefined && { minClassRead }),
+          ...(minClassWrite !== undefined && { minClassWrite }),
+          ...(minClassCreate !== undefined && { minClassCreate }),
+          ...(autoLock !== undefined && { autoLock }),
+          ...(autoLockWeeks !== undefined && { autoLockWeeks })
+        }
+      });
+    } catch (err) {
+      // Addressed by a PATH id with no prior read, so P2025 was reaching the
+      // global handler as a 500 (#564, arm B).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AppError(404, 'Forum not found');
       }
-    });
+      throw err;
+    }
     res.json(forum);
   })
 );

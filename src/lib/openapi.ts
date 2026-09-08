@@ -5647,7 +5647,8 @@ registry.registerPath({
       content: {
         'application/json': { schema: SimilarArtist }
       }
-    }
+    },
+    409: msgResponse('That similarity is already recorded')
   }
 });
 
@@ -5681,7 +5682,8 @@ registry.registerPath({
       content: {
         'application/json': { schema: ArtistTag }
       }
-    }
+    },
+    409: msgResponse('Tag vote already being recorded, retry')
   }
 });
 

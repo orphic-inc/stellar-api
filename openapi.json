@@ -24260,6 +24260,16 @@
               }
             }
           },
+          "409": {
+            "description": "That similarity is already recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -24410,6 +24420,16 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Tag vote already being recorded, retry",
             "content": {
               "application/json": {
                 "schema": {

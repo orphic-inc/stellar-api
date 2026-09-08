@@ -192,6 +192,40 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   filtering out `internallyDerived` and so printed a total the next run
   contradicted.
 
+- **`/artists`, `/forums` and `/tools`: 19 constraint violations that answered
+  500** ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — one pass
+  over three surfaces the issue's queue put at **8** between them. The checker
+  finds **19**, and on `/forums` a _different_ three from the ones the queue
+  named: it listed `POST /forums`, `topic-notes` and `polls`, where the real set
+  is the two category writes, the forum update and the last-read upsert.
+
+  **Sixteen sites gained a guard.** Path ids answer `404`
+  (`PUT /artists/{id}/vanity-house`, `POST /artists/{id}/subscribe`,
+  `DELETE /artists/{id}`, `PUT /forums/{id}`, both `/forums/categories/{id}`
+  writes, `DELETE /forums/topic-notes/{id}`, and all three `/tools` deletes).
+  Body ids answer `400`, because the route exists and the payload is what names
+  something absent (`POST /artists/similar`, `/artists/alias`, `/artists/tag`,
+  `POST /forums`, `POST /forums/last-read`).
+
+  **P2003 does not say which foreign key failed**, so where two body ids are in
+  play the message names both rather than guessing — `Artist or tag not found`,
+  `Artist or redirect target not found`.
+
+  **Three sites are recorded as internally derived rather than guarded.** The
+  audit writes in the `/tools` deletes take `actorId` from the session, and
+  `POST /forums/{id}/catchup` upserts against topic ids it read moments earlier
+  in the same request. No client-supplied id reaches a constrained column, and
+  #564 is about a well-formed request naming something absent.
+
+  **Thirteen of the fifteen affected operations already declared the code they
+  could not emit**, the same shape as `/announcements`. Only `POST /artists/similar`
+  and `POST /artists/tag` gain a declaration — a `409` for a lost upsert race,
+  which unlike the `/bookmarks` toggle is not idempotent: the tag upsert
+  increments a vote, so a swallowed race would silently under-count.
+
+  Guard coverage: **101 → 82 unreviewed**, 18 → 36 guarded, 2 → 3 internally
+  derived. Failure coverage: 214 → 216 declaring, 150 → 148 verified silent.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added
