@@ -15,6 +15,7 @@ import {
   type ReputationHistoryPeriodQuery
 } from '../../schemas/statsHistory';
 import { getPolicyState } from '../../modules/ratioPolicy';
+import { resolveViewer } from '../../modules/bbcodeRender';
 import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../lib/audit';
 import {
@@ -45,7 +46,11 @@ router.get(
   '/me',
   requireAuth,
   authHandler(async (req, res) => {
-    const user = await getProfileById(req.user.id, req.user.id);
+    const user = await getProfileById(
+      req.user.id,
+      req.user.id,
+      await resolveViewer(req)
+    );
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
   })
@@ -75,7 +80,11 @@ router.get(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const { userId } = req.params;
-    const user = await getProfileByLookup(userId, req.user!.id);
+    const user = await getProfileByLookup(
+      userId,
+      req.user!.id,
+      await resolveViewer(req)
+    );
 
     if (!user) return res.status(404).json({ msg: 'Profile not found' });
     res.json(user);
@@ -132,7 +141,11 @@ router.put(
   validate(profileUpdateSchema),
   authHandler(async (req, res) => {
     const data = parsedBody<ProfileUpdateInput>(res);
-    const updated = await updateProfile(req.user.id, data);
+    const updated = await updateProfile(
+      req.user.id,
+      data,
+      await resolveViewer(req)
+    );
     if (!updated) return res.status(404).json({ msg: 'User not found' });
     await audit(prisma, req.user.id, 'profile.update', 'User', req.user.id, {
       fields: Object.keys(data).sort()

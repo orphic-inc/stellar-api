@@ -44,7 +44,11 @@ describe('updateProfile — profileInfo storage (#402)', () => {
     });
     prismaMock.user.findUnique.mockResolvedValue(null); // getProfileById → null
 
-    await updateProfile(1, { profileInfo: '[b]hello[/b]' });
+    await updateProfile(
+      1,
+      { profileInfo: '[b]hello[/b]' },
+      { showMature: true }
+    );
 
     expect(prismaMock.profile.update).toHaveBeenCalledWith({
       where: { id: 42 },
@@ -59,7 +63,7 @@ describe('updateProfile — profileInfo storage (#402)', () => {
     });
     prismaMock.user.findUnique.mockResolvedValue(null);
 
-    await updateProfile(1, { profileInfo: '' });
+    await updateProfile(1, { profileInfo: '' }, { showMature: true });
 
     expect(prismaMock.profile.update).toHaveBeenCalledWith({
       where: { id: 42 },
@@ -74,7 +78,7 @@ describe('updateProfile — profileInfo storage (#402)', () => {
     });
     prismaMock.user.findUnique.mockResolvedValue(null);
 
-    await updateProfile(1, { profileTitle: 'hi' });
+    await updateProfile(1, { profileTitle: 'hi' }, { showMature: true });
 
     expect(prismaMock.profile.update).toHaveBeenCalledWith({
       where: { id: 42 },

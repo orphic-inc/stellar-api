@@ -194,9 +194,31 @@ function emitElement(
       return `<details class="bbcode-hide"><summary>${summary}</summary>${inner()}</details>`;
     }
     case 'mature': {
-      // Phase 1: no viewer gate yet (#400) — a collapsed disclosure, content still
-      // present. When `ctx.viewer.showMature` lands this branch omits the content
-      // server-side when off, and the render becomes viewer-dependent (cache dim).
+      // The viewer gate (#400). When the setting is off the content is omitted from
+      // this render entirely -- `inner()` is never called, so nothing from inside the
+      // tag reaches the output.
+      //
+      // The author's `arg` is discarded too, and that is the point rather than an
+      // oversight: `[mature=graphic description of the injuries]` puts the gated
+      // payload in the LABEL, so passing the summary through would defeat the gate
+      // for exactly the content most likely to need it. The replacement is a fixed,
+      // server-owned string.
+      //
+      // It is not a <details>: there is nothing to disclose, and a disclosure that
+      // opens to nothing is worse than a plain notice. No settings URL is embedded --
+      // rendered HTML ships to stellar-ui, which owns its own routes; ui#311 turns
+      // this class into a link.
+      //
+      // <div>, not <p>: `p` is absent from sanitizeConfig's ALLOWED_TAGS, so DOMPurify
+      // would strip the wrapper and keep only its text -- taking the class ui#311
+      // needs with it, and leaving a bare sentence with nothing to style.
+      //
+      // This omits content from `bodyHtml` only. Every prose response also carries the
+      // raw `body` so the editor round-trips (#402), so this is a display PREFERENCE,
+      // not an access control. See #400.
+      if (!ctx.viewer.showMature) {
+        return '<div class="bbcode-mature-hidden">Mature content hidden.</div>';
+      }
       const summary = escapeText((arg ?? 'Mature content').trim());
       return `<details class="bbcode-mature"><summary>${summary}</summary>${inner()}</details>`;
     }

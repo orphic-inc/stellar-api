@@ -53,6 +53,7 @@ export const updateUserSettings = async (
     showContributedStats?: boolean;
     showConsumedStats?: boolean;
     showRatioStats?: boolean;
+    showMatureContent?: boolean;
   }
 ) => {
   const user = await prisma.user.findUnique({
@@ -90,6 +91,9 @@ export const updateUserSettings = async (
         }),
         ...(data.showRatioStats !== undefined && {
           showRatioStats: data.showRatioStats
+        }),
+        ...(data.showMatureContent !== undefined && {
+          showMatureContent: data.showMatureContent
         })
       }
     }),

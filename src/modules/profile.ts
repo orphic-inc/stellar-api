@@ -11,7 +11,7 @@ import { sanitizePlain } from '../lib/sanitize';
 // Profile info is stored as raw BBCode and transcribed at read time via the
 // shared render-at-read seam — the API is the single source of transcription
 // (#398/#402).
-import { renderSiteBBCode } from './bbcodeRender';
+import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
 import { computeRatio } from './ratio';
@@ -51,6 +51,7 @@ type UserSettingsView = {
   showContributedStats: boolean;
   showConsumedStats: boolean;
   showRatioStats: boolean;
+  showMatureContent: boolean;
 };
 
 type InviteTreeNode = {
@@ -240,7 +241,8 @@ const PROFILE_BASE_SELECT = {
       showLastSeen: true,
       showContributedStats: true,
       showConsumedStats: true,
-      showRatioStats: true
+      showRatioStats: true,
+      showMatureContent: true
     }
   }
 } as const;
@@ -890,7 +892,8 @@ export const buildCommunityStats = (
 const buildProfileView = async (
   user: ProfileUserRecord,
   viewer: ViewerContext,
-  includeInviteTree: boolean
+  includeInviteTree: boolean,
+  bbViewer: BBViewer
 ) => {
   const settings = user.userSettings as UserSettingsView;
   const rawProfile = user.profile ?? {
@@ -904,7 +907,7 @@ const buildProfileView = async (
   // source) and attach the transcribed, sanitized `profileInfoHtml` (#398/#402).
   const profile = {
     ...rawProfile,
-    profileInfoHtml: await renderSiteBBCode(rawProfile.profileInfo)
+    profileInfoHtml: await renderSiteBBCode(rawProfile.profileInfo, bbViewer)
   };
   const canSeeEmail = viewer.isOwner || viewer.isStaff || settings.showEmail;
   const canSeeLastSeen =
@@ -1032,7 +1035,8 @@ const buildProfileView = async (
           showLastSeen: settings.showLastSeen,
           showContributedStats: settings.showContributedStats,
           showConsumedStats: settings.showConsumedStats,
-          showRatioStats: settings.showRatioStats
+          showRatioStats: settings.showRatioStats,
+          showMatureContent: settings.showMatureContent
         }
       : undefined,
     activitySummary,
@@ -1052,7 +1056,8 @@ const buildProfileView = async (
 
 export const getProfileById = async (
   targetUserId: number,
-  viewerUserId?: number
+  viewerUserId: number | undefined,
+  bbViewer: BBViewer
 ) => {
   const viewer = await loadViewerContext(targetUserId, viewerUserId);
   const user = await prisma.user.findUnique({
@@ -1060,12 +1065,18 @@ export const getProfileById = async (
     select: PROFILE_BASE_SELECT
   });
   if (!user) return null;
-  return buildProfileView(user, viewer, viewer.isOwner || viewer.isStaff);
+  return buildProfileView(
+    user,
+    viewer,
+    viewer.isOwner || viewer.isStaff,
+    bbViewer
+  );
 };
 
 export const getProfileByLookup = async (
   userIdOrUsername: string,
-  viewerUserId?: number
+  viewerUserId: number | undefined,
+  bbViewer: BBViewer
 ) => {
   const trimmedLookup = userIdOrUsername.trim();
   const numericId = Number(trimmedLookup);
@@ -1095,12 +1106,20 @@ export const getProfileByLookup = async (
 
   if (!user) return null;
   const viewer = await loadViewerContext(user.id, viewerUserId);
-  return buildProfileView(user, viewer, viewer.isOwner || viewer.isStaff);
+  return buildProfileView(
+    user,
+    viewer,
+    viewer.isOwner || viewer.isStaff,
+    bbViewer
+  );
 };
 
 // Paranoia is the single privacy control. Each level hides progressively more:
 //   0 = fully visible; 1 = hide email + last-seen; 2 = also hide contributed/
 //   consumed stats; 3 = also hide ratio/buffer.
+// NOTE: showMatureContent is deliberately NOT here (#400). Paranoia governs what
+// OTHERS can see of you; the mature gate governs what YOU see. Raising paranoia
+// must not silently change a member's own content preferences.
 const paranoiaToVisibility = (level: number) => ({
   showEmail: level < 1,
   showLastSeen: level < 1,
@@ -1127,7 +1146,9 @@ export const updateProfile = async (
     showContributedStats?: boolean;
     showConsumedStats?: boolean;
     showRatioStats?: boolean;
-  }
+    showMatureContent?: boolean;
+  },
+  bbViewer: BBViewer
 ) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -1221,6 +1242,9 @@ export const updateProfile = async (
         ...(data.showRatioStats !== undefined && {
           showRatioStats: data.showRatioStats
         }),
+        ...(data.showMatureContent !== undefined && {
+          showMatureContent: data.showMatureContent
+        }),
         ...(data.paranoia !== undefined && {
           paranoia: data.paranoia,
           ...paranoiaToVisibility(data.paranoia)
@@ -1229,7 +1253,7 @@ export const updateProfile = async (
     })
   ]);
 
-  return getProfileById(userId, userId);
+  return getProfileById(userId, userId, bbViewer);
 };
 
 type CreateInviteResult =

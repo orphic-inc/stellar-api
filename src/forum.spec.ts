@@ -1131,7 +1131,8 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/session', () => {
       9,
       44,
       expect.objectContaining({ actorId: 7 }),
-      expect.objectContaining({ page: 1 })
+      expect.objectContaining({ page: 1 }),
+      { showMature: false }
     );
     expect(res.body.forum.name).toBe('Open Forum');
     expect(res.body.topic.title).toBe('Test Topic');
@@ -1170,7 +1171,8 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/session', () => {
       9,
       44,
       expect.any(Object),
-      expect.objectContaining({ page: 3 })
+      expect.objectContaining({ page: 3 }),
+      { showMature: false }
     );
   });
 
@@ -1189,7 +1191,8 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/session', () => {
       9,
       44,
       expect.objectContaining({ canModerateForums: true }),
-      expect.any(Object)
+      expect.any(Object),
+      { showMature: false }
     );
   });
 });

@@ -401,6 +401,12 @@ model UserSettings {
   showContributedStats     Boolean            @default(true)
   showConsumedStats        Boolean            @default(true)
   showRatioStats           Boolean            @default(true)
+  // Whether [mature] BBCode renders its content for this viewer (#400).
+  // Defaults TRUE so members opt OUT: the gate ships before stellar-ui has a
+  // control (ui#311), and defaulting false would hide every [mature] block from
+  // everyone with no way to re-enable it. Read at render time, not by the auth
+  // middleware -- see modules/bbcodeRender.resolveViewer.
+  showMatureContent        Boolean            @default(true)
   user                     User?
   // The AuthorStylesheet adopted into this member's Site Stylesheet slot
   // (PRD-03 #119): what they see on the general site. Null = on the Site Theme

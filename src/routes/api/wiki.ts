@@ -20,7 +20,7 @@ import { sanitizePlain } from '../../lib/sanitize';
 // the single source of transcription (#398/#402). `withBodyHtml` attaches the
 // cached, sanitized `bodyHtml` alongside the raw `body` so the editor round-trips
 // the source and the view renders the HTML.
-import { withBodyHtml } from '../../modules/bbcodeRender';
+import { withBodyHtml, resolveViewer } from '../../modules/bbcodeRender';
 import { audit } from '../../lib/audit';
 import {
   createWikiPageSchema,
@@ -182,7 +182,7 @@ router.get(
         .status(403)
         .json({ msg: 'Insufficient rank to view this page' });
     }
-    res.json(await withBodyHtml(record.page));
+    res.json(await withBodyHtml(record.page, await resolveViewer(req)));
   })
 );
 
@@ -203,7 +203,7 @@ router.get(
         .status(403)
         .json({ msg: 'Insufficient rank to view this page' });
     }
-    res.json(await withBodyHtml(page));
+    res.json(await withBodyHtml(page, await resolveViewer(req)));
   })
 );
 

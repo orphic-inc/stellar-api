@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { getStaffList } from '../../modules/staff';
+import { resolveViewer } from '../../modules/bbcodeRender';
 
 const router = express.Router();
 
@@ -9,8 +10,8 @@ const router = express.Router();
 router.get(
   '/',
   requireAuth,
-  asyncHandler(async (_req: Request, res: Response) => {
-    res.json(await getStaffList());
+  asyncHandler(async (req: Request, res: Response) => {
+    res.json(await getStaffList(await resolveViewer(req)));
   })
 );
 

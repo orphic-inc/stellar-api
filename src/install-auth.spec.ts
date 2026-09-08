@@ -651,7 +651,8 @@ describe('API auth/profile/user flows', () => {
         showLastSeen: false,
         showContributedStats: true,
         showConsumedStats: true,
-        showRatioStats: true
+        showRatioStats: true,
+        showMatureContent: true
       },
       userRank: {
         id: 1,
@@ -713,10 +714,14 @@ describe('API auth/profile/user flows', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalledWith(7, {
-      profileTitle: 'New Title',
-      siteAppearance: 'dark'
-    });
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      {
+        profileTitle: 'New Title',
+        siteAppearance: 'dark'
+      },
+      { showMature: false }
+    );
     expect(res.body.profile.profileTitle).toBe('New Title');
   });
 
@@ -767,7 +772,8 @@ describe('API auth/profile/user flows', () => {
         showLastSeen: true,
         showContributedStats: true,
         showConsumedStats: true,
-        showRatioStats: true
+        showRatioStats: true,
+        showMatureContent: true
       },
       activitySummary: {
         contributions: 1,
@@ -804,7 +810,9 @@ describe('API auth/profile/user flows', () => {
     const res = await request(app).get('/api/profile/me');
 
     expect(res.status).toBe(200);
-    expect(getProfileByIdMock).toHaveBeenCalledWith(7, 7);
+    expect(getProfileByIdMock).toHaveBeenCalledWith(7, 7, {
+      showMature: false
+    });
     expect(res.body.stats.ratio).toBe('2.00');
   });
 
@@ -879,7 +887,9 @@ describe('API auth/profile/user flows', () => {
     const res = await request(app).get('/api/profile/user/target-user');
 
     expect(res.status).toBe(200);
-    expect(getProfileByLookupMock).toHaveBeenCalledWith('target-user', 7);
+    expect(getProfileByLookupMock).toHaveBeenCalledWith('target-user', 7, {
+      showMature: false
+    });
     expect(res.body.email).toBeNull();
   });
 
@@ -913,6 +923,7 @@ describe('API auth/profile/user flows', () => {
       showContributedStats: true,
       showConsumedStats: true,
       showRatioStats: true,
+      showMatureContent: true,
       activeAuthorStylesheetId: null,
       ircNick: 'stargazer'
     });
@@ -939,6 +950,7 @@ describe('API auth/profile/user flows', () => {
       showContributedStats: false,
       showConsumedStats: false,
       showRatioStats: false,
+      showMatureContent: true,
       activeAuthorStylesheetId: null
     });
 
@@ -952,7 +964,8 @@ describe('API auth/profile/user flows', () => {
       showLastSeen: true,
       showContributedStats: false,
       showConsumedStats: false,
-      showRatioStats: false
+      showRatioStats: false,
+      showMatureContent: true
     });
 
     expect(res.status).toBe(200);
@@ -966,7 +979,8 @@ describe('API auth/profile/user flows', () => {
       showLastSeen: true,
       showContributedStats: false,
       showConsumedStats: false,
-      showRatioStats: false
+      showRatioStats: false,
+      showMatureContent: true
     });
     expect(res.body.avatar).toBe('https://example.com/avatar.png');
   });

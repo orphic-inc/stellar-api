@@ -39,6 +39,7 @@ import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 import forumPostRouter from './forumPost';
 import { assertForumReadAccess } from '../../../modules/forumAccess';
+import { resolveViewer } from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
 const forumIdParamsSchema = z.object({
@@ -129,7 +130,13 @@ router.get(
     const pg = parsedPage(res);
     const actor = await buildActor(req, res);
 
-    const session = await getTopicSession(forumId, topicId, actor, pg);
+    const session = await getTopicSession(
+      forumId,
+      topicId,
+      actor,
+      pg,
+      await resolveViewer(req)
+    );
     res.json(session);
   })
 );

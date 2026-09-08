@@ -249,10 +249,18 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
       source: 'a {}'
     });
 
-    await updateProfile(member.id, {
-      externalStylesheet: 'https://cdn.example.com/mine.css'
-    });
-    await updateProfile(member.id, { activeAuthorStylesheetId: sheet.id });
+    await updateProfile(
+      member.id,
+      {
+        externalStylesheet: 'https://cdn.example.com/mine.css'
+      },
+      { showMature: true }
+    );
+    await updateProfile(
+      member.id,
+      { activeAuthorStylesheetId: sheet.id },
+      { showMature: true }
+    );
 
     const settings = await testPrisma.user
       .findUniqueOrThrow({
@@ -272,10 +280,18 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
       source: 'a {}'
     });
 
-    await updateProfile(member.id, { activeAuthorStylesheetId: sheet.id });
-    await updateProfile(member.id, {
-      externalStylesheet: 'https://cdn.example.com/mine.css'
-    });
+    await updateProfile(
+      member.id,
+      { activeAuthorStylesheetId: sheet.id },
+      { showMature: true }
+    );
+    await updateProfile(
+      member.id,
+      {
+        externalStylesheet: 'https://cdn.example.com/mine.css'
+      },
+      { showMature: true }
+    );
 
     const settings = await testPrisma.user
       .findUniqueOrThrow({
@@ -298,17 +314,25 @@ describe('Site Stylesheet radio — Personal ⟷ Registry mutual exclusion (ADR-
     });
 
     await expect(
-      updateProfile(member.id, {
-        externalStylesheet: 'https://cdn.example.com/mine.css',
-        activeAuthorStylesheetId: sheet.id
-      })
+      updateProfile(
+        member.id,
+        {
+          externalStylesheet: 'https://cdn.example.com/mine.css',
+          activeAuthorStylesheetId: sheet.id
+        },
+        { showMature: true }
+      )
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('rejects a pointer at a non-existent sheet (400) — clean, not a raw FK 500', async () => {
     const member = await createUser();
     await expect(
-      updateProfile(member.id, { activeAuthorStylesheetId: 999999 })
+      updateProfile(
+        member.id,
+        { activeAuthorStylesheetId: 999999 },
+        { showMature: true }
+      )
     ).rejects.toBeInstanceOf(AppError);
   });
 });
