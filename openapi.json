@@ -8342,6 +8342,8 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Public self-registration",
+        "description": "Ungated — no session, no permission — so the 403 here is the handler speaking, not middleware: it is the site's registration policy refusing, and every branch of it concerns the invite. The 400 is the submission itself being unusable. A request-body validation failure also answers 400, carrying an `errors` object this schema does not show.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8371,7 +8373,17 @@
             }
           },
           "400": {
-            "description": "User already exists",
+            "description": "Username or email already taken, the password is on the denylist, or the address is not accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Registration is closed, or the invite key is missing, invalid, already used, or issued for a different email address",
             "content": {
               "application/json": {
                 "schema": {

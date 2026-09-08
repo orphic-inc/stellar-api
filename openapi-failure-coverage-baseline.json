@@ -8,8 +8,6 @@
     "GET /announcements",
     "GET /announcements/album-of-month",
     "GET /announcements/global-notices",
-    "GET /auth",
-    "GET /auth/sessions",
     "GET /bad-passwords",
     "GET /collages",
     "GET /collages/deleted",
@@ -73,11 +71,6 @@
     "POST /announcements/blog",
     "POST /announcements/global-notice",
     "POST /asset",
-    "POST /auth/logout",
-    "POST /auth/password",
-    "POST /auth/recovery/request",
-    "POST /auth/recovery/reset",
-    "POST /auth/register",
     "POST /comments",
     "POST /communities/{communityId}/dnc",
     "POST /communities/{communityId}/releases",
@@ -101,7 +94,6 @@
     "POST /users",
     "POST /users/donor-ranks",
     "POST /users/irc-nick/verify",
-    "PUT /auth/email",
     "PUT /contributions/{id}/ratio-exempt",
     "PUT /settings"
   ],
@@ -117,6 +109,8 @@
     "GET /artists/vanity-house",
     "GET /artists/{id}/similar",
     "GET /artists/{id}/subscribe",
+    "GET /auth",
+    "GET /auth/sessions",
     "GET /bookmarks/artists",
     "GET /bookmarks/communities",
     "GET /bookmarks/releases",
@@ -155,6 +149,10 @@
     "POST /artists/alias",
     "POST /artists/similar",
     "POST /artists/tag",
+    "POST /auth/logout",
+    "POST /auth/password",
+    "POST /auth/recovery/request",
+    "POST /auth/recovery/reset",
     "POST /bookmarks/artists/{artistId}",
     "POST /bookmarks/communities/{communityId}",
     "POST /bookmarks/releases/{releaseId}",
@@ -166,6 +164,7 @@
     "POST /messages/mass",
     "POST /staff-inbox/bulk-resolve",
     "POST /staff-inbox/responses",
-    "POST /staff-inbox/tickets"
+    "POST /staff-inbox/tickets",
+    "PUT /auth/email"
   ]
 }

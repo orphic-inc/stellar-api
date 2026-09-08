@@ -195,9 +195,14 @@ describe('checkFailureCoverage', () => {
 
   describe('the blind spot, pinned deliberately', () => {
     it('does NOT flag a partially-described operation', () => {
-      // POST /auth/register declares 200/400 and answers 403 on three branches
-      // (src/routes/api/auth.ts:123-135). It declares SOMETHING, so it counts
-      // as covered here and the missing 403 goes unreported.
+      // The motivating case was POST /auth/register, which declared 200/400
+      // while answering 403 on four invite branches. It declared SOMETHING, so
+      // it counted as covered and the missing 403 went unreported.
+      //
+      // THAT INSTANCE IS CLOSED — the #517 burn-down read the handler and
+      // declared the 403, which is precisely how the blind spot is meant to be
+      // found. The fixture below stays synthetic so the property outlives the
+      // example: an operation declaring one code still hides the others.
       //
       // This is the accepted cost of keeping the codes in the registry alone
       // rather than duplicating them into the baseline, where they could drift.

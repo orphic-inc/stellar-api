@@ -334,6 +334,14 @@ registry.registerPath({
   method: 'post',
   path: '/auth/register',
   tags: ['Auth'],
+  summary: 'Public self-registration',
+  description:
+    'Ungated — no session, no permission — so the 403 here is the handler ' +
+    "speaking, not middleware: it is the site's registration policy " +
+    'refusing, and every branch of it concerns the invite. The 400 is the ' +
+    'submission itself being unusable. A request-body validation failure ' +
+    'also answers 400, carrying an `errors` object this schema does not ' +
+    'show.',
   request: {
     body: { content: { 'application/json': { schema: RegisterBody } } }
   },
@@ -346,7 +354,14 @@ registry.registerPath({
         }
       }
     },
-    400: msgResponse('User already exists')
+    400: msgResponse(
+      'Username or email already taken, the password is on the denylist, ' +
+        'or the address is not accepted'
+    ),
+    403: msgResponse(
+      'Registration is closed, or the invite key is missing, invalid, ' +
+        'already used, or issued for a different email address'
+    )
   }
 });
 
