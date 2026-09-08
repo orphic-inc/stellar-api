@@ -15367,6 +15367,7 @@
         "tags": [
           "Forums"
         ],
+        "description": "Categories the caller may read, each with its readable forums. `?all=true` skips both the class filter and the empty-category filter and is checked in the handler, not by a gate — hence the 403 no middleware declares.",
         "responses": {
           "200": {
             "description": "All categories with forums",
@@ -15383,6 +15384,16 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "?all=true without forums_manage, rank_permissions_manage or admin",
             "content": {
               "application/json": {
                 "schema": {
@@ -16292,6 +16303,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Insufficient class to read this forum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Forum not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16368,6 +16399,26 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient class to create topics in this forum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Forum not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -16892,6 +16943,26 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient class to read this forum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Forum not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -17503,6 +17574,26 @@
               }
             }
           },
+          "403": {
+            "description": "Not the topic author, and missing forums_moderate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such topic, or it is deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -17771,6 +17862,26 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient class to read this forum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such post in that topic, or either is deleted",
             "content": {
               "application/json": {
                 "schema": {

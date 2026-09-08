@@ -3142,13 +3142,21 @@ registry.registerPath({
   method: 'get',
   path: '/forums/categories',
   tags: ['Forums'],
+  description:
+    'Categories the caller may read, each with its readable forums. ' +
+    '`?all=true` skips both the class filter and the empty-category filter ' +
+    'and is checked in the handler, not by a gate — hence the 403 no ' +
+    'middleware declares.',
   responses: {
     200: {
       description: 'All categories with forums',
       content: {
         'application/json': { schema: z.array(ForumCategory) }
       }
-    }
+    },
+    403: msgResponse(
+      '?all=true without forums_manage, rank_permissions_manage or admin'
+    )
   }
 });
 
@@ -3322,7 +3330,9 @@ registry.registerPath({
     200: {
       description: 'Paginated topics',
       content: { 'application/json': { schema: PaginatedForumTopics } }
-    }
+    },
+    403: msgResponse('Insufficient class to read this forum'),
+    404: msgResponse('Forum not found')
   }
 });
 
@@ -3375,7 +3385,9 @@ registry.registerPath({
     201: {
       description: 'Topic created',
       content: { 'application/json': { schema: ForumTopic } }
-    }
+    },
+    403: msgResponse('Insufficient class to create topics in this forum'),
+    404: msgResponse('Forum not found')
   }
 });
 
@@ -3447,7 +3459,9 @@ registry.registerPath({
           })
         }
       }
-    }
+    },
+    403: msgResponse('Insufficient class to read this forum'),
+    404: msgResponse('Forum not found')
   }
 });
 
@@ -3580,7 +3594,9 @@ registry.registerPath({
     201: {
       description: 'Poll created',
       content: { 'application/json': { schema: ForumPoll } }
-    }
+    },
+    403: msgResponse('Not the topic author, and missing forums_moderate'),
+    404: msgResponse('No such topic, or it is deleted')
   }
 });
 
@@ -3639,7 +3655,9 @@ registry.registerPath({
     200: {
       description: 'Last-read marker saved',
       content: { 'application/json': { schema: ForumLastReadTopic } }
-    }
+    },
+    403: msgResponse('Insufficient class to read this forum'),
+    404: msgResponse('No such post in that topic, or either is deleted')
   }
 });
 
