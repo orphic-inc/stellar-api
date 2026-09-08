@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Stellar API",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "description": "REST API for the Stellar community tracker. All routes under `/api/*`. Authentication uses JWT cookies (`token` cookie set on login). Separately from any per-operation failure documented below, **every** endpoint can answer `403` with `{ msg: \"Access from this network is not permitted\" }` when the caller's IP is banned: that check runs before routing and applies even to endpoints needing no session."
   },
   "servers": [
