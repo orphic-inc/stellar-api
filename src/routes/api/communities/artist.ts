@@ -9,7 +9,8 @@ import { communityRoleUnion } from '../../../modules/communityAccess';
 import {
   createArtist,
   updateArtist,
-  revertArtistFromHistory
+  revertArtistFromHistory,
+  assertArtistLive
 } from '../../../modules/artist';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
@@ -132,6 +133,10 @@ router.get(
   validateParams(artistHistoryParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { artistId } = parsedParams<{ artistId: number }>(res);
+    // Each history row's `data` snapshot carries the artist's name, so a
+    // withdrawn artist is readable by name through this route (#573). It used
+    // to answer an empty 200 for a missing id as well; both now 404.
+    await assertArtistLive(artistId);
     const history = await prisma.artistHistory.findMany({
       where: { artistId },
       orderBy: { editedAt: 'desc' },
@@ -166,6 +171,17 @@ router.post(
   validate(similarArtistSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { artistId, similarArtistId } = parsedBody<SimilarArtistInput>(res);
+    // A soft-deleted artist keeps a live row, so the foreign key below is
+    // satisfied and this would record a similarity the read then filters out
+    // (#573) — a write reporting success with no possible effect. Same status
+    // and wording as the P2003 arm: both mean "a body id names no usable
+    // artist", and they must not diverge on which kind of unusable it was.
+    const bodyIdMissing: [number, string] = [
+      400,
+      'Artist or similar artist not found'
+    ];
+    await assertArtistLive(artistId, bodyIdMissing);
+    await assertArtistLive(similarArtistId, bodyIdMissing);
     let result;
     try {
       result = await prisma.similarArtist.upsert({
@@ -190,6 +206,14 @@ router.post(
   validate(artistAliasSchema),
   authHandler(async (req, res) => {
     const { artistId, redirectId } = parsedBody<ArtistAliasInput>(res);
+    // As on /similar: a withdrawn artist satisfies the foreign key, so without
+    // this the alias is created and then filtered out of every read (#573).
+    const bodyIdMissing: [number, string] = [
+      400,
+      'Artist or redirect target not found'
+    ];
+    await assertArtistLive(artistId, bodyIdMissing);
+    await assertArtistLive(redirectId, bodyIdMissing);
     let alias;
     try {
       alias = await prisma.artistAlias.create({
@@ -249,6 +273,10 @@ router.get(
   validateParams(artistIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
+    // POST on this same path already 404s for a missing or withdrawn artist.
+    // GET and DELETE answered an unconditional 200, so one resource had two
+    // answers depending on the verb (#573, closing the #575 /artists split).
+    await assertArtistLive(id);
     const sub = await prisma.artistSubscription.findUnique({
       where: { userId_artistId: { userId: req.user.id, artistId: id } }
     });
@@ -263,10 +291,7 @@ router.post(
   validateParams(artistIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const artist = await prisma.artist.findUnique({
-      where: { id, deletedAt: null }
-    });
-    if (!artist) return res.status(404).json({ msg: 'Artist not found' });
+    await assertArtistLive(id);
     try {
       await prisma.artistSubscription.upsert({
         where: { userId_artistId: { userId: req.user.id, artistId: id } },
@@ -288,6 +313,10 @@ router.delete(
   validateParams(artistIdParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
+    // Gates on the ARTIST, not on the subscription: unsubscribing stays
+    // idempotent, so a live artist you were never subscribed to still answers
+    // 200 `{ subscribed: false }` rather than 404.
+    await assertArtistLive(id);
     await prisma.artistSubscription.deleteMany({
       where: { userId: req.user.id, artistId: id }
     });
@@ -320,11 +349,18 @@ router.get(
       prisma.artist.findUnique({
         where: { id, deletedAt: null },
         include: {
+          // Both relations name another ARTIST, so both need the invariant
+          // applied to the target as well as to the row above (#573). The
+          // filter drops the join row rather than nulling its target: an alias
+          // pointing at a withdrawn artist, or a similarity to one, is not a
+          // fact worth rendering. `tags` is unaffected — a Tag, not an Artist.
           aliases: {
+            where: { redirect: { deletedAt: null } },
             include: { redirect: { select: { id: true, name: true } } }
           },
           tags: { include: { tag: true } },
           similarTo: {
+            where: { similarArtist: { deletedAt: null } },
             include: { similarArtist: { select: { id: true, name: true } } }
           },
           credits: {
@@ -367,8 +403,13 @@ router.get(
   validateParams(artistIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id: artistId } = parsedParams<{ id: number }>(res);
+    // Both directions leaked (#573). The parent was never checked at all, so a
+    // withdrawn artist's own similar list stayed readable; and the target was
+    // unfiltered, so a withdrawn artist appeared in a live one's list.
+    // Filtering the target alone fixes only the second.
+    await assertArtistLive(artistId);
     const similar = await prisma.similarArtist.findMany({
-      where: { artistId },
+      where: { artistId, similarArtist: { deletedAt: null } },
       include: { similarArtist: { select: { id: true, name: true } } },
       orderBy: { score: 'desc' }
     });

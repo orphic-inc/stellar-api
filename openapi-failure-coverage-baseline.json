@@ -3,7 +3,6 @@
   "generated": "2026-09-07",
   "unreviewed": [],
   "noFailureModes": [
-    "DELETE /artists/{id}/subscribe",
     "DELETE /bookmarks/artists/{artistId}",
     "DELETE /bookmarks/communities/{communityId}",
     "DELETE /bookmarks/releases/consumed",
@@ -15,10 +14,7 @@
     "GET /announcements/album-of-month",
     "GET /announcements/global-notices",
     "GET /artists",
-    "GET /artists/history/{artistId}",
     "GET /artists/vanity-house",
-    "GET /artists/{id}/similar",
-    "GET /artists/{id}/subscribe",
     "GET /auth",
     "GET /auth/sessions",
     "GET /bad-passwords",

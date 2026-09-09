@@ -377,6 +377,62 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   Description-only: one line of `openapi.json` moves, no operation, code or
   body shape changes.
 
+- **A withdrawn artist still surfaced by name through six reads**
+  ([#573](https://github.com/orphic-inc/stellar-api/issues/573)) — `DELETE
+/api/artists/{id}` is a soft delete, and the direct list, search, count and
+  detail reads all honoured it. The reads that reach an artist through a **join
+  row** did not, because the sweep that added `deletedAt: null` looked only at
+  handlers naming `prisma.artist`.
+
+  Fixed: the similar-artist list and the detail read's `similarTo` / `aliases`
+  includes now filter the target; `GET /artists/history/{artistId}` gains a
+  parent check, its `data` snapshots carrying the artist's name; and
+  `GET /bookmarks/artists` filters, having handed the member a name whose own
+  detail route answers **404** — a dead entry in their own list.
+
+  **Filtering the target alone would have fixed half of it.** `GET
+/artists/{id}/similar` never read the parent at all, so a withdrawn artist's
+  own similar list stayed served to anyone with the id. That direction needs the
+  parent check, not a filter.
+
+  **The writes had the mirror gap.** A soft-deleted artist keeps a live row, so
+  the foreign key is satisfied and `POST /artists/similar` and `POST
+/artists/alias` recorded links the reads then discard — a write reporting
+  success with no possible effect. Both now reject a withdrawn id with the same
+  **400** and wording their dangling-id arm already answers, since both mean "a
+  body id names no usable artist".
+
+- **`/artists` answered 404 on five operations and an empty 200 on four**
+  — closing the discrepancy recorded on
+  [#575](https://github.com/orphic-inc/stellar-api/issues/575). `GET` and
+  `DELETE /artists/{id}/subscribe` now **404** for a missing or withdrawn
+  artist, as `POST` on the same path already did: one resource had two answers
+  depending on the verb. Unsubscribing stays idempotent — the gate is on the
+  artist, so a live artist you were never subscribed to still answers `200
+{ subscribed: false }`.
+
+  Four operations gain a `404` (`GET /artists/{id}/similar`, `GET
+/artists/history/{artistId}`, `GET` and `DELETE /artists/{id}/subscribe`) and
+  leave `noFailureModes`. **None is reachable from stellar-ui today** — its
+  history, similar and subscription-status hooks are exported with no consumers,
+  and the unsubscribe mutation fires only from a page that already resolved the
+  artist.
+
+  Neither `POST` registers a new `400`: both already declare a derived one with
+  a `ValidationError` body, and registering a handler `400` would suppress it
+  under REGISTERED WINS — trading one inaccurate declaration for another. The
+  handler `400` those routes have always been able to send stays undeclared,
+  which is #575's standing entry rather than something this change introduces.
+
+- **The `Artist.deletedAt` doc comment now says which relations are exempt.**
+  It asserted the invariant without naming the relation reads, so a reader
+  checking "is `deletedAt` respected?" found five call sites that said yes. It
+  now splits explicitly: **filtered** covers anything presenting an artist as a
+  catalogue entry, relation reads included; **not filtered, deliberately**
+  covers release credits, contribution collaborators and the artists named on a
+  request — a citation of the artist as author of a work that still exists.
+  Blanking those is the harm the original exception was written to prevent.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

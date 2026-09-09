@@ -61,7 +61,11 @@ jest.mock('../modules/donor', () => ({
   updateDonorForumTitle: jest.fn()
 }));
 
+// `requireActual` so `assertArtistLive` runs for real against prismaMock — it
+// is the #573 guard itself, and a jest.fn() stub would make every test that
+// exercises it pass by never throwing.
 jest.mock('../modules/artist', () => ({
+  ...jest.requireActual('../modules/artist'),
   createArtist: jest.fn(),
   updateArtist: jest.fn(),
   revertArtistFromHistory: jest.fn()

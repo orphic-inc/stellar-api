@@ -33,6 +33,14 @@ const makeArtist = (overrides = {}) => ({
   ...overrides
 });
 
+// `assertArtistLive` (#573) reads artist.findUnique on every by-id route, so
+// the default is a LIVE artist and each withdrawn-artist test overrides it with
+// null. Without a default the guard would 404 every pre-existing test, which is
+// exactly what it did when first wired — nine failures, each named.
+beforeEach(() => {
+  prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+});
+
 // ─── GET /api/artists ─────────────────────────────────────────────────────────
 
 describe('GET /api/artists', () => {
@@ -728,6 +736,141 @@ describe('artists — constraint handling (#564)', () => {
     const res = await request(app)
       .post('/api/artists/tag')
       .send({ artistId: 1, tagId: 2 });
+
+    expect(res.status).toBe(500);
+  });
+});
+
+// ─── #573 — the relation half of the same invariant ──────────────────────────
+
+describe('withdrawn artists do not surface through relations (#573)', () => {
+  // #509 F3 above covers the DIRECT reads. These cover the reads that reach an
+  // artist through a join row, which that sweep missed. As above, they assert
+  // the QUERY: the mock returns whatever it is told, so only the where-clause
+  // proves a filter is applied.
+
+  it('filters the target of a similar-artist list, and checks the parent', async () => {
+    prismaMock.similarArtist.findMany.mockResolvedValue([] as never);
+
+    await request(app).get('/api/artists/1/similar');
+
+    expect(prismaMock.similarArtist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { artistId: 1, similarArtist: { deletedAt: null } }
+      })
+    );
+  });
+
+  it('404s a withdrawn artists own similar list', async () => {
+    // The direction filtering the target alone cannot fix: the parent was
+    // never read at all, so the list stayed served for a withdrawn artist.
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/artists/1/similar');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Artist not found');
+    expect(prismaMock.similarArtist.findMany).not.toHaveBeenCalled();
+  });
+
+  it('filters both artist-valued relations on the detail read', async () => {
+    prismaMock.community.findMany.mockResolvedValue([] as never);
+    prismaMock.artistSubscription.findUnique.mockResolvedValue(null);
+
+    await request(app).get('/api/artists/1');
+
+    const call = prismaMock.artist.findUnique.mock.calls[0][0] as {
+      include: {
+        aliases: { where: unknown };
+        similarTo: { where: unknown };
+        tags: Record<string, unknown>;
+      };
+    };
+    expect(call.include.aliases.where).toEqual({
+      redirect: { deletedAt: null }
+    });
+    expect(call.include.similarTo.where).toEqual({
+      similarArtist: { deletedAt: null }
+    });
+    // tags resolve a Tag, not an Artist — deliberately unfiltered.
+    expect(call.include.tags).not.toHaveProperty('where');
+  });
+
+  it('404s the history of a withdrawn artist, whose snapshots carry its name', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/artists/history/1');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Artist not found');
+    expect(prismaMock.artistHistory.findMany).not.toHaveBeenCalled();
+  });
+
+  it('404s both subscribe reads for a withdrawn artist, as POST already did', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(null);
+
+    const get = await request(app).get('/api/artists/1/subscribe');
+    const del = await request(app).delete('/api/artists/1/subscribe');
+
+    expect(get.status).toBe(404);
+    expect(del.status).toBe(404);
+    expect(prismaMock.artistSubscription.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsubscribing idempotent for a LIVE artist with no subscription', async () => {
+    // The gate is on the artist, not the subscription — 404 here would break
+    // the idempotence DELETE already promised.
+    prismaMock.artistSubscription.deleteMany.mockResolvedValue({
+      count: 0
+    } as never);
+
+    const res = await request(app).delete('/api/artists/1/subscribe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.subscribed).toBe(false);
+  });
+
+  it('refuses to record a similarity pointing at a withdrawn artist', async () => {
+    // Same status and wording as the route's P2003 arm: a body id that names
+    // no usable artist gets one answer, whichever kind of unusable it is.
+    prismaMock.artist.findUnique
+      .mockResolvedValueOnce(makeArtist() as never)
+      .mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/artists/similar')
+      .send({ artistId: 1, similarArtistId: 2 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('Artist or similar artist not found');
+    expect(prismaMock.similarArtist.upsert).not.toHaveBeenCalled();
+  });
+
+  it('refuses to record an alias pointing at a withdrawn artist', async () => {
+    prismaMock.artist.findUnique
+      .mockResolvedValueOnce(makeArtist() as never)
+      .mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/artists/alias')
+      .send({ artistId: 1, redirectId: 2 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('Artist or redirect target not found');
+    expect(prismaMock.artistAlias.create).not.toHaveBeenCalled();
+  });
+
+  it('still propagates a non-constraint error from a guarded write', async () => {
+    // The negative control every guard spec in this repo carries: proves the
+    // assertions above pass because the GUARD fired, not because the route
+    // happens to fail for any reason at all.
+    prismaMock.similarArtist.upsert.mockRejectedValue(
+      new Error('connection reset') as never
+    );
+
+    const res = await request(app)
+      .post('/api/artists/similar')
+      .send({ artistId: 1, similarArtistId: 2 });
 
     expect(res.status).toBe(500);
   });

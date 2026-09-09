@@ -5524,7 +5524,8 @@ registry.registerPath({
           schema: z.object({ subscribed: z.boolean() })
         }
       }
-    }
+    },
+    404: msgResponse('Artist not found')
   }
 });
 
@@ -5559,7 +5560,8 @@ registry.registerPath({
           schema: z.object({ subscribed: z.boolean() })
         }
       }
-    }
+    },
+    404: msgResponse('Artist not found')
   }
 });
 
@@ -5572,7 +5574,8 @@ registry.registerPath({
     200: {
       description: 'Artist history',
       content: { 'application/json': { schema: z.array(ArtistHistory) } }
-    }
+    },
+    404: msgResponse('Artist not found')
   }
 });
 
@@ -5606,7 +5609,8 @@ registry.registerPath({
     200: {
       description: 'Similar artists',
       content: { 'application/json': { schema: z.array(SimilarArtistEntry) } }
-    }
+    },
+    404: msgResponse('Artist not found')
   }
 });
 
