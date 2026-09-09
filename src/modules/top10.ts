@@ -1,6 +1,7 @@
 import { Prisma, Top10SnapshotType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { computeRatio } from './ratio';
+import { primaryArtist } from './releaseCredits';
 import type {
   ReleasesQuery,
   UsersQuery,
@@ -150,14 +151,173 @@ type ReleaseRow = {
   id: bigint;
   title: string;
   year: number;
-  artistId: bigint;
-  artistName: string;
   type: string;
   releaseType: string;
   consumerCount: number;
   totalBytesConsumed: bigint;
   contributionCount: number;
 };
+
+/**
+ * The chart's release scope (ADR-0036 §3).
+ *
+ * Top 10 is a SITE-WIDE chart, so it ranks only releases in public
+ * communities — a release in a `PRIVATE` community is absent for everyone,
+ * including that community's own members, who see their own rankings through
+ * the community-scoped surfaces instead.
+ *
+ * This is deliberately NOT `releaseVisibleToViewer`. That predicate answers
+ * "may this viewer see this release" and would make the chart viewer-dependent,
+ * which ADR-0036 §3 rejects: renumbering per viewer makes "the #1 release this
+ * week" unstateable, and preserving the global ranks with gaps tells a
+ * non-member exactly how many hidden releases outrank what they can see. The
+ * predicate here is viewer-independent and static, which is also why restating
+ * it in SQL is safe where restating the access rule would not be (ADR-0036 §2,
+ * amended 2026-09-09).
+ *
+ * The `communityId IS NULL` arm is load-bearing for the same reason it is
+ * everywhere else: the column is nullable, and a release that belongs to no
+ * community was never private.
+ */
+const chartableRelease = Prisma.sql`
+  AND (
+    r."communityId" IS NULL
+    OR EXISTS (
+      SELECT 1 FROM communities c2
+      WHERE c2.id = r."communityId"
+        AND c2."registrationStatus" = 'open'::"RegistrationStatus"
+    )
+  )`;
+
+/**
+ * A release with no credited artist has never appeared in this chart.
+ *
+ * It used to be excluded by `INNER JOIN artists a ON a.id = r."artistId"` — a
+ * column #72 dropped, which is why every branch of this query answered 500
+ * until now (#608). The exclusion is preserved as an EXISTS so the semantics
+ * survive without multiplying rows into the aggregate, and the artist itself is
+ * derived afterwards through `primaryArtist`, the one place that rule lives.
+ */
+const hasCreditedArtist = Prisma.sql`
+  AND EXISTS (SELECT 1 FROM release_artists ra WHERE ra."releaseId" = r.id)`;
+
+/** The columns and grouping every branch shares. Kept together so a column
+ *  added to the SELECT cannot be forgotten in the GROUP BY. */
+const releaseColumns = Prisma.sql`
+        r.id,
+        r.title,
+        r.year,
+        r.type,
+        r."releaseType"`;
+
+const releaseGrouping = Prisma.sql`
+      GROUP BY r.id, r.title, r.year, r.type, r."releaseType"`;
+
+const rankByContributions = (
+  tagFilter: Prisma.Sql,
+  formatFilter: Prisma.Sql,
+  limit: number
+) => prisma.$queryRaw<ReleaseRow[]>`
+      SELECT
+        ${releaseColumns},
+        COUNT(c.id)::int AS "consumerCount",
+        0::bigint        AS "totalBytesConsumed",
+        COUNT(c.id)::int AS "contributionCount"
+      FROM releases r
+      INNER JOIN contributions c ON c."releaseId" = r.id
+      WHERE 1=1
+      ${chartableRelease}
+      ${hasCreditedArtist}
+      ${tagFilter}
+      ${formatFilter}
+      ${releaseGrouping}
+      ORDER BY "contributionCount" DESC
+      LIMIT ${limit}
+    `;
+
+const rankByBytesConsumed = (
+  tagFilter: Prisma.Sql,
+  formatFilter: Prisma.Sql,
+  limit: number
+) => prisma.$queryRaw<ReleaseRow[]>`
+      SELECT
+        ${releaseColumns},
+        COUNT(DISTINCT dag."consumerId")::int AS "consumerCount",
+        COALESCE(SUM(dag."amountBytes"), 0)   AS "totalBytesConsumed",
+        COUNT(DISTINCT c.id)::int             AS "contributionCount"
+      FROM releases r
+      INNER JOIN contributions c ON c."releaseId" = r.id
+      INNER JOIN download_access_grants dag
+        ON dag."contributionId" = c.id AND dag.status = 'COMPLETED'
+      WHERE 1=1
+      ${chartableRelease}
+      ${hasCreditedArtist}
+      ${tagFilter}
+      ${formatFilter}
+      ${releaseGrouping}
+      ORDER BY "totalBytesConsumed" DESC
+      LIMIT ${limit}
+    `;
+
+const rankByConsumers = (
+  windowFilter: Prisma.Sql,
+  tagFilter: Prisma.Sql,
+  formatFilter: Prisma.Sql,
+  limit: number
+) => prisma.$queryRaw<ReleaseRow[]>`
+      SELECT
+        ${releaseColumns},
+        COUNT(DISTINCT dag."consumerId")::int AS "consumerCount",
+        COALESCE(SUM(dag."amountBytes"), 0)   AS "totalBytesConsumed",
+        COUNT(DISTINCT c.id)::int             AS "contributionCount"
+      FROM releases r
+      INNER JOIN contributions c ON c."releaseId" = r.id
+      INNER JOIN download_access_grants dag
+        ON dag."contributionId" = c.id AND dag.status = 'COMPLETED'
+      WHERE 1=1
+      ${chartableRelease}
+      ${hasCreditedArtist}
+      ${windowFilter}
+      ${tagFilter}
+      ${formatFilter}
+      ${releaseGrouping}
+      ORDER BY "consumerCount" DESC
+      LIMIT ${limit}
+    `;
+
+/**
+ * The credited artist for each ranked release, derived through
+ * `primaryArtist` rather than re-implemented in SQL.
+ *
+ * A second query, in the shape `attachTags` already established. The
+ * alternative — a LATERAL join picking the Main credit — would restate
+ * `primaryArtist`'s "prefer Main, else the first credit" rule in SQL, and
+ * `releaseCredits.ts` exists precisely so that rule has one home.
+ */
+async function attachArtists(
+  releaseIds: number[]
+): Promise<Map<number, { id: number; name: string }>> {
+  const credits = await prisma.releaseArtist.findMany({
+    where: { releaseId: { in: releaseIds } },
+    select: {
+      releaseId: true,
+      role: true,
+      artist: { select: { id: true, name: true } }
+    }
+  });
+  const byRelease = new Map<number, typeof credits>();
+  for (const credit of credits) {
+    const existing = byRelease.get(credit.releaseId) ?? [];
+    existing.push(credit);
+    byRelease.set(credit.releaseId, existing);
+  }
+  const map = new Map<number, { id: number; name: string }>();
+  for (const [releaseId, rows] of byRelease) {
+    const artist = primaryArtist(rows);
+    if (artist) map.set(releaseId, artist);
+  }
+  return map;
+}
 
 export async function getTopReleases(
   params: ReleasesQuery
@@ -180,103 +340,49 @@ export async function getTopReleases(
   let rows: ReleaseRow[];
 
   if (type === 'contributed') {
-    rows = await prisma.$queryRaw<ReleaseRow[]>`
-      SELECT
-        r.id,
-        r.title,
-        r.year,
-        r."artistId",
-        a.name AS "artistName",
-        r.type,
-        r."releaseType",
-        COUNT(c.id)::int AS "consumerCount",
-        0::bigint        AS "totalBytesConsumed",
-        COUNT(c.id)::int AS "contributionCount"
-      FROM releases r
-      INNER JOIN artists a ON a.id = r."artistId"
-      INNER JOIN contributions c ON c."releaseId" = r.id
-      WHERE 1=1
-      ${tagFilter}
-      ${formatFilter}
-      GROUP BY r.id, r.title, r.year, r."artistId", a.name, r.type, r."releaseType"
-      ORDER BY "contributionCount" DESC
-      LIMIT ${limit}
-    `;
+    rows = await rankByContributions(tagFilter, formatFilter, limit);
   } else if (type === 'consumed') {
-    rows = await prisma.$queryRaw<ReleaseRow[]>`
-      SELECT
-        r.id,
-        r.title,
-        r.year,
-        r."artistId",
-        a.name AS "artistName",
-        r.type,
-        r."releaseType",
-        COUNT(DISTINCT dag."consumerId")::int AS "consumerCount",
-        COALESCE(SUM(dag."amountBytes"), 0)   AS "totalBytesConsumed",
-        COUNT(DISTINCT c.id)::int             AS "contributionCount"
-      FROM releases r
-      INNER JOIN artists a ON a.id = r."artistId"
-      INNER JOIN contributions c ON c."releaseId" = r.id
-      INNER JOIN download_access_grants dag
-        ON dag."contributionId" = c.id AND dag.status = 'COMPLETED'
-      WHERE 1=1
-      ${tagFilter}
-      ${formatFilter}
-      GROUP BY r.id, r.title, r.year, r."artistId", a.name, r.type, r."releaseType"
-      ORDER BY "totalBytesConsumed" DESC
-      LIMIT ${limit}
-    `;
+    rows = await rankByBytesConsumed(tagFilter, formatFilter, limit);
   } else {
     const win = windowStart(type);
     const windowFilter = win
       ? Prisma.sql`AND dag."createdAt" >= ${win}`
       : Prisma.empty;
-
-    rows = await prisma.$queryRaw<ReleaseRow[]>`
-      SELECT
-        r.id,
-        r.title,
-        r.year,
-        r."artistId",
-        a.name AS "artistName",
-        r.type,
-        r."releaseType",
-        COUNT(DISTINCT dag."consumerId")::int AS "consumerCount",
-        COALESCE(SUM(dag."amountBytes"), 0)   AS "totalBytesConsumed",
-        COUNT(DISTINCT c.id)::int             AS "contributionCount"
-      FROM releases r
-      INNER JOIN artists a ON a.id = r."artistId"
-      INNER JOIN contributions c ON c."releaseId" = r.id
-      INNER JOIN download_access_grants dag
-        ON dag."contributionId" = c.id AND dag.status = 'COMPLETED'
-      WHERE 1=1
-      ${windowFilter}
-      ${tagFilter}
-      ${formatFilter}
-      GROUP BY r.id, r.title, r.year, r."artistId", a.name, r.type, r."releaseType"
-      ORDER BY "consumerCount" DESC
-      LIMIT ${limit}
-    `;
+    rows = await rankByConsumers(windowFilter, tagFilter, formatFilter, limit);
   }
 
   const releaseIds = rows.map((r) => Number(r.id));
-  const tagMap = await attachTags(releaseIds);
+  const [tagMap, artistMap] = await Promise.all([
+    attachTags(releaseIds),
+    attachArtists(releaseIds)
+  ]);
 
-  return rows.map((row, i) => ({
-    rank: i + 1,
-    releaseId: Number(row.id),
-    title: row.title,
-    year: row.year,
-    artistId: Number(row.artistId),
-    artistName: row.artistName,
-    type: row.type,
-    releaseType: row.releaseType,
-    tags: tagMap.get(Number(row.id)) ?? [],
-    consumerCount: Number(row.consumerCount),
-    totalBytesConsumed: String(row.totalBytesConsumed),
-    contributionCount: Number(row.contributionCount)
-  }));
+  return rows.flatMap((row, i) => {
+    const releaseId = Number(row.id);
+    const artist = artistMap.get(releaseId);
+    // `hasCreditedArtist` guarantees a credit at ranking time, so this only
+    // fires if the last one was deleted between the two queries. Dropping the
+    // row keeps `artistId`/`artistName` non-null rather than widening the
+    // contract for a race; `rank` comes from the SQL position, so the surviving
+    // rows keep the rank they actually held.
+    if (!artist) return [];
+    return [
+      {
+        rank: i + 1,
+        releaseId,
+        title: row.title,
+        year: row.year,
+        artistId: artist.id,
+        artistName: artist.name,
+        type: row.type,
+        releaseType: row.releaseType,
+        tags: tagMap.get(releaseId) ?? [],
+        consumerCount: Number(row.consumerCount),
+        totalBytesConsumed: String(row.totalBytesConsumed),
+        contributionCount: Number(row.contributionCount)
+      }
+    ];
+  });
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────

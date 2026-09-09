@@ -45,7 +45,13 @@ There are **two** predicates, and they are named apart because reaching for the 
 
 Both carry the `{ communityId: null }` arm, for the reason `artist.ts` demonstrates by omitting it.
 
-**`top10` stops using `$queryRaw`** so that it consumes a fragment like everything else rather than restating an access rule in SQL, where no type and no spec could hold the two together. #608 forces that rewrite regardless: all three branches (`modules/top10.ts:195`, `:218`, `:248`) select and join `releases.artistId`, a column migration `20260609171357_music_model_release_files` dropped when #72 replaced it with role-based credits.
+**`top10` keeps `$queryRaw`, and states the chart predicate in SQL.** _(Amended 2026-09-09, during the #608 slice. The paragraph originally read "top10 stops using `$queryRaw`" — that is not implementable, and the reasoning behind it did not survive contact with the code. Recorded as an amendment rather than a silent edit.)_
+
+Two of the three ranking branches have no Prisma expression. `DownloadAccessGrant` carries no `releaseId` — it reaches a release only through `contribution.releaseId` — and Prisma's `groupBy` can group only by a model's own scalar fields. So `COUNT(DISTINCT consumerId)` and `SUM(amountBytes)` **per release** cannot be written in Prisma at all, and doing the aggregation in JS would mean reading essentially the whole grants table to rank ten rows, on an endpoint that is cached for six hours precisely because it is expensive.
+
+The original rationale also does not apply here. It was about not restating an **access** rule in SQL, where no type and no spec could hold the two expressions together. But top10 does not take the access rule: Decision 3 gives it the publicly-chartable predicate, which is viewer-independent and static — a fixed property of a community rather than a per-viewer authorization. That is the kind of rule SQL states safely, and `$queryRaw` is an established pattern in this codebase for exactly this shape of aggregation.
+
+**The guard is an integration test, not a shared fragment**, and it is the better guard. #608 survived a release because every unit spec mocks `$queryRaw` and **a mock cannot fail on a column that does not exist** — all three branches (`modules/top10.ts:195`, `:218`, `:248`) selected and joined `releases.artistId`, dropped by migration `20260609171357_music_model_release_files` when #72 replaced it with role-based credits, and no integration test covered top10 at all. `src/integration/top10Chart.integration.ts` closes both halves: it proves the query runs, and it proves the chart excludes `closed` and `invite` communities while keeping community-less releases.
 
 ### 3. A site-wide chart contains only public communities
 
