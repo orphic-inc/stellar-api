@@ -4274,7 +4274,8 @@ registry.registerPath({
       description: 'Community created',
       content: { 'application/json': { schema: Community } }
     },
-    404: msgResponse('Leader user not found')
+    404: msgResponse('Leader user not found'),
+    409: msgResponse('A community with that name already exists')
   }
 });
 
@@ -4300,7 +4301,8 @@ registry.registerPath({
       description: 'Updated community',
       content: { 'application/json': { schema: Community } }
     },
-    404: msgResponse('Community, or the named leader user, not found')
+    404: msgResponse('Community, or the named leader user, not found'),
+    409: msgResponse('A community with that name already exists')
   }
 });
 
@@ -4410,7 +4412,8 @@ registry.registerPath({
     204: {
       description: 'Curator removed'
     },
-    403: msgResponse('Not a community admin or curator')
+    403: msgResponse('Not a community admin or curator'),
+    404: msgResponse('Community or user not found')
   }
 });
 
@@ -8760,7 +8763,8 @@ registry.registerPath({
       description: 'Page created',
       content: { 'application/json': { schema: WikiPage } }
     },
-    403: msgResponse('Neither wiki_edit nor a managing permission')
+    403: msgResponse('Neither wiki_edit nor a managing permission'),
+    409: msgResponse('A page with this slug already exists')
   }
 });
 
@@ -8820,7 +8824,8 @@ registry.registerPath({
       content: { 'application/json': { schema: WikiPage } }
     },
     403: msgResponse('Insufficient permission to edit this page'),
-    404: msgResponse('Not found, or above the caller read level')
+    404: msgResponse('Not found, or above the caller read level'),
+    409: msgResponse('The page changed while you were editing, reload')
   }
 });
 
@@ -8933,7 +8938,8 @@ registry.registerPath({
       content: { 'application/json': { schema: WikiPage } }
     },
     403: msgResponse('Insufficient permission to edit this page'),
-    404: msgResponse('Page or revision not found')
+    404: msgResponse('Page or revision not found'),
+    409: msgResponse('The page changed while you were rolling back, reload')
   }
 });
 

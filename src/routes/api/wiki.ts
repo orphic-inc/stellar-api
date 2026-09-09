@@ -1,6 +1,7 @@
 import express, { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
@@ -371,6 +372,54 @@ router.get(
   })
 );
 
+/**
+ * Who may create a page, and at what levels. Returns `null` when the caller may
+ * not create one at all. Only a manager may raise the levels above 0; an editor
+ * creates at the floor.
+ *
+ * Extracted so the handler keeps room for its #564 guard — a guard has to sit
+ * lexically in the handler for `prisma:guard-coverage` to see it, so the
+ * complexity budget has to come from elsewhere.
+ */
+/** What an edit needs off the current page: the fields it snapshots into a
+ *  revision, plus the levels that gate it. */
+const EDIT_PAGE_SELECT = {
+  title: true,
+  body: true,
+  revision: true,
+  minReadLevel: true,
+  minEditLevel: true,
+  authorId: true,
+  updatedAt: true
+} as const;
+
+/** A manager may change a level on edit; anyone else keeps the stored one. */
+const keptLevel = (
+  canManage: boolean,
+  requested: number | undefined,
+  current: number
+): number => (canManage && requested !== undefined ? requested : current);
+
+/** A manager may request a level; anyone else creates at the floor. */
+const requestedLevel = (canManage: boolean, value?: number): number =>
+  canManage ? (value ?? 0) : 0;
+
+const resolveCreateLevels = (
+  perms: Record<string, boolean>,
+  input: { minReadLevel?: number; minEditLevel?: number }
+): { minReadLevel: number; minEditLevel: number } | null => {
+  const canManage = !!(
+    perms['wiki_manage'] ||
+    perms['admin'] ||
+    perms['staff']
+  );
+  if (!canManage && !perms['wiki_edit']) return null;
+  return {
+    minReadLevel: requestedLevel(canManage, input.minReadLevel),
+    minEditLevel: requestedLevel(canManage, input.minEditLevel)
+  };
+};
+
 // ─── POST /api/wiki  (create) ─────────────────────────────────────────────────
 router.post(
   '/',
@@ -380,21 +429,11 @@ router.post(
     const input = parsedBody<CreateWikiPageInput>(res);
     const authReq = req as AuthenticatedRequest;
     const perms = await loadPermissions(authReq, res);
-    const canManage = !!(
-      perms['wiki_manage'] ||
-      perms['admin'] ||
-      perms['staff']
-    );
-    const canEditWiki = !!perms['wiki_edit'];
-
-    if (!canManage && !canEditWiki) {
+    const levels = resolveCreateLevels(perms, input);
+    if (!levels) {
       return res.status(403).json({ msg: 'Permission denied' });
     }
-
-    // prettier-ignore
-    const minReadLevel = canManage ? (input.minReadLevel ?? 0) : 0;
-    // prettier-ignore
-    const minEditLevel = canManage ? (input.minEditLevel ?? 0) : 0;
+    const { minReadLevel, minEditLevel } = levels;
 
     const title = sanitizePlain(input.title).trim();
     // Store raw BBCode; transcription + sanitization happen at read time (#398).
@@ -412,28 +451,44 @@ router.post(
         .status(409)
         .json({ msg: 'A page with this slug already exists' });
 
-    const page = await prisma.$transaction(async (tx) => {
-      const created = await tx.wikiPage.create({
-        data: {
-          title,
-          body,
-          slug,
-          minReadLevel,
-          minEditLevel,
-          authorId: authReq.user.id,
-          revision: 1
-        },
-        select: PAGE_WITH_BODY_SELECT
+    let page;
+    try {
+      page = await prisma.$transaction(async (tx) => {
+        const created = await tx.wikiPage.create({
+          data: {
+            title,
+            body,
+            slug,
+            minReadLevel,
+            minEditLevel,
+            authorId: authReq.user.id,
+            revision: 1
+          },
+          select: PAGE_WITH_BODY_SELECT
+        });
+        await tx.wikiAlias.create({
+          data: { alias: slug, pageId: created.id, userId: authReq.user.id }
+        });
+        await audit(
+          tx,
+          authReq.user.id,
+          'wiki.create',
+          'WikiPage',
+          created.id,
+          {
+            title,
+            slug
+          }
+        );
+        return created;
       });
-      await tx.wikiAlias.create({
-        data: { alias: slug, pageId: created.id, userId: authReq.user.id }
+    } catch (err) {
+      // WikiPage.slug is unique and the alias is a primary key, so a slug
+      // taken between the read above and this write raises P2002 (#564).
+      translatePrismaError(err, {
+        P2002: [409, 'A page with this slug already exists']
       });
-      await audit(tx, authReq.user.id, 'wiki.create', 'WikiPage', created.id, {
-        title,
-        slug
-      });
-      return created;
-    });
+    }
 
     res.status(201).json(page);
   })
@@ -452,15 +507,7 @@ router.put(
 
     const page = await prisma.wikiPage.findFirst({
       where: { id, deletedAt: null },
-      select: {
-        title: true,
-        body: true,
-        revision: true,
-        minReadLevel: true,
-        minEditLevel: true,
-        authorId: true,
-        updatedAt: true
-      }
+      select: EDIT_PAGE_SELECT
     });
     if (!page) return res.status(404).json({ msg: 'Page not found' });
 
@@ -480,47 +527,60 @@ router.put(
     const title = input.title ? sanitizePlain(input.title).trim() : page.title;
     // Store raw BBCode; transcription + sanitization happen at read time (#398).
     const body = input.body ? input.body : page.body;
-    const minReadLevel =
-      canManage && input.minReadLevel !== undefined
-        ? input.minReadLevel
-        : page.minReadLevel;
-    const minEditLevel =
-      canManage && input.minEditLevel !== undefined
-        ? input.minEditLevel
-        : page.minEditLevel;
+    const minReadLevel = keptLevel(
+      canManage,
+      input.minReadLevel,
+      page.minReadLevel
+    );
+    const minEditLevel = keptLevel(
+      canManage,
+      input.minEditLevel,
+      page.minEditLevel
+    );
 
     const effectiveEditLevel = Math.max(minEditLevel, minReadLevel);
 
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.wikiRevision.create({
-        data: {
-          pageId: id,
-          revision: page.revision,
-          title: page.title,
-          body: page.body,
-          authorId: page.authorId
-        }
-      });
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        await tx.wikiRevision.create({
+          data: {
+            pageId: id,
+            revision: page.revision,
+            title: page.title,
+            body: page.body,
+            authorId: page.authorId
+          }
+        });
 
-      const result = await tx.wikiPage.update({
-        where: { id },
-        data: {
-          title,
-          body,
-          revision: page.revision + 1,
-          minReadLevel,
-          minEditLevel: effectiveEditLevel,
-          authorId: authReq.user.id
-        },
-        select: PAGE_WITH_BODY_SELECT
-      });
+        const result = await tx.wikiPage.update({
+          where: { id },
+          data: {
+            title,
+            body,
+            revision: page.revision + 1,
+            minReadLevel,
+            minEditLevel: effectiveEditLevel,
+            authorId: authReq.user.id
+          },
+          select: PAGE_WITH_BODY_SELECT
+        });
 
-      await audit(tx, authReq.user.id, 'wiki.edit', 'WikiPage', id, {
-        revision: result.revision,
-        title
+        await audit(tx, authReq.user.id, 'wiki.edit', 'WikiPage', id, {
+          revision: result.revision,
+          title
+        });
+        return result;
       });
-      return result;
-    });
+    } catch (err) {
+      // WikiRevision is unique on (pageId, revision), so a concurrent edit
+      // that bumps the revision first raises P2002; the page itself can go
+      // between the read and the update, which raises P2025 (#564).
+      translatePrismaError(err, {
+        P2002: [409, 'The page changed while you were editing, reload'],
+        P2025: [404, 'Page not found']
+      });
+    }
 
     res.json(updated);
   })
@@ -546,20 +606,24 @@ router.delete(
     });
     if (!page) return res.status(404).json({ msg: 'Page not found' });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.wikiPage.update({
-        where: { id },
-        data: { deletedAt: new Date() }
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.wikiPage.update({
+          where: { id },
+          data: { deletedAt: new Date() }
+        });
+        await audit(
+          tx,
+          (req as AuthenticatedRequest).user.id,
+          'wiki.delete',
+          'WikiPage',
+          id,
+          { title: page.title }
+        );
       });
-      await audit(
-        tx,
-        (req as AuthenticatedRequest).user.id,
-        'wiki.delete',
-        'WikiPage',
-        id,
-        { title: page.title }
-      );
-    });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Page not found'] });
+    }
 
     res.status(204).send();
   })
@@ -593,9 +657,18 @@ router.post(
     const existing = await prisma.wikiAlias.findUnique({ where: { alias } });
     if (existing) return res.status(409).json({ msg: 'Alias already in use' });
 
-    await prisma.wikiAlias.create({
-      data: { alias, pageId: id, userId: authReq.user.id }
-    });
+    try {
+      await prisma.wikiAlias.create({
+        data: { alias, pageId: id, userId: authReq.user.id }
+      });
+    } catch (err) {
+      // `pageId` is the PATH id; `alias` is the primary key and the read above
+      // leaves its window open. `userId` is session-derived (#564).
+      translatePrismaError(err, {
+        P2003: [404, 'Page not found'],
+        P2002: [409, 'Alias already in use']
+      });
+    }
     res.status(201).json({ alias });
   })
 );
@@ -631,7 +704,13 @@ router.delete(
       return res.status(404).json({ msg: 'Alias not found on this page' });
     }
 
-    await prisma.wikiAlias.delete({ where: { alias } });
+    try {
+      await prisma.wikiAlias.delete({ where: { alias } });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Alias not found on this page']
+      });
+    }
     res.status(204).send();
   })
 );
@@ -667,34 +746,44 @@ router.post(
     });
     if (!target) return res.status(404).json({ msg: 'Revision not found' });
 
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.wikiRevision.create({
-        data: {
-          pageId: id,
-          revision: page.revision,
-          title: page.title,
-          body: page.body,
-          authorId: page.authorId
-        }
-      });
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        await tx.wikiRevision.create({
+          data: {
+            pageId: id,
+            revision: page.revision,
+            title: page.title,
+            body: page.body,
+            authorId: page.authorId
+          }
+        });
 
-      const result = await tx.wikiPage.update({
-        where: { id },
-        data: {
-          title: target.title,
-          body: target.body,
-          revision: page.revision + 1,
-          authorId: authReq.user.id
-        },
-        select: PAGE_WITH_BODY_SELECT
-      });
+        const result = await tx.wikiPage.update({
+          where: { id },
+          data: {
+            title: target.title,
+            body: target.body,
+            revision: page.revision + 1,
+            authorId: authReq.user.id
+          },
+          select: PAGE_WITH_BODY_SELECT
+        });
 
-      await audit(tx, authReq.user.id, 'wiki.rollback', 'WikiPage', id, {
-        toRevision: rev,
-        newRevision: result.revision
+        await audit(tx, authReq.user.id, 'wiki.rollback', 'WikiPage', id, {
+          toRevision: rev,
+          newRevision: result.revision
+        });
+        return result;
       });
-      return result;
-    });
+    } catch (err) {
+      // Same pair as the edit path: a concurrent write can take the next
+      // revision number, and the page can go between the read and the write.
+      translatePrismaError(err, {
+        P2002: [409, 'The page changed while you were rolling back, reload'],
+        P2025: [404, 'Page not found']
+      });
+    }
 
     res.json(updated);
   })

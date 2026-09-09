@@ -1,6 +1,6 @@
 {
   "$comment": "Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, not a mute button: a new unguarded site fails, and an entry that becomes guarded or disappears fails as stale. `internallyDerived` records sites whose constrained ids cannot dangle (session- or internally-sourced), each with the reason — a prior read is NOT a reason, it leaves a TOCTOU window. Regenerate with: npm run prisma:guard-coverage -- --write",
-  "generated": "2026-09-08",
+  "generated": "2026-09-09",
   "internallyDerived": {
     "POST /announcements/blog::blog.create": "Blog's only foreign key is userId, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
     "POST /announcements/global-notice::globalNotice.create": "GlobalNotice's only foreign key is createdById, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
@@ -9,10 +9,6 @@
   "unreviewed": [
     "DELETE /auth/sessions/{id}::userSession.update",
     "DELETE /bad-passwords/{id}::badPassword.delete",
-    "DELETE /communities/{communityId}/dnc/{dncId}::doNotContribute.delete",
-    "DELETE /communities/{id}/curators/{userId}::community.update",
-    "DELETE /communities/{id}/members/{userId}::consumer.update",
-    "DELETE /communities/{id}::community.delete",
     "DELETE /donations/{id}::donation.delete",
     "DELETE /email-blacklist/{id}::emailBlacklist.delete",
     "DELETE /ip-bans/{id}::ipBan.delete",
@@ -24,15 +20,9 @@
     "DELETE /rules/{id}::rulesPage.delete",
     "DELETE /site-history/{id}::siteHistory.delete",
     "DELETE /tag-aliases/{id}::tagAlias.delete",
-    "DELETE /wiki/{id}/aliases/{alias}::wikiAlias.delete",
-    "DELETE /wiki/{id}::wikiPage.update",
     "POST /auth::userSession.create",
     "POST /bad-passwords::badPassword.create",
     "POST /comments::comment.create",
-    "POST /communities/{communityId}/dnc::doNotContribute.create",
-    "POST /communities/{id}/curators::community.update",
-    "POST /communities/{id}/members::consumer.upsert",
-    "POST /communities::community.create",
     "POST /donations::donation.create",
     "POST /friends/{userId}/accept::friendRelationship.update",
     "POST /friends/{userId}::friendRelationship.delete",
@@ -49,18 +39,10 @@
     "POST /subscriptions/subscribe-comments::commentSubscription.upsert",
     "POST /subscriptions/subscribe::subscription.upsert",
     "POST /tag-aliases::tagAlias.create",
-    "POST /wiki/{id}/aliases::wikiAlias.create",
-    "POST /wiki/{id}/rollback/{rev}::wikiPage.update",
-    "POST /wiki/{id}/rollback/{rev}::wikiRevision.create",
-    "POST /wiki::wikiAlias.create",
-    "POST /wiki::wikiPage.create",
     "PUT /comments/{id}::comment.update",
-    "PUT /communities/{id}::community.update",
     "PUT /messages/drafts/{id}::pmDraft.update",
     "PUT /rules/{id}::rulesPage.update",
     "PUT /site-history/{id}::siteHistory.update",
-    "PUT /tag-aliases/{id}::tagAlias.update",
-    "PUT /wiki/{id}::wikiPage.update",
-    "PUT /wiki/{id}::wikiRevision.create"
+    "PUT /tag-aliases/{id}::tagAlias.update"
   ]
 }
