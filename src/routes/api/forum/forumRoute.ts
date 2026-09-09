@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
-import { AppError } from '../../../lib/errors';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { deleteForum } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
@@ -154,13 +153,7 @@ router.post(
     } catch (err) {
       // `forumCategoryId` comes from the BODY, so 400 rather than 404: the route
       // exists and the payload names a category that does not (#564, arm A).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
-        throw new AppError(400, 'Forum category not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2003: [400, 'Forum category not found'] });
     }
     res.status(201).json(forum);
   })
@@ -205,13 +198,7 @@ router.put(
     } catch (err) {
       // Addressed by a PATH id with no prior read, so P2025 was reaching the
       // global handler as a 500 (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Forum not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Forum not found'] });
     }
     res.json(forum);
   })

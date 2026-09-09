@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -136,13 +135,7 @@ router.delete(
       // This closes the window between that read and this write: #564 treats a
       // prior read as insufficient on its own, because the row can go in
       // between and P2025 would then 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Featured album not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Featured album not found'] });
     }
     res.status(204).send();
   })
@@ -172,13 +165,7 @@ router.put(
       // constraint — which is why the constraint-only reading of #564
       // classified this as safe. The contract has always declared this 404;
       // until now it could not fire.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Announcement not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Announcement not found'] });
     }
     res.json(news);
   })
@@ -199,13 +186,7 @@ router.delete(
       // constraint — which is why the constraint-only reading of #564
       // classified this as safe. The contract has always declared this 404;
       // until now it could not fire.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Announcement not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Announcement not found'] });
     }
     res.status(204).send();
   })
@@ -242,13 +223,7 @@ router.delete(
     } catch (err) {
       // P2025 on a missing row (#564, arm B). `Blog` has no unique constraint
       // and its only foreign key is the author, so nothing else can raise here.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Blog post not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Blog post not found'] });
     }
     res.status(204).send();
   })
@@ -311,13 +286,7 @@ router.delete(
       await prisma.globalNotice.delete({ where: { id } });
     } catch (err) {
       // P2025 on a missing row (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Global notice not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Global notice not found'] });
     }
     res.status(204).send();
   })

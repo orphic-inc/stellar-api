@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -364,13 +364,7 @@ router.delete(
       // rank itself is never read. P2025 on a missing row was reaching the
       // global handler as a 500 (#564, arm B). The audit write in the same
       // transaction takes actorId from the session and cannot dangle.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Rank not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Rank not found'] });
     }
     res.status(204).send();
   })
@@ -611,13 +605,7 @@ router.delete(
     } catch (err) {
       // The findUnique above covers the ordinary case; this covers its removal
       // in between, where P2025 would otherwise 500 (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Promotion rule not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Promotion rule not found'] });
     }
     res.status(204).send();
   })
@@ -771,13 +759,7 @@ router.delete(
     } catch (err) {
       // The findUnique above covers the ordinary case; this covers its removal
       // in between, where P2025 would otherwise 500 (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Staff group not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Staff group not found'] });
     }
     res.status(204).send();
   })

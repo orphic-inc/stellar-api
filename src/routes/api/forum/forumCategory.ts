@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
-import { AppError } from '../../../lib/errors';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import {
@@ -132,13 +131,7 @@ router.put(
       // ForumCategory carries no foreign key and no unique constraint, so P2025
       // on a vanished row is the only code reachable here (#564, arm B). The
       // findUnique above covers the ordinary case; this covers the window.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Category not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Category not found'] });
     }
     res.json(category);
   })
@@ -156,13 +149,7 @@ router.delete(
     try {
       await prisma.forumCategory.delete({ where: { id } });
     } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Category not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Category not found'] });
     }
     res.status(204).send();
   })

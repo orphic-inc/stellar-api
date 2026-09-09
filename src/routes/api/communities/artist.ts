@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma, RegistrationStatus } from '@prisma/client';
+import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
-import { AppError } from '../../../lib/errors';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { communityRoleUnion } from '../../../modules/communityAccess';
@@ -117,13 +117,7 @@ router.put(
     } catch (err) {
       // The findUnique above answers the ordinary case; this closes the window
       // between it and the write, where P2025 would otherwise 500 (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Artist not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Artist not found'] });
     }
     res.json(updated);
   })
@@ -180,18 +174,10 @@ router.post(
         update: {}
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        // 400 rather than 404: the route exists, the BODY names something that
-        // does not. P2003 does not say WHICH foreign key failed, so the message
-        // names both rather than guessing (#564).
-        if (err.code === 'P2003') {
-          throw new AppError(400, 'Artist or similar artist not found');
-        }
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'That similarity is already recorded');
-        }
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2003: [400, 'Artist or similar artist not found'],
+        P2002: [409, 'That similarity is already recorded']
+      });
     }
     res.json(result);
   })
@@ -212,13 +198,9 @@ router.post(
     } catch (err) {
       // Two body-supplied foreign keys, and P2003 names neither, so the message
       // covers both. `userId` is session-derived and cannot dangle (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
-        throw new AppError(400, 'Artist or redirect target not found');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2003: [400, 'Artist or redirect target not found']
+      });
     }
     res.status(201).json(alias);
   })
@@ -239,17 +221,10 @@ router.post(
         update: { positiveVotes: { increment: 1 } }
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2003') {
-          throw new AppError(400, 'Artist or tag not found');
-        }
-        // The upsert's update arm increments a vote, so a lost race drops one.
-        // 409 tells the caller to retry rather than silently under-counting.
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'Tag vote already being recorded, retry');
-        }
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2003: [400, 'Artist or tag not found'],
+        P2002: [409, 'Tag vote already being recorded, retry']
+      });
     }
     res.json(tag);
   })
@@ -300,13 +275,7 @@ router.post(
       });
     } catch (err) {
       // `userId` is session-derived; only the PATH id can dangle, so 404 (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
-        throw new AppError(404, 'Artist not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2003: [404, 'Artist not found'] });
     }
     res.json({ subscribed: true });
   })
@@ -469,13 +438,7 @@ router.delete(
         data: { deletedAt: new Date() }
       });
     } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Artist not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Artist not found'] });
     }
     await audit(prisma, req.user.id, 'artist.delete', 'Artist', id, {
       name: artist.name

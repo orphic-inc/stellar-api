@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { getUserRankQuotas } from '../../lib/userRankAccess';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -519,13 +520,9 @@ router.post(
       // `Collage.name` carries a unique constraint, so a duplicate name raised
       // P2002 and answered 500 (#564, arm A). The only foreign key is `userId`,
       // taken from the session, so P2003 is unreachable here.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
-        throw new AppError(409, 'A collage with that name already exists');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2002: [409, 'A collage with that name already exists']
+      });
     }
 
     res.status(201).json({
@@ -580,13 +577,10 @@ router.put(
     } catch (err) {
       // loadActiveCollage above is a READ, so it leaves the window this closes.
       // #564 treats a prior read as insufficient for exactly this reason.
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2025') throw new AppError(404, 'Collage not found');
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'A collage with that name already exists');
-        }
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2025: [404, 'Collage not found'],
+        P2002: [409, 'A collage with that name already exists']
+      });
     }
 
     res.json({
@@ -639,13 +633,7 @@ router.delete(
         });
       }
     } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Collage not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Collage not found'] });
     }
 
     res.status(204).send();
@@ -680,13 +668,7 @@ router.post(
     } catch (err) {
       // loadActiveCollage above is a READ; this closes the window it leaves,
       // where P2025 would otherwise reach the global handler as a 500 (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Collage not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Collage not found'] });
     }
 
     res.json({
@@ -779,21 +761,11 @@ router.post(
         return created;
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        // The release and duplicate checks above are reads; both windows stay
-        // open until the write lands (#564). `collageId` and `releaseId` are
-        // path/body ids, `userId` is session-derived.
-        if (err.code === 'P2003') {
-          throw new AppError(404, 'Collage or release not found');
-        }
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'Release already in collage');
-        }
-        if (err.code === 'P2025') {
-          throw new AppError(404, 'Collage not found');
-        }
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2003: [404, 'Collage or release not found'],
+        P2002: [409, 'Release already in collage'],
+        P2025: [404, 'Collage not found']
+      });
     }
 
     res.status(201).json({
@@ -846,13 +818,7 @@ router.delete(
       // Both writes are addressed by id after reads, so either can meet a row
       // that has since gone. Rolling back leaves the counter consistent; the
       // 500 it used to answer did not (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Collage entry not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Collage entry not found'] });
     }
 
     res.status(204).send();
@@ -893,13 +859,9 @@ router.put(
     } catch (err) {
       // The entry ids come from the BODY and none is read first, so a reorder
       // naming an entry that does not exist answered 500 (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(400, 'One or more entries not found');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2025: [400, 'One or more entries not found']
+      });
     }
 
     res.status(204).send();
