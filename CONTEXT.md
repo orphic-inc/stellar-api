@@ -195,7 +195,7 @@ const RegisterBody = registry.register(
 );
 ```
 
-### 3. Error Control & Telemtry Pipeline
+### 3. Error Control & Telemetry Pipeline
 
 - Operational exceptions must route directly out of controller scopes into Express middleware handlers to be serialized for the client.
 - System crashes and unhandled exceptions are captured simultaneously across Winston data streams and remote Sentry scopes.
