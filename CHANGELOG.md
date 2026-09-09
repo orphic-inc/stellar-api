@@ -362,6 +362,21 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   over Codacy's per-function limits go from four to three — one eliminated, one
   improved, none made worse.**
 
+- **The bookmarks `404` described a community as a `communitie`** — the four
+  `POST /bookmarks/*` operations registered their new
+  [#564](https://github.com/orphic-inc/stellar-api/issues/564) `404` through one
+  helper that derived the noun from the path segment by stripping a trailing
+  `s`. Three segments survive that; `communities` does not, and the contract
+  shipped `No communitie with that id` to every consumer of `openapi.json`.
+
+  The noun is now passed per call site rather than derived. English plurals do
+  not invert by rule, every other description in `lib/openapi.ts` is written
+  out, and the helper's doc comment now says so — a second derivation would
+  fail on the next irregular segment instead of this one.
+
+  Description-only: one line of `openapi.json` moves, no operation, code or
+  body shape changes.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

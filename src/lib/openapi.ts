@@ -9321,10 +9321,16 @@ const requestBookmark = z.object({
  * with the resulting state, because the caller asked to bookmark and the
  * bookmark exists — a toggle reports what is true now, not that someone else
  * got there first.
+ *
+ * That `404`'s noun is passed, not derived from `segment`. Stripping a trailing
+ * `s` published `No communitie with that id` for a whole release. English
+ * plurals do not invert by rule, and every other description in this file is
+ * written out.
  */
 const registerBookmark = (
   segment: string,
   paramName: string,
+  noun: string,
   item: z.ZodTypeAny
 ) => {
   registry.registerPath({
@@ -9348,7 +9354,7 @@ const registerBookmark = (
         description: 'Toggled bookmark',
         content: { 'application/json': { schema: bookmarkToggle } }
       },
-      404: { description: `No ${segment.replace(/s$/, '')} with that id` }
+      404: { description: `No ${noun} with that id` }
     }
   });
   registry.registerPath({
@@ -9362,10 +9368,10 @@ const registerBookmark = (
   });
 };
 
-registerBookmark('artists', 'artistId', artistBookmark);
-registerBookmark('releases', 'releaseId', releaseBookmark);
-registerBookmark('communities', 'communityId', communityBookmark);
-registerBookmark('requests', 'requestId', requestBookmark);
+registerBookmark('artists', 'artistId', 'artist', artistBookmark);
+registerBookmark('releases', 'releaseId', 'release', releaseBookmark);
+registerBookmark('communities', 'communityId', 'community', communityBookmark);
+registerBookmark('requests', 'requestId', 'request', requestBookmark);
 
 registry.registerPath({
   method: 'delete',
