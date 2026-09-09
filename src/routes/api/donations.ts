@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -67,18 +68,25 @@ router.post(
     const input = parsedBody<CreateDonationInput>(res);
     const user = await prisma.user.findUnique({ where: { id: input.userId } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
-    const donation = await prisma.donation.create({
-      data: {
-        userId: input.userId,
-        amount: input.amount,
-        email: input.email,
-        donatedAt: new Date(input.donatedAt),
-        currency: input.currency,
-        source: input.source,
-        reason: input.reason
-      },
-      include: { user: { select: { id: true, username: true } } }
-    });
+    let donation;
+    try {
+      donation = await prisma.donation.create({
+        data: {
+          userId: input.userId,
+          amount: input.amount,
+          email: input.email,
+          donatedAt: new Date(input.donatedAt),
+          currency: input.currency,
+          source: input.source,
+          reason: input.reason
+        },
+        include: { user: { select: { id: true, username: true } } }
+      });
+    } catch (err) {
+      // `userId` arrives in the BODY and the read above leaves its window
+      // open — the route exists, the payload names an absent user (#564).
+      translatePrismaError(err, { P2003: [400, 'User not found'] });
+    }
     await audit(
       prisma,
       req.user.id,
@@ -103,7 +111,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const donation = await prisma.donation.findUnique({ where: { id } });
     if (!donation) return res.status(404).json({ msg: 'Donation not found' });
-    await prisma.donation.delete({ where: { id } });
+    try {
+      await prisma.donation.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Donation not found'] });
+    }
     await audit(prisma, req.user.id, 'donation.delete', 'Donation', id);
     res.status(204).send();
   })

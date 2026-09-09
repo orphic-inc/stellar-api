@@ -7907,7 +7907,8 @@ registry.registerPath({
       description: 'Tag alias created',
       content: { 'application/json': { schema: TagAliasItem } }
     },
-    404: msgResponse('Canonical tag not found')
+    404: msgResponse('Canonical tag not found'),
+    409: msgResponse('That tag alias already exists')
   }
 });
 
@@ -7926,7 +7927,8 @@ registry.registerPath({
       description: 'Tag alias updated',
       content: { 'application/json': { schema: TagAliasItem } }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('Not found'),
+    409: msgResponse('That tag alias already exists')
   }
 });
 

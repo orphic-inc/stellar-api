@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -106,42 +107,50 @@ router.post(
     const slug = input.slug ?? normalizeRulesSlug(input.title);
     const body = sanitizeHtml(input.body);
 
-    const page = await prisma.$transaction(async (tx) => {
-      if (input.isMain) {
-        const existing = await tx.rulesPage.findFirst({
-          where: { isMain: true },
+    let page;
+    try {
+      page = await prisma.$transaction(async (tx) => {
+        if (input.isMain) {
+          const existing = await tx.rulesPage.findFirst({
+            where: { isMain: true },
+            select: { id: true }
+          });
+          if (existing)
+            throw new AppError(409, 'A main rules page already exists');
+        }
+
+        const existing = await tx.rulesPage.findUnique({
+          where: { slug },
           select: { id: true }
         });
         if (existing)
-          throw new AppError(409, 'A main rules page already exists');
-      }
+          throw new AppError(409, 'A page with this slug already exists');
 
-      const existing = await tx.rulesPage.findUnique({
-        where: { slug },
-        select: { id: true }
-      });
-      if (existing)
-        throw new AppError(409, 'A page with this slug already exists');
+        const created = await tx.rulesPage.create({
+          data: {
+            slug,
+            title: input.title,
+            body,
+            isMain: input.isMain ?? false,
+            sortOrder: input.sortOrder ?? 0,
+            authorId: req.user.id
+          },
+          select: pageSelect
+        });
 
-      const created = await tx.rulesPage.create({
-        data: {
-          slug,
+        await audit(tx, req.user.id, 'rules.create', 'RulesPage', created.id, {
           title: input.title,
-          body,
-          isMain: input.isMain ?? false,
-          sortOrder: input.sortOrder ?? 0,
-          authorId: req.user.id
-        },
-        select: pageSelect
+          slug,
+          isMain: created.isMain
+        });
+        return created;
       });
-
-      await audit(tx, req.user.id, 'rules.create', 'RulesPage', created.id, {
-        title: input.title,
-        slug,
-        isMain: created.isMain
+    } catch (err) {
+      // `RulesPage.slug` is unique; the read above leaves its window open.
+      translatePrismaError(err, {
+        P2002: [409, 'A page with this slug already exists']
       });
-      return created;
-    });
+    }
 
     res.status(201).json(page);
   })
@@ -157,38 +166,43 @@ router.put(
     const { id } = parsedParams<{ id: number }>(res);
     const input = parsedBody<UpdateRulesPageInput>(res);
 
-    const page = await prisma.$transaction(async (tx) => {
-      const existing = await tx.rulesPage.findUnique({
-        where: { id },
-        select: { id: true, isMain: true }
-      });
-      if (!existing) throw new AppError(404, 'Page not found');
-
-      if (input.isMain && !existing.isMain) {
-        const currentMain = await tx.rulesPage.findFirst({
-          where: { isMain: true },
-          select: { id: true }
+    let page;
+    try {
+      page = await prisma.$transaction(async (tx) => {
+        const existing = await tx.rulesPage.findUnique({
+          where: { id },
+          select: { id: true, isMain: true }
         });
-        if (currentMain)
-          throw new AppError(409, 'A main rules page already exists');
-      }
+        if (!existing) throw new AppError(404, 'Page not found');
 
-      const updated = await tx.rulesPage.update({
-        where: { id },
-        data: {
-          ...(input.title !== undefined && { title: input.title }),
-          ...(input.body !== undefined && { body: sanitizeHtml(input.body) }),
-          ...(input.isMain !== undefined && { isMain: input.isMain }),
-          ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder })
-        },
-        select: pageSelect
-      });
+        if (input.isMain && !existing.isMain) {
+          const currentMain = await tx.rulesPage.findFirst({
+            where: { isMain: true },
+            select: { id: true }
+          });
+          if (currentMain)
+            throw new AppError(409, 'A main rules page already exists');
+        }
 
-      await audit(tx, req.user.id, 'rules.edit', 'RulesPage', id, {
-        title: updated.title
+        const updated = await tx.rulesPage.update({
+          where: { id },
+          data: {
+            ...(input.title !== undefined && { title: input.title }),
+            ...(input.body !== undefined && { body: sanitizeHtml(input.body) }),
+            ...(input.isMain !== undefined && { isMain: input.isMain }),
+            ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder })
+          },
+          select: pageSelect
+        });
+
+        await audit(tx, req.user.id, 'rules.edit', 'RulesPage', id, {
+          title: updated.title
+        });
+        return updated;
       });
-      return updated;
-    });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Page not found'] });
+    }
 
     res.json(page);
   })
@@ -202,20 +216,24 @@ router.delete(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    await prisma.$transaction(async (tx) => {
-      const existing = await tx.rulesPage.findUnique({
-        where: { id },
-        select: { id: true, isMain: true, title: true }
-      });
-      if (!existing) throw new AppError(404, 'Page not found');
-      if (existing.isMain)
-        throw new AppError(400, 'Cannot delete the main rules page');
+    try {
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.rulesPage.findUnique({
+          where: { id },
+          select: { id: true, isMain: true, title: true }
+        });
+        if (!existing) throw new AppError(404, 'Page not found');
+        if (existing.isMain)
+          throw new AppError(400, 'Cannot delete the main rules page');
 
-      await tx.rulesPage.delete({ where: { id } });
-      await audit(tx, req.user.id, 'rules.delete', 'RulesPage', id, {
-        title: existing.title
+        await tx.rulesPage.delete({ where: { id } });
+        await audit(tx, req.user.id, 'rules.delete', 'RulesPage', id, {
+          title: existing.title
+        });
       });
-    });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Page not found'] });
+    }
 
     res.status(204).send();
   })

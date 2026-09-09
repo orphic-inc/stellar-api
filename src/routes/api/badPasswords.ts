@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -79,9 +80,18 @@ router.post(
       return res.status(409).json({ msg: 'Password is already denied' });
     }
 
-    const entry = await prisma.badPassword.create({
-      data: { password: normalized, source: 'STAFF' }
-    });
+    let entry;
+    try {
+      entry = await prisma.badPassword.create({
+        data: { password: normalized, source: 'STAFF' }
+      });
+    } catch (err) {
+      // `BadPassword.password` is unique and the model has no foreign key, so a
+      // duplicate is the only reachable code (#564).
+      translatePrismaError(err, {
+        P2002: [409, 'That password is already listed']
+      });
+    }
     await audit(
       prisma,
       req.user.id,
@@ -106,7 +116,13 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const entry = await prisma.badPassword.findUnique({ where: { id } });
     if (!entry) return res.status(404).json({ msg: 'Entry not found' });
-    await prisma.badPassword.delete({ where: { id } });
+    try {
+      await prisma.badPassword.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Entry not found']
+      });
+    }
     await audit(prisma, req.user.id, 'badpassword.delete', 'BadPassword', id);
     res.status(204).send();
   })

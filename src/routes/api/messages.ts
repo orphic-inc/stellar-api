@@ -2,6 +2,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -187,14 +188,19 @@ router.put(
     });
     if (!draft) return res.status(404).json({ msg: 'Draft not found' });
 
-    const updated = await prisma.pmDraft.update({
-      where: { id },
-      data: {
-        ...(toUserId !== undefined ? { toUserId } : { toUserId: null }),
-        subject,
-        body
-      }
-    });
+    let updated;
+    try {
+      updated = await prisma.pmDraft.update({
+        where: { id },
+        data: {
+          ...(toUserId !== undefined ? { toUserId } : { toUserId: null }),
+          subject,
+          body
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Draft not found'] });
+    }
     res.json(updated);
   })
 );
@@ -210,7 +216,11 @@ router.delete(
       where: { id, userId: req.user.id }
     });
     if (!draft) return res.status(404).json({ msg: 'Draft not found' });
-    await prisma.pmDraft.delete({ where: { id } });
+    try {
+      await prisma.pmDraft.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Draft not found'] });
+    }
     res.status(204).send();
   })
 );

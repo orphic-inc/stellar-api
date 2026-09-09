@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { SubscriptionPage } from '@prisma/client';
+import { Prisma, SubscriptionPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
@@ -31,11 +31,22 @@ router.post(
     const userId = req.user.id;
 
     if (action === 'subscribe') {
-      await prisma.subscription.upsert({
-        where: { userId_topicId: { userId, topicId } },
-        create: { userId, topicId },
-        update: {}
-      });
+      try {
+        await prisma.subscription.upsert({
+          where: { userId_topicId: { userId, topicId } },
+          create: { userId, topicId },
+          update: {}
+        });
+      } catch (err) {
+        // A concurrent subscribe won the unique race, which leaves the caller
+        // subscribed either way — the state they asked for (#564).
+        if (!(
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        )) {
+          throw err;
+        }
+      }
       res.status(204).send();
     } else if (action === 'unsubscribe') {
       await prisma.subscription.deleteMany({ where: { userId, topicId } });
@@ -85,11 +96,22 @@ router.post(
     const userId = req.user.id;
 
     if (action === 'subscribe') {
-      await prisma.commentSubscription.upsert({
-        where: { userId_page_pageId: { userId, page, pageId } },
-        create: { userId, page, pageId },
-        update: {}
-      });
+      try {
+        await prisma.commentSubscription.upsert({
+          where: { userId_page_pageId: { userId, page, pageId } },
+          create: { userId, page, pageId },
+          update: {}
+        });
+      } catch (err) {
+        // A concurrent subscribe won the unique race, which leaves the caller
+        // subscribed either way — the state they asked for (#564).
+        if (!(
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        )) {
+          throw err;
+        }
+      }
       res.status(204).send();
     } else if (action === 'unsubscribe') {
       await prisma.commentSubscription.deleteMany({

@@ -1,7 +1,8 @@
 import express from 'express';
 import { z } from 'zod';
-import { Prisma, FriendStatus } from '@prisma/client';
+import { FriendStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { AppError } from '../../lib/errors';
 import { sanitizePlain } from '../../lib/sanitize';
 import {
@@ -135,6 +136,78 @@ router.get(
   })
 );
 
+/**
+ * Accept an existing pending request, as the response body the route sends.
+ *
+ * Split out of the request handler to keep it inside Codacy's per-function
+ * limits once its #564 guard was added — a guard has to sit lexically in the
+ * handler that owns the write, so this branch moves instead.
+ */
+const acceptExisting = async (id: number) => {
+  let accepted;
+  try {
+    accepted = await prisma.friendRelationship.update({
+      where: { id },
+      data: { status: FriendStatus.accepted },
+      include: {
+        requester: { select: userSummary },
+        recipient: { select: userSummary }
+      }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2025: [404, 'No pending friend request from this user']
+    });
+  }
+  const friend = accepted.requester;
+  return {
+    id: accepted.id,
+    friendId: friend.id,
+    status: accepted.status,
+    comment: accepted.comment,
+    friend
+  };
+};
+
+/** The target must exist and be active before a request can be sent. */
+const assertRequestable = async (otherId: number): Promise<void> => {
+  const target = await prisma.user.findUnique({
+    where: { id: otherId },
+    select: { id: true, disabled: true }
+  });
+  if (!target || target.disabled) throw new AppError(404, 'User not found');
+};
+
+/**
+ * What to do about a relationship that already exists between the two users:
+ * refuse it, accept the reverse pending request (returning the response body),
+ * or clear a rejected row so a fresh request can be made (returning `null`).
+ */
+const resolveExisting = async (
+  existing: { id: number; status: FriendStatus; requesterId: number },
+  actorId: number
+) => {
+  if (existing.status === FriendStatus.accepted) {
+    throw new AppError(409, 'Already friends');
+  }
+  if (existing.status === FriendStatus.pending) {
+    if (existing.requesterId === actorId) {
+      throw new AppError(409, 'Friend request already pending');
+    }
+    // Reverse pending request exists → accept it instead of duplicating.
+    return acceptExisting(existing.id);
+  }
+  // A prior rejected row exists — clear it so a fresh request can be made.
+  try {
+    await prisma.friendRelationship.delete({ where: { id: existing.id } });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2025: [404, 'No pending friend request from this user']
+    });
+  }
+  return null;
+};
+
 // ─── POST /:userId — send a friend request ────────────────────────────────────
 // If the target has already sent the actor a pending request, this accepts it
 // (so two opposite-direction pending rows never coexist).
@@ -149,47 +222,18 @@ router.post(
       throw new AppError(400, 'Cannot add yourself as a friend');
     }
 
-    const target = await prisma.user.findUnique({
-      where: { id: otherId },
-      select: { id: true, disabled: true }
-    });
-    if (!target || target.disabled) {
-      throw new AppError(404, 'User not found');
-    }
+    await assertRequestable(otherId);
 
     const existing = await prisma.friendRelationship.findFirst({
       where: betweenUsers(req.user.id, otherId)
     });
 
     if (existing) {
-      if (existing.status === FriendStatus.accepted) {
-        throw new AppError(409, 'Already friends');
-      }
-      if (existing.status === FriendStatus.pending) {
-        if (existing.requesterId === req.user.id) {
-          throw new AppError(409, 'Friend request already pending');
-        }
-        // Reverse pending request exists → accept it instead of duplicating.
-        const accepted = await prisma.friendRelationship.update({
-          where: { id: existing.id },
-          data: { status: FriendStatus.accepted },
-          include: {
-            requester: { select: userSummary },
-            recipient: { select: userSummary }
-          }
-        });
-        const friend = accepted.requester;
-        res.status(200).json({
-          id: accepted.id,
-          friendId: friend.id,
-          status: accepted.status,
-          comment: accepted.comment,
-          friend
-        });
+      const accepted = await resolveExisting(existing, req.user.id);
+      if (accepted) {
+        res.status(200).json(accepted);
         return;
       }
-      // A prior rejected row exists — clear it so a fresh request can be made.
-      await prisma.friendRelationship.delete({ where: { id: existing.id } });
     }
 
     let created;
@@ -199,13 +243,10 @@ router.post(
         include: { recipient: { select: userSummary } }
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'Friend request already pending');
-        }
-        if (err.code === 'P2003') throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2002: [409, 'Friend request already pending'],
+        P2003: [404, 'User not found']
+      });
     }
 
     res.status(201).json({
@@ -236,11 +277,18 @@ router.post(
     if (!pending) {
       throw new AppError(404, 'No pending friend request from this user');
     }
-    const accepted = await prisma.friendRelationship.update({
-      where: { id: pending.id },
-      data: { status: FriendStatus.accepted },
-      include: { requester: { select: userSummary } }
-    });
+    let accepted;
+    try {
+      accepted = await prisma.friendRelationship.update({
+        where: { id: pending.id },
+        data: { status: FriendStatus.accepted },
+        include: { requester: { select: userSummary } }
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'No pending friend request from this user']
+      });
+    }
     res.json({
       id: accepted.id,
       friendId: accepted.requester.id,

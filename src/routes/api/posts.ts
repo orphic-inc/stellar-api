@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
@@ -102,7 +103,11 @@ router.delete(
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
-    await prisma.post.delete({ where: { id } });
+    try {
+      await prisma.post.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Post not found'] });
+    }
     res.status(204).send();
   })
 );
@@ -118,10 +123,17 @@ router.post(
     const { text } = parsedBody<PostCommentInput>(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
-    const comment = await prisma.postComment.create({
-      data: { postId: id, userId: req.user.id, text },
-      include: { user: { select: authorRefSelect } }
-    });
+    let comment;
+    try {
+      comment = await prisma.postComment.create({
+        data: { postId: id, userId: req.user.id, text },
+        include: { user: { select: authorRefSelect } }
+      });
+    } catch (err) {
+      // `postId` is the PATH id; `userId` is session-derived. The read above
+      // leaves the window this closes (#564).
+      translatePrismaError(err, { P2003: [404, 'Post not found'] });
+    }
     res.status(201).json({ ...comment, user: toAuthorRefOrNull(comment.user) });
   })
 );
@@ -142,7 +154,11 @@ router.delete(
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
     if (comment.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
-    await prisma.postComment.delete({ where: { id: commentId } });
+    try {
+      await prisma.postComment.delete({ where: { id: commentId } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Comment not found'] });
+    }
     res.status(204).send();
   })
 );

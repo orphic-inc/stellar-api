@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -86,7 +87,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const entry = await prisma.emailBlacklist.findUnique({ where: { id } });
     if (!entry) return res.status(404).json({ msg: 'Entry not found' });
-    await prisma.emailBlacklist.delete({ where: { id } });
+    try {
+      await prisma.emailBlacklist.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Entry not found'] });
+    }
     await audit(
       prisma,
       req.user.id,
