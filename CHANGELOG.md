@@ -304,6 +304,37 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   stays green with the change reverted. It earns its place for a map passed by
   reference, which the checker's own tests now cover.
 
+- **`/communities` and `/wiki`: 18 constraint violations that answered 500**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — the first
+  batch written against `translatePrismaError` from the start.
+
+  **The wiki revision writes are the interesting half.** `WikiRevision` is unique
+  on `(pageId, revision)`, so a second editor who saves first takes the next
+  revision number and the slower save raised P2002 — a lost edit race reported as
+  a server error, telling the caller nothing about reloading. Both the edit and
+  rollback paths now answer `409` with a message that says to reload.
+
+  **The membership and curator routes write relations.** `connect`/`disconnect`
+  raises P2025 when either side has gone, and the code does not say which, so
+  those messages name both rather than guessing.
+
+  **One deliberate departure from the body-id rule.** A dangling `leaderId`
+  arrives in the body, which the rule answers `400` — but `POST /communities`
+  already answers `404` for exactly that from its own read, and a route
+  contradicting itself is worse than the rule bending. Both paths answer `404`.
+
+  Six operations gain a declaration; the other nine already declared the code
+  they could not emit, which is now the fourth surface-set running.
+
+  Guard coverage: **55 → 37 unreviewed**, 61 → 79 guarded.
+
+  `wiki.ts` also gains three small extractions — `resolveCreateLevels`,
+  `keptLevel` and `EDIT_PAGE_SELECT`. The guards pushed two handlers further past
+  Codacy's per-function limits, and a guard cannot move without becoming
+  invisible to `prisma:guard-coverage`, so the room came from logic it does not
+  touch. **Every function in the file is now inside those limits — `main` had two
+  that were not.**
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

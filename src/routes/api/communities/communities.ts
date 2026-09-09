@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { RegistrationStatus, StatSnapshotPeriod } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { AppError } from '../../../lib/errors';
 import type { AuthenticatedRequest } from '../../../types/auth';
 import { audit } from '../../../lib/audit';
@@ -210,11 +211,23 @@ router.post(
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
 
-    const consumer = await prisma.consumer.upsert({
-      where: { userId },
-      create: { userId, communities: { connect: { id } } },
-      update: { communities: { connect: { id } } }
-    });
+    let consumer;
+    try {
+      consumer = await prisma.consumer.upsert({
+        where: { userId },
+        create: { userId, communities: { connect: { id } } },
+        update: { communities: { connect: { id } } }
+      });
+    } catch (err) {
+      // The `connect` raises P2025 when the community is gone, the FK raises
+      // P2003 when the user is, and neither says which — so the message names
+      // both. The read above already answers the ordinary missing-user case
+      // with a 404, so 404 stays the honest status here (#564).
+      translatePrismaError(err, {
+        P2025: [404, 'Community or user not found'],
+        P2003: [404, 'Community or user not found']
+      });
+    }
     res.status(201).json(consumer);
   })
 );
@@ -249,10 +262,16 @@ router.delete(
     const consumer = await prisma.consumer.findUnique({ where: { userId } });
     if (!consumer) return res.status(404).json({ msg: 'User not found' });
 
-    await prisma.consumer.update({
-      where: { userId },
-      data: { communities: { disconnect: { id } } }
-    });
+    try {
+      await prisma.consumer.update({
+        where: { userId },
+        data: { communities: { disconnect: { id } } }
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Community or user not found']
+      });
+    }
     res.status(204).send();
   })
 );
@@ -272,10 +291,16 @@ router.post(
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
 
-    await prisma.community.update({
-      where: { id },
-      data: { curators: { connect: { id: userId } } }
-    });
+    try {
+      await prisma.community.update({
+        where: { id },
+        data: { curators: { connect: { id: userId } } }
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Community or user not found']
+      });
+    }
     res.status(204).send();
   })
 );
@@ -290,10 +315,16 @@ router.delete(
 
     await assertCommunityAdminOrCurator(id, req, res);
 
-    await prisma.community.update({
-      where: { id },
-      data: { curators: { disconnect: { id: userId } } }
-    });
+    try {
+      await prisma.community.update({
+        where: { id },
+        data: { curators: { disconnect: { id: userId } } }
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Community or user not found']
+      });
+    }
     res.status(204).send();
   })
 );
@@ -338,23 +369,35 @@ router.post(
       ...(leaderId !== undefined ? [leaderId] : [])
     ];
 
-    const community = await prisma.community.create({
-      data: {
-        name,
-        ...(description !== undefined && { description }),
-        type,
-        registrationStatus,
-        image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
-        ...(announceVisibility !== undefined && { announceVisibility }),
-        ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
-        ...(leaderId !== undefined && { leaderId }),
-        ...(allCuratorIds.length && {
-          curators: {
-            connect: [...new Set(allCuratorIds)].map((cid) => ({ id: cid }))
-          }
-        })
-      }
-    });
+    let community;
+    try {
+      community = await prisma.community.create({
+        data: {
+          name,
+          ...(description !== undefined && { description }),
+          type,
+          registrationStatus,
+          image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
+          ...(announceVisibility !== undefined && { announceVisibility }),
+          ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
+          ...(leaderId !== undefined && { leaderId }),
+          ...(allCuratorIds.length && {
+            curators: {
+              connect: [...new Set(allCuratorIds)].map((cid) => ({ id: cid }))
+            }
+          })
+        }
+      });
+    } catch (err) {
+      // `Community.name` is unique. `leaderId` is a body-supplied foreign key,
+      // which the general rule would answer 400 — but the read above already
+      // answers 404 for exactly this, and one route contradicting itself is
+      // worse than the rule bending (#564).
+      translatePrismaError(err, {
+        P2002: [409, 'A community with that name already exists'],
+        P2003: [404, 'Leader user not found']
+      });
+    }
 
     // No Consumer is written for the leader (ADR-0033 §Decision 3). That upsert
     // existed only so the old `consumer ∪ contributor` checks would pass; the
@@ -411,27 +454,40 @@ router.put(
         ? [...new Set([...curatorIds, leaderId])]
         : curatorIds;
 
-    const community = await prisma.community.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(description !== undefined && { description }),
-        ...(image !== undefined && { image }),
-        ...(registrationStatus !== undefined && { registrationStatus }),
-        ...(announceVisibility !== undefined && { announceVisibility }),
-        ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
-        ...(leaderId !== undefined && { leaderId }),
-        ...(curatorConnect !== undefined && {
-          curators: { set: curatorConnect.map((cid: number) => ({ id: cid })) }
-        }),
-        // Leader given but curator set untouched: connect (don't replace) so the
-        // invariant holds without disturbing existing curators.
-        ...(leaderId !== undefined &&
-          curatorIds === undefined && {
-            curators: { connect: { id: leaderId } }
-          })
-      }
-    });
+    let community;
+    try {
+      community = await prisma.community.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(image !== undefined && { image }),
+          ...(registrationStatus !== undefined && { registrationStatus }),
+          ...(announceVisibility !== undefined && { announceVisibility }),
+          ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
+          ...(leaderId !== undefined && { leaderId }),
+          ...(curatorConnect !== undefined && {
+            curators: {
+              set: curatorConnect.map((cid: number) => ({ id: cid }))
+            }
+          }),
+          // Leader given but curator set untouched: connect (don't replace) so the
+          // invariant holds without disturbing existing curators.
+          ...(leaderId !== undefined &&
+            curatorIds === undefined && {
+              curators: { connect: { id: leaderId } }
+            })
+        }
+      });
+    } catch (err) {
+      // P2025 is the community going away; P2003 can only be `leaderId`, so the
+      // two are distinguishable here. Matches the create path's wording (#564).
+      translatePrismaError(err, {
+        P2025: [404, 'Community not found'],
+        P2002: [409, 'A community with that name already exists'],
+        P2003: [404, 'Leader user not found']
+      });
+    }
 
     // No Consumer upsert here either — see the create path (ADR-0033 §3).
     if (leaderId !== undefined) {
@@ -458,7 +514,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
-    await prisma.community.delete({ where: { id } });
+    try {
+      await prisma.community.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Community not found'] });
+    }
     res.status(204).send();
   })
 );

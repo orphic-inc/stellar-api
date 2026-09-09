@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
@@ -79,9 +80,16 @@ router.post(
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
 
-    const entry = await prisma.doNotContribute.create({
-      data: { communityId, name, comment, userId: req.user.id }
-    });
+    let entry;
+    try {
+      entry = await prisma.doNotContribute.create({
+        data: { communityId, name, comment, userId: req.user.id }
+      });
+    } catch (err) {
+      // `communityId` is the PATH id and the only foreign key that can dangle —
+      // `userId` comes from the session. The read above leaves the window (#564).
+      translatePrismaError(err, { P2003: [404, 'Community not found'] });
+    }
     res.status(201).json(entry);
   })
 );
@@ -102,7 +110,11 @@ router.delete(
     });
     if (!entry) return res.status(404).json({ msg: 'DNC entry not found' });
 
-    await prisma.doNotContribute.delete({ where: { id: dncId } });
+    try {
+      await prisma.doNotContribute.delete({ where: { id: dncId } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'DNC entry not found'] });
+    }
     res.status(204).send();
   })
 );
