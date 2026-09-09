@@ -33,8 +33,11 @@ router.get(
   '/artists',
   requireAuth,
   authHandler(async (req, res) => {
+    // A bookmark list IS an artist list, which `Artist.deletedAt` says filters
+    // withdrawn artists out (#573). Unfiltered, this handed the member a name
+    // whose own detail route answers 404 — a dead entry in their own list.
     const bookmarks = await prisma.bookmarkArtist.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id, artist: { deletedAt: null } },
       include: { artist: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' }
     });

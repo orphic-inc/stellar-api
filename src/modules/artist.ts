@@ -1,8 +1,37 @@
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
 
 type ArtistHistorySnapshot = {
   name?: string;
   vanityHouse?: boolean;
+};
+
+/**
+ * The `Artist.deletedAt` invariant as one call (#573).
+ *
+ * A soft-deleted artist keeps a live row, so a foreign key to it still
+ * resolves and `findUnique({ where: { id } })` still finds it. Every surface
+ * that treats an artist as a catalogue entry has to add `deletedAt: null`
+ * itself, and four did not — `GET /{id}/similar`, `GET /history/{artistId}`
+ * and both subscribe reads — because the sweep that added it to the direct
+ * reads only looked at handlers naming `prisma.artist`.
+ *
+ * `onMissing` is a `[status, message]` tuple, the same shape
+ * `translatePrismaError` takes, so a route keeps the answer it already gives
+ * for the adjacent case. A path id defaults to `404`. The two POST bodies take
+ * `[400, ...]` instead, because their ids arrive in the body and the route
+ * itself exists (#564's rule) — and they already answer exactly that for a
+ * dangling id, so a withdrawn one must not answer differently.
+ */
+export const assertArtistLive = async (
+  id: number,
+  onMissing: [number, string] = [404, 'Artist not found']
+): Promise<void> => {
+  const artist = await prisma.artist.findUnique({
+    where: { id, deletedAt: null },
+    select: { id: true }
+  });
+  if (!artist) throw new AppError(onMissing[0], onMissing[1]);
 };
 
 export const createArtist = async (

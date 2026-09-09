@@ -27,6 +27,22 @@ describe('GET /api/bookmarks/artists', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].artist.name).toBe('Miles Davis');
   });
+
+  it('excludes bookmarks whose artist has been withdrawn (#573)', async () => {
+    // A bookmark list is an artist list, so `Artist.deletedAt` applies. Asserts
+    // the where-clause: the mock returns whatever it is told, so the payload
+    // cannot prove the filter. Unfiltered, this handed back a name whose own
+    // detail route answers 404 — a dead entry in the member's own list.
+    prismaMock.bookmarkArtist.findMany.mockResolvedValue([] as never);
+
+    await request(app).get('/api/bookmarks/artists');
+
+    expect(prismaMock.bookmarkArtist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 7, artist: { deletedAt: null } }
+      })
+    );
+  });
 });
 
 describe('POST /api/bookmarks/artists/:artistId', () => {

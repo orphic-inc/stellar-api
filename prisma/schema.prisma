@@ -909,15 +909,29 @@ model Artist {
   id             Int                  @id @default(autoincrement())
   name           String
   vanityHouse    Boolean              @default(false)
-  /// Soft delete (#509 F3). Set by `DELETE /api/artists/:id`; every artist
-  /// list, search, count and detail read filters it out. A hard delete is not
-  /// available here: artist_histories, release credits, tags, aliases,
+  /// Soft delete (#509 F3). Set by `DELETE /api/artists/:id`. A hard delete is
+  /// not available here: artist_histories, release credits, tags, aliases,
   /// comments, bookmarks, subscriptions and both similar-artist sides are all
   /// `ON DELETE RESTRICT`, and `createArtist` writes a history row at creation,
   /// so `prisma.artist.delete()` could only ever raise a foreign-key error.
-  /// Credits already rendered on a release keep resolving, which is deliberate:
-  /// withdrawing a catalogue entry must not blank the artist line on every
-  /// release that cites it.
+  ///
+  /// The invariant, in two halves — #573 was the second half being missed.
+  ///
+  /// FILTERED — every read that presents an artist AS a catalogue entry. That
+  /// covers the direct list/search/count/detail reads AND relation reads that
+  /// reach an artist through a join row: similar-artist (both directions),
+  /// aliases, and a member's artist bookmarks. A soft-deleted artist keeps a
+  /// live row, so a foreign key to it still resolves and `findUnique` still
+  /// finds it — each of these has to say `deletedAt: null` itself. Use
+  /// `assertArtistLive` in modules/artist.ts for the by-id case rather than
+  /// open-coding it; the four routes that open-coded nothing are what #573 was.
+  ///
+  /// NOT FILTERED, deliberately — a citation of the artist as author of a work
+  /// that still exists: release credits, contribution collaborators, and the
+  /// artists named on a release request. Withdrawing a catalogue entry must not
+  /// blank the artist line on every release, contribution or request that cites
+  /// it. Adding a relation here is a decision, not an oversight: say which half
+  /// it belongs to.
   deletedAt      DateTime?
   histories      ArtistHistory[]
   aliases        ArtistAlias[]        @relation("ArtistAliases")
