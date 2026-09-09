@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -56,10 +57,15 @@ router.put(
     const { title, body } = parsedBody<SiteHistoryInput>(res);
     const existing = await prisma.siteHistory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Entry not found' });
-    const entry = await prisma.siteHistory.update({
-      where: { id },
-      data: { title, body }
-    });
+    let entry;
+    try {
+      entry = await prisma.siteHistory.update({
+        where: { id },
+        data: { title, body }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Entry not found'] });
+    }
     res.json(entry);
   })
 );
@@ -73,7 +79,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.siteHistory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Entry not found' });
-    await prisma.siteHistory.delete({ where: { id } });
+    try {
+      await prisma.siteHistory.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Entry not found'] });
+    }
     res.status(204).send();
   })
 );

@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { auth as authConfig, email as emailConfig } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
@@ -272,10 +273,14 @@ router.delete(
     });
     if (!session) return res.status(404).json({ msg: 'Session not found' });
 
-    await prisma.userSession.update({
-      where: { id },
-      data: { revokedAt: new Date() }
-    });
+    try {
+      await prisma.userSession.update({
+        where: { id },
+        data: { revokedAt: new Date() }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Session not found'] });
+    }
     res.status(204).send();
   })
 );

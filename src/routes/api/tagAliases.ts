@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -62,13 +63,22 @@ router.post(
       where: { name: goodTagName }
     });
     if (!goodTag) throw new AppError(404, `Tag "${goodTagName}" not found`);
-    const alias = await prisma.tagAlias.create({
-      data: { badTag, goodTagId: goodTag.id, createdById: req.user.id },
-      include: {
-        goodTag: { select: { id: true, name: true } },
-        createdBy: { select: { id: true, username: true } }
-      }
-    });
+    let alias;
+    try {
+      alias = await prisma.tagAlias.create({
+        data: { badTag, goodTagId: goodTag.id, createdById: req.user.id },
+        include: {
+          goodTag: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, username: true } }
+        }
+      });
+    } catch (err) {
+      // `TagAlias.badTag` is unique. `goodTagId` is read above and
+      // `createdById` is session-derived, so P2002 is what remains (#564).
+      translatePrismaError(err, {
+        P2002: [409, 'That tag alias already exists']
+      });
+    }
     res.status(201).json(alias);
   })
 );
@@ -89,14 +99,22 @@ router.put(
       where: { name: goodTagName }
     });
     if (!goodTag) throw new AppError(404, `Tag "${goodTagName}" not found`);
-    const alias = await prisma.tagAlias.update({
-      where: { id },
-      data: { badTag, goodTagId: goodTag.id },
-      include: {
-        goodTag: { select: { id: true, name: true } },
-        createdBy: { select: { id: true, username: true } }
-      }
-    });
+    let alias;
+    try {
+      alias = await prisma.tagAlias.update({
+        where: { id },
+        data: { badTag, goodTagId: goodTag.id },
+        include: {
+          goodTag: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, username: true } }
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2025: [404, 'Tag alias not found'],
+        P2002: [409, 'That tag alias already exists']
+      });
+    }
     res.json(alias);
   })
 );
@@ -110,7 +128,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.tagAlias.findUnique({ where: { id } });
     if (!existing) throw new AppError(404, 'Tag alias not found');
-    await prisma.tagAlias.delete({ where: { id } });
+    try {
+      await prisma.tagAlias.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Tag alias not found'] });
+    }
     res.status(204).send();
   })
 );

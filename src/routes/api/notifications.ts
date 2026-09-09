@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { validateParams } from '../../middleware/validate';
@@ -238,10 +239,14 @@ router.post(
     if (notif.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
     if (!notif.readAt) {
-      await prisma.notification.update({
-        where: { id },
-        data: { readAt: new Date() }
-      });
+      try {
+        await prisma.notification.update({
+          where: { id },
+          data: { readAt: new Date() }
+        });
+      } catch (err) {
+        translatePrismaError(err, { P2025: [404, 'Notification not found'] });
+      }
     }
     res.status(204).send();
   })
@@ -258,7 +263,11 @@ router.delete(
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
-    await prisma.notification.delete({ where: { id } });
+    try {
+      await prisma.notification.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Notification not found'] });
+    }
     res.status(204).send();
   })
 );

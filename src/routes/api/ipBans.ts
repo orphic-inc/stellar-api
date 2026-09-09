@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -120,7 +121,11 @@ router.delete(
     const { id } = parsedParams<{ id: number }>(res);
     const ban = await prisma.ipBan.findUnique({ where: { id } });
     if (!ban) return res.status(404).json({ msg: 'Ban not found' });
-    await prisma.ipBan.delete({ where: { id } });
+    try {
+      await prisma.ipBan.delete({ where: { id } });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Ban not found'] });
+    }
     // Likewise on the way out — an unbanned network must not stay locked out
     // for the rest of the TTL.
     invalidateIpBanCache();

@@ -335,6 +335,33 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   touch. **Every function in the file is now inside those limits — `main` had two
   that were not.**
 
+- **The last 37: `prisma:guard-coverage` reads 0 unreviewed**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — sixteen
+  surfaces, none of them big enough to have earned a PR on its own, which is
+  exactly why they survived five earlier passes and appear in none of the
+  issue's tallies. The gate is what surfaced them.
+
+  **29 sites gained a guard; 8 are recorded as internally derived**, each with
+  its reason — a session-derived author, a row addressed by the caller's own
+  session id, or an install transaction whose foreign keys it created itself.
+  The gated route backlog is now **108 guarded / 11 internally derived / 0
+  unreviewed**.
+
+  **Six guard messages were rewritten to match the 404 their own route already
+  answers.** `/ip-bans` says `Ban not found`, `/bad-passwords` and
+  `/email-blacklist` say `Entry not found`, and so on. Inventing a second wording
+  for the same condition would have made a route contradict itself.
+
+  Two operations gain a declaration (`409` on `POST` and `PUT /tag-aliases`); the
+  other twenty-five already declared the code they could not emit — the fifth
+  surface-set running.
+
+  `friends.ts` and `comments.ts` gain four small extractions, for the same reason
+  as the earlier batches: a guard must sit lexically in its handler, so the room
+  comes from logic it does not touch. **Across every file this touches, functions
+  over Codacy's per-function limits go from four to three — one eliminated, one
+  improved, none made worse.**
+
 ## [0.9.2] — 2026-09-08
 
 ### Added

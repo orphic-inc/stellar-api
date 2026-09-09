@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { CommentPage, SubscriptionPage } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import {
   emitNotifications,
   extractMentionedUsernames,
@@ -31,6 +32,38 @@ import {
 import { deleteComment } from '../../modules/comment';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
+
+/** Which comment page maps to which subscription page, and the id field on the
+ *  comment that identifies the thing subscribed to. A table rather than six
+ *  branches, so the lookup below stays trivial. */
+const SUBSCRIPTION_TARGETS: Partial<
+  Record<CommentPage, { subPage: SubscriptionPage; field: string }>
+> = {
+  release: { subPage: 'release', field: 'releaseId' },
+  requests: { subPage: 'requests', field: 'requestId' },
+  artist: { subPage: 'artist', field: 'artistId' },
+  collages: { subPage: 'collages', field: 'collageId' },
+  communities: { subPage: 'communities', field: 'communityId' },
+  contributions: { subPage: 'contributions', field: 'contributionId' }
+};
+
+/**
+ * Which subscription page a comment belongs to, and the id within it.
+ *
+ * Lifted out of the edit handler so it keeps room for its #564 guard — a guard
+ * must sit lexically in the handler that owns the write, so the surrounding
+ * logic is what moves.
+ */
+const subscriptionTargetFor = (
+  comment: Record<string, unknown> & { page: string }
+): { subPage: SubscriptionPage; pageId: number | undefined } | undefined => {
+  const target = SUBSCRIPTION_TARGETS[comment.page as CommentPage];
+  if (!target) return undefined;
+  return {
+    subPage: target.subPage,
+    pageId: (comment[target.field] as number | null) ?? undefined
+  };
+};
 
 const router = express.Router();
 const commentIdParamsSchema = z.object({
@@ -154,63 +187,73 @@ router.post(
     };
     const subTarget = subPageMap[page];
 
-    const comment = await prisma.$transaction(async (tx) => {
-      const created = await tx.comment.create({
-        data: {
-          page,
-          body: sanitizeHtml(body),
-          authorId: req.user.id,
-          ...(communityId && { communityId }),
-          ...(contributionId && { contributionId }),
-          ...(requestId && { requestId }),
-          ...(artistId && { artistId }),
-          ...(releaseId && { releaseId }),
-          ...(collageId && { collageId })
-        },
-        include: {
-          author: { select: authorRefSelect }
-        }
-      });
-
-      if (subTarget?.pageId) {
-        const subs = await tx.commentSubscription.findMany({
-          where: { page: subTarget.subPage, pageId: subTarget.pageId },
-          select: { userId: true }
+    let comment;
+    try {
+      comment = await prisma.$transaction(async (tx) => {
+        const created = await tx.comment.create({
+          data: {
+            page,
+            body: sanitizeHtml(body),
+            authorId: req.user.id,
+            ...(communityId && { communityId }),
+            ...(contributionId && { contributionId }),
+            ...(requestId && { requestId }),
+            ...(artistId && { artistId }),
+            ...(releaseId && { releaseId }),
+            ...(collageId && { collageId })
+          },
+          include: {
+            author: { select: authorRefSelect }
+          }
         });
-        if (subs.length > 0) {
-          await emitNotifications(tx, {
-            userIds: subs.map((s) => s.userId),
-            type: 'comment_sub',
-            actorId: req.user.id,
-            page: subTarget.subPage,
-            pageId: subTarget.pageId
+
+        if (subTarget?.pageId) {
+          const subs = await tx.commentSubscription.findMany({
+            where: { page: subTarget.subPage, pageId: subTarget.pageId },
+            select: { userId: true }
           });
+          if (subs.length > 0) {
+            await emitNotifications(tx, {
+              userIds: subs.map((s) => s.userId),
+              type: 'comment_sub',
+              actorId: req.user.id,
+              page: subTarget.subPage,
+              pageId: subTarget.pageId
+            });
+          }
+
+          const quotedUsernames = extractMentionedUsernames(body);
+          if (quotedUsernames.length > 0) {
+            const quotedUsers = await tx.user.findMany({
+              where: {
+                username: { in: quotedUsernames, mode: 'insensitive' },
+                disabled: false
+              },
+              select: { id: true }
+            });
+            // postId stores the comment id for potential future deep-link use;
+            // the UI only uses postId for forum-page anchors so this is safe for all other pages.
+            await emitNotifications(tx, {
+              userIds: quotedUsers.map((u) => u.id),
+              type: 'forum_quote',
+              actorId: req.user.id,
+              page: subTarget.subPage,
+              pageId: subTarget.pageId,
+              postId: created.id
+            });
+          }
         }
 
-        const quotedUsernames = extractMentionedUsernames(body);
-        if (quotedUsernames.length > 0) {
-          const quotedUsers = await tx.user.findMany({
-            where: {
-              username: { in: quotedUsernames, mode: 'insensitive' },
-              disabled: false
-            },
-            select: { id: true }
-          });
-          // postId stores the comment id for potential future deep-link use;
-          // the UI only uses postId for forum-page anchors so this is safe for all other pages.
-          await emitNotifications(tx, {
-            userIds: quotedUsers.map((u) => u.id),
-            type: 'forum_quote',
-            actorId: req.user.id,
-            page: subTarget.subPage,
-            pageId: subTarget.pageId,
-            postId: created.id
-          });
-        }
-      }
-
-      return created;
-    });
+        return created;
+      });
+    } catch (err) {
+      // Every id in the body names another model — an artist, community,
+      // contribution, request, release or collage — so a dangling one is a
+      // payload problem rather than a missing route (#564).
+      translatePrismaError(err, {
+        P2003: [400, 'The commented item was not found']
+      });
+    }
 
     res.status(201).json({
       ...comment,
@@ -234,69 +277,49 @@ router.put(
     if (comment.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.comment.update({
-        where: { id },
-        data: {
-          body: sanitizeHtml(body),
-          editedUserId: req.user.id,
-          editedAt: new Date()
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        const result = await tx.comment.update({
+          where: { id },
+          data: {
+            body: sanitizeHtml(body),
+            editedUserId: req.user.id,
+            editedAt: new Date()
+          }
+        });
+
+        const subTarget = subscriptionTargetFor(comment);
+
+        if (subTarget?.pageId) {
+          const newlyQuotedUsernames = extractNewMentionedUsernames(
+            comment.body,
+            body
+          );
+          if (newlyQuotedUsernames.length > 0) {
+            const quotedUsers = await tx.user.findMany({
+              where: {
+                username: { in: newlyQuotedUsernames, mode: 'insensitive' },
+                disabled: false
+              },
+              select: { id: true }
+            });
+            await emitNotifications(tx, {
+              userIds: quotedUsers.map((u) => u.id),
+              type: 'forum_quote',
+              actorId: req.user.id,
+              page: subTarget.subPage,
+              pageId: subTarget.pageId,
+              postId: id
+            });
+          }
         }
+
+        return result;
       });
-
-      const subPageMap: Partial<
-        Record<
-          CommentPage,
-          { subPage: SubscriptionPage; pageId: number | undefined }
-        >
-      > = {
-        release: { subPage: 'release', pageId: comment.releaseId ?? undefined },
-        requests: {
-          subPage: 'requests',
-          pageId: comment.requestId ?? undefined
-        },
-        artist: { subPage: 'artist', pageId: comment.artistId ?? undefined },
-        collages: {
-          subPage: 'collages',
-          pageId: comment.collageId ?? undefined
-        },
-        communities: {
-          subPage: 'communities',
-          pageId: comment.communityId ?? undefined
-        },
-        contributions: {
-          subPage: 'contributions',
-          pageId: comment.contributionId ?? undefined
-        }
-      };
-      const subTarget = subPageMap[comment.page as CommentPage];
-
-      if (subTarget?.pageId) {
-        const newlyQuotedUsernames = extractNewMentionedUsernames(
-          comment.body,
-          body
-        );
-        if (newlyQuotedUsernames.length > 0) {
-          const quotedUsers = await tx.user.findMany({
-            where: {
-              username: { in: newlyQuotedUsernames, mode: 'insensitive' },
-              disabled: false
-            },
-            select: { id: true }
-          });
-          await emitNotifications(tx, {
-            userIds: quotedUsers.map((u) => u.id),
-            type: 'forum_quote',
-            actorId: req.user.id,
-            page: subTarget.subPage,
-            pageId: subTarget.pageId,
-            postId: id
-          });
-        }
-      }
-
-      return result;
-    });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Comment not found'] });
+    }
 
     res.json({
       ...updated,

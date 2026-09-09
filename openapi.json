@@ -32356,6 +32356,16 @@
               }
             }
           },
+          "409": {
+            "description": "That tag alias already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -32457,6 +32467,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That tag alias already exists",
             "content": {
               "application/json": {
                 "schema": {
