@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { CommentPage, SubscriptionPage } from '@prisma/client';
+import { Prisma, CommentPage, SubscriptionPage } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
@@ -63,6 +63,55 @@ const subscriptionTargetFor = (
     subPage: target.subPage,
     pageId: (comment[target.field] as number | null) ?? undefined
   };
+};
+
+/** Tell everyone subscribed to the page that a new comment landed. */
+const notifySubscribers = async (
+  tx: Prisma.TransactionClient,
+  target: { subPage: SubscriptionPage; pageId: number },
+  actorId: number
+): Promise<void> => {
+  const subs = await tx.commentSubscription.findMany({
+    where: { page: target.subPage, pageId: target.pageId },
+    select: { userId: true }
+  });
+  if (subs.length === 0) return;
+  await emitNotifications(tx, {
+    userIds: subs.map((s) => s.userId),
+    type: 'comment_sub',
+    actorId,
+    page: target.subPage,
+    pageId: target.pageId
+  });
+};
+
+/** Tell anyone the comment body quotes that they were mentioned. */
+const notifyQuoted = async (
+  tx: Prisma.TransactionClient,
+  target: { subPage: SubscriptionPage; pageId: number },
+  actorId: number,
+  body: string,
+  commentId: number
+): Promise<void> => {
+  const usernames = extractMentionedUsernames(body);
+  if (usernames.length === 0) return;
+  const quoted = await tx.user.findMany({
+    where: {
+      username: { in: usernames, mode: 'insensitive' },
+      disabled: false
+    },
+    select: { id: true }
+  });
+  // postId stores the comment id for potential future deep-link use; the UI only
+  // uses postId for forum-page anchors, so this is safe for all other pages.
+  await emitNotifications(tx, {
+    userIds: quoted.map((u) => u.id),
+    type: 'forum_quote',
+    actorId,
+    page: target.subPage,
+    pageId: target.pageId,
+    postId: commentId
+  });
 };
 
 const router = express.Router();
@@ -207,41 +256,11 @@ router.post(
           }
         });
 
-        if (subTarget?.pageId) {
-          const subs = await tx.commentSubscription.findMany({
-            where: { page: subTarget.subPage, pageId: subTarget.pageId },
-            select: { userId: true }
-          });
-          if (subs.length > 0) {
-            await emitNotifications(tx, {
-              userIds: subs.map((s) => s.userId),
-              type: 'comment_sub',
-              actorId: req.user.id,
-              page: subTarget.subPage,
-              pageId: subTarget.pageId
-            });
-          }
-
-          const quotedUsernames = extractMentionedUsernames(body);
-          if (quotedUsernames.length > 0) {
-            const quotedUsers = await tx.user.findMany({
-              where: {
-                username: { in: quotedUsernames, mode: 'insensitive' },
-                disabled: false
-              },
-              select: { id: true }
-            });
-            // postId stores the comment id for potential future deep-link use;
-            // the UI only uses postId for forum-page anchors so this is safe for all other pages.
-            await emitNotifications(tx, {
-              userIds: quotedUsers.map((u) => u.id),
-              type: 'forum_quote',
-              actorId: req.user.id,
-              page: subTarget.subPage,
-              pageId: subTarget.pageId,
-              postId: created.id
-            });
-          }
+        const { subPage, pageId } = subTarget ?? {};
+        if (pageId !== undefined && subPage !== undefined) {
+          const target = { subPage, pageId };
+          await notifySubscribers(tx, target, req.user.id);
+          await notifyQuoted(tx, target, req.user.id, body, created.id);
         }
 
         return created;
