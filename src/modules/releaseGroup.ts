@@ -7,6 +7,8 @@ import {
 } from './communityAccess';
 import { assertArtistLive } from './artist';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
+import { audit } from '../lib/audit';
+import { translatePrismaError } from '../lib/prismaErrors';
 
 // ReleaseGroup — cross-community content identity (ADR-0023, #265).
 //
@@ -160,22 +162,6 @@ export const resolveGroupForViewer = async (
   };
 };
 
-/**
- * Find-or-create on the normalized identity.
- *
- * Reported as created/found so the route can answer 201 or 200 honestly. The
- * read-then-create is racy on its own, so the `P2002` arm re-reads: two callers
- * naming the same identity both end up with the same row, and the loser reports
- * `created: false` rather than failing. That is the point of putting uniqueness
- * in the database instead of in a check.
- *
- * A dangling `artistId` is a body-supplied id, so it answers **400**, matching
- * the write guards #597 added — the route itself exists, the value in the
- * payload does not. `assertArtistLive` rather than a bare foreign key because a
- * soft-deleted artist keeps a live row: the FK would resolve happily and let a
- * new group cite a withdrawn artist. (Preserving an *existing* citation is the
- * NOT FILTERED half; minting a new one is not.)
- */
 const isUniqueViolation = (err: unknown): boolean =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 
@@ -197,6 +183,22 @@ const identityColumns = (input: GroupIdentityInput) => ({
   year: input.year ?? null
 });
 
+/**
+ * Find-or-create on the normalized identity.
+ *
+ * Reported as created/found so the route can answer 201 or 200 honestly. The
+ * read-then-create is racy on its own, so the `P2002` arm re-reads: two callers
+ * naming the same identity both end up with the same row, and the loser reports
+ * `created: false` rather than failing. That is the point of putting uniqueness
+ * in the database instead of in a check.
+ *
+ * A dangling `artistId` is a body-supplied id, so it answers **400**, matching
+ * the write guards #597 added — the route itself exists, the value in the
+ * payload does not. `assertArtistLive` rather than a bare foreign key because a
+ * soft-deleted artist keeps a live row: the FK would resolve happily and let a
+ * new group cite a withdrawn artist. (Preserving an *existing* citation is the
+ * NOT FILTERED half; minting a new one is not.)
+ */
 export const createReleaseGroup = async (input: GroupIdentityInput) => {
   if (input.artistId != null) {
     await assertArtistLive(input.artistId, [
@@ -273,4 +275,429 @@ export const setReleaseGroup = async (input: {
   });
 
   return updated;
+};
+
+// ─── Curation verbs (#265 PR2) ───────────────────────────────────────────────
+//
+// Merge, split and retitle all move releases between identities, and all three
+// require `contributions_manage` at the route. They also inherit PR1's read
+// boundary rather than inventing a moderation one: an actor may only act on a
+// group `resolveGroupForViewer` resolves for them. That keeps the leak surface
+// at exactly one function — there is still no permission-aware community read
+// anywhere in this codebase.
+
+/** One log line on a group. `userId` null means the system wrote it. */
+const logGroupEvent = (
+  tx: Prisma.TransactionClient,
+  releaseGroupId: number,
+  actorId: number | null,
+  info: string
+) =>
+  tx.groupLog.create({
+    data: { releaseGroupId, userId: actorId, info }
+  });
+
+/**
+ * Move the source group's covers onto the target.
+ *
+ * `CoverArt` is unique on `[releaseGroupId, image]`, so a cover the target
+ * already carries would violate that constraint on repoint and abort the whole
+ * transaction. Two groups being merged are, by definition, likely to share
+ * artwork — so the duplicate is dropped rather than letting a merge fail on a
+ * picture.
+ */
+const repointCovers = async (
+  tx: Prisma.TransactionClient,
+  sourceId: number,
+  targetId: number
+) => {
+  const existing = await tx.coverArt.findMany({
+    where: { releaseGroupId: targetId },
+    select: { image: true }
+  });
+  await tx.coverArt.deleteMany({
+    where: {
+      releaseGroupId: sourceId,
+      image: { in: existing.map((cover) => cover.image) }
+    }
+  });
+  await tx.coverArt.updateMany({
+    where: { releaseGroupId: sourceId },
+    data: { releaseGroupId: targetId }
+  });
+};
+
+/**
+ * Fold `sourceId` into `targetId`. **There is no undo** — the group log is the
+ * record, and a two-step confirmation belongs in the UI rather than here.
+ *
+ * Both groups must resolve for the actor. Merge is destructive and
+ * cross-community by nature, so it reuses the same resolver every read uses
+ * instead of a moderator bypass; a `contributions_manage` holder still cannot
+ * reach a group whose every member sits in a community they cannot see.
+ *
+ * A consequence worth stating: you cannot merge INTO a memberless group,
+ * because a memberless group resolves for nobody. Rename that group instead —
+ * which is what you actually meant.
+ *
+ * Order inside the transaction is load-bearing. The source's log rows are
+ * repointed **before** the source is deleted: `GroupLog.releaseGroupId`
+ * cascades, so deleting first would destroy exactly the history this verb
+ * exists to preserve.
+ */
+export const mergeReleaseGroups = async (input: {
+  actorId: number;
+  targetId: number;
+  sourceId: number;
+}) => {
+  if (input.targetId === input.sourceId) {
+    throw new AppError(400, 'A group cannot be merged into itself');
+  }
+
+  const target = await resolveGroupForViewer(input.targetId, input.actorId);
+  const source = await resolveGroupForViewer(input.sourceId, input.actorId);
+
+  return prisma.$transaction(async (tx) => {
+    const moved = await tx.release.updateMany({
+      where: { releaseGroupId: input.sourceId },
+      data: { releaseGroupId: input.targetId }
+    });
+
+    await repointCovers(tx, input.sourceId, input.targetId);
+
+    // Before the delete — see the doc comment.
+    await tx.groupLog.updateMany({
+      where: { releaseGroupId: input.sourceId },
+      data: { releaseGroupId: input.targetId }
+    });
+
+    await logGroupEvent(
+      tx,
+      input.targetId,
+      input.actorId,
+      `Merged "${source.title}" (#${input.sourceId}) into this group. ` +
+        `${moved.count} release(s) moved; that group's history is preserved above.`
+    );
+
+    await tx.releaseGroup.delete({ where: { id: input.sourceId } });
+
+    await audit(
+      tx,
+      input.actorId,
+      'release_group.merge',
+      'ReleaseGroup',
+      input.targetId,
+      {
+        sourceId: input.sourceId,
+        sourceTitle: source.title,
+        movedReleases: moved.count
+      }
+    );
+
+    return {
+      id: target.id,
+      title: target.title,
+      mergedFrom: input.sourceId,
+      movedReleases: moved.count
+    };
+  });
+};
+
+/**
+ * Move selected releases out of `groupId` and into the identity described by
+ * `title`/`artistId`/`year`, creating that identity only if it does not exist.
+ *
+ * Split takes an identity rather than minting an anonymous "new group": the
+ * derived-title alternative is almost always wrong, because the release being
+ * split out is the one that was mis-grouped in the first place. Reusing
+ * `createReleaseGroup` also means split can move releases into an EXISTING
+ * group, which is the more common intent.
+ *
+ * Only the source must resolve for the actor. The target legitimately may not:
+ * a freshly created identity has no members yet, so it resolves for nobody.
+ *
+ * An emptied source group is left in place rather than deleted. A memberless
+ * group is not an anomaly here — `POST /release-groups` creates one on purpose
+ * — so deleting it on this path only would be an inconsistency, and it would
+ * take that group's log down with it.
+ */
+export const splitReleaseGroup = async (input: {
+  actorId: number;
+  groupId: number;
+  releaseIds: number[];
+  title: string;
+  artistId?: number | null;
+  year?: number | null;
+}) => {
+  const source = await resolveGroupForViewer(input.groupId, input.actorId);
+
+  const { group: target } = await createReleaseGroup({
+    title: input.title,
+    artistId: input.artistId,
+    year: input.year
+  });
+
+  if (target.id === input.groupId) {
+    throw new AppError(400, 'That identity is the group being split');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Scoped to the source group, so a release id from anywhere else is simply
+    // not matched rather than being quietly re-grouped.
+    const moved = await tx.release.updateMany({
+      where: { id: { in: input.releaseIds }, releaseGroupId: input.groupId },
+      data: { releaseGroupId: target.id }
+    });
+
+    if (moved.count === 0) {
+      throw new AppError(400, 'None of those releases belong to this group');
+    }
+
+    await logGroupEvent(
+      tx,
+      input.groupId,
+      input.actorId,
+      `Split ${moved.count} release(s) out to "${target.title}" (#${target.id}).`
+    );
+    await logGroupEvent(
+      tx,
+      target.id,
+      input.actorId,
+      `Received ${moved.count} release(s) split from "${source.title}" (#${input.groupId}).`
+    );
+
+    await audit(
+      tx,
+      input.actorId,
+      'release_group.split',
+      'ReleaseGroup',
+      input.groupId,
+      {
+        targetId: target.id,
+        movedReleases: moved.count
+      }
+    );
+
+    return { id: target.id, title: target.title, movedReleases: moved.count };
+  });
+};
+
+/**
+ * Change a group's canonical identity.
+ *
+ * Recomputing `identityKey` can land on an identity another group already
+ * holds, and that is structurally a merge — two identities becoming one. This
+ * **refuses with 409 and names the other group** rather than folding into it:
+ * a PUT that silently destroys a row, with no undo, is more power than an edit
+ * form should carry. The caller can then choose `merge` deliberately.
+ */
+export const updateGroupIdentity = async (input: {
+  actorId: number;
+  groupId: number;
+  title: string;
+  artistId?: number | null;
+  year?: number | null;
+}) => {
+  const current = await resolveGroupForViewer(input.groupId, input.actorId);
+
+  if (input.artistId != null) {
+    await assertArtistLive(input.artistId, [
+      400,
+      'No live artist with that id'
+    ]);
+  }
+
+  const identityKey = identityKeyFor(input);
+  const clash = await prisma.releaseGroup.findUnique({
+    where: { identityKey },
+    select: { id: true }
+  });
+  if (clash && clash.id !== input.groupId) {
+    throw new AppError(
+      409,
+      `That identity already belongs to release group #${clash.id}. ` +
+        'Merge this group into it instead of renaming onto it.'
+    );
+  }
+
+  // `current` carries the artist as an object, not an id — recompute from its
+  // parts rather than spreading it, or a group that cites an artist compares
+  // against a key built with `artistId: null` and every edit looks like a
+  // change.
+  const currentKey = identityKeyFor({
+    title: current.title,
+    artistId: current.artist?.id ?? null,
+    year: current.year
+  });
+  if (identityKey === currentKey) {
+    return {
+      id: current.id,
+      title: current.title,
+      artist: current.artist,
+      year: current.year
+    };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.releaseGroup.update({
+      where: { id: input.groupId },
+      data: { ...identityColumns(input), identityKey },
+      include: { artist: groupArtistSelect }
+    });
+    await logGroupEvent(
+      tx,
+      input.groupId,
+      input.actorId,
+      `Identity changed from "${current.title}" to "${updated.title}".`
+    );
+    return toGroupIdentity(updated);
+  });
+};
+
+const coverSelect = {
+  id: true,
+  image: true,
+  summary: true,
+  userId: true,
+  addedAt: true,
+  user: { select: { id: true, username: true } }
+} as const;
+
+/**
+ * Covers, like everything else here, are reachable only through the resolver:
+ * seeing a group's cover art means being able to see the group.
+ */
+export const listGroupCovers = async (
+  groupId: number,
+  viewerId: number,
+  page: { skip: number; limit: number }
+) => {
+  await resolveGroupForViewer(groupId, viewerId);
+  const where = { releaseGroupId: groupId };
+  const [data, total] = await Promise.all([
+    prisma.coverArt.findMany({
+      where,
+      select: coverSelect,
+      orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
+      skip: page.skip,
+      take: page.limit
+    }),
+    prisma.coverArt.count({ where })
+  ]);
+  return { data, total };
+};
+
+/** Adding a cover needs no permission beyond reaching the group — it is
+ *  curation, like attaching a release. Removing someone else's does. */
+export const addGroupCover = async (input: {
+  actorId: number;
+  groupId: number;
+  image: string;
+  summary?: string | null;
+}) => {
+  await resolveGroupForViewer(input.groupId, input.actorId);
+
+  return prisma.$transaction(async (tx) => {
+    let cover;
+    try {
+      cover = await tx.coverArt.create({
+        data: {
+          releaseGroupId: input.groupId,
+          image: input.image,
+          summary: input.summary ?? null,
+          userId: input.actorId
+        },
+        select: coverSelect
+      });
+    } catch (err) {
+      translatePrismaError(err, {
+        P2002: [409, 'This group already carries that cover'],
+        P2003: [404, 'Release group not found']
+      });
+    }
+    await logGroupEvent(
+      tx,
+      input.groupId,
+      input.actorId,
+      `Added a cover: ${input.image}`
+    );
+    return cover;
+  });
+};
+
+/**
+ * Remove a cover. The adder may remove their own; removing anyone else's needs
+ * `contributions_manage`, which the route resolves and passes in — the module
+ * takes the decision, not the permission map, so the rule is testable without
+ * a request.
+ */
+export const removeGroupCover = async (input: {
+  actorId: number;
+  groupId: number;
+  coverId: number;
+  canModerate: boolean;
+}) => {
+  await resolveGroupForViewer(input.groupId, input.actorId);
+
+  const cover = await prisma.coverArt.findFirst({
+    where: { id: input.coverId, releaseGroupId: input.groupId },
+    select: { id: true, userId: true, image: true }
+  });
+  if (!cover) throw new AppError(404, 'Cover not found');
+
+  if (cover.userId !== input.actorId && !input.canModerate) {
+    throw new AppError(
+      403,
+      'Only the member who added this cover may remove it'
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.coverArt.delete({ where: { id: cover.id } });
+    await logGroupEvent(
+      tx,
+      input.groupId,
+      input.actorId,
+      `Removed a cover: ${cover.image}`
+    );
+  });
+};
+
+/**
+ * The group's identity history.
+ *
+ * `hidden` rows are staff-only. **Nothing writes one yet** — no verb in this
+ * module sets `hidden: true` — so today the filter is a guard against a future
+ * writer rather than a live distinction. It is enforced now precisely so that
+ * whoever adds the first hidden row does not also have to remember to add the
+ * filter.
+ */
+export const listGroupLog = async (
+  groupId: number,
+  viewerId: number,
+  canSeeHidden: boolean,
+  page: { skip: number; limit: number }
+) => {
+  await resolveGroupForViewer(groupId, viewerId);
+  const where = {
+    releaseGroupId: groupId,
+    ...(canSeeHidden ? {} : { hidden: false })
+  };
+  const [data, total] = await Promise.all([
+    prisma.groupLog.findMany({
+      where,
+      select: {
+        id: true,
+        info: true,
+        hidden: true,
+        loggedAt: true,
+        user: { select: { id: true, username: true } }
+      },
+      orderBy: [{ loggedAt: 'desc' }, { id: 'desc' }],
+      skip: page.skip,
+      take: page.limit
+    }),
+    prisma.groupLog.count({ where })
+  ]);
+  return { data, total };
 };

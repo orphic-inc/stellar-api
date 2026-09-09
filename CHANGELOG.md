@@ -69,6 +69,59 @@ All notable changes to stellar-api are documented here.
   either — so the rewrite carries no data risk. Merge, split, covers and the
   group log itself are the follow-on; they need no further migration.
 
+- **Release groups can be merged, split, retitled and given cover art**
+  ([#265](https://github.com/orphic-inc/stellar-api/issues/265)) — the curation
+  half of the identity work. Seven operations: `PUT /api/release-groups/{id}`,
+  `POST .../{id}/merge`, `POST .../{id}/split`, `GET .../{id}/log`, and
+  `GET`/`POST`/`DELETE` on `.../{id}/covers`. **No migration** — PR1 landed the
+  foreign keys these need.
+
+  **Every verb inherits the read boundary rather than getting a moderator
+  bypass.** Merge, split and retitle require `contributions_manage`, but they
+  all go through `resolveGroupForViewer` first, so the permission says what you
+  may _do_, not what you may _see_: a moderator still cannot reach a group whose
+  every member sits in a community they cannot see. One consequence is worth
+  stating outright — **you cannot merge into a memberless group**, because a
+  memberless group resolves for nobody. Rename that group instead, which is what
+  was meant.
+
+  **Merge has no undo.** The source's releases, covers and log entries move to
+  the target and the source is deleted; the group log is the record, and a
+  two-step confirmation belongs in the UI. Ordering inside the transaction is
+  load-bearing: `GroupLog.releaseGroupId` cascades, so the log rows are
+  repointed **before** the source is deleted. Reversed, the merge would destroy
+  exactly the history it exists to preserve — and the response body would look
+  identical, which is why the spec asserts call order rather than payload. A
+  cover the target already carries is dropped rather than failing the whole
+  merge on a duplicate image, since two groups being merged are likely to share
+  artwork.
+
+  **Split takes an identity, not just a release list.** The target is found or
+  created by the same normalized key `POST /release-groups` uses, so a split can
+  move releases into an existing group instead of only ever minting a new one.
+  Deriving the title from a moved release would be wrong more often than right —
+  the release being split out is precisely the one that was mis-grouped. Only
+  releases actually in the source group move; an id from elsewhere is ignored
+  rather than quietly re-grouped. An emptied source group is left in place,
+  because a memberless group is not an anomaly here.
+
+  **Retitling onto an identity another group holds answers `409` and names
+  that group**, rather than folding into it. That collision is structurally a
+  merge, and an edit that silently destroyed a row with no undo is more power
+  than a rename should carry — so the destructive act stays behind the verb that
+  logs it.
+
+  **Covers are curation, not moderation**: adding one needs only the ability to
+  reach the group, exactly like attaching a release. Removing your own is
+  likewise open; removing someone else's needs `contributions_manage`. Cover
+  URLs must be `https`, since a cover renders in every viewer's browser and a
+  plain-http source is a mixed-content failure rather than a style preference.
+
+  `hidden` group-log rows are filtered out for anyone without
+  `contributions_manage`. **Nothing writes one yet** — the filter is enforced
+  now so that whoever adds the first hidden row does not also have to remember
+  to add the filter.
+
 ## [0.9.3] — 2026-09-09
 
 ### Added
