@@ -57,6 +57,9 @@ beforeEach(() => {
   prismaMock.$queryRaw.mockResolvedValue([]);
   // getTopReleases always calls attachTags, even for an empty result set.
   prismaMock.releaseTag.findMany.mockResolvedValue([]);
+  // ...and attachArtists alongside it (#608). Both run unconditionally, so an
+  // unstubbed one throws before the window assertion is ever reached.
+  prismaMock.releaseArtist.findMany.mockResolvedValue([]);
   prismaMock.top10Snapshot.create.mockResolvedValue({} as never);
 });
 

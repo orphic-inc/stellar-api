@@ -5,6 +5,11 @@ const prismaMock = {
   releaseTag: {
     findMany: jest.fn()
   },
+  // getTopReleases derives the credited artist through `primaryArtist` rather
+  // than selecting it in SQL (#608), so this runs on every call.
+  releaseArtist: {
+    findMany: jest.fn()
+  },
   release: {
     findMany: jest.fn()
   },
@@ -49,8 +54,6 @@ describe('getTopReleases', () => {
         id: BigInt(1),
         title: 'Blue Train',
         year: 1957,
-        artistId: BigInt(2),
-        artistName: 'John Coltrane',
         type: 'Music',
         releaseType: 'Album',
         consumerCount: 4,
@@ -60,6 +63,9 @@ describe('getTopReleases', () => {
     ]);
     prismaMock.releaseTag.findMany.mockResolvedValue([
       { releaseId: 1, tag: { id: 5, name: 'jazz' } }
+    ]);
+    prismaMock.releaseArtist.findMany.mockResolvedValue([
+      { releaseId: 1, role: 'Main', artist: { id: 2, name: 'John Coltrane' } }
     ]);
 
     const result = await getTopReleases({
@@ -99,8 +105,6 @@ describe('getTopReleases', () => {
           id: BigInt(3),
           title: 'Consumed Release',
           year: 2024,
-          artistId: BigInt(7),
-          artistName: 'Artist',
           type: 'Music',
           releaseType: 'EP',
           consumerCount: 8,
@@ -113,8 +117,6 @@ describe('getTopReleases', () => {
           id: BigInt(4),
           title: 'Weekly Release',
           year: 2025,
-          artistId: BigInt(8),
-          artistName: 'Artist 2',
           type: 'Music',
           releaseType: 'Single',
           consumerCount: 3,
@@ -123,6 +125,12 @@ describe('getTopReleases', () => {
         }
       ]);
     prismaMock.releaseTag.findMany.mockResolvedValue([]);
+    // Both ranked releases in one stub: attachArtists indexes by releaseId and
+    // each call looks up only the ids its own query returned.
+    prismaMock.releaseArtist.findMany.mockResolvedValue([
+      { releaseId: 3, role: 'Main', artist: { id: 7, name: 'Artist' } },
+      { releaseId: 4, role: 'Main', artist: { id: 8, name: 'Artist 2' } }
+    ]);
 
     const consumed = await getTopReleases({
       type: 'consumed',
@@ -402,8 +410,6 @@ describe('createSnapshot', () => {
         id: BigInt(9),
         title: 'Kind of Blue',
         year: 1959,
-        artistId: BigInt(4),
-        artistName: 'Miles Davis',
         type: 'Music',
         releaseType: 'Album',
         consumerCount: 10,
@@ -413,6 +419,9 @@ describe('createSnapshot', () => {
     ]);
     prismaMock.releaseTag.findMany.mockResolvedValue([
       { releaseId: 9, tag: { id: 1, name: 'jazz' } }
+    ]);
+    prismaMock.releaseArtist.findMany.mockResolvedValue([
+      { releaseId: 9, role: 'Main', artist: { id: 4, name: 'Miles Davis' } }
     ]);
     prismaMock.top10Snapshot.create.mockResolvedValue(undefined);
 

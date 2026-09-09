@@ -122,6 +122,40 @@ All notable changes to stellar-api are documented here.
   now so that whoever adds the first hidden row does not also have to remember
   to add the filter.
 
+### Fixed
+
+- **`GET /api/top10/releases` answered 500 on every call, and now ranks only
+  public communities**
+  ([#608](https://github.com/orphic-inc/stellar-api/issues/608),
+  [ADR-0036](docs/adr/0036-release-identity-is-community-private.md)) — all
+  three ranking branches selected and joined `releases."artistId"`, a column
+  dropped by #72 when role-based `ReleaseArtist` credits replaced it. The
+  endpoint has been raising `column r.artistId does not exist` ever since. The
+  credited artist is now derived through `primaryArtist`, the same helper every
+  other release read uses, so the rule has one home rather than a second copy
+  in SQL. The response shape is unchanged — `artistId` and `artistName` are
+  still present and still non-null.
+
+  It survived a release because **every unit spec mocks `$queryRaw`, and a mock
+  cannot fail on a column that does not exist**, while no integration test
+  covered top10 at all. `src/integration/top10Chart.integration.ts` closes that
+  gap against a real database.
+
+  The chart now also ranks **only releases in public communities** — a release
+  in a `closed` or `invite` community is absent for everyone, including that
+  community's own members, who see their own rankings through the
+  community-scoped surfaces. This is the first slice of ADR-0036. It is a
+  product decision rather than a security one: ranking per viewer would make
+  "the #1 release this week" something the site cannot state, and preserving
+  the global ranks with gaps would tell a non-member exactly how many hidden
+  releases outrank what they can see. Releases belonging to no community are
+  kept — that column is nullable, and such a release was never private.
+
+  **ADR-0036 §2 is amended in the same change.** It had said top10 would stop
+  using `$queryRaw`; two of the three branches have no Prisma expression, since
+  `DownloadAccessGrant` reaches a release only through its contribution and
+  `groupBy` cannot group across a relation.
+
 ## [0.9.3] — 2026-09-09
 
 ### Added
