@@ -66,6 +66,7 @@ import contributionsRouter from './routes/api/communities/contributions';
 import logCheckRouter from './routes/api/logCheck';
 import artistRouter from './routes/api/communities/artist';
 import collagesRouter from './routes/api/collages';
+import releaseGroupsRouter from './routes/api/releaseGroups';
 import messagesRouter from './routes/api/messages';
 import staffInboxRouter from './routes/api/staffInbox';
 import reportsRouter from './routes/api/reports';
@@ -196,6 +197,7 @@ export const createApp = () => {
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/log-check', logCheckRouter);
   app.use('/api/artists', artistRouter);
+  app.use('/api/release-groups', releaseGroupsRouter);
   app.use('/api/collages', collagesRouter);
   app.use('/api/messages', messagesRouter);
   app.use('/api/staff-inbox', staffInboxRouter);

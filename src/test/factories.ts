@@ -518,6 +518,9 @@ export function makeRelease(overrides: Partial<Release> = {}): Release {
     image: null,
     description: '',
     communityId: null,
+    // Ungrouped is the normal case: groups are created on demand and
+    // `Release.releaseGroupId` is never backfilled (ADR-0023).
+    releaseGroupId: null,
     type: ReleaseType.Music,
     releaseType: ReleaseCategory.Album,
     year: 1959,

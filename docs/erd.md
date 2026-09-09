@@ -181,6 +181,21 @@ erDiagram
     }
   
 
+  "release_groups" {
+
+    }
+  
+
+  "cover_art" {
+
+    }
+  
+
+  "group_logs" {
+
+    }
+  
+
   "releases" {
 
     }
@@ -331,11 +346,6 @@ erDiagram
     }
   
 
-  "cover_art" {
-
-    }
-  
-
   "featured_albums" {
 
     }
@@ -432,11 +442,6 @@ erDiagram
   
 
   "ip_bans" {
-
-    }
-  
-
-  "group_logs" {
 
     }
   
@@ -693,7 +698,13 @@ erDiagram
     "contributors" |o--|| users : "user"
     "contributors" }o--|| communities : "community"
     "contributors" o{--}o "releases" : ""
+    "release_groups" }o--|o artists : "artist"
+    "cover_art" }o--|| release_groups : "releaseGroup"
+    "cover_art" }o--|| users : "user"
+    "group_logs" }o--|| release_groups : "releaseGroup"
+    "group_logs" }o--|o users : "user"
     "releases" }o--|o communities : "community"
+    "releases" }o--|o release_groups : "releaseGroup"
     "contributions" }o--|| users : "user"
     "contributions" }o--|| releases : "release"
     "contributions" }o--|| contributors : "contributor"

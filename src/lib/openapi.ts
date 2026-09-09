@@ -78,6 +78,10 @@ import {
   addMemberSchema
 } from '../schemas/community';
 import {
+  createReleaseGroupSchema,
+  setReleaseGroupSchema
+} from '../schemas/releaseGroup';
+import {
   updateRequestSchema,
   unfillRequestSchema,
   listRequestsQuerySchema,
@@ -4551,6 +4555,144 @@ registry.registerPath({
       content: { 'application/json': { schema: Release } }
     },
     404: msgResponse('Not found')
+  }
+});
+
+// ─── Release Groups (ADR-0023, #265) ─────────────────────────────────────────
+//
+// Cross-community content identity. A group carries identity ONLY — no
+// editions, contributions or files — so a client resolves "the same album"
+// here and then reads each member release for its own edition/quality.
+//
+// `identityKey` is deliberately absent from every shape below. It is a derived
+// internal key with one writer; exposing it would invite a client to compute
+// its own and freeze the normalization rules.
+
+const ReleaseGroupArtistRef = z
+  .object({ id: z.number(), name: z.string() })
+  .nullable();
+
+const ReleaseGroupIdentity = registry.register(
+  'ReleaseGroupIdentity',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    artist: ReleaseGroupArtistRef,
+    year: z.number().nullable()
+  })
+);
+
+const ReleaseGroupMember = registry.register(
+  'ReleaseGroupMember',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    year: z.number(),
+    image: z.string().nullable(),
+    communityId: z.number().nullable(),
+    community: z
+      .object({ id: z.number(), name: z.string() })
+      .nullable()
+      .optional(),
+    artist: ReleaseGroupArtistRef
+  })
+);
+
+const ReleaseGroupDetail = registry.register(
+  'ReleaseGroupDetail',
+  ReleaseGroupIdentity.extend({ releases: z.array(ReleaseGroupMember) })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/release-groups/{id}',
+  tags: ['Release Groups'],
+  summary: 'Resolve a release group for the current viewer',
+  description:
+    'Returns the group identity plus **only the member releases this viewer ' +
+    'may see** — a group edge never widens visibility (ADR-0023). \n\n' +
+    'The `404` covers two cases deliberately: the group does not exist, and ' +
+    'the group exists but the viewer can see none of its members. They are ' +
+    'indistinguishable on purpose. Telling them apart would make this an ' +
+    'existence oracle for private community catalogues, which is the leak ' +
+    'this whole surface is designed against. There is no staff bypass.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'The group, with the viewer-visible member releases',
+      content: { 'application/json': { schema: ReleaseGroupDetail } }
+    },
+    404: msgResponse('Release group not found, or no member is visible to you')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/release-groups',
+  tags: ['Release Groups'],
+  summary: 'Create a release group, or return the one that already matches',
+  description:
+    'Find-or-create on a normalized identity derived from `title`, ' +
+    '`artistId` and `year`: **201** when a new identity is minted, **200** ' +
+    'when an existing group already carries it. Matching ignores case and ' +
+    'surrounding or repeated whitespace, so `Greatest Hits` and ' +
+    '`greatest  hits` are one identity, not two.\n\n' +
+    'Open to any authenticated member: a bare identity node has no members ' +
+    'until a release is attached through the community-gated route, so it ' +
+    'reveals nothing about any catalogue.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: createReleaseGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'A group with this identity already existed',
+      content: { 'application/json': { schema: ReleaseGroupIdentity } }
+    },
+    201: {
+      description: 'Group created',
+      content: { 'application/json': { schema: ReleaseGroupIdentity } }
+    },
+    400: msgResponse(
+      'No live artist with that id — including an artist that has been withdrawn'
+    )
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/communities/{communityId}/releases/{releaseId}/release-group',
+  tags: ['Communities'],
+  summary: 'Attach a release to a release group, or detach it',
+  description:
+    'Pass `releaseGroupId: null` to detach. Named `release-group` rather ' +
+    'than `group` because in the community routes "group" already means a ' +
+    'release, inherited from the legacy vocabulary.\n\n' +
+    'Gated by **community access, not a permission**, and it refuses rather ' +
+    'than filtering: the path names one community, so the caller is owed a ' +
+    'straight answer. You may only group releases you can already reach.',
+  request: {
+    params: z.object({ communityId: z.string(), releaseId: z.string() }),
+    body: {
+      content: { 'application/json': { schema: setReleaseGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The release and its new group id',
+      content: {
+        'application/json': {
+          schema: z.object({
+            id: z.number(),
+            releaseGroupId: z.number().nullable()
+          })
+        }
+      }
+    },
+    400: msgResponse('No release group with that id'),
+    403: msgResponse('Not a member of this community'),
+    404: msgResponse('Community not found, or no such release in it')
   }
 });
 
