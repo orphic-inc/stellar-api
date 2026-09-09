@@ -1,7 +1,6 @@
 import express from 'express';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
-import { AppError } from '../../../lib/errors';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
@@ -73,13 +72,9 @@ router.post(
       // Both foreign keys come from the BODY, so 400 rather than 404: the route
       // exists and the payload is what names something absent. The read above
       // validates the post, not the topic id (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
-        throw new AppError(400, 'Forum topic or post not found');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2003: [400, 'Forum topic or post not found']
+      });
     }
     res.json(record);
   })

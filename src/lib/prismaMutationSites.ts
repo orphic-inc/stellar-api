@@ -33,7 +33,22 @@ const BULK_OPS = new Set(['createMany', 'updateMany', 'deleteMany']);
 /** Every write op. Reads (findUnique, count, ...) are not sites at all. */
 const MUTATION_OPS = new Set([...ARM_A_OPS, ...ARM_B_OPS, ...BULK_OPS]);
 
-const PRISMA_CODE_RE = /P2002|P2003|P2025|PrismaClientKnownRequestError/;
+/**
+ * What makes a `catch` count as a guard.
+ *
+ * The literal codes and the Prisma error class cover a longhand catch. The
+ * fourth alternative is `translatePrismaError`, the shared helper (#564): its
+ * whole point is that the catch shrinks to one call, and keying only on the
+ * codes would mean a site that passes its map by reference reports as unguarded
+ * while being perfectly guarded.
+ *
+ * This is a heuristic, and deliberately so — it is a textual test on the catch
+ * clause, so a catch that merely MENTIONS one of these counts. That was already
+ * true of the codes; the ratchet plus review is the real control, not this
+ * regex.
+ */
+const PRISMA_CODE_RE =
+  /P2002|P2003|P2025|PrismaClientKnownRequestError|translatePrismaError/;
 const HTTP_VERBS = new Set(['get', 'post', 'put', 'patch', 'delete']);
 
 /**

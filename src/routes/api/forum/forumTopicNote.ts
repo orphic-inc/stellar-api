@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
-import { AppError } from '../../../lib/errors';
+import { translatePrismaError } from '../../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createTopicNote } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
@@ -68,13 +67,7 @@ router.delete(
     } catch (err) {
       // The note was read and authorised above; this covers its removal in
       // between, which would otherwise be a 500 (#564, arm B).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Note not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Note not found'] });
     }
     res.status(204).send();
   })

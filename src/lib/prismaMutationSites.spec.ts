@@ -107,6 +107,31 @@ describe('collectMutationSites', () => {
       expect(s[0].guarded).toBe(false);
     });
 
+    it('the shared translatePrismaError helper counts as a guard', () => {
+      // The helper's purpose is that the catch shrinks to one call, so a site
+      // passing its map by reference names no code at all. Keying only on the
+      // literal codes would report a perfectly guarded site as unguarded.
+      const s = scan(`
+        try {
+          await prisma.bookmarkArtist.create({});
+        } catch (err) {
+          translatePrismaError(err, MISSING_TARGET);
+        }
+      `);
+      expect(s[0].guarded).toBe(true);
+    });
+
+    it('a catch calling some other helper is still not a guard', () => {
+      const s = scan(`
+        try {
+          await prisma.bookmarkArtist.create({});
+        } catch (err) {
+          reportToSentry(err);
+        }
+      `);
+      expect(s[0].guarded).toBe(false);
+    });
+
     it('an enclosing guarded try still counts through nested blocks', () => {
       const s = scan(`
         try {

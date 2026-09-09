@@ -465,19 +465,32 @@ Two arms, and the second is the one that gets missed:
 - **B** — `update` / `delete` addressed by id → P2025 on _every_ model,
   constrained or not
 
-Catch and translate, per `routes/api/friends.ts:195`:
+Catch and translate with `translatePrismaError` (`lib/prismaErrors.ts`):
 
 ```ts
 try {
   created = await prisma.friendRelationship.create({ data });
 } catch (err) {
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    if (err.code === 'P2002') throw new AppError(409, '...');
-    if (err.code === 'P2003') throw new AppError(404, '...');
-  }
-  throw err;
+  translatePrismaError(err, {
+    P2002: [409, '...'],
+    P2003: [404, '...']
+  });
 }
 ```
+
+Notes on the helper — why the return type is `never`, what happens to codes the
+map omits, and why it is a function declaration — are in its doc comment in
+`lib/prismaErrors.ts`, next to the code they describe.
+
+Two things to know at the call site:
+
+- The `try` belongs in the handler. `prisma:guard-coverage` finds guards
+  structurally, so a catch behind a call is invisible to it. Where that makes a
+  handler too large, extract other logic instead — `collages.ts` does.
+- Prefer the longhand form when an arm returns a response rather than throwing,
+  such as a toggle answering `200` with the resulting state. Only a throwing arm
+  can be a map entry, and the mixed case measured longer through the helper than
+  without it (on `/bookmarks`).
 
 Status codes:
 

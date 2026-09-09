@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   getUserSettings,
@@ -155,13 +156,9 @@ router.post(
     } catch (err) {
       // DonorRank.name carries a unique constraint and the model has no foreign
       // key, so P2002 on a duplicate name is the only reachable code (#564).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
-        throw new AppError(409, 'A donor rank with that name already exists');
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2002: [409, 'A donor rank with that name already exists']
+      });
     }
     res.status(201).json(rank);
   })
@@ -195,16 +192,10 @@ router.put(
         }
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        // The findUnique above is a read; both windows stay open (#564).
-        if (err.code === 'P2025') {
-          throw new AppError(404, 'Donor rank not found');
-        }
-        if (err.code === 'P2002') {
-          throw new AppError(409, 'A donor rank with that name already exists');
-        }
-      }
-      throw err;
+      translatePrismaError(err, {
+        P2025: [404, 'Donor rank not found'],
+        P2002: [409, 'A donor rank with that name already exists']
+      });
     }
     res.json(rank);
   })
@@ -226,13 +217,7 @@ router.delete(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Donor rank not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Donor rank not found'] });
     }
     res.status(204).send();
   })
@@ -376,13 +361,7 @@ router.delete(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Recovery request not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Recovery request not found'] });
     }
     await audit(
       prisma,
@@ -811,13 +790,7 @@ router.post(
       });
     } catch (err) {
       // `authorId` is session-derived, so only the PATH user id can dangle.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
-        throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2003: [404, 'User not found'] });
     }
     res.status(201).json({ note });
   })
@@ -839,13 +812,7 @@ router.delete(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'Note not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'Note not found'] });
     }
     res.status(204).send();
   })
@@ -865,13 +832,7 @@ router.post(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'User not found'] });
     }
     await audit(prisma, req.user.id, 'user.disabled', 'User', id);
     res.json({ msg: 'User disabled' });
@@ -892,13 +853,7 @@ router.post(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'User not found'] });
     }
     await audit(prisma, req.user.id, 'user.enabled', 'User', id);
     res.json({ msg: 'User enabled' });
@@ -971,13 +926,7 @@ router.put(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'User not found'] });
     }
     await audit(prisma, req.user.id, 'user.rank_lock_changed', 'User', id, {
       rankLocked
@@ -1018,13 +967,7 @@ router.delete(
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new AppError(404, 'User not found');
-      }
-      throw err;
+      translatePrismaError(err, { P2025: [404, 'User not found'] });
     }
     res.status(204).send();
   })

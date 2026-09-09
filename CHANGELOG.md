@@ -275,6 +275,35 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   Tests live in new spec files rather than appended, and `src/collages.spec.ts`
   measures 858 non-comment lines, under the 1000 limit.
 
+- **`translatePrismaError` — the #564 guard as one call instead of ten lines**
+  ([#564](https://github.com/orphic-inc/stellar-api/issues/564)) — every write
+  that can violate a constraint needs a catch that translates a Prisma code,
+  because the global handler maps none. Written longhand that catch is about ten
+  lines, and it has to sit **lexically inside its handler**: `prisma:guard-coverage`
+  finds guards structurally, so a catch moved behind a call reports as unguarded.
+
+  **That is a real tension, and it had already cost something.** Five guards took
+  three `collages.ts` handlers past Codacy's per-function limits, and four
+  helpers had to be extracted to make room. This resolves it: the `try` stays in
+  the handler, only the translation moves.
+
+  Migrating the thirty-seven existing pure-throw guards takes **210 non-comment
+  lines out of nine route files**, with no function left worse than before.
+  `collages.ts` drops from three functions over Codacy's per-function limits to
+  one, and that one is a detail read this change does not touch.
+
+  **It does not fit every guard, and the four on `/bookmarks` are the
+  counter-example.** Those toggles answer `200` with the resulting state on a
+  lost race, and only a _throwing_ arm can be a map entry. Forcing the mixed
+  shape through the helper measured **longer**, not shorter, so those stay
+  longhand and `AGENTS.md` says why.
+
+  The checker also learns to recognise the helper by name. **This is
+  future-proofing rather than a fix**: an inline map like `{ P2025: [404, '…'] }`
+  already contains the literal code the existing pattern matched, and the gate
+  stays green with the change reverted. It earns its place for a map passed by
+  reference, which the checker's own tests now cover.
+
 ## [0.9.2] — 2026-09-08
 
 ### Added
