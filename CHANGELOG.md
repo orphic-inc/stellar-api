@@ -6,6 +6,69 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`ReleaseGroup` — cross-community content identity**
+  ([#265](https://github.com/orphic-inc/stellar-api/issues/265),
+  [ADR-0023](docs/adr/0023-contribution-package-and-releasegroup-identity.md))
+  — the identity node above `Release`, so "the same album" catalogued in two
+  communities can be resolved as one thing. It carries **identity only**: title,
+  cited artist, year and the member releases. No editions, contributions or
+  files, which stay on the community-scoped `Release` — as does community
+  attribution, so CommunityScore, the health pulse and link-health are
+  untouched.
+
+  **ADR-0023 moves from Proposed to Accepted**, and its open sub-decision is
+  resolved in both halves it actually contained: a group with no
+  viewer-visible member answers **404**, and a collage **omits** the entry
+  rather than rendering an identity-only placeholder. Answering only one of
+  those is what left it open across two sessions.
+
+  **Three operations.** `GET /api/release-groups/{id}` resolves a group for the
+  current viewer; `POST /api/release-groups` is find-or-create;
+  `PUT /api/communities/{communityId}/releases/{releaseId}/release-group`
+  attaches or detaches a release. Named `release-group`, not `group`, because
+  in the community routes "group" already means a _release_ — legacy vocabulary
+  the new identity must not collide with.
+
+  **The read filters and the write refuses**, which is the distinction
+  `communityAccess.ts` documents, applied one level up. A group spans
+  communities, so resolving its members is search-shaped: it uses
+  `communityReadableWhere` in the same fragment `search.ts` applies, and a
+  member the viewer cannot reach is simply absent. The attach route names one
+  community in its path, so it is browse-shaped: `assertCommunityAccess`
+  answers 403, and you may only group releases you can already reach.
+
+  **The 404 is unconditional — there is no staff bypass.** No community-scoped
+  release read in this codebase has one and `communityAccess.ts` holds no
+  permission check at all; the newest leak surface was not the place to
+  introduce the first. It is also the _same_ 404 with the same message as a
+  group id that does not exist, so the two stay indistinguishable and the
+  endpoint cannot be used as an existence oracle for private catalogues.
+
+  **Duplicates are prevented, not merely repairable.** Uniqueness is enforced
+  on a normalized `identityKey` derived from `lower(trim(title))`, `artistId`
+  and `year`, so `Greatest Hits` and `greatest  hits` are one identity.
+  `@@unique([title, artistId, year])` could not do this: Postgres treats NULLs
+  as distinct and Prisma 6 rejects `nullsNotDistinct`, so artist-less and
+  year-less groups would still accrete. The key is JSON-encoded rather than
+  `|`-joined so a title containing the separator (`AC|DC`) cannot collide with
+  a different identity, and it is never exposed in a response.
+
+  **The group cites its artist rather than copying the name.**
+  `ReleaseGroup.artistId` joins the **NOT FILTERED** half of the `Artist`
+  soft-delete invariant, alongside release credits — withdrawing a catalogue
+  entry must not blank a group's identity line. Creating a _new_ citation still
+  requires a live artist and answers 400 otherwise; that is a different
+  question from preserving an existing one.
+
+  `CoverArt` and `GroupLog` stop being unreferenced legacy stubs and gain real
+  foreign keys with cascade. `GroupLog.communityId` is dropped: a group spans
+  communities, so a community-scoped column on its log was a category error.
+  Both tables were empty by construction — nothing in the tree had ever written
+  either — so the rewrite carries no data risk. Merge, split, covers and the
+  group log itself are the follow-on; they need no further migration.
+
 ## [0.9.3] — 2026-09-09
 
 ### Added

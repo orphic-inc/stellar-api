@@ -558,6 +558,8 @@ model User {
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
   authoredStylesheets      AuthorStylesheet[]
   ownedAssets              Asset[]
+  coverArtAdded            CoverArt[]
+  groupLogsAuthored        GroupLog[]
 
   @@index([userRankId])
   @@map("users")
@@ -948,11 +950,12 @@ model Artist {
   /// open-coding it; the four routes that open-coded nothing are what #573 was.
   ///
   /// NOT FILTERED, deliberately — a citation of the artist as author of a work
-  /// that still exists: release credits, contribution collaborators, and the
-  /// artists named on a release request. Withdrawing a catalogue entry must not
-  /// blank the artist line on every release, contribution or request that cites
-  /// it. Adding a relation here is a decision, not an oversight: say which half
-  /// it belongs to.
+  /// that still exists: release credits, contribution collaborators, the
+  /// artists named on a release request, and the artist a ReleaseGroup cites as
+  /// part of its identity (ADR-0023). Withdrawing a catalogue entry must not
+  /// blank the artist line on every release, contribution, request or group
+  /// that cites it. Adding a relation here is a decision, not an oversight: say
+  /// which half it belongs to.
   deletedAt      DateTime?
   histories      ArtistHistory[]
   aliases        ArtistAlias[]        @relation("ArtistAliases")
@@ -967,6 +970,7 @@ model Artist {
   RequestArtist  RequestArtist[]
   subscriptions  ArtistSubscription[]
   credits        ReleaseArtist[]
+  releaseGroups  ReleaseGroup[]
 
   @@index([deletedAt])
   @@map("artists")
@@ -1158,6 +1162,91 @@ model Contributor {
   @@map("contributors")
 }
 
+/// Cross-community content identity (ADR-0023). Groups the Releases that are
+/// "the same album/work" so a collage or search can dedup them, and carries
+/// IDENTITY ONLY — never editions, contributions, files or any catalogue
+/// content. Content stays on the community-scoped Release, and so does
+/// community attribution: CommunityScore, the health pulse and link-health all
+/// keep reading `release.communityId` and are untouched by this node.
+///
+/// A group edge crosses community boundaries, which makes every read that
+/// walks it access-control-sensitive — the one leak surface this model buys.
+/// `modules/releaseGroup.ts` owns the single resolver, and it filters members
+/// through the viewer's community scope with no bypass for anyone. A group
+/// with no viewer-visible member is omitted (404), never rendered
+/// identity-only.
+model ReleaseGroup {
+  id          Int        @id @default(autoincrement())
+  /// Canonical display title. Uniqueness is enforced on `identityKey`, not here.
+  title       String     @db.VarChar(100)
+  /// NOT FILTERED — a citation of the artist as author of a work that still
+  /// exists, the same half release credits belong to (see `Artist.deletedAt`).
+  /// Withdrawing a catalogue entry must not blank a group's identity line.
+  artistId    Int?
+  artist      Artist?    @relation(fields: [artistId], references: [id])
+  year        Int?
+  /// Normalized identity — `lower(trim(title))|artistId|year` — written only by
+  /// `identityKeyFor` in modules/releaseGroup.ts, which is why create is a
+  /// find-or-create against it.
+  ///
+  /// Unique here rather than `@@unique([title, artistId, year])` because that
+  /// constraint cannot do the job: Postgres treats NULLs as distinct and Prisma
+  /// 6 rejects `nullsNotDistinct`, so artist-less and year-less groups would
+  /// still accrete — as would two titles differing only in case, since there is
+  /// no `citext` here and case-insensitivity is done at query time.
+  identityKey String     @unique
+  releases    Release[]
+  coverArt    CoverArt[]
+  logs        GroupLog[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([artistId])
+  @@map("release_groups")
+}
+
+/// Group-level cover art (ADR-0023): a cover describes the shared identity, not
+/// one community's copy of it. `Release.image` stays as the release-local
+/// fallback.
+model CoverArt {
+  id             Int          @id @default(autoincrement())
+  releaseGroupId Int
+  releaseGroup   ReleaseGroup @relation(fields: [releaseGroupId], references: [id], onDelete: Cascade)
+  image          String
+  summary        String?
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id])
+  addedAt        DateTime     @default(now())
+
+  @@unique([releaseGroupId, image])
+  @@index([userId])
+  @@map("cover_art")
+}
+
+/// Durable identity log for a ReleaseGroup (ADR-0023): merges, splits and
+/// canonical-field edits. Merge has no undo, so this is the record of what
+/// happened.
+///
+/// Group-scoped, NOT community-scoped. The legacy table carried a
+/// `communityId`; a group spans communities by definition, so that column was a
+/// category error and is dropped rather than carried forward.
+model GroupLog {
+  id             Int          @id @default(autoincrement())
+  releaseGroupId Int
+  releaseGroup   ReleaseGroup @relation(fields: [releaseGroupId], references: [id], onDelete: Cascade)
+  /// Null = written by the system rather than by a member.
+  userId         Int?
+  user           User?        @relation(fields: [userId], references: [id])
+  info           String       @db.Text
+  /// Staff-only rows; the log read filters these out for everyone else.
+  hidden         Boolean      @default(false)
+  loggedAt       DateTime     @default(now())
+
+  @@index([releaseGroupId, loggedAt])
+  @@index([userId])
+  @@map("group_logs")
+}
+
 model Release {
   id              Int                   @id @default(autoincrement())
   title           String                @db.VarChar(100)
@@ -1165,6 +1254,12 @@ model Release {
   description     String                @db.VarChar(1000)
   communityId     Int?
   community       Community?            @relation(fields: [communityId], references: [id])
+  /// Cross-community identity (ADR-0023). Nullable and never backfilled —
+  /// groups are created on demand, so an ungrouped release is the normal case,
+  /// not a gap. This edge does NOT widen visibility: reads that follow it into
+  /// sibling releases must apply the viewer's community filter at that hop.
+  releaseGroupId  Int?
+  releaseGroup    ReleaseGroup?         @relation(fields: [releaseGroupId], references: [id])
   consumers       Consumer[]            @relation("ReleaseConsumers")
   contributors    Contributor[]         @relation("ReleaseContributors")
   contributions   Contribution[]
@@ -1187,6 +1282,9 @@ model Release {
   @@index([communityId])
   @@index([year])
   @@index([createdAt])
+  /// The resolver's hot path: every group read fetches its member releases by
+  /// this column. Postgres does not index a foreign key for you.
+  @@index([releaseGroupId])
   @@map("releases")
 }
 
@@ -1755,18 +1853,6 @@ model ContestType {
   @@map("contest_types")
 }
 
-model CoverArt {
-  id      Int       @id @default(autoincrement())
-  groupId Int
-  image   String    @default("")
-  summary String?
-  userId  Int       @default(0)
-  addedAt DateTime?
-
-  @@unique([groupId, image])
-  @@map("cover_art")
-}
-
 model FeaturedAlbum {
   id       Int      @id @default(autoincrement())
   groupId  Int
@@ -2047,18 +2133,6 @@ model IpBan {
 
   @@index([fromIp, toIp])
   @@map("ip_bans")
-}
-
-model GroupLog {
-  id          Int      @id @default(autoincrement())
-  groupId     Int
-  communityId Int
-  userId      Int      @default(0)
-  info        String?  @db.Text
-  loggedAt    DateTime
-  hidden      Int      @default(0)
-
-  @@map("group_logs")
 }
 
 model AuditLog {

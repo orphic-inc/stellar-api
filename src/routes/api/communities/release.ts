@@ -39,6 +39,11 @@ import {
   deleteCommunityRelease
 } from '../../../modules/releaseLifecycle';
 import { listCommunityReleases } from '../../../modules/releaseBrowse';
+import { setReleaseGroup } from '../../../modules/releaseGroup';
+import {
+  setReleaseGroupSchema,
+  type SetReleaseGroupInput
+} from '../../../schemas/releaseGroup';
 import {
   renderSiteBBCode,
   resolveViewer,
@@ -410,6 +415,43 @@ router.delete(
     });
     await session.removeTag({ tagId });
     res.status(204).send();
+  })
+);
+
+// PUT /api/communities/:communityId/releases/:releaseId/release-group
+//
+// Attach this release to a cross-community identity node, or detach it with
+// `null` (ADR-0023, #265). The day-to-day curation verb.
+//
+// Named `release-group`, not `group`: in this router "group" already means a
+// Release — `createGroupSchema` above is the create-a-release body, inherited
+// from the legacy vocabulary where a group WAS the release. ADR-0023's group is
+// the identity one level above that, so the two must not share a word here.
+//
+// Gated by community access rather than a permission, and it REFUSES rather
+// than filtering: the path names one community, so the caller is owed a
+// straight answer. `setReleaseGroup` runs `assertCommunityAccess`, so you may
+// only group releases you can already reach. That is the read/write asymmetry
+// `communityAccess.ts` documents, applied one level up.
+router.put(
+  '/:releaseId/release-group',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  validate(setReleaseGroupSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const { releaseGroupId } = parsedBody<SetReleaseGroupInput>(res);
+
+    const updated = await setReleaseGroup({
+      actorId: req.user.id,
+      communityId,
+      releaseId,
+      releaseGroupId
+    });
+    res.json(updated);
   })
 );
 
