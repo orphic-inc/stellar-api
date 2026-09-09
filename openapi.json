@@ -37106,7 +37106,7 @@
             }
           },
           "404": {
-            "description": "No communitie with that id"
+            "description": "No community with that id"
           },
           "429": {
             "description": "Rate limited",
