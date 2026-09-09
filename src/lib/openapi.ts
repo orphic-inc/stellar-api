@@ -78,8 +78,12 @@ import {
   addMemberSchema
 } from '../schemas/community';
 import {
+  addCoverSchema,
   createReleaseGroupSchema,
-  setReleaseGroupSchema
+  mergeReleaseGroupSchema,
+  setReleaseGroupSchema,
+  splitReleaseGroupSchema,
+  updateReleaseGroupSchema
 } from '../schemas/releaseGroup';
 import {
   updateRequestSchema,
@@ -4657,6 +4661,246 @@ registry.registerPath({
     400: msgResponse(
       'No live artist with that id — including an artist that has been withdrawn'
     )
+  }
+});
+
+const ReleaseGroupCover = registry.register(
+  'ReleaseGroupCover',
+  z.object({
+    id: z.number(),
+    image: z.string(),
+    summary: z.string().nullable(),
+    userId: z.number(),
+    addedAt: z.string(),
+    user: z.object({ id: z.number(), username: z.string() }).nullable()
+  })
+);
+
+const ReleaseGroupLogEntry = registry.register(
+  'ReleaseGroupLogEntry',
+  z.object({
+    id: z.number(),
+    info: z.string(),
+    hidden: z.boolean(),
+    loggedAt: z.string(),
+    user: z.object({ id: z.number(), username: z.string() }).nullable()
+  })
+);
+
+registry.registerPath({
+  method: 'put',
+  path: '/release-groups/{id}',
+  tags: ['Release Groups'],
+  summary: "Change a group's canonical identity",
+  description:
+    'Recomputing the identity can land on one another group already holds. ' +
+    'That is structurally a **merge** — two identities becoming one — so this ' +
+    'refuses with **409 naming the other group** rather than folding into it. ' +
+    'An edit that silently destroyed a row, with no undo, would be more power ' +
+    'than a rename should carry; call `merge` deliberately instead.\n\n' +
+    'A no-op edit returns 200 without writing a log entry.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: updateReleaseGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The updated identity',
+      content: { 'application/json': { schema: ReleaseGroupIdentity } }
+    },
+    400: msgResponse('No live artist with that id'),
+    404: msgResponse('Release group not found, or no member is visible to you'),
+    409: msgResponse('Another release group already holds that identity')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/release-groups/{id}/merge',
+  tags: ['Release Groups'],
+  summary: 'Fold another group into this one',
+  description:
+    '**There is no undo.** The group log is the record, and a two-step ' +
+    'confirmation belongs in the UI rather than in this call.\n\n' +
+    "The source's releases, covers and log entries all move here, and the " +
+    'source group is deleted. A cover this group already carries is dropped ' +
+    'rather than failing the merge on a duplicate image.\n\n' +
+    '**Both groups must resolve for you.** Merge reuses the same viewer ' +
+    'filter every read uses instead of a moderator bypass, so a ' +
+    '`contributions_manage` holder still cannot reach a group whose every ' +
+    'member sits in a community they cannot see. A consequence worth knowing: ' +
+    'you cannot merge into a memberless group, because a memberless group ' +
+    'resolves for nobody — rename that group instead.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: mergeReleaseGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Merged',
+      content: {
+        'application/json': {
+          schema: z.object({
+            id: z.number(),
+            title: z.string(),
+            mergedFrom: z.number(),
+            movedReleases: z.number()
+          })
+        }
+      }
+    },
+    400: msgResponse('A group cannot be merged into itself'),
+    404: msgResponse('Either group is unknown, or not visible to you')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/release-groups/{id}/split',
+  tags: ['Release Groups'],
+  summary: 'Move selected releases out to another identity',
+  description:
+    'Takes the target **identity**, not just a release list: the target is ' +
+    'found or created by the same normalized key `POST /release-groups` uses, ' +
+    'so a split can move releases into an existing group rather than only ' +
+    'ever minting a new one. Deriving the title from a moved release would be ' +
+    'wrong more often than right — the release being split out is the one ' +
+    'that was mis-grouped.\n\n' +
+    'Only releases actually in this group move; an id from elsewhere is ' +
+    'ignored rather than quietly re-grouped. An emptied source group is left ' +
+    'in place, because a memberless group is not an anomaly here.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: splitReleaseGroupSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The target identity and how many releases moved',
+      content: {
+        'application/json': {
+          schema: z.object({
+            id: z.number(),
+            title: z.string(),
+            movedReleases: z.number()
+          })
+        }
+      }
+    },
+    400: msgResponse(
+      'None of those releases belong to this group, the target identity is ' +
+        'this group, or the artist id names no live artist'
+    ),
+    404: msgResponse('Release group not found, or no member is visible to you')
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/release-groups/{id}/log',
+  tags: ['Release Groups'],
+  summary: "The group's identity history",
+  description:
+    'Merges, splits and identity edits, newest first. Rows flagged `hidden` ' +
+    'are returned only to `contributions_manage` holders.',
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated log entries',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(ReleaseGroupLogEntry),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    404: msgResponse('Release group not found, or no member is visible to you')
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/release-groups/{id}/covers',
+  tags: ['Release Groups'],
+  summary: "The group's cover art",
+  description:
+    'Group-level covers describe the shared identity; `Release.image` remains ' +
+    'the release-local fallback.',
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated covers',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(ReleaseGroupCover),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    404: msgResponse('Release group not found, or no member is visible to you')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/release-groups/{id}/covers',
+  tags: ['Release Groups'],
+  summary: 'Add a cover to a group',
+  description:
+    'Curation, not moderation: reaching the group is the only requirement, ' +
+    'exactly as with attaching a release. The URL must be `https` — a cover ' +
+    "renders in every viewer's browser, so a plain-http source is a " +
+    'mixed-content failure rather than a stylistic preference.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: addCoverSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Cover added',
+      content: { 'application/json': { schema: ReleaseGroupCover } }
+    },
+    404: msgResponse('Release group not found, or no member is visible to you'),
+    409: msgResponse('This group already carries that cover')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/release-groups/{id}/covers/{coverId}',
+  tags: ['Release Groups'],
+  summary: 'Remove a cover',
+  description:
+    "The member who added a cover may remove it; removing anyone else's " +
+    'needs `contributions_manage`.',
+  request: {
+    params: z.object({ id: z.string(), coverId: z.string() })
+  },
+  responses: {
+    204: { description: 'Cover removed' },
+    403: msgResponse('Only the member who added this cover may remove it'),
+    404: msgResponse('Release group or cover not found')
   }
 });
 
