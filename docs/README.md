@@ -1,6 +1,6 @@
 # Stellar API — Developer Documentation
 
-The human entry point for developing and operating the Stellar API. Start here after the root [README.md](../README.md) (install & run) and [CONTRIBUTING.md](../CONTRIBUTING.md) (workflow & gates). `CLAUDE.md` and `AGENTS.md` at the repo root carry the same material formatted for AI coding agents — this document is the human-facing source; the agent files point back here rather than duplicating it.
+The human entry point for developing and operating the Stellar API. Start here after the root [README.md](../README.md) (install & run) and [CONTRIBUTING.md](../CONTRIBUTING.md) (workflow & gates). [`AGENTS.md`](../AGENTS.md) at the repo root is the canonical agent-instruction file and carries the exhaustive reference — the full module/route inventory, the established patterns, the commit and merge discipline. `CLAUDE.md` is a one-line `@import` of it and holds no content of its own. This document is the human-facing orientation; where the two overlap, `AGENTS.md` is the more detailed of the pair.
 
 ## Where things live
 
@@ -11,7 +11,7 @@ The human entry point for developing and operating the Stellar API. Start here a
 | Understand the architecture                                   | [Architecture](#architecture) (below)                                                                   |
 | Configure the app                                             | [Environment reference](#environment-reference) (below)                                                 |
 | Add a feature                                                 | [Adding a module or route](#adding-a-module-or-route) (below)                                           |
-| Understand a design decision                                  | [`adr/`](adr/) — 28 Architecture Decision Records                                                       |
+| Understand a design decision                                  | [`adr/`](adr/) — Architecture Decision Records                                                          |
 | Understand a product requirement                              | [`prd/`](prd/) — 10 Product Requirement Docs                                                            |
 | Deploy / operate the whole stack                              | [stellar-compose](https://github.com/orphic-inc/stellar-compose) (operator runbook + constellation map) |
 | Agent/domain conventions                                      | [`agents/`](agents/) · [CONTEXT.md](../CONTEXT.md) · [CONTEXT-MAP.md](../CONTEXT-MAP.md)                |
@@ -43,7 +43,7 @@ src/
 - **Soft delete**: users are never hard-deleted (`disabled: true`); forum content uses `deletedAt`.
 - **The OpenAPI contract** is authored in `src/lib/openapi.ts` and exported to `openapi.json` (git-tracked, CI-gated). stellar-ui regenerates its types from it. Run `npm run openapi:export` after any contract change.
 
-The exhaustive module/route inventory (every file and its responsibility) is maintained in [CLAUDE.md](../CLAUDE.md#architecture); this section is the orientation, that is the map.
+The exhaustive module/route inventory (every file and its responsibility) is maintained in [AGENTS.md](../AGENTS.md#architecture); this section is the orientation, that is the map.
 
 ## Environment reference
 
@@ -101,9 +101,9 @@ The end-to-end shape for a new feature, using an existing route as the template:
    ```
 4. **Contract** — register the response shape in `src/lib/openapi.ts`, then `npm run openapi:export` (regenerates the git-tracked `openapi.json`; the CI freshness gate fails if you forget). Pair a stellar-ui `api:sync` after merge.
 5. **Test** — add a `*.spec.ts` (mock DB) and/or an integration test (`src/integration/`, real DB). Seed deterministic data and assert observable behavior.
-6. **List endpoints** paginate with `parsePage(req)` + `paginatedResponse(res, rows, total, pg)`.
+6. **List endpoints** paginate with `parsedPage(res)` + `paginatedResponse(res, rows, total, pg)`. `parsedPage` reads the already-validated query off `res.locals`, so the route must first run `validateQuery` with a schema spreading `paginationBase` — there is no `parsePage(req)`.
 
-The **stub models** in `schema.prisma` that have no routes yet (CoverArt, BitcoinDonation, Applicant/Thread, Concert, etc. — see [CLAUDE.md](../CLAUDE.md#stub-models-no-routes-implemented)) are the standing extension backlog.
+The **stub models** in `schema.prisma` that have no routes yet (CoverArt, BitcoinDonation, Applicant/Thread, Concert, etc. — see [AGENTS.md](../AGENTS.md#stub-models-no-routes-implemented)) are the standing extension backlog.
 
 ## Testing
 
