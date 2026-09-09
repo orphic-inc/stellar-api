@@ -92,7 +92,12 @@ router.get(
         take: pg.limit,
         include: {
           author: { select: authorRefSelect },
+          // Unfiltered, this spread the deleted post's whole row at the mapper
+          // below — `body` included, since `deletePost` keeps it verbatim
+          // (#598). The pointer recompute keeps this correct going forward;
+          // the filter covers rows already stale in a deployed database.
           lastPost: {
+            where: { deletedAt: null },
             include: { author: { select: authorRefSelect } }
           }
         }

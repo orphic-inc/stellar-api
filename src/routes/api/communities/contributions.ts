@@ -143,7 +143,12 @@ router.get(
         user: { select: { id: true, username: true } },
         release: true,
         collaborators: true,
+        // `deleteComment` stamps `deletedAt` and keeps the body verbatim, and
+        // routes/api/comments.ts filters at its list, count and detail — this
+        // relation read was missed by that sweep, so a contribution served the
+        // bodies of comments that had been deleted (#598).
         comments: {
+          where: { deletedAt: null },
           include: {
             author: { select: authorRefSelect }
           }

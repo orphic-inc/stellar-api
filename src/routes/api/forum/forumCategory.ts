@@ -49,7 +49,14 @@ router.get(
         forums: {
           orderBy: { sort: 'asc' },
           include: {
-            lastTopic: { select: { id: true, title: true } }
+            // The pointer is kept live by the recompute in modules/forum.ts,
+            // and this filter neutralises rows already stale in a deployed
+            // database (#598) — a to-one include resolves to null when its
+            // where does not match.
+            lastTopic: {
+              where: { deletedAt: null },
+              select: { id: true, title: true }
+            }
           }
         }
       }
@@ -81,7 +88,14 @@ router.get(
         forums: {
           orderBy: { sort: 'asc' },
           include: {
-            lastTopic: { select: { id: true, title: true } }
+            // The pointer is kept live by the recompute in modules/forum.ts,
+            // and this filter neutralises rows already stale in a deployed
+            // database (#598) — a to-one include resolves to null when its
+            // where does not match.
+            lastTopic: {
+              where: { deletedAt: null },
+              select: { id: true, title: true }
+            }
           }
         }
       }

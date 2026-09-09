@@ -1315,3 +1315,49 @@ describe('forums — constraint handling (#564)', () => {
     expect(res.status).toBe(500);
   });
 });
+
+// ─── #598 — the reads that carry the last-pointers ───────────────────────────
+
+describe('withdrawn topics and posts do not surface through relations (#598)', () => {
+  // The pointer recompute in modules/forum.ts keeps these correct going
+  // forward; these filters cover rows already stale in a deployed database.
+  // Assert the QUERY — a stale pointer and a correct one both render as the
+  // absence of a deleted row, so the payload cannot tell them apart.
+
+  it('filters a soft-deleted last post off the topic list', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(makeForum({ id: 9 }));
+    prismaMock.forumTopic.findMany.mockResolvedValue([] as never);
+    prismaMock.forumTopic.count.mockResolvedValue(0 as never);
+
+    await request(app).get('/api/forums/9/topics');
+
+    const call = prismaMock.forumTopic.findMany.mock.calls[0][0] as {
+      include: { lastPost: { where: unknown } };
+    };
+    expect(call.include.lastPost.where).toEqual({ deletedAt: null });
+  });
+
+  it('filters a soft-deleted last topic off the forum list', async () => {
+    prismaMock.forum.findMany.mockResolvedValue([] as never);
+
+    await request(app).get('/api/forums');
+
+    const call = prismaMock.forum.findMany.mock.calls[0][0] as {
+      include: { lastTopic: { where: unknown } };
+    };
+    expect(call.include.lastTopic.where).toEqual({ deletedAt: null });
+  });
+
+  it('filters a soft-deleted last topic off the single-forum read', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue(
+      makeForum({ id: 9, minClassRead: 0 })
+    );
+
+    await request(app).get('/api/forums/9');
+
+    const call = prismaMock.forum.findUnique.mock.calls[0][0] as {
+      include: { lastTopic: { where: unknown } };
+    };
+    expect(call.include.lastTopic.where).toEqual({ deletedAt: null });
+  });
+});

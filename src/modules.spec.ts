@@ -599,9 +599,14 @@ describe('forum.deletePost', () => {
         data: { deletedAt: expect.any(Date) }
       })
     );
-    expect(prismaMock.forumTopic.update).toHaveBeenCalledTimes(1);
     expect(prismaMock.forumTopic.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { numPosts: { decrement: 1 } } })
+    );
+    // "without touching the topic" means without soft-deleting it. #598 adds a
+    // second topic write — the lastPostId recompute — so assert the absence of
+    // a deletedAt stamp rather than a call count.
+    expect(prismaMock.forumTopic.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: { deletedAt: expect.any(Date) } })
     );
   });
 

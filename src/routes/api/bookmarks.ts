@@ -263,8 +263,12 @@ router.get(
   '/requests',
   requireAuth,
   authHandler(async (req, res) => {
+    // As with the artist list above (#573): a bookmark list is a list of the
+    // thing bookmarked, and every request detail read filters `deletedAt`
+    // (modules/requestLifecycle.ts), so this returned a title whose own route
+    // answers 404 (#598).
     const bookmarks = await prisma.bookmarkRequest.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id, request: { deletedAt: null } },
       include: { request: { select: { id: true, title: true } } },
       orderBy: { createdAt: 'desc' }
     });

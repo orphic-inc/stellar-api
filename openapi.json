@@ -2844,6 +2844,7 @@
           },
           "lastTopic": {
             "type": "object",
+            "nullable": true,
             "properties": {
               "id": {
                 "type": "number"

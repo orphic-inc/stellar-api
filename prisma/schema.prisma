@@ -790,6 +790,17 @@ model ForumTopic {
   specificRules ForumSpecificRule[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+  /// Soft delete. Every member-facing read filters it (modules/topicSession.ts,
+  /// forumRoute.ts, forumTopic.ts).
+  ///
+  /// `Forum.lastTopicId` is a denormalized pointer at a topic, kept correct by a
+  /// recompute inside deleteTopic / deletePost / trashTopic rather than by a filter
+  /// (#598) — `onDelete: SetNull` fires only for a hard delete, which never happens
+  /// here. Its ordering follows the newest live POST, because that is what
+  /// `createPost` maintains the column to mean.
+  ///
+  /// NOT FILTERED, deliberately: reports.ts resolving a report's URL — ids and
+  /// routing fields only, never the title.
   deletedAt     DateTime?
 
   @@index([forumId])
@@ -809,6 +820,16 @@ model ForumPost {
   lastReadOf   ForumLastReadTopic[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
+  /// Soft delete. `deletePost` stamps this and keeps `body` VERBATIM. Every
+  /// member-facing read filters it (modules/topicSession.ts, forumPost.ts).
+  ///
+  /// `ForumTopic.lastPostId` is a denormalized pointer at a post, not a read, and
+  /// `onDelete: SetNull` does not fire for a soft delete — so it is kept correct by
+  /// recomputing it inside the delete transaction (#598), not by filtering. The
+  /// includes that read it filter as well, to neutralise rows already stale.
+  ///
+  /// NOT FILTERED, deliberately: reports.ts resolving a report's URL — ids and
+  /// routing fields only, never the body.
   deletedAt    DateTime?
 
   @@index([forumTopicId])
@@ -1342,6 +1363,13 @@ model Comment {
   collageId      Int?
   collage        Collage?      @relation(fields: [collageId], references: [id])
   createdAt      DateTime      @default(now())
+  /// Soft delete. `deleteComment` stamps this and keeps `body` VERBATIM, so any
+  /// read that forgets the filter serves deleted content rather than a tombstone.
+  /// routes/api/comments.ts filters at its list, its count and its detail (#509 F4);
+  /// a contribution's comments relation did not until #598.
+  ///
+  /// NOT FILTERED, deliberately: reports.ts resolving a report's URL — ids and
+  /// routing fields only, never the body.
   deletedAt      DateTime?
 
   @@index([page, communityId])
@@ -1569,6 +1597,13 @@ model Request {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// Soft delete. Every request read filters it out — detail, bounty history,
+  /// voting and fill all carry `deletedAt: null` (modules/requestLifecycle.ts), and
+  /// so does a member's request bookmark list, which did not until #598.
+  ///
+  /// NOT FILTERED, deliberately: reports.ts resolving a report's URL. It reads ids
+  /// and routing fields, never a title or body, so a report about a since-withdrawn
+  /// request still links somewhere.
   deletedAt DateTime?
 
   @@index([communityId])

@@ -212,6 +212,23 @@ describe('API content and shared flows', () => {
       ...over
     }) as never;
 
+  it('excludes soft-deleted comments from the contribution read (#598)', async () => {
+    // `deleteComment` stamps `deletedAt` and keeps the body verbatim, so an
+    // unfiltered relation read served deleted content — not a tombstone.
+    // routes/api/comments.ts filters at its list, count and detail; this
+    // relation was missed by that sweep.
+    prismaMock.contribution.findUnique.mockResolvedValue(contributionRow());
+
+    await request(app).get('/api/contributions/5');
+
+    // The relation sits under `select`, not `include`, and the route reads the
+    // contribution more than once — so find the call that carries it.
+    const withComments = prismaMock.contribution.findUnique.mock.calls
+      .map((c) => c[0] as { select?: { comments?: { where?: unknown } } })
+      .find((a) => a.select?.comments);
+    expect(withComments?.select?.comments?.where).toEqual({ deletedAt: null });
+  });
+
   it('lets the owner read their own contribution without a community check', async () => {
     // Ownership is tested first and independently: a member who contributed
     // and later lost access to that community still sees the row in their own
