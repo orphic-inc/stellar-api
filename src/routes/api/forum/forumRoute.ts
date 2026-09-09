@@ -38,6 +38,7 @@ router.get(
       include: {
         forumCategory: { select: { id: true, name: true } },
         lastTopic: {
+          where: { deletedAt: null },
           include: { author: { select: { id: true, username: true } } }
         }
       }
@@ -61,7 +62,10 @@ router.get(
       where: { id },
       include: {
         forumCategory: true,
-        lastTopic: { select: { id: true, title: true } }
+        lastTopic: {
+          where: { deletedAt: null },
+          select: { id: true, title: true }
+        }
       }
     });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });

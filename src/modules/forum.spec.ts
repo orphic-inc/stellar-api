@@ -3,12 +3,15 @@ const mockTx = {
     create: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
-    findUnique: jest.fn()
+    findUnique: jest.fn(),
+    // #598 — the last-pointer recomputes read live rows inside the transaction
+    findFirst: jest.fn()
   },
   forumPost: {
     create: jest.fn(),
     update: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     count: jest.fn()
   },
   forum: {
@@ -426,14 +429,16 @@ describe('deleteTopic', () => {
       where: { forumTopicId: 44, deletedAt: null }
     });
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
-    expect(prismaMock.forum.update).toHaveBeenCalledWith({
+    // Interactive since #598, so the writes land on the tx client rather than
+    // on prisma directly — the recompute has to read after the delete.
+    expect(mockTx.forum.update).toHaveBeenCalledWith({
       where: { id: 9 },
       data: {
         numTopics: { decrement: 1 },
         numPosts: { decrement: 3 }
       }
     });
-    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+    expect(mockTx.auditLog.create).toHaveBeenCalledWith({
       data: {
         actorId: 7,
         action: 'topic.mod_delete',
@@ -470,11 +475,13 @@ describe('deletePost', () => {
         targetId: 21
       }
     });
-    expect(mockTx.forumTopic.update).toHaveBeenLastCalledWith({
+    // Not `LastCalledWith` any more: #598 appends the pointer recomputes after
+    // the cascade, so the soft-delete is no longer the final write.
+    expect(mockTx.forumTopic.update).toHaveBeenCalledWith({
       where: { id: 44 },
       data: { deletedAt: expect.any(Date) }
     });
-    expect(mockTx.forum.update).toHaveBeenLastCalledWith({
+    expect(mockTx.forum.update).toHaveBeenCalledWith({
       where: { id: 9 },
       data: { numTopics: { decrement: 1 } }
     });

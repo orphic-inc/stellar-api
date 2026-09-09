@@ -17,6 +17,66 @@ type CastVoteResult =
       reason: 'not_found' | 'insufficient_class' | 'closed' | 'invalid_vote';
     };
 
+/** The interactive-transaction client the recomputes below run on. */
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * `Forum.lastTopicId` and `ForumTopic.lastPostId` are denormalized pointers,
+ * and a SOFT delete leaves them pointing at the row it just hid (#598). The
+ * `onDelete: SetNull` on both relations only fires for a hard delete, which
+ * never happens here — so without these the forum index renders a deleted
+ * topic's title, and the topic list renders a deleted post's whole row, body
+ * included.
+ *
+ * Call AFTER the soft delete inside the same transaction: each re-reads live
+ * rows, so the row being removed is already excluded by its own `deletedAt`.
+ *
+ * Both are `Promise<void>`; neither reads what the other writes, but order
+ * still matters in `deletePost` — recompute the topic's pointer first, because
+ * the forum's ordering below reads `lastPost`.
+ */
+const recomputeTopicLastPost = async (tx: Tx, forumTopicId: number) => {
+  const next = await tx.forumPost.findFirst({
+    where: { forumTopicId, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true }
+  });
+  await tx.forumTopic.update({
+    where: { id: forumTopicId },
+    data: { lastPostId: next?.id ?? null }
+  });
+};
+
+/**
+ * Ordered by the newest remaining live POST, not by topic `createdAt`, because
+ * that is what the column means: `createPost` sets `lastTopicId` to whichever
+ * topic just received a post. Ordering by creation would surface a quiet new
+ * thread over an old one that was replied to an hour ago.
+ *
+ * The second pass exists for rows already stale in a deployed database: a live
+ * topic whose `lastPostId` points at a deleted post is skipped by the first
+ * query, and a forum holding live topics must not render a blank last-topic
+ * column. A fresh database never reaches it.
+ */
+const recomputeForumLastTopic = async (tx: Tx, forumId: number) => {
+  const byActivity = await tx.forumTopic.findFirst({
+    where: { forumId, deletedAt: null, lastPostId: { not: null } },
+    orderBy: { lastPost: { createdAt: 'desc' } },
+    select: { id: true }
+  });
+  const next =
+    byActivity ??
+    (await tx.forumTopic.findFirst({
+      where: { forumId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true }
+    }));
+  await tx.forum.update({
+    where: { id: forumId },
+    data: { lastTopicId: next?.id ?? null }
+  });
+};
+
 export const createTopic = async (
   forumId: number,
   authorId: number,
@@ -62,27 +122,31 @@ export const deleteTopic = async (
   const livePostCount = await prisma.forumPost.count({
     where: { forumTopicId: id, deletedAt: null }
   });
-  await prisma.$transaction([
-    prisma.forumTopic.update({
+  // Interactive rather than a batch array (#598): the recompute has to read
+  // live rows AFTER this topic is hidden, and a batch cannot read between its
+  // own writes. AGENTS.md names this as the case interactive exists for.
+  await prisma.$transaction(async (tx) => {
+    await tx.forumTopic.update({
       where: { id },
       data: { deletedAt: new Date() }
-    }),
-    prisma.forum.update({
+    });
+    await tx.forum.update({
       where: { id: forumId },
       data: {
         numTopics: { decrement: 1 },
         numPosts: { decrement: livePostCount }
       }
-    }),
-    prisma.auditLog.create({
+    });
+    await tx.auditLog.create({
       data: {
         actorId,
         action: isModAction ? 'topic.mod_delete' : 'topic.delete',
         targetType: 'ForumTopic',
         targetId: id
       }
-    })
-  ]);
+    });
+    await recomputeForumLastTopic(tx, forumId);
+  });
 };
 
 export const createPost = async (
@@ -249,6 +313,10 @@ export const deletePost = async (
       }
     });
 
+    // Before the cascade below, so the topic's own pointer is correct whether
+    // or not it survives (#598).
+    await recomputeTopicLastPost(tx, forumTopicId);
+
     const remainingPosts = await tx.forumPost.count({
       where: { forumTopicId, deletedAt: null }
     });
@@ -262,6 +330,9 @@ export const deletePost = async (
         data: { numTopics: { decrement: 1 } }
       });
     }
+    // Unconditional: deleting the newest post reorders the forum by activity
+    // even when the topic survives, since the ordering reads `lastPost`.
+    await recomputeForumLastTopic(tx, forumId);
   });
 };
 
@@ -298,44 +369,31 @@ export const trashTopic = async (id: number): Promise<TrashTopicResult> => {
     where: { forumTopicId: id }
   });
 
-  const sourceForum = await prisma.forum.findUnique({
-    where: { id: topic.forumId },
-    select: { lastTopicId: true }
-  });
-
   const updated = await prisma.$transaction(async (tx) => {
-    // If this topic was the forum's latest, find the next most recent one
-    if (sourceForum?.lastTopicId === id) {
-      const nextTopic = await tx.forumTopic.findFirst({
-        where: { forumId: topic.forumId, id: { not: id } },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true }
-      });
-      await tx.forum.update({
-        where: { id: topic.forumId },
-        data: {
-          numTopics: { decrement: 1 },
-          numPosts: { decrement: postCount },
-          lastTopicId: nextTopic?.id ?? null
-        }
-      });
-    } else {
-      await tx.forum.update({
-        where: { id: topic.forumId },
-        data: {
-          numTopics: { decrement: 1 },
-          numPosts: { decrement: postCount }
-        }
-      });
-    }
+    await tx.forum.update({
+      where: { id: topic.forumId },
+      data: {
+        numTopics: { decrement: 1 },
+        numPosts: { decrement: postCount }
+      }
+    });
     await tx.forum.update({
       where: { id: trash.id },
       data: { numTopics: { increment: 1 }, numPosts: { increment: postCount } }
     });
-    return tx.forumTopic.update({
+    const moved = await tx.forumTopic.update({
       where: { id },
       data: { forumId: trash.id, isSticky: false }
     });
+    // This function already recomputed the source forum's pointer — it was the
+    // worked example the delete paths were missing. Two things were wrong with
+    // it (#598): it ordered by topic `createdAt` rather than by activity, and
+    // it did not filter `deletedAt`, so it could repoint the forum at a
+    // soft-deleted topic. Running the shared helper AFTER the move puts all
+    // three call sites on one shape; the moved topic now carries the trash
+    // forum's id, so it is excluded without an explicit `id: { not: id }`.
+    await recomputeForumLastTopic(tx, topic.forumId);
+    return moved;
   });
 
   return { ok: true, topic: updated };

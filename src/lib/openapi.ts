@@ -3019,11 +3019,15 @@ const Forum = registry.register(
         name: z.string()
       })
       .optional(),
+    // Nullable since #598: the read filters a soft-deleted last topic, and a
+    // forum with no live topics has none. `lastPost` on ForumTopic below was
+    // already declared this way.
     lastTopic: z
       .object({
         id: z.number(),
         title: z.string()
       })
+      .nullable()
       .optional()
   })
 );

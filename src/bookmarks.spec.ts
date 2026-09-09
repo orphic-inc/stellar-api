@@ -362,3 +362,20 @@ describe.each([
     });
   }
 );
+
+describe('GET /api/bookmarks/requests — withdrawn requests (#598)', () => {
+  it('excludes bookmarks whose request has been withdrawn', async () => {
+    // The same shape as the artist list above (#573), one route below it: every
+    // request detail read filters `deletedAt`, so this returned a title whose
+    // own route answers 404.
+    prismaMock.bookmarkRequest.findMany.mockResolvedValue([] as never);
+
+    await request(app).get('/api/bookmarks/requests');
+
+    expect(prismaMock.bookmarkRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 7, request: { deletedAt: null } }
+      })
+    );
+  });
+});

@@ -432,6 +432,57 @@ data`) and Zod strips unknown keys, so a `PUT /api/profile/me` carrying
   covers release credits, contribution collaborators and the artists named on a
   request — a citation of the artist as author of a work that still exists.
   Blanking those is the harm the original exception was written to prevent.
+- **A soft-deleted forum post's body was served on the topic list, and a deleted
+  topic's title on the forum index**
+  ([#598](https://github.com/orphic-inc/stellar-api/issues/598)) — `Forum.lastTopicId`
+  and `ForumTopic.lastPostId` are denormalized pointers, and the `onDelete:
+SetNull` on both relations fires only for a **hard** delete, which never
+  happens here. `deleteTopic` and `deletePost` decremented their counters and
+  left the pointers aimed at the row they had just hidden. `deletePost` keeps
+  `body` verbatim, and the topic list spread the whole row, so the deleted text
+  shipped.
+
+  **Fixed by recomputing the pointer inside the delete transaction, not by
+  filtering** — a filter alone would blank the forum index rather than correct
+  it, since the previous live topic is the right answer. `deleteTopic` moves
+  from a batch to an interactive transaction to do it: the recompute has to read
+  live rows after the delete, which a batch cannot.
+
+  The ordering follows the **newest live post**, not topic `createdAt`, because
+  that is what the column means — `createPost` sets `lastTopicId` on every post,
+  so it tracks activity. Ordering by creation would surface a quiet new thread
+  over an old one replied to an hour ago.
+
+  **`trashTopic` already did this, and had both bugs.** It was the worked example
+  the delete paths were missing, but it ordered by `createdAt` and did **not**
+  filter `deletedAt` — so it could repoint a forum at a soft-deleted topic. All
+  three call sites now share one helper.
+
+  The reads that carry these pointers filter as well. That is not redundancy: it
+  neutralises rows **already stale** in a deployed database, which the recompute
+  cannot reach without a data migration.
+
+- **A contribution served the bodies of deleted comments, and a request bookmark
+  its withdrawn title** — same class as the above.
+  `routes/api/comments.ts` filters `deletedAt` at its list, its count and its
+  detail ([#509](https://github.com/orphic-inc/stellar-api/issues/509) F4); the
+  `Contribution.comments` relation was missed by that sweep. `GET
+/bookmarks/requests` is the request-shaped twin of the artist bookmark fixed
+  in [#573](https://github.com/orphic-inc/stellar-api/issues/573) — one route
+  below it in the same file, returning a title whose own route answers 404.
+
+- **`Forum.lastTopic` is now declared nullable.** It was `.optional()` only, so
+  a forum whose last topic is filtered or absent contradicted its own contract.
+  `ForumTopic.lastPost` was already declared this way. stellar-ui already guards
+  with `forum.lastTopic ? …`, so this widens what the contract admits rather
+  than changing what the UI does. **It owes an `api:sync`.**
+
+- **`ForumTopic`, `ForumPost`, `Comment` and `Request` gained the two-halves
+  `deletedAt` doc comment** `Artist.deletedAt` received in #573 — what is
+  filtered, and what is deliberately not. In all four the single exception is
+  `reports.ts` resolving a report's URL, which reads ids and routing fields and
+  never a body or title. The absence of that statement is why three consecutive
+  sweeps each missed the relation reads.
 
 ## [0.9.2] — 2026-09-08
 
