@@ -17,9 +17,10 @@ import {
 } from './test/apiTestHarness';
 import { makeUser, asUserMock } from './test/factories';
 import { updateProfile } from './modules/profile';
-import { sendRecoveryEmail } from './lib/mailer';
+import { sendRecoveryEmail, sendReactivationEmail } from './lib/mailer';
 
 const sendRecoveryEmailMock = sendRecoveryEmail as jest.Mock;
+const sendReactivationEmailMock = sendReactivationEmail as jest.Mock;
 
 describe('API auth/profile/user flows', () => {
   beforeEach(() => {
@@ -522,6 +523,137 @@ describe('API auth/profile/user flows', () => {
 
     expect(res.status).toBe(200);
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  // ── Reactivation (#279) ────────────────────────────────────────────────────
+
+  it('sends a reactivation link only for a DISABLED account', async () => {
+    sendReactivationEmailMock.mockResolvedValue(true);
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      email: 'kai@example.com',
+      disabled: true
+    } as never);
+    prismaMock.$transaction.mockResolvedValueOnce([{}, { id: 1 }] as never);
+
+    const res = await request(app)
+      .post('/api/auth/reactivation-request')
+      .send({ email: 'kai@example.com' });
+
+    expect(res.status).toBe(200);
+    expect(sendReactivationEmailMock).toHaveBeenCalledWith(
+      'kai@example.com',
+      expect.stringContaining('/reactivate?token=')
+    );
+  });
+
+  it('answers identically for an active account, and mints nothing', async () => {
+    // The generic message is the whole point: a distinguishable response would
+    // say which accounts are disabled, and therefore which members were banned.
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 7,
+      email: 'kai@example.com',
+      disabled: false
+    } as never);
+
+    const active = await request(app)
+      .post('/api/auth/reactivation-request')
+      .send({ email: 'kai@example.com' });
+
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+    const unknown = await request(app)
+      .post('/api/auth/reactivation-request')
+      .send({ email: 'nobody@example.com' });
+
+    expect(active.status).toBe(200);
+    expect(unknown.status).toBe(200);
+    expect(active.body).toEqual(unknown.body);
+    expect(sendReactivationEmailMock).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token that is not a reactivation token', async () => {
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/auth/reactivation-confirm')
+      .send({ token: 'a-password-reset-token' });
+
+    expect(res.status).toBe(400);
+    // The purpose filter is the guard: without it this token would be accepted
+    // here, and a reactivation token would be accepted at /recovery/reset.
+    expect(prismaMock.accountRecovery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ purpose: 'Reactivation' })
+      })
+    );
+  });
+
+  it('opens a staff ticket on confirm', async () => {
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce({
+      id: 9,
+      userId: 7
+    } as never);
+    prismaMock.staffInboxConversation.findFirst.mockResolvedValueOnce(null);
+    prismaMock.$transaction.mockResolvedValueOnce([{}, {}] as never);
+
+    const res = await request(app)
+      .post('/api/auth/reactivation-confirm')
+      .send({ token: 'good-token' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.staffInboxConversation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subject: 'Reactivation request',
+          userId: 7
+        })
+      })
+    );
+  });
+
+  it('appends to an open ticket instead of opening a second one', async () => {
+    // Idempotent per member: one email round-trip must not become an unlimited
+    // supply of threads. The token is spent either way.
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce({
+      id: 9,
+      userId: 7
+    } as never);
+    prismaMock.staffInboxConversation.findFirst.mockResolvedValueOnce({
+      id: 412
+    } as never);
+    prismaMock.$transaction.mockResolvedValueOnce([{}, {}] as never);
+
+    const res = await request(app)
+      .post('/api/auth/reactivation-confirm')
+      .send({ token: 'good-token' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.staffInboxConversation.create).not.toHaveBeenCalled();
+    expect(prismaMock.staffInboxMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ conversationId: 412, senderId: 7 })
+      })
+    );
+    expect(prismaMock.accountRecovery.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { usedAt: expect.any(Date) }
+    });
+  });
+
+  it('will not accept a reactivation token at /recovery/reset', async () => {
+    prismaMock.accountRecovery.findFirst.mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/api/auth/recovery/reset')
+      .send({ token: 'a-reactivation-token', newPassword: 'new-password-123' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.accountRecovery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ purpose: 'PasswordReset' })
+      })
+    );
   });
 
   it('lists and revokes the current user sessions', async () => {

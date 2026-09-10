@@ -88,3 +88,24 @@ export async function sendInactivityDisabledEmail(
   });
   return true;
 }
+
+export async function sendReactivationEmail(
+  to: string,
+  confirmUrl: string
+): Promise<boolean> {
+  if (!emailConfig.smtpHost) {
+    log.warn('STELLAR_SMTP_HOST not set — reactivation email not sent', { to });
+    return false;
+  }
+
+  await createTransporter().sendMail({
+    from: emailConfig.fromAddress,
+    to,
+    subject: 'Reactivate your account',
+    // Deliberately says nothing about WHY the account is disabled: the same
+    // mail goes out whether it was inactivity or a moderator, so the flow
+    // cannot be used to find out which (#279).
+    text: `Someone asked to reinstate the account registered to this address. Confirm here and staff will pick it up:\n\n${confirmUrl}\n\nThis link expires in 2 hours. If this was not you, you can ignore this email.`
+  });
+  return true;
+}

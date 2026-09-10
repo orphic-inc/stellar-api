@@ -31,9 +31,25 @@ export const recoveryResetSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters')
 });
 
+// Reactivation (#279). Deliberately the same shapes as the recovery pair — the
+// two flows differ in what the token is FOR, not in what the client sends.
+export const reactivationRequestSchema = z.object({
+  email: z.string().email('Please include a valid email')
+});
+
+export const reactivationConfirmSchema = z.object({
+  token: z.string().min(1, 'Token is required')
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type RecoveryRequestInput = z.infer<typeof recoveryRequestSchema>;
 export type RecoveryResetInput = z.infer<typeof recoveryResetSchema>;
+export type ReactivationRequestInput = z.infer<
+  typeof reactivationRequestSchema
+>;
+export type ReactivationConfirmInput = z.infer<
+  typeof reactivationConfirmSchema
+>;

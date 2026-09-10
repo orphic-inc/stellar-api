@@ -146,7 +146,10 @@ jest.mock('../modules/staff', () => ({
 
 jest.mock('../lib/mailer', () => ({
   sendInviteEmail: jest.fn().mockResolvedValue(true),
-  sendRecoveryEmail: jest.fn().mockResolvedValue(true)
+  sendRecoveryEmail: jest.fn().mockResolvedValue(true),
+  sendReactivationEmail: jest.fn().mockResolvedValue(true),
+  sendInactivityWarningEmail: jest.fn().mockResolvedValue(true),
+  sendInactivityDisabledEmail: jest.fn().mockResolvedValue(true)
 }));
 
 jest.mock('../modules/config', () => ({
@@ -163,6 +166,10 @@ jest.mock('../modules/config', () => ({
   assets: { maxBytes: 2000000 },
   economy: { minimumBounty: 104857600 },
   ranks: { progressionIntervalMs: 3600000 },
+  // Must be present, or startInactivityJob reads `.mode` off undefined and the
+  // whole harness fails at import — createApp() runs at app.ts module scope.
+  // `off` matches the real default, so the sweep stays inert in route tests.
+  inactivity: { mode: 'off', maxDisablesPerCycle: 50, intervalMs: 86400000 },
   sentry: { dsn: '' },
   email: {
     smtpHost: '',

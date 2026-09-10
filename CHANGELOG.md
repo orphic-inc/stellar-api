@@ -8,6 +8,54 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **Inactivity lifecycle — a dormancy sweep, and a way back in**
+  ([#279](https://github.com/orphic-inc/stellar-api/issues/279),
+  [ADR-0038](docs/adr/0038-inactivity-is-a-clock-not-a-timestamp.md)) —
+  accounts were only ever disabled by hand, and a disabled member had no route
+  back: login answers `403` before it even checks the password, so the existing
+  recovery flow could hand them a working password they still could not use.
+
+  A daily sweep warns at 110 days idle (System PM + email), and disables at 120
+  provided the warning went out at least 7 days earlier — the gap is measured
+  from the stamp, not the calendar, so a job that was down for a month cannot
+  warn and disable in one catch-up pass. Signing in clears the warning. Donors,
+  `rankLocked` accounts, staff ranks and already-disabled accounts are exempt.
+  Accounts that registered and never returned are swept after 7 days, but only
+  **self-registered** ones: an account staff created for someone away for a
+  fortnight should not be disabled before they arrive.
+
+  **It is off by default and stays off until someone turns it on.**
+  `INACTIVITY_MODE` is `off` / `dryRun` / `on`; `dryRun` evaluates every
+  candidate and writes nothing, and the count it prints against real data is
+  what makes enabling it a decision rather than a hope.
+  `INACTIVITY_MAX_DISABLES_PER_CYCLE` (default 50) bounds a live run — warnings
+  are uncapped, since signing in undoes one, while a disable needs staff.
+
+  **`POST /auth/reactivation-request` and `/auth/reactivation-confirm`** let a
+  disabled member ask to be reinstated: the first mails a link, the second opens
+  a staff-inbox ticket that staff resolve through the existing `users_disable`
+  surface. Open to **any** disabled account, moderator actions included — it is
+  an appeals channel, and filtering by reason would leak which members were
+  banned. Both answer one generic sentence for an unknown, active or disabled
+  address alike. Confirm is idempotent per member, so one email round-trip
+  cannot become an unlimited supply of threads.
+
+### Changed
+
+- **A recovery token now says what it is for** — `AccountRecovery.purpose`
+  (`PasswordReset` | `Reactivation`), defaulted so every existing row keeps its
+  meaning. `resetPasswordWithToken` matched _any_ unused, unexpired row, so
+  without this a reactivation link mailed to a four-month-dormant address would
+  also set that account's password. `persistRecoveryToken` now scopes its
+  invalidation by purpose, so asking to be reinstated no longer silently expires
+  a password reset already in flight.
+
+- **Re-enabling a user stamps `reactivatedAt` and clears the dormancy warning.**
+  The handler previously wrote `disabled: false` and nothing else, which would
+  have let the new sweep re-disable a reinstated member within 24 hours — the
+  clock reads `max(lastLogin, dateRegistered, reactivatedAt)` for exactly this
+  reason.
+
 - **`ReleaseGroup` — cross-community content identity**
   ([#265](https://github.com/orphic-inc/stellar-api/issues/265),
   [ADR-0023](docs/adr/0023-contribution-package-and-releasegroup-identity.md))
