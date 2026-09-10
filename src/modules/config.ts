@@ -128,6 +128,35 @@ export const ranks = {
   )
 };
 
+/**
+ * Inactivity lifecycle (#279, ADR-0038). These are the operational dials only —
+ * the thresholds themselves are constants in `modules/inactivity.ts`, because a
+ * rule that disables member accounts should move by code review rather than by
+ * environment variable.
+ *
+ * `mode` defaults to `off`. The first live run against an aged dataset is the
+ * dangerous one, so the feature does nothing until someone deliberately turns it
+ * on, and `dryRun` exists as a first-class state rather than as a logging
+ * accident — it evaluates everything and applies nothing.
+ *
+ * `maxDisablesPerCycle` is the part that actually bounds the damage. A wrong
+ * predicate cannot disable ten thousand accounts in one pass; the job runs daily,
+ * so a legitimate backlog drains on its own while a mistake stays small enough to
+ * notice and undo.
+ */
+export const inactivity = {
+  mode: (['off', 'dryRun', 'on'] as const).includes(
+    process.env.INACTIVITY_MODE as 'off' | 'dryRun' | 'on'
+  )
+    ? (process.env.INACTIVITY_MODE as 'off' | 'dryRun' | 'on')
+    : ('off' as const),
+  maxDisablesPerCycle: parseInt(
+    process.env.INACTIVITY_MAX_DISABLES_PER_CYCLE ?? '50',
+    10
+  ),
+  intervalMs: parseInt(process.env.INACTIVITY_INTERVAL_MS ?? '86400000', 10)
+};
+
 export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };

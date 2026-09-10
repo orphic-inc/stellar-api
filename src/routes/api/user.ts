@@ -849,7 +849,19 @@ router.post(
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
     try {
-      await prisma.user.update({ where: { id }, data: { disabled: false } });
+      // `reactivatedAt` is stamped, and the dormancy warn cleared, in the same
+      // write as the re-enable (#279, ADR-0038). Without it the inactivity
+      // sweep re-disables this account on its next run: `disabled` goes false
+      // but `lastLogin` and `inactivityWarnedAt` are both still stale, which
+      // satisfies the disable predicate again within 24 hours.
+      await prisma.user.update({
+        where: { id },
+        data: {
+          disabled: false,
+          reactivatedAt: new Date(),
+          inactivityWarnedAt: null
+        }
+      });
     } catch (err) {
       // The findUnique above is a READ; #564 treats it as insufficient because
       // the row can go between it and the write, where P2025 would 500.

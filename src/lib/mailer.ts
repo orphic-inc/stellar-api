@@ -49,3 +49,42 @@ export async function sendRecoveryEmail(
   });
   return true;
 }
+
+export async function sendInactivityWarningEmail(
+  to: string,
+  daysUntilDisable: number
+): Promise<boolean> {
+  if (!emailConfig.smtpHost) {
+    log.warn('STELLAR_SMTP_HOST not set — inactivity warning not sent', { to });
+    return false;
+  }
+
+  await createTransporter().sendMail({
+    from: emailConfig.fromAddress,
+    to,
+    subject: 'Your account is about to be deactivated',
+    text: `Your account has been inactive for a long time and is scheduled to be deactivated in ${daysUntilDisable} days.\n\nTo keep it, just sign in:\n\n${emailConfig.siteUrl}/login\n\nSigning in is enough — there is nothing else to do.`
+  });
+  return true;
+}
+
+export async function sendInactivityDisabledEmail(
+  to: string
+): Promise<boolean> {
+  if (!emailConfig.smtpHost) {
+    log.warn('STELLAR_SMTP_HOST not set — deactivation notice not sent', {
+      to
+    });
+    return false;
+  }
+
+  await createTransporter().sendMail({
+    from: emailConfig.fromAddress,
+    to,
+    subject: 'Your account has been deactivated',
+    // Points at the reactivation flow rather than at login, which would only
+    // return the 403 that brought them here.
+    text: `Your account has been deactivated after a long period of inactivity.\n\nIf you would like it back, you can ask staff to reinstate it:\n\n${emailConfig.siteUrl}/reactivate\n\nNothing has been deleted.`
+  });
+  return true;
+}
