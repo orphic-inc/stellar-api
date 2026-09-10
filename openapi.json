@@ -4128,6 +4128,62 @@
           "actor"
         ]
       },
+      "ReleaseGroupIdentity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "year": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "artist",
+          "year"
+        ]
+      },
+      "ReleaseGroupRef": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReleaseGroupIdentity"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "image": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "image"
+            ]
+          }
+        ]
+      },
       "Release": {
         "type": "object",
         "properties": {
@@ -4249,6 +4305,13 @@
           },
           "isContributor": {
             "type": "boolean"
+          },
+          "releaseGroupId": {
+            "type": "number",
+            "nullable": true
+          },
+          "group": {
+            "$ref": "#/components/schemas/ReleaseGroupRef"
           }
         },
         "required": [
@@ -4560,43 +4623,6 @@
         "required": [
           "myVote",
           "voteAggregate"
-        ]
-      },
-      "ReleaseGroupIdentity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "title": {
-            "type": "string"
-          },
-          "artist": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "id": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name"
-            ]
-          },
-          "year": {
-            "type": "number",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "artist",
-          "year"
         ]
       },
       "ReleaseGroupMember": {
@@ -39334,6 +39360,9 @@
                               "consumers",
                               "contributors"
                             ]
+                          },
+                          "group": {
+                            "$ref": "#/components/schemas/ReleaseGroupRef"
                           }
                         },
                         "required": [
@@ -39347,7 +39376,8 @@
                           "createdAt",
                           "artist",
                           "tags",
-                          "_count"
+                          "_count",
+                          "group"
                         ]
                       }
                     },

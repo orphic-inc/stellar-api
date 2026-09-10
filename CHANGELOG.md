@@ -122,6 +122,29 @@ All notable changes to stellar-api are documented here.
   now so that whoever adds the first hidden row does not also have to remember
   to add the filter.
 
+- **Releases carry their release group** ([#605](https://github.com/orphic-inc/stellar-api/issues/605),
+  [ADR-0037](docs/adr/0037-group-dedup-is-a-read-time-projection.md)) — the
+  release detail read and every `/search/releases` hit now carry an additive
+  `group` of `{ id, title, artist, year, image }`, from one shared projection so
+  the label cannot drift between the surfaces that show it. `image` is the
+  group's oldest `CoverArt` and null when it has none; `release.image` is
+  unchanged and remains the release-local fallback.
+
+  **Identity inlines, membership does not.** Seeing a release already entitles a
+  viewer to its group's identity, so this needs no gate of its own — but the
+  sibling releases still come only from `GET /release-groups/{id}`, which
+  filters them per viewer.
+
+  **Search attaches the group rather than collapsing onto it.** Pagination and
+  `total` are untouched, so a cross-community duplicate is now labelled as the
+  same album instead of silently removed from a count that would no longer
+  match its list.
+
+  `releaseGroupId` is **documented** on the release detail response for the
+  first time. It has always been sent — the handler spreads the full Prisma
+  payload — but the contract did not list it, so a generated client could not
+  see it. That is why the group panel could not be built against the API.
+
 ### Fixed
 
 - **Global release surfaces served release identity to authenticated
