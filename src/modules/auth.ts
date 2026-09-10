@@ -389,6 +389,11 @@ export const loginUser = async (
     where: { id: user.id },
     data: {
       lastLogin: new Date(),
+      // Signing in IS the answer to a dormancy warning (#279) — clearing the
+      // stamp here is what makes the warning recoverable without staff.
+      // Unconditional rather than guarded on non-null: a conditional would need
+      // the current value, and writing null over null costs nothing.
+      inactivityWarnedAt: null,
       ...(ipAddress ? { lastIp: ipAddress } : {})
     },
     select: authUserSelect
