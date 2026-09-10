@@ -1,11 +1,10 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { RegistrationStatus } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { translatePrismaError } from '../../../lib/prismaErrors';
 import { audit } from '../../../lib/audit';
 import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
-import { communityRoleUnion } from '../../../modules/communityAccess';
+import { releaseVisibleToViewer } from '../../../modules/communityAccess';
 import {
   createArtist,
   updateArtist,
@@ -332,19 +331,6 @@ router.get(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    // Communities the requesting user can access — the same union the gates
-    // use (#419), so credits from a community they staff are no longer hidden.
-    const accessible = await prisma.community.findMany({
-      where: {
-        OR: [
-          { registrationStatus: RegistrationStatus.open },
-          communityRoleUnion(req.user.id)
-        ]
-      },
-      select: { id: true }
-    });
-    const accessibleCommunityIds = accessible.map((c) => c.id);
-
     const [artist, subscription] = await Promise.all([
       prisma.artist.findUnique({
         where: { id, deletedAt: null },
@@ -364,9 +350,13 @@ router.get(
             include: { similarArtist: { select: { id: true, name: true } } }
           },
           credits: {
-            where: {
-              release: { communityId: { in: accessibleCommunityIds } }
-            },
+            // The shared predicate (ADR-0036 §2), not a hand-rolled id list.
+            // The list this replaced was built from `communityId: { in: … }`,
+            // which excludes a NULL relation — so a release belonging to no
+            // community was silently dropped from every discography. That is
+            // the fail-closed half of the same bug the null arm exists for, and
+            // its visible symptom was nothing.
+            where: { release: releaseVisibleToViewer(req.user.id) },
             include: {
               release: {
                 include: { community: { select: { id: true, name: true } } }

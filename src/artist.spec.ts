@@ -1,4 +1,4 @@
-import { Prisma, RegistrationStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   request,
   app,
@@ -10,7 +10,7 @@ import {
   revertArtistFromHistoryMock,
   setCurrentUserPermissions
 } from './test/apiTestHarness';
-import { communityRoleUnion } from './modules/communityAccess';
+import { releaseVisibleToViewer } from './modules/communityAccess';
 
 beforeEach(() => resetApiTestState());
 
@@ -273,31 +273,51 @@ describe('GET /api/artists/:id', () => {
     expect(res.status).toBe(400);
   });
 
-  it('filters credits by the same access union the community gates use (#419)', async () => {
-    prismaMock.community.findMany.mockResolvedValue([{ id: 5 }] as never);
+  it('filters credits with the shared release predicate (#419, ADR-0036 §2)', async () => {
     prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
 
     const res = await request(app).get('/api/artists/1');
 
     expect(res.status).toBe(200);
-    expect(prismaMock.community.findMany).toHaveBeenCalledWith({
-      where: {
-        OR: [
-          { registrationStatus: RegistrationStatus.open },
-          communityRoleUnion(7)
-        ]
-      },
-      select: { id: true }
-    });
+
+    // Referencing the predicate rather than rebuilding it is safe here BECAUSE
+    // its exact shape is pinned independently, against a spelled-out literal,
+    // in modules/communityAccess.spec.ts. What this asserts is that the route
+    // applies THAT function rather than a filter of its own.
     expect(prismaMock.artist.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
         include: expect.objectContaining({
           credits: expect.objectContaining({
-            where: { release: { communityId: { in: [5] } } }
+            where: { release: releaseVisibleToViewer(7) }
           })
         })
       })
     );
+  });
+
+  it('no longer pre-queries the accessible community ids', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+
+    await request(app).get('/api/artists/1');
+
+    // The hand-rolled `communityId: { in: [...] }` list this replaced cost an
+    // extra query AND excluded a NULL relation, so a release belonging to no
+    // community vanished from every discography. Asserting the query is GONE
+    // is what stops it coming back by reflex.
+    expect(prismaMock.community.findMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps community-less releases in the discography', async () => {
+    prismaMock.artist.findUnique.mockResolvedValue(makeArtist() as never);
+
+    await request(app).get('/api/artists/1');
+
+    const call = prismaMock.artist.findUnique.mock.calls[0][0];
+    const where = (
+      call?.include?.credits as { where?: { release?: { OR?: unknown[] } } }
+    )?.where;
+    // The regression this fixes, asserted at the point it reaches Prisma.
+    expect(where?.release?.OR).toContainEqual({ communityId: null });
   });
 });
 

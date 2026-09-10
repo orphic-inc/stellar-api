@@ -173,6 +173,33 @@ export const communityReadableWhere = (
 });
 
 /**
+ * The viewer's release scope — the rule the whole release leak surface rests on
+ * (ADR-0036 §2).
+ *
+ * A `where` fragment rather than a gate, and that is the point. A browse names
+ * one community and is owed a straight answer, so it refuses with 403; a read
+ * that spans communities has nothing to throw about, so the rule travels into
+ * the query instead. `communityReadableWhere` above states why at length.
+ *
+ * **The `communityId: null` arm is load-bearing.** `Release.communityId` is
+ * nullable and **a bare relation filter excludes a null relation**, so without
+ * this arm the filter would hide releases that were never private. That is not
+ * hypothetical: `routes/api/communities/artist.ts` shipped without it and
+ * silently dropped community-less releases from every artist discography, a
+ * fail-closed bug whose visible symptom is nothing.
+ *
+ * There is no staff bypass, here or in any caller. No community-scoped release
+ * read in this codebase has one, this module contains no permission check at
+ * all, and adding the first one is not a local decision (ADR-0023
+ * §Implementation contract 2, ADR-0036 §2).
+ */
+export const releaseVisibleToViewer = (
+  viewerId: number
+): Prisma.ReleaseWhereInput => ({
+  OR: [{ communityId: null }, { community: communityReadableWhere(viewerId) }]
+});
+
+/**
  * Load a community the user is allowed to reach, or throw the 404/403 the
  * route would have sent. The load-then-gate shape every module-side caller
  * needs, so the gate can't be forgotten between the two.

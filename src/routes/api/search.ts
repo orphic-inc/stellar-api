@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import { communityReadableWhere } from '../../modules/communityAccess';
+import { releaseVisibleToViewer } from '../../modules/communityAccess';
 import { forumReadableWhere } from '../../modules/forumAccess';
 import { computeRatio } from '../../modules/ratio';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
@@ -210,9 +210,10 @@ const scopedToReadableCommunities = (
   where: Record<string, unknown>,
   userId: number
 ): Record<string, unknown> => {
-  const scope = {
-    OR: [{ communityId: null }, { community: communityReadableWhere(userId) }]
-  };
+  // The one definition, in the module named for access (ADR-0036 §2). It is
+  // typed for Release; a Request carries the same two fields, and the null arm
+  // stays inert there for the reason the doc comment above gives.
+  const scope = releaseVisibleToViewer(userId) as Record<string, unknown>;
   const existing = where.AND;
   return {
     ...where,

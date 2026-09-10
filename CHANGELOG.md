@@ -124,6 +124,20 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **An artist's discography silently dropped every release belonging to no
+  community** ([#607](https://github.com/orphic-inc/stellar-api/issues/607),
+  [ADR-0036](docs/adr/0036-release-identity-is-community-private.md)) —
+  `GET /api/artists/{id}` filtered credits with a hand-rolled
+  `release: { communityId: { in: [...] } }`, and **a bare relation filter
+  excludes a NULL relation**. `Release.communityId` is nullable, so such a
+  release matched nothing and vanished from every discography. It failed
+  **closed**, which is why nobody reported it: the symptom is an absence.
+
+  The filter is now the shared `releaseVisibleToViewer` predicate, which
+  carries the `communityId: null` arm. This **widens** what the endpoint
+  returns — the one effect of ADR-0036 that adds rows rather than removing
+  them. The extra `community.findMany` the id list required is gone with it.
+
 - **`GET /api/top10/releases` answered 500 on every call, and now ranks only
   public communities**
   ([#608](https://github.com/orphic-inc/stellar-api/issues/608),

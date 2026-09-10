@@ -13,6 +13,7 @@ import {
   COMMUNITY_ROLES,
   communityReadableWhere,
   communityRoleUnion,
+  releaseVisibleToViewer,
   hasCommunityAccess,
   listCommunityMembers
 } from './communityAccess';
@@ -177,5 +178,55 @@ describe('communityReadableWhere', () => {
     expect(JSON.stringify(communityReadableWhere(7))).not.toContain(
       'announceVisibility'
     );
+  });
+});
+
+/**
+ * The viewer's release scope (ADR-0036 §2), which moved here from
+ * `modules/releaseGroup.ts` when it stopped being a release-group concern and
+ * became the rule every global release read applies.
+ *
+ * The scope is spelled out rather than rebuilt from `communityReadableWhere`,
+ * for the reason the block above gives: composing it from the thing under test
+ * asserts only itself.
+ */
+const VIEWER_RELEASE_SCOPE = {
+  OR: [
+    { communityId: null },
+    {
+      community: {
+        OR: [
+          { registrationStatus: 'open' },
+          {
+            OR: [
+              { consumers: { some: { userId: 7 } } },
+              { contributors: { some: { userId: 7 } } },
+              { curators: { some: { id: 7 } } },
+              { leaderId: 7 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+};
+
+describe('releaseVisibleToViewer', () => {
+  it('is the spelled-out community scope, including the null-community arm', () => {
+    expect(releaseVisibleToViewer(7)).toEqual(VIEWER_RELEASE_SCOPE);
+  });
+
+  it('keeps the communityId:null arm — a bare relation filter drops null relations', () => {
+    // `Release.communityId` is nullable. Without this arm the filter hides rows
+    // that were never private, turning a leak fix into a regression. That is
+    // not hypothetical: routes/api/communities/artist.ts shipped without it.
+    expect(releaseVisibleToViewer(7).OR).toContainEqual({ communityId: null });
+  });
+
+  it('carries no staff arm — the filter applies to every caller', () => {
+    // Asserted structurally so a bypass cannot be added quietly. ADR-0023
+    // §Implementation contract 2 and ADR-0036 §2 both refuse one, and this
+    // module holds no permission check at all.
+    expect(Object.keys(releaseVisibleToViewer(7))).toEqual(['OR']);
   });
 });
