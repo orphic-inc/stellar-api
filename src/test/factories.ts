@@ -101,6 +101,8 @@ export function makeUser(overrides: Partial<User> = {}): User {
     consumed: BigInt(0),
     lastLogin: null,
     dateRegistered: new Date(),
+    inactivityWarnedAt: null,
+    reactivatedAt: null,
     disabled: false,
     isArtist: false,
     isDonor: false,

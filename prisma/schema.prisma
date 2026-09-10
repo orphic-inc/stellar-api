@@ -437,6 +437,21 @@ model User {
   consumed              BigInt              @default(0)
   lastLogin             DateTime?
   dateRegistered        DateTime            @default(now())
+  // Inactivity lifecycle (#279, ADR-0038). The dormancy clock is
+  // max(lastLogin, dateRegistered, reactivatedAt) -- all three, because each
+  // alone is wrong for some account: a member who registered and never returned
+  // has no lastLogin, and one staff have just reinstated has an old one.
+  //
+  // inactivityWarnedAt is stamped when the warning goes out and cleared on
+  // login, and the disable step requires it to be at least WARN_GRACE_DAYS old,
+  // so a job that was down for a month cannot warn and disable in one pass.
+  //
+  // reactivatedAt is stamped by the staff re-enable. Without it the job
+  // re-disables a reinstated member on its next run: `disabled` goes false but
+  // lastLogin and inactivityWarnedAt are both still stale, which satisfies the
+  // disable predicate again within 24 hours.
+  inactivityWarnedAt    DateTime?
+  reactivatedAt         DateTime?
   disabled              Boolean             @default(false)
   isArtist              Boolean             @default(false)
   isDonor               Boolean             @default(false)
@@ -2325,14 +2340,30 @@ model UserSession {
   @@map("user_sessions")
 }
 
+/// What a recovery token is allowed to do (#279, ADR-0038).
+///
+/// Without this the table is a single pool of interchangeable tokens:
+/// resetPasswordWithToken matches any unused, unexpired row, so a reactivation
+/// link mailed to a dormant account would also set that account's password.
+/// That address has been unused for months and is the likeliest to be stale or
+/// compromised, which is exactly where password-reset power should not be
+/// handed out as a side effect.
+enum RecoveryPurpose {
+  PasswordReset
+  Reactivation
+}
+
 model AccountRecovery {
-  id        Int       @id @default(autoincrement())
+  id        Int             @id @default(autoincrement())
   userId    Int
-  user      User      @relation(fields: [userId], references: [id])
-  token     String    @unique
+  user      User            @relation(fields: [userId], references: [id])
+  token     String          @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  // Defaulted so every pre-#279 row keeps the only meaning it ever had. Both
+  // consumers filter on it -- a token is useless at the other's endpoint.
+  purpose   RecoveryPurpose @default(PasswordReset)
+  createdAt DateTime        @default(now())
 
   @@index([userId])
   @@map("account_recoveries")
