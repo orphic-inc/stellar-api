@@ -168,6 +168,26 @@ All notable changes to stellar-api are documented here.
   a group-level refusal would tell the adder that a release they cannot see
   exists in a community they do not belong to.
 
+- **`GET /api/search/release-groups` — dedup with a count you can trust**
+  ([#605](https://github.com/orphic-inc/stellar-api/issues/605),
+  [ADR-0037](docs/adr/0037-group-dedup-is-a-read-time-projection.md)) — where
+  `/search/releases` attaches a group to each hit and keeps its own pagination,
+  this makes the **group the row**, so `total` counts albums rather than
+  releases and a cross-community duplicate is one result.
+
+  It takes every filter the release search takes, and those decide which
+  **groups** match. Each result carries the members this viewer may see, which
+  is a different set on purpose: a group matched by one release still shows
+  every version of that album the viewer can reach.
+
+  Orders by group fields only. Ordering by member count is deliberately absent —
+  only the whole relation can be counted, not its visible part, so it would rank
+  groups by a number that includes members the caller cannot see.
+
+  Returns only releases that have been grouped, which is honest for an endpoint
+  named for groups: `releaseGroupId` is never backfilled, so an uncurated
+  catalogue returns nothing here and `/search/releases` stays the complete list.
+
 ### Fixed
 
 - **Global release surfaces served release identity to authenticated
