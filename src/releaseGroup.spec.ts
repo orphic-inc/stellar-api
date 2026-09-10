@@ -5,7 +5,7 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
-import { identityKeyFor, releaseVisibleToViewer } from './modules/releaseGroup';
+import { identityKeyFor } from './modules/releaseGroup';
 
 /**
  * ReleaseGroup — ADR-0023's one accepted leak surface (#265).
@@ -60,38 +60,6 @@ const makeGroupRow = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   resetApiTestState();
-});
-
-describe('releaseVisibleToViewer', () => {
-  it('is the spelled-out community scope, including the null-community arm', () => {
-    expect(releaseVisibleToViewer(7)).toEqual(VIEWER_SCOPE);
-  });
-
-  it('keeps the communityId:null arm — a bare relation filter drops null relations', () => {
-    // Release.communityId is nullable. Without this arm the filter hides rows
-    // that were never private, turning a leak fix into a regression — the
-    // reason search.ts carries the same arm.
-    const arms = releaseVisibleToViewer(7).OR;
-    expect(arms).toContainEqual({ communityId: null });
-  });
-});
-
-describe('the access filter agrees with the search read', () => {
-  it('produces the identical scope object that /search/releases applies', async () => {
-    prismaMock.release.findMany.mockResolvedValue([]);
-    prismaMock.release.count.mockResolvedValue(0);
-    await request(app).get('/api/search/releases?title=blue');
-
-    const searchWhere = prismaMock.release.findMany.mock.calls[0][0]
-      ?.where as Record<string, unknown>;
-    const searchScope = (searchWhere.AND as unknown[]).find(
-      (clause) => (clause as Record<string, unknown>).OR
-    );
-
-    // One rule, two call sites (routes/api/search.ts and modules/releaseGroup.ts).
-    // If either moves without the other, this fails.
-    expect(searchScope).toEqual(releaseVisibleToViewer(7));
-  });
 });
 
 describe('GET /api/release-groups/:id — the leak spec', () => {

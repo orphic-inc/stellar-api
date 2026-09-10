@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import {
   assertCommunityAccess,
-  communityReadableWhere
+  releaseVisibleToViewer
 } from './communityAccess';
 import { assertArtistLive } from './artist';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
@@ -21,37 +21,6 @@ import { translatePrismaError } from '../lib/prismaErrors';
 //
 // The group carries IDENTITY ONLY. Editions and rip-quality come from the
 // release-scoped contributions read, not from here.
-
-/**
- * The viewer's release scope — the one rule the whole leak surface rests on.
- *
- * This is a `where` fragment rather than a gate, and that is the point.
- * `communityAccess.ts` draws the line in its own doc comments: "A search
- * filters where a browse refuses… Making search do the same would turn every
- * query into an existence oracle for private communities." A ReleaseGroup names
- * no single community — it spans them — so resolving its members is
- * search-shaped, and `hasCommunityAccess` (which answers about one named
- * community, and throws) is the wrong tool as well as the old name.
- *
- * The `communityId: null` arm is load-bearing, for the reason
- * `routes/api/search.ts` records at its own copy: `Release.communityId` is
- * nullable and **a bare relation filter excludes a null relation**, so without
- * this arm the filter would hide rows that were never private.
- *
- * Deliberately identical to `scopedToReadableCommunities` in
- * `routes/api/search.ts`. The two are one rule with two call sites and must not
- * drift; `releaseGroup.spec.ts` asserts they agree.
- *
- * There is no staff bypass, here or anywhere below. No community-scoped release
- * read in this codebase has one, `communityAccess.ts` contains no permission
- * check at all, and adding the first one on the newest leak surface is not a
- * thing to do quietly (ADR-0023 §Implementation contract 2).
- */
-export const releaseVisibleToViewer = (
-  viewerId: number
-): Prisma.ReleaseWhereInput => ({
-  OR: [{ communityId: null }, { community: communityReadableWhere(viewerId) }]
-});
 
 export interface GroupIdentityInput {
   title: string;
