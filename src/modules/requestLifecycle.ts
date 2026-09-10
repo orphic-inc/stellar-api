@@ -803,7 +803,7 @@ export async function listRequests({
       where,
       skip,
       take,
-      orderBy: { [orderBy]: order },
+      orderBy: [{ [orderBy]: order }, { id: 'asc' }],
       include
     }),
     prisma.request.count({ where })

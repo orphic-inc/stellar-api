@@ -332,7 +332,9 @@ export async function bulkResolve(ids: number[], resolverId: number) {
 // ─── Canned responses ─────────────────────────────────────────────────────────
 
 export async function listResponses() {
-  return prisma.staffInboxResponse.findMany({ orderBy: { name: 'asc' } });
+  return prisma.staffInboxResponse.findMany({
+    orderBy: [{ name: 'asc' }, { id: 'asc' }]
+  });
 }
 
 export async function createResponse(name: string, body: string) {

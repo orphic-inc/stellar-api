@@ -467,12 +467,12 @@ export async function getTopUsers(params: UsersQuery): Promise<TopUserItem[]> {
       ? { showConsumedStats: true }
       : { showContributedStats: true };
 
-  const orderBy: Prisma.UserOrderByWithRelationInput =
+  const orderBy: Prisma.UserOrderByWithRelationInput[] =
     type === 'numContributions'
-      ? { contributions: { _count: 'desc' } }
+      ? [{ contributions: { _count: 'desc' } }, { id: 'asc' }]
       : type === 'consumed'
-        ? { consumed: 'desc' }
-        : { contributed: 'desc' };
+        ? [{ consumed: 'desc' }, { id: 'asc' }]
+        : [{ contributed: 'desc' }, { id: 'asc' }];
 
   const users = await prisma.user.findMany({
     where: {
@@ -556,7 +556,7 @@ export async function getTopTags(params: TagsQuery): Promise<TopTagItem[]> {
   // type === 'used'
   const tags = await prisma.tag.findMany({
     where: { occurrences: { gt: 0 } },
-    orderBy: { occurrences: 'desc' },
+    orderBy: [{ occurrences: 'desc' }, { id: 'asc' }],
     take: limit,
     select: { id: true, name: true, occurrences: true }
   });
@@ -679,7 +679,7 @@ export async function getHistorySnapshot(
     orderBy: { createdAt: 'desc' },
     include: {
       entries: {
-        orderBy: { rank: 'asc' },
+        orderBy: [{ rank: 'asc' }, { id: 'asc' }],
         include: {
           release: { select: { id: true } }
         }

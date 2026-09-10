@@ -284,10 +284,10 @@ router.get(
     }
 
     const orderByMap: Record<string, unknown> = {
-      createdAt: { createdAt: q.order },
-      year: { year: q.order },
-      consumers: { consumers: { _count: q.order } },
-      contributors: { contributors: { _count: q.order } }
+      createdAt: [{ createdAt: q.order }, { id: 'asc' }],
+      year: [{ year: q.order }, { id: 'asc' }],
+      consumers: [{ consumers: { _count: q.order } }, { id: 'asc' }],
+      contributors: [{ contributors: { _count: q.order } }, { id: 'asc' }]
     };
 
     const [data, total] = await Promise.all([
@@ -355,7 +355,7 @@ router.get(
     const [data, total] = await Promise.all([
       prisma.artist.findMany({
         where,
-        orderBy: { name: q.order },
+        orderBy: [{ name: q.order }, { id: 'asc' }],
         skip: pg.skip,
         take: pg.limit,
         select: ARTIST_SELECT

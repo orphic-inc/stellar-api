@@ -465,7 +465,7 @@ const getProfileCollages = async (
       // releases this viewer may see. A shelf can therefore show fewer than
       // four covers, which is correct rather than a gap.
       where: { release: releaseVisibleTo(viewerId) },
-      orderBy: { sort: 'asc' as const },
+      orderBy: [{ sort: 'asc' as const }, { id: 'asc' as const }],
       take: 4,
       select: {
         release: {

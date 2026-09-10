@@ -93,7 +93,7 @@ describe('deleteTopic repoints the forum (#598)', () => {
     expect(tx.forumTopic.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { forumId: 9, deletedAt: null, lastPostId: { not: null } },
-        orderBy: { lastPost: { createdAt: 'desc' } }
+        orderBy: [{ lastPost: { createdAt: 'desc' } }, { id: 'asc' }]
       })
     );
   });

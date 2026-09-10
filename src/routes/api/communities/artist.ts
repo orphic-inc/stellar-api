@@ -64,7 +64,7 @@ router.get(
         skip: pg.skip,
         take: pg.limit,
         include: { _count: { select: { credits: true } } },
-        orderBy: { name: 'asc' }
+        orderBy: [{ name: 'asc' }, { id: 'asc' }]
       }),
       prisma.artist.count({ where: { deletedAt: null } })
     ]);
@@ -85,7 +85,7 @@ router.get(
         skip: pg.skip,
         take: pg.limit,
         include: { _count: { select: { credits: true } } },
-        orderBy: { name: 'asc' }
+        orderBy: [{ name: 'asc' }, { id: 'asc' }]
       }),
       prisma.artist.count({ where: { vanityHouse: true, deletedAt: null } })
     ]);
@@ -401,7 +401,7 @@ router.get(
     const similar = await prisma.similarArtist.findMany({
       where: { artistId, similarArtist: { deletedAt: null } },
       include: { similarArtist: { select: { id: true, name: true } } },
-      orderBy: { score: 'desc' }
+      orderBy: [{ score: 'desc' }, { id: 'asc' }]
     });
     res.json(similar);
   })

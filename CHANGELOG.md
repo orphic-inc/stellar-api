@@ -216,6 +216,36 @@ All notable changes to stellar-api are documented here.
   `DownloadAccessGrant` reaches a release only through its contribution and
   `groupBy` cannot group across a relation.
 
+- **Ordered lists could return tied rows in any order**
+  ([#613](https://github.com/orphic-inc/stellar-api/issues/613)) — `orderBy` on
+  a non-unique column leaves the row order unordered by contract, and Postgres
+  may return tied rows differently between two requests. Twenty-six reads now
+  end in a tiebreak.
+
+  **Where a limit was involved, a tie decided membership rather than
+  arrangement.** Which tags chart (`top10`), who appears on the staff
+  leaderboard, which user agents are listed, and which four covers a collage
+  shelf shows were all resolved arbitrarily. Three paginated reads —
+  release search, the request list, and the user chart — could show a row on
+  two pages or on none, because `skip` and a tie together drop and duplicate
+  rows rather than reorder them.
+
+  `GET /api/forums` demonstrated it on every install: the seed numbers forums
+  10/20/30 within each category, so six forums share `sort = 10` across the
+  table, and that list is ordered globally.
+
+  The tiebreak is `{ id: 'asc' }` everywhere, whatever the primary direction —
+  one rule to verify by eye rather than a per-site judgment. The three
+  `groupBy` reads tiebreak on their `by` column, which is all Prisma exposes
+  there, and `UserSecondaryRank` on `userId`, having no `id` of its own. No
+  response shape, status code or migration changes.
+
+  A drift spec derives its exemptions from the datamodel rather than a list: a
+  column is exempt when it is unique in every model that has one by that name,
+  or a `DateTime` in every such model. The `DateTime` exemption is what leaves
+  the deferred `createdAt` sweep out of scope. Three dynamically-built
+  orderings carry the tiebreak but cannot be seen by it, and the spec says so.
+
 ## [0.9.3] — 2026-09-09
 
 ### Added

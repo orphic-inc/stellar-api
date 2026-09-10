@@ -51,7 +51,7 @@ router.get(
     const pg = parsedPage(res);
     const [rows, total] = await Promise.all([
       prisma.badPassword.findMany({
-        orderBy: { password: 'asc' },
+        orderBy: [{ password: 'asc' }, { id: 'asc' }],
         skip: pg.skip,
         take: pg.limit
       }),

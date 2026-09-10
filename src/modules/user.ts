@@ -415,7 +415,7 @@ export const getDuplicateIps = async () => {
     where: { lastIp: { not: null } },
     _count: { lastIp: true },
     having: { lastIp: { _count: { gt: 1 } } },
-    orderBy: { _count: { lastIp: 'desc' } }
+    orderBy: [{ _count: { lastIp: 'desc' } }, { lastIp: 'asc' }]
   });
 
   return Promise.all(

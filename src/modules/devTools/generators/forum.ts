@@ -117,7 +117,7 @@ export async function generateForum(
   const forums = await prisma.forum.findMany({
     where: { isTrash: false },
     select: { id: true, numTopics: true, numPosts: true, lastTopicId: true },
-    orderBy: { sort: 'asc' }
+    orderBy: [{ sort: 'asc' }, { id: 'asc' }]
   });
 
   if (forums.length === 0) {

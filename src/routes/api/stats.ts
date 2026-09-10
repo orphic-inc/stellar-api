@@ -90,7 +90,7 @@ router.get(
     const rows = await prisma.userSession.groupBy({
       by: ['userAgent'],
       _count: { userAgent: true },
-      orderBy: { _count: { userAgent: 'desc' } },
+      orderBy: [{ _count: { userAgent: 'desc' } }, { userAgent: 'asc' }],
       take: 50
     });
     res.json(

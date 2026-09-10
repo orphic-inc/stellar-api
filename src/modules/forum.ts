@@ -61,7 +61,7 @@ const recomputeTopicLastPost = async (tx: Tx, forumTopicId: number) => {
 const recomputeForumLastTopic = async (tx: Tx, forumId: number) => {
   const byActivity = await tx.forumTopic.findFirst({
     where: { forumId, deletedAt: null, lastPostId: { not: null } },
-    orderBy: { lastPost: { createdAt: 'desc' } },
+    orderBy: [{ lastPost: { createdAt: 'desc' } }, { id: 'asc' }],
     select: { id: true }
   });
   const next =

@@ -415,7 +415,7 @@ router.get(
           // reappears correctly if this viewer later joins that community
           // (ADR-0036 §7).
           where: { release: releaseVisibleToViewer(authReq.user.id) },
-          orderBy: { sort: 'asc' },
+          orderBy: [{ sort: 'asc' }, { id: 'asc' }],
           include: {
             release: {
               select: {
