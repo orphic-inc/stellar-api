@@ -145,6 +145,29 @@ All notable changes to stellar-api are documented here.
   payload — but the contract did not list it, so a generated client could not
   see it. That is why the group panel could not be built against the API.
 
+- **Collages collapse "the same album" onto one entry**
+  ([#605](https://github.com/orphic-inc/stellar-api/issues/605),
+  [ADR-0037](docs/adr/0037-group-dedup-is-a-read-time-projection.md)) — a
+  collage holding one album under two communities' releases now renders it
+  once. `GET /collages/{id}` collapses entries sharing a release group onto the
+  first of them, and `numVisibleEntries` counts the collapsed list, which is
+  what that field was added for.
+
+  **Nothing is dropped.** The surviving entry carries `groupedWith`, naming
+  every entry it absorbed with its `id`, `releaseId`, `communityId`, `title`,
+  `userId` and `addedAt` — so each stays addressable by delete (keyed on
+  `releaseId`) and reorder (keyed on entry `id`), and keeps its own adder,
+  because delete permission is per row and two collapsed entries can have two
+  different adders. Both fields are additive; `numEntries` is unchanged and
+  remains the true total.
+
+  The collapse is safe because it runs on the already-filtered entry set — it
+  applies no access rule of its own, so `groupedWith` can only ever name
+  releases the viewer can already see. `CollageEntry` keeps
+  `@@unique([collageId, releaseId])`: dedup at entry time was refused, because
+  a group-level refusal would tell the adder that a release they cannot see
+  exists in a community they do not belong to.
+
 ### Fixed
 
 - **Global release surfaces served release identity to authenticated

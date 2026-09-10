@@ -6,6 +6,7 @@ import {
   prismaMock
 } from './test/apiTestHarness';
 import {
+  collapseByGroup,
   groupProjectionSelect,
   identityKeyFor,
   toGroupProjection
@@ -206,6 +207,94 @@ describe('the release-facing projection (ADR-0037 §3)', () => {
         coverArt: []
       })
     ).toMatchObject({ image: null, artist: null, year: null });
+  });
+});
+
+describe('collapseByGroup (ADR-0037 §2)', () => {
+  const group = (id: number, title: string) => ({
+    id,
+    title,
+    year: 2000,
+    artist: null,
+    coverArt: []
+  });
+
+  const entry = (
+    id: number,
+    releaseId: number,
+    userId: number,
+    releaseGroup: ReturnType<typeof group> | null,
+    communityId: number | null = 1
+  ) => ({
+    id,
+    releaseId,
+    userId,
+    addedAt: new Date('2026-01-0' + id),
+    sort: id * 10,
+    release: {
+      id: releaseId,
+      title: 'Kid A',
+      communityId,
+      releaseGroup
+    }
+  });
+
+  it('leaves ungrouped entries alone rather than folding them together', () => {
+    // The `distinct` failure in miniature: every ungrouped release shares a
+    // null group, so treating null as a key would collapse a whole collage
+    // into one row.
+    const out = collapseByGroup([
+      entry(1, 100, 7, null),
+      entry(2, 200, 7, null),
+      entry(3, 300, 7, null)
+    ]);
+    expect(out).toHaveLength(3);
+    expect(out.every((e) => e.group === null)).toBe(true);
+    expect(out.every((e) => e.groupedWith.length === 0)).toBe(true);
+  });
+
+  it('collapses onto the FIRST occurrence and keeps the absorbed row addressable', () => {
+    const g = group(12, 'Kid A');
+    const out = collapseByGroup([
+      entry(1, 100, 7, g, 3),
+      entry(2, 200, 9, g, 7)
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe(1);
+    // Everything delete and reorder need: `releaseId` keys the delete route,
+    // `id` keys reorder, and `userId` is the per-row delete permission.
+    expect(out[0].groupedWith).toEqual([
+      {
+        id: 2,
+        releaseId: 200,
+        communityId: 7,
+        title: 'Kid A',
+        userId: 9,
+        addedAt: new Date('2026-01-02')
+      }
+    ]);
+  });
+
+  it('never emits the raw releaseGroup relation', () => {
+    // The projection is the only shape of the group that may reach a response.
+    const out = collapseByGroup([entry(1, 100, 7, group(12, 'Kid A'))]);
+    expect(out[0].release).not.toHaveProperty('releaseGroup');
+    expect(out[0].group).toMatchObject({ id: 12, title: 'Kid A', image: null });
+  });
+
+  it('preserves order and collapses only within a group', () => {
+    const a = group(12, 'Kid A');
+    const b = group(13, 'Amnesiac');
+    const out = collapseByGroup([
+      entry(1, 100, 7, a),
+      entry(2, 200, 7, null),
+      entry(3, 300, 7, b),
+      entry(4, 400, 7, a)
+    ]);
+    expect(out.map((e) => e.id)).toEqual([1, 2, 3]);
+    expect(out[0].groupedWith.map((e) => e.id)).toEqual([4]);
+    expect(out[1].groupedWith).toEqual([]);
+    expect(out[2].groupedWith).toEqual([]);
   });
 });
 
