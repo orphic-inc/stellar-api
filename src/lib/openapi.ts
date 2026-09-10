@@ -164,6 +164,7 @@ import {
 } from '../schemas/reports';
 import {
   searchReleasesQuerySchema,
+  searchReleaseGroupsQuerySchema,
   searchArtistsQuerySchema,
   searchRequestsQuerySchema,
   searchLogQuerySchema,
@@ -9976,6 +9977,51 @@ registry.registerPath({
     200: {
       description: 'Release search results',
       content: { 'application/json': { schema: paged(releaseSearchItem) } }
+    }
+  }
+});
+
+/**
+ * A group as the group search returns it: identity, canonical cover, and the
+ * members this viewer may see.
+ *
+ * `.extend()` ADDS `releases` to `ReleaseGroupRef` rather than narrowing
+ * anything, which is the safe direction — a narrowing extend generates
+ * `Base & Record<string, never>` in the generated client.
+ */
+const ReleaseGroupSearchItem = registry.register(
+  'ReleaseGroupSearchItem',
+  ReleaseGroupRef.extend({ releases: z.array(ReleaseGroupMember) })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/search/release-groups',
+  tags: ['Search'],
+  summary:
+    'Search release groups, deduping "the same album" across communities',
+  description:
+    'Where `/search/releases` ATTACHES a group to each hit and keeps its own ' +
+    'pagination, this endpoint makes the group the row — so `total` counts ' +
+    'albums rather than releases, and a cross-community duplicate is one ' +
+    'result (ADR-0037 §4).\n\n' +
+    'Takes every filter `/search/releases` takes; those decide which GROUPS ' +
+    'match. Each result carries the members this viewer may see, which is not ' +
+    'the same set — a group matched by one release still shows every version ' +
+    'of that album the viewer can reach.\n\n' +
+    'Returns only releases that have been grouped. `releaseGroupId` is never ' +
+    'backfilled, so an uncurated catalogue returns nothing here and ' +
+    '`/search/releases` remains the complete list.\n\n' +
+    'Orders by group fields only. Ordering by member count is deliberately ' +
+    'absent: only the whole relation can be counted, not its visible part, so ' +
+    'it would rank groups by a number including members the caller cannot see.',
+  request: { query: searchReleaseGroupsQuerySchema },
+  responses: {
+    200: {
+      description: 'Release group search results',
+      content: {
+        'application/json': { schema: paged(ReleaseGroupSearchItem) }
+      }
     }
   }
 });

@@ -6,6 +6,7 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { releaseVisibleToViewer } from '../../modules/communityAccess';
 import {
   groupProjectionSelect,
+  searchReleaseGroups,
   toGroupProjection
 } from '../../modules/releaseGroup';
 import { forumReadableWhere } from '../../modules/forumAccess';
@@ -18,11 +19,13 @@ import {
 } from '../../modules/releaseCredits';
 import {
   searchReleasesQuerySchema,
+  searchReleaseGroupsQuerySchema,
   searchArtistsQuerySchema,
   searchRequestsQuerySchema,
   searchLogQuerySchema,
   searchUsersQuerySchema,
   type SearchReleasesQuery,
+  type SearchReleaseGroupsQuery,
   type SearchArtistsQuery,
   type SearchRequestsQuery,
   type SearchLogQuery,
@@ -74,7 +77,7 @@ function buildArtistTagWhere(
  * substring.
  */
 function buildContributionFilter(
-  q: SearchReleasesQuery
+  q: ReleaseFilterQuery
 ): Record<string, unknown> | undefined {
   const releaseFile: Record<string, unknown> = {};
   if (q.bitrate) releaseFile.bitrate = q.bitrate;
@@ -90,7 +93,7 @@ function buildContributionFilter(
 
 /** Edition-level filters — label, catalogue and media are edition-scoped. */
 function buildEditionFilter(
-  q: SearchReleasesQuery
+  q: ReleaseFilterQuery
 ): Record<string, unknown> | undefined {
   const filter: Record<string, unknown> = {};
   if (q.recordLabel)
@@ -106,7 +109,7 @@ function buildEditionFilter(
 
 /** Artist-credit filters (name + vanityHouse), traversing the credits relation. */
 function buildReleaseArtistFilter(
-  q: SearchReleasesQuery
+  q: ReleaseFilterQuery
 ): Record<string, unknown> | undefined {
   const filter: Record<string, unknown> = {};
   if (q.artist) filter.name = { contains: q.artist, mode: 'insensitive' };
@@ -118,9 +121,17 @@ function buildReleaseArtistFilter(
  * Free-text and per-column text matching. `q` spans title, description and
  * credited artist name; the named params match their own column only.
  */
-function buildReleaseTextWhere(
-  q: SearchReleasesQuery
-): Record<string, unknown> {
+/**
+ * The filter half of a release query — everything the `where` builders read.
+ *
+ * Named because two endpoints share these filters and order differently:
+ * `/search/releases` ranks releases, `/search/release-groups` ranks groups
+ * (ADR-0037 §4). Excluding the orderings from the type is what lets both pass
+ * their own query to the same builders unchanged.
+ */
+type ReleaseFilterQuery = Omit<SearchReleasesQuery, 'orderBy' | 'order'>;
+
+function buildReleaseTextWhere(q: ReleaseFilterQuery): Record<string, unknown> {
   const where: Record<string, unknown> = {};
   if (q.q) {
     where.OR = [
@@ -147,7 +158,7 @@ function buildReleaseTextWhere(
  * spelled out rather than folded into a generic equality pass.
  */
 function buildReleaseScalarWhere(
-  q: SearchReleasesQuery
+  q: ReleaseFilterQuery
 ): Record<string, unknown> {
   const where: Record<string, unknown> = {};
   if (q.type) where.type = q.type;
@@ -168,7 +179,7 @@ function buildReleaseScalarWhere(
  * the original block was already commented.
  */
 function buildReleaseWhere(
-  q: SearchReleasesQuery,
+  q: ReleaseFilterQuery,
   communityIds: number[] | undefined
 ): Record<string, unknown> {
   const where: Record<string, unknown> = {
@@ -328,6 +339,44 @@ router.get(
     ]);
 
     paginatedResponse(res, data.map(toSearchHit), total, pg);
+  })
+);
+
+// ─── GET /api/search/release-groups ───────────────────────────────────────────
+
+/**
+ * Dedup that can be counted honestly (ADR-0037 §4).
+ *
+ * `/search/releases` attaches the group and keeps its pagination; this is where
+ * "the same album" becomes ONE result, because here the group is the row, so
+ * `total` and `totalPages` describe what the caller is paging through.
+ */
+router.get(
+  '/release-groups',
+  requireAuth,
+  validateQuery(searchReleaseGroupsQuerySchema),
+  authHandler(async (req, res) => {
+    const q = parsedQuery<SearchReleaseGroupsQuery>(res);
+    const pg = parsedPage(res);
+
+    const communityIds = q.communityId
+      ? Array.isArray(q.communityId)
+        ? q.communityId
+        : [q.communityId]
+      : undefined;
+
+    const { data, total } = await searchReleaseGroups({
+      viewerId: req.user.id,
+      // The same filters the release search builds — they decide which groups
+      // match, not which members are shown.
+      releaseWhere: buildReleaseWhere(q, communityIds),
+      skip: pg.skip,
+      take: pg.limit,
+      orderBy: q.orderBy,
+      order: q.order
+    });
+
+    paginatedResponse(res, data, total, pg);
   })
 );
 

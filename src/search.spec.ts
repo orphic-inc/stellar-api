@@ -348,6 +348,57 @@ describe('GET /api/search/releases', () => {
 
 // ─── GET /api/search/artists ──────────────────────────────────────────────────
 
+describe('GET /api/search/release-groups (ADR-0037 §4)', () => {
+  beforeEach(() => resetApiTestState());
+
+  it('counts GROUPS, so the total describes what is paged', async () => {
+    prismaMock.releaseGroup.findMany.mockResolvedValue([]);
+    prismaMock.releaseGroup.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/search/release-groups');
+    expect(res.status).toBe(200);
+    // Not release.count — that is the number this endpoint exists to stop
+    // reporting, because it counts a duplicated album twice.
+    expect(prismaMock.releaseGroup.count).toHaveBeenCalled();
+    expect(prismaMock.release.count).not.toHaveBeenCalled();
+  });
+
+  it('scopes matching groups AND their attached members', async () => {
+    prismaMock.releaseGroup.findMany.mockResolvedValue([]);
+    prismaMock.releaseGroup.count.mockResolvedValue(0);
+    await request(app).get('/api/search/release-groups?q=kid');
+
+    expect(prismaMock.releaseGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // Which GROUPS match: filters AND visibility.
+        where: {
+          releases: {
+            some: { AND: [expect.anything(), READABLE_COMMUNITIES] }
+          }
+        },
+        include: expect.objectContaining({
+          // Which MEMBERS come back: visibility alone. Without this the
+          // endpoint would answer with every member of a matched group,
+          // including releases in communities the caller cannot reach.
+          releases: expect.objectContaining({ where: READABLE_COMMUNITIES })
+        })
+      })
+    );
+  });
+
+  it('orders by a group field with an id tiebreak (#613)', async () => {
+    prismaMock.releaseGroup.findMany.mockResolvedValue([]);
+    prismaMock.releaseGroup.count.mockResolvedValue(0);
+    await request(app).get(
+      '/api/search/release-groups?orderBy=year&order=desc'
+    );
+    expect(prismaMock.releaseGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ year: 'desc' }, { id: 'asc' }]
+      })
+    );
+  });
+});
+
 describe('GET /api/search/artists', () => {
   beforeEach(() => resetApiTestState());
 

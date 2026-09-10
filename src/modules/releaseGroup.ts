@@ -287,6 +287,77 @@ export const resolveGroupForViewer = async (
   };
 };
 
+/**
+ * Search groups, where the GROUP is the row (ADR-0037 §4).
+ *
+ * `/search/releases` cannot honestly dedup: it paginates with `skip`/`take`, so
+ * collapsing a fetched page would leave `total` overstating and a group whose
+ * members straddle a page boundary appearing twice. `distinct` cannot do it
+ * either — `releaseGroupId` is nullable and Postgres groups NULLs together, so
+ * it collapses every ungrouped release into one row (measured: 1 row for 101
+ * releases). Here the count is true because it counts groups.
+ *
+ * **The filter appears twice, and the two occurrences mean different things.**
+ * In the `where` it is filters ∧ visibility, deciding which GROUPS match. In
+ * the members `where` it is visibility alone, deciding which MEMBERS come back
+ * — so a group found by a 2001 release still shows the viewer every version of
+ * that album they can reach, which is the question they were asking. This
+ * mirrors `resolveGroupForViewer`, where the same doubling is the difference
+ * between a filtered read and a group with every member attached.
+ *
+ * Only grouped releases appear here at all, which is honest for an endpoint
+ * named for groups: `releaseGroupId` is never backfilled, so a catalogue with
+ * no curation returns nothing and `/search/releases` remains the complete list.
+ */
+export const searchReleaseGroups = async (input: {
+  viewerId: number;
+  releaseWhere: Prisma.ReleaseWhereInput;
+  skip: number;
+  take: number;
+  orderBy: 'title' | 'year' | 'createdAt';
+  order: 'asc' | 'desc';
+}) => {
+  const visible = releaseVisibleToViewer(input.viewerId);
+  const matching: Prisma.ReleaseWhereInput = {
+    AND: [input.releaseWhere, visible]
+  };
+  const where: Prisma.ReleaseGroupWhereInput = {
+    releases: { some: matching }
+  };
+
+  const [data, total] = await Promise.all([
+    prisma.releaseGroup.findMany({
+      where,
+      include: {
+        artist: groupArtistSelect,
+        coverArt: {
+          select: { image: true },
+          orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
+          take: 1
+        },
+        releases: {
+          where: visible,
+          select: memberReleaseSelect,
+          orderBy: [{ year: 'asc' }, { id: 'asc' }]
+        }
+      },
+      orderBy: [{ [input.orderBy]: input.order }, { id: 'asc' }],
+      skip: input.skip,
+      take: input.take
+    }),
+    prisma.releaseGroup.count({ where })
+  ]);
+
+  return {
+    data: data.map((group) => ({
+      ...toGroupIdentity(group),
+      image: group.coverArt[0]?.image ?? null,
+      releases: group.releases.map(withPrimaryArtist)
+    })),
+    total
+  };
+};
+
 const isUniqueViolation = (err: unknown): boolean =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 

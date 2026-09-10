@@ -62,6 +62,31 @@ export const searchReleasesQuerySchema = z.object({
   vanityHouse: z.coerce.boolean().optional()
 });
 
+/**
+ * The group search takes every release filter, because the filters decide which
+ * GROUPS match — but not the release orderings.
+ *
+ * Built by spreading `.shape` rather than `.extend()`. Extending would REPLACE
+ * `orderBy` with a narrower enum, and a narrowing `.extend()` generates
+ * `Base & Record<string, never>` in the generated client. Spreading produces a
+ * plain object type with no intersection.
+ *
+ * `consumers`, `contributors` and `random` are gone because they are release
+ * orderings with no group meaning. Ordering by member COUNT is deliberately
+ * absent too: Prisma can only count the whole relation, not the visible part of
+ * it, so it would rank groups by a number including members the viewer cannot
+ * see — the disclosure ADR-0036 §3 refused when it declined to leave rank gaps.
+ */
+export const searchReleaseGroupsQuerySchema = z.object({
+  ...searchReleasesQuerySchema.shape,
+  orderBy: z.enum(['title', 'year', 'createdAt']).optional().default('title'),
+  order: z.enum(['asc', 'desc']).optional().default('asc')
+});
+
+export type SearchReleaseGroupsQuery = z.infer<
+  typeof searchReleaseGroupsQuerySchema
+>;
+
 export type SearchReleasesQuery = z.infer<typeof searchReleasesQuerySchema>;
 
 export const searchArtistsQuerySchema = z.object({

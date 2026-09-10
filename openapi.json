@@ -8330,6 +8330,27 @@
           "addedBy"
         ]
       },
+      "ReleaseGroupSearchItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReleaseGroupRef"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "releases": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGroupMember"
+                }
+              }
+            },
+            "required": [
+              "releases"
+            ]
+          }
+        ]
+      },
       "CrsSnapshot": {
         "type": "object",
         "properties": {
@@ -39420,6 +39441,386 @@
                           "_count",
                           "group"
                         ]
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/search/release-groups": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search release groups, deduping \"the same album\" across communities",
+        "description": "Where `/search/releases` ATTACHES a group to each hit and keeps its own pagination, this endpoint makes the group the row — so `total` counts albums rather than releases, and a cross-community duplicate is one result (ADR-0037 §4).\n\nTakes every filter `/search/releases` takes; those decide which GROUPS match. Each result carries the members this viewer may see, which is not the same set — a group matched by one release still shows every version of that album the viewer can reach.\n\nReturns only releases that have been grouped. `releaseGroupId` is never backfilled, so an uncurated catalogue returns nothing here and `/search/releases` remains the complete list.\n\nOrders by group fields only. Ordering by member count is deliberately absent: only the whole relation can be counted, not its visible part, so it would rank groups by a number including members the caller cannot see.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "required": false,
+            "name": "tags",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "all"
+              ],
+              "default": "any"
+            },
+            "required": false,
+            "name": "tagMode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "year",
+                "createdAt"
+              ],
+              "default": "title"
+            },
+            "required": false,
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            },
+            "required": false,
+            "name": "order",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  }
+                }
+              ]
+            },
+            "required": false,
+            "name": "communityId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "artist",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "title",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "recordLabel",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "catalogueNumber",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            },
+            "required": false,
+            "name": "year",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            },
+            "required": false,
+            "name": "yearTo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "required": false,
+            "name": "description",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Music",
+                "Applications",
+                "EBooks",
+                "ELearningVideos",
+                "Audiobooks",
+                "Comedy",
+                "Comics"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Album",
+                "Single",
+                "EP",
+                "Anthology",
+                "Compilation",
+                "DJMix",
+                "Live",
+                "Remix",
+                "Bootleg",
+                "Interview",
+                "Mixtape",
+                "Demo",
+                "ConcertRecording",
+                "Unknown"
+              ]
+            },
+            "required": false,
+            "name": "releaseType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mp3",
+                "flac",
+                "wav",
+                "ogg",
+                "aac",
+                "m4a",
+                "m4b",
+                "mp4",
+                "mkv",
+                "avi",
+                "mov",
+                "zip",
+                "exe",
+                "dmg",
+                "apk",
+                "pdf",
+                "epub",
+                "mobi",
+                "cbz",
+                "cbr",
+                "jpg",
+                "png",
+                "gif",
+                "txt"
+              ]
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Lossless",
+                "Lossless24",
+                "Kbps320",
+                "Kbps256",
+                "KbpsV0",
+                "Kbps192",
+                "KbpsV2",
+                "Kbps128",
+                "Other"
+              ]
+            },
+            "required": false,
+            "name": "bitrate",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CD",
+                "WEB",
+                "Vinyl",
+                "SACD",
+                "DVD",
+                "Cassette",
+                "BluRay",
+                "DAT",
+                "Soundboard",
+                "Other"
+              ]
+            },
+            "required": false,
+            "name": "media",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "required": false,
+            "name": "hasLog",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "required": false,
+            "name": "hasCue",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "required": false,
+            "name": "isScene",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "required": false,
+            "name": "vanityHouse",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release group search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReleaseGroupSearchItem"
                       }
                     },
                     "meta": {
