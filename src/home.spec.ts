@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
+import { releaseInPublicCommunity } from './modules/communityAccess';
 
 const makeRelease = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -28,6 +29,25 @@ const makeFeaturedAlbum = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => resetApiTestState());
 
 describe('GET /api/home/featured', () => {
+  it('limits the vanity-house slot to public communities (ADR-0036 §4)', async () => {
+    prismaMock.featuredAlbum.findFirst.mockResolvedValue(null);
+    prismaMock.release.findFirst.mockResolvedValue(null);
+
+    await request(app).get('/api/home/featured');
+
+    // The vanity-house slot is a QUERY, not curation, so it behaves like a
+    // ranking and takes the chart predicate rather than the viewer one. Album
+    // of the Month is the curated half and is governed by a refusal at set
+    // time instead.
+    expect(prismaMock.release.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: releaseInPublicCommunity.OR
+        })
+      })
+    );
+  });
+
   it('returns albumOfTheMonth and vanityHouse when both exist', async () => {
     const featured = makeFeaturedAlbum();
     const release = makeRelease();

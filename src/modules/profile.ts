@@ -7,6 +7,7 @@ import type {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
+import { releaseVisibleTo } from './communityAccess';
 import { sanitizePlain } from '../lib/sanitize';
 // Profile info is stored as raw BBCode and transcribed at read time via the
 // shared render-at-read seam — the API is the single source of transcription
@@ -355,11 +356,21 @@ const getActivitySummary = async (
   };
 };
 
+/**
+ * The target's five most recent contributions, as THIS viewer may see them.
+ *
+ * The scope goes in the `where`, not a post-filter, so `take: 5` still yields
+ * five visible rows rather than five-minus-hidden. That makes a profile
+ * viewer-dependent, which is the intended reading of ADR-0036 §1: two members
+ * open the same profile and see different recent contributions, because a
+ * release's identity is private to its community.
+ */
 const getRecentContributions = async (
-  userId: number
+  userId: number,
+  viewerId: number | null
 ): Promise<RecentContribution[]> => {
   const rows = await prisma.contribution.findMany({
-    where: { userId },
+    where: { userId, release: releaseVisibleTo(viewerId) },
     orderBy: { createdAt: 'desc' },
     take: 5,
     select: {
@@ -435,7 +446,8 @@ const getRecentSnatches = async (userId: number): Promise<RecentSnatch[]> => {
 };
 
 const getProfileCollages = async (
-  userId: number
+  userId: number,
+  viewerId: number | null
 ): Promise<{
   featuredPersonalCollages: ProfileCollagePreview[];
   publicCollages: ProfileCollagePreview[];
@@ -449,6 +461,10 @@ const getProfileCollages = async (
     createdAt: true,
     updatedAt: true,
     entries: {
+      // Cover art is identity too (ADR-0036 §1), so the shelf previews only
+      // releases this viewer may see. A shelf can therefore show fewer than
+      // four covers, which is correct rather than a gap.
+      where: { release: releaseVisibleTo(viewerId) },
       orderBy: { sort: 'asc' as const },
       take: 4,
       select: {
@@ -936,12 +952,12 @@ const buildProfileView = async (
     reputation
   ] = await Promise.all([
     getActivitySummary(user.id),
-    getRecentContributions(user.id),
+    getRecentContributions(user.id, viewer.viewerId),
     canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
     includeInviteTree
       ? getInviteSubtreeRows(user.id)
       : Promise.resolve([] as InviteSubtreeRow[]),
-    getProfileCollages(user.id),
+    getProfileCollages(user.id, viewer.viewerId),
     viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null),
     canSeeRatio
       ? prisma.friendRelationship.count({

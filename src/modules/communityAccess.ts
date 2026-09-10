@@ -200,6 +200,47 @@ export const releaseVisibleToViewer = (
 });
 
 /**
+ * Releases anyone may see: in no community, or in an `open` one.
+ *
+ * Named apart from `releaseVisibleToViewer` on purpose, because reaching for
+ * the wrong one **returns rows rather than failing** (ADR-0036 §2). It takes no
+ * viewer, and that is the whole distinction.
+ *
+ * Two callers want it, for two unrelated reasons, and both belong here rather
+ * than in a copy:
+ *
+ * 1. **The site-wide chart** (ADR-0036 §3). A deliberate product rule, not an
+ *    access one: Top 10 excludes `PRIVATE`-community releases for everyone,
+ *    including that community's own members, because ranking per viewer makes
+ *    "the #1 release this week" something the site cannot state. `top10.ts`
+ *    states the same rule in SQL, since its aggregation has no Prisma form.
+ * 2. **A reader with no session** — the degenerate case of the viewer scope,
+ *    where the role union has nobody to match and only the open arm can fire.
+ *
+ * Do not collapse it into `releaseVisibleToViewer(null)`. The chart is not a
+ * viewer-less read; it is a read that deliberately ignores the viewer, and a
+ * name that hid the difference would invite someone to "fix" it later.
+ */
+export const releaseInPublicCommunity: Prisma.ReleaseWhereInput = {
+  OR: [
+    { communityId: null },
+    { community: { registrationStatus: RegistrationStatus.open } }
+  ]
+};
+
+/**
+ * The right predicate for a viewer who may or may not have a session. Callers
+ * holding a nullable viewer id should use this rather than branching, so the
+ * anonymous case cannot be forgotten at one call site out of several.
+ */
+export const releaseVisibleTo = (
+  viewerId: number | null
+): Prisma.ReleaseWhereInput =>
+  viewerId === null
+    ? releaseInPublicCommunity
+    : releaseVisibleToViewer(viewerId);
+
+/**
  * Load a community the user is allowed to reach, or throw the 404/403 the
  * route would have sent. The load-then-gate shape every module-side caller
  * needs, so the gate can't be forgotten between the two.

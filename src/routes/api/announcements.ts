@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
+import { AppError } from '../../lib/errors';
+import { releaseInPublicCommunity } from '../../modules/communityAccess';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -98,6 +100,30 @@ router.post(
   asyncHandler(async (_req: Request, res: Response) => {
     const { groupId, threadId, title, image, started, ended } =
       parsedBody<FeaturedAlbumInput>(res);
+
+    // Staff curation is an act of publication (ADR-0036 §4). Featuring a
+    // release makes its identity public, so the refusal belongs HERE, at the
+    // moment a person chooses it — not as a read-time filter, which would empty
+    // the homepage slot silently and leave nobody accountable for it.
+    //
+    // This also closes a pre-existing hole: `FeaturedAlbum.groupId` carries no
+    // foreign key to Release, so a dangling feature was already possible and
+    // GET /home/featured rendered null for it without explanation. 400 rather
+    // than 404 — the route exists; the id in the BODY does not resolve.
+    //
+    // (`groupId` naming a Release rather than a ReleaseGroup is #603's rename
+    // territory, left alone here deliberately.)
+    const featurable = await prisma.release.findFirst({
+      where: { id: groupId, ...releaseInPublicCommunity },
+      select: { id: true }
+    });
+    if (!featurable) {
+      throw new AppError(
+        400,
+        'No release with that id in a public community — a release in a private community cannot be featured'
+      );
+    }
+
     const album = await prisma.featuredAlbum.create({
       data: {
         groupId,

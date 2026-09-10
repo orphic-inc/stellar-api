@@ -6,6 +6,7 @@ import {
   makeUserRank,
   makeRankQuotas
 } from './test/apiTestHarness';
+import { releaseVisibleToViewer } from './modules/communityAccess';
 import {
   makeCollage,
   makeCollageDetail,
@@ -264,6 +265,43 @@ describe('GET /api/collages/:id', () => {
     expect(res.body.isSubscribed).toBe(false);
     expect(res.body.isBookmarked).toBe(false);
     expect(res.body.entries).toHaveLength(1);
+  });
+
+  it('filters entries by the viewer release scope (ADR-0036 §1)', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        entries: [makeCollageEntryDetail()]
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
+
+    await request(app).get('/api/collages/1');
+
+    // The query, not the payload. A mock returns the entries it was handed
+    // regardless, so only the where clause proves the filter reached Prisma.
+    const call = prismaMock.collage.findUnique.mock.calls[0][0];
+    const entries = call?.include?.entries as { where?: unknown };
+    expect(entries.where).toEqual({ release: releaseVisibleToViewer(7) });
+  });
+
+  it('reports numVisibleEntries beside the true numEntries', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        numEntries: 12,
+        entries: [makeCollageEntryDetail()]
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/collages/1');
+
+    // Additive, not a replacement (ADR-0036 §6). numEntries stays the true
+    // total — it is a browse sort key and the quota is enforced against it —
+    // while this is the count matching the array the viewer actually received.
+    expect(res.body.numEntries).toBe(12);
+    expect(res.body.numVisibleEntries).toBe(1);
   });
 
   it('returns 404 for soft-deleted collage to non-staff', async () => {
@@ -650,7 +688,7 @@ describe('POST /api/collages/:id/entries', () => {
 
   it('returns 201 on successful add and uses aggregate sort', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
@@ -667,9 +705,43 @@ describe('POST /api/collages/:id/entries', () => {
     );
   });
 
+  it('answers 404 for a release the caller cannot see, indistinguishably', async () => {
+    // ADR-0036 §5. This is the sharper half of #607: a read leaks what the
+    // caller could reach anyway, but this WRITE let a non-member plant a
+    // private-community release in a global collage and publish its title,
+    // artist, year and cover to everyone who opened it.
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.release.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/collages/1/entries').send({
+      releaseId: 42
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Release not found' });
+    expect(prismaMock.collageEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('scopes the entry-add existence check to the caller', async () => {
+    prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
+    prismaMock.collageEntry.findUnique.mockResolvedValue({ id: 1 } as never);
+
+    await request(app).post('/api/collages/1/entries').send({ releaseId: 42 });
+
+    expect(prismaMock.release.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 42,
+          OR: releaseVisibleToViewer(7).OR
+        })
+      })
+    );
+  });
+
   it('returns 409 when release is already in collage', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(makeCollageEntry());
 
     const res = await request(app)
@@ -695,7 +767,7 @@ describe('POST /api/collages/:id/entries', () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollage({ maxEntries: 2, numEntries: 2 })
     );
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
@@ -721,7 +793,7 @@ describe('POST /api/collages/:id/entries', () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollage({ maxEntriesPerUser: 2 })
     );
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.count.mockResolvedValue(2);
 
@@ -995,7 +1067,7 @@ describe('collages Prisma contract', () => {
 
   it('POST /:id/entries wraps create + numEntries increment in one transaction', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage());
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
@@ -1018,7 +1090,7 @@ describe('collages Prisma contract', () => {
 
   it('POST /:id/entries notifies collage subscribers excluding the adder', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage({ id: 1 }));
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
@@ -1052,7 +1124,7 @@ describe('collages Prisma contract', () => {
 
   it('POST /:id/entries emits no notification when no subscribers', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(makeCollage({ id: 1 }));
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease());
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.aggregate.mockResolvedValue(
       makeEntryAggregateResult(10)
