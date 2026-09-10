@@ -131,6 +131,109 @@ export const toGroupProjection = (
     ? null
     : { ...toGroupIdentity(group), image: group.coverArt[0]?.image ?? null };
 
+/**
+ * One entry absorbed into another under the same group (ADR-0037 §2).
+ *
+ * Enough to address the row — `id` for reorder, `releaseId` for delete — and to
+ * say who put it there, because delete permission is per row: the collage
+ * owner, THAT entry's adder, or staff. Two entries that collapse into one can
+ * have two different adders, which is why nothing is dropped.
+ */
+export type AbsorbedEntry = {
+  id: number;
+  releaseId: number;
+  communityId: number | null;
+  title: string;
+  userId: number;
+  addedAt: Date;
+};
+
+type CollapsibleEntry = {
+  id: number;
+  releaseId: number;
+  userId: number;
+  addedAt: Date;
+  release: {
+    id: number;
+    title: string;
+    communityId: number | null;
+    releaseGroup: Prisma.ReleaseGroupGetPayload<{
+      select: typeof groupProjectionSelect;
+    }> | null;
+  };
+};
+
+/**
+ * Collapse entries sharing a release group onto their first occurrence
+ * (ADR-0037 §2).
+ *
+ * **The input MUST already be filtered to what this viewer may see.** This
+ * function applies no access rule of its own and cannot: it never queries. Its
+ * safety is entirely inherited from its caller passing the rows
+ * `releaseVisibleToViewer` returned. Hand it a wider set and `groupedWith`
+ * becomes a leak — it would name releases, communities and titles the viewer
+ * has no access to — and no test here would fail. That is the one thing to
+ * check before reusing this anywhere.
+ *
+ * Order is preserved and nothing is dropped. The first entry of a group in the
+ * input order represents it, which makes the caller's `[{sort},{id}]` ordering
+ * the thing that decides the representative (#613 — before that tiebreak the
+ * choice was not deterministic at all). An ungrouped entry is always its own
+ * row: `releaseGroupId` is nullable and never backfilled, so that is the common
+ * case, and collapsing on a null group would fold the whole collage into one
+ * row for exactly the reason `distinct` is unusable here.
+ *
+ * The raw `releaseGroup` relation is stripped from every returned release, so
+ * the projection is the only shape of the group that reaches a response.
+ */
+export const collapseByGroup = <E extends CollapsibleEntry>(entries: E[]) => {
+  const representativeOf = new Map<number, number>();
+  const out: Array<
+    Omit<E, 'release'> & {
+      release: Omit<E['release'], 'releaseGroup'>;
+      group: GroupProjection | null;
+      groupedWith: AbsorbedEntry[];
+    }
+  > = [];
+
+  for (const entry of entries) {
+    const { releaseGroup, ...release } = entry.release;
+    const groupId = releaseGroup?.id ?? null;
+    const seenAt = groupId === null ? undefined : representativeOf.get(groupId);
+
+    if (seenAt !== undefined) {
+      out[seenAt].groupedWith.push({
+        id: entry.id,
+        releaseId: entry.releaseId,
+        communityId: release.communityId,
+        title: release.title,
+        userId: entry.userId,
+        addedAt: entry.addedAt
+      });
+      continue;
+    }
+
+    if (groupId !== null) representativeOf.set(groupId, out.length);
+    out.push({
+      // `release` below overrides the one this spread carries, so the raw
+      // relation cannot survive into the response — asserted by the "never
+      // emits the raw releaseGroup relation" spec rather than trusted.
+      ...entry,
+      // The cast is confined to this one property. Destructuring a
+      // generic-constrained field narrows to the CONSTRAINT's shape, so TS sees
+      // `CollapsibleEntry['release']` here and loses whatever extra columns the
+      // caller selected — `image`, `releaseType`, `credits`. The runtime value
+      // is exactly `Omit<E['release'], 'releaseGroup'>`, which is what the two
+      // rests above construct.
+      release: release as Omit<E['release'], 'releaseGroup'>,
+      group: toGroupProjection(releaseGroup),
+      groupedWith: []
+    });
+  }
+
+  return out;
+};
+
 // Identity only. No contributions, no editions, no files — those are the
 // release-scoped read's half of the split ADR-0023 Decision 2 describes.
 const memberReleaseSelect = {

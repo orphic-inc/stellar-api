@@ -25,6 +25,10 @@ import {
   withPrimaryArtist
 } from '../../modules/releaseCredits';
 import { releaseVisibleToViewer } from '../../modules/communityAccess';
+import {
+  collapseByGroup,
+  groupProjectionSelect
+} from '../../modules/releaseGroup';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import {
@@ -425,7 +429,8 @@ router.get(
                 year: true,
                 communityId: true,
                 releaseType: true,
-                credits: releaseCreditsSelect
+                credits: releaseCreditsSelect,
+                releaseGroup: { select: groupProjectionSelect }
               }
             },
             user: { select: { id: true, username: true } }
@@ -470,13 +475,19 @@ router.get(
       });
     }
 
+    // ADR-0037 §2: entries sharing a release group collapse onto their first
+    // occurrence. Safe ONLY because `collage.entries` is the already-filtered
+    // set — `collapseByGroup` applies no access rule and cannot, so
+    // `groupedWith` can never name a release this viewer may not see.
+    const visible = collapseByGroup(collage.entries);
+
     res.json({
       ...collage,
       descriptionHtml: await renderSiteBBCode(
         collage.description,
         await resolveViewer(req)
       ),
-      entries: collage.entries.map((entry) => ({
+      entries: visible.map((entry) => ({
         ...entry,
         release: withPrimaryArtist(entry.release)
       })),
@@ -486,7 +497,7 @@ router.get(
       // so it cannot become viewer-dependent. This is the count that matches
       // the array above it. #605 reuses it when a release group collapses
       // duplicates into one entry, for the same arithmetic reason.
-      numVisibleEntries: collage.entries.length,
+      numVisibleEntries: visible.length,
       isSubscribed: !!subscription,
       isBookmarked: !!bookmark
     });

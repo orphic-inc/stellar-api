@@ -6,6 +6,7 @@ import {
   makeUserRank,
   makeRankQuotas
 } from './test/apiTestHarness';
+import { ReleaseCategory } from '@prisma/client';
 import { releaseVisibleToViewer } from './modules/communityAccess';
 import {
   makeCollage,
@@ -1022,6 +1023,68 @@ describe('GET /api/collages/:id/subscriptions', () => {
 
 describe('collages Prisma contract', () => {
   beforeEach(() => resetApiTestState());
+
+  it('GET /:id collapses entries sharing a release group (ADR-0037 §2)', async () => {
+    // A payload assertion is meaningful here, unlike most in this file: the
+    // collapse happens in our code AFTER the mock returns, so the mock cannot
+    // fake the result. What the mock supplies is the pre-collapse input.
+    const group = {
+      id: 12,
+      title: 'Kid A',
+      year: 2000,
+      artist: null,
+      coverArt: [{ image: 'https://example.test/cover.jpg' }]
+    };
+    const withGroup = (releaseId: number) => ({
+      id: releaseId,
+      title: 'Kid A',
+      image: null,
+      year: 2000,
+      communityId: releaseId === 100 ? 3 : 7,
+      releaseType: ReleaseCategory.Album,
+      credits: [],
+      releaseGroup: group
+    });
+    prismaMock.collage.findUnique.mockResolvedValue(
+      makeCollageDetail({
+        entries: [
+          makeCollageEntryDetail({
+            id: 1,
+            releaseId: 100,
+            release: withGroup(100)
+          }),
+          makeCollageEntryDetail({
+            id: 2,
+            releaseId: 200,
+            userId: 9,
+            release: withGroup(200)
+          })
+        ]
+      }) as unknown as ReturnType<typeof makeCollage>
+    );
+    prismaMock.collageSubscription.findUnique.mockResolvedValue(null);
+    prismaMock.bookmarkCollage.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/collages/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.entries).toHaveLength(1);
+    // The count matches the list it describes (ADR-0036 §6, reused by §5).
+    expect(res.body.numVisibleEntries).toBe(1);
+    expect(res.body.entries[0].id).toBe(1);
+    expect(res.body.entries[0].group).toMatchObject({
+      id: 12,
+      title: 'Kid A',
+      image: 'https://example.test/cover.jpg'
+    });
+    // Nothing is dropped: the absorbed row stays addressable and keeps its own
+    // adder, because delete permission is per row.
+    expect(res.body.entries[0].groupedWith).toEqual([
+      expect.objectContaining({ id: 2, releaseId: 200, userId: 9 })
+    ]);
+    // The raw relation never reaches the response.
+    expect(res.body.entries[0].release).not.toHaveProperty('releaseGroup');
+  });
 
   it('GET /:id calls collage.findUnique with the expected nested include shape', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(

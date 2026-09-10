@@ -8729,6 +8729,26 @@ const Collage = registry.register(
   })
 );
 
+/**
+ * An entry absorbed into another under the same release group (ADR-0037 §2).
+ *
+ * Present so nothing is lost by the collapse: the row stays addressable by
+ * `releaseId` for delete and by `id` for reorder, and `userId` is here because
+ * delete permission is per row — two entries that collapse into one can have
+ * two different adders.
+ */
+const AbsorbedCollageEntry = registry.register(
+  'AbsorbedCollageEntry',
+  z.object({
+    id: z.number().int(),
+    releaseId: z.number().int(),
+    communityId: z.number().int().nullable(),
+    title: z.string(),
+    userId: z.number().int(),
+    addedAt: z.string()
+  })
+);
+
 const CollageEntry = registry.register(
   'CollageEntry',
   z.object({
@@ -8755,7 +8775,14 @@ const CollageEntry = registry.register(
       // has no credits at all.
       artist: z.object({ id: z.number().int(), name: z.string() }).nullable()
     }),
-    user: z.object({ id: z.number().int(), username: z.string() })
+    user: z.object({ id: z.number().int(), username: z.string() }),
+    // Both OPTIONAL because this schema serves two operations and only one
+    // collapses: the detail read groups entries, the add-entry 201 returns the
+    // row just created and has nothing to collapse it against.
+    group: ReleaseGroupRef.nullable().optional(),
+    // Empty for an entry that absorbed nothing, which is every entry until two
+    // releases in one collage share a group.
+    groupedWith: z.array(AbsorbedCollageEntry).optional()
   })
 );
 

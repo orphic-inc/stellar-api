@@ -7690,6 +7690,38 @@
           "_count"
         ]
       },
+      "AbsorbedCollageEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "releaseId": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "addedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "releaseId",
+          "communityId",
+          "title",
+          "userId",
+          "addedAt"
+        ]
+      },
       "CollageEntry": {
         "type": "object",
         "properties": {
@@ -7790,6 +7822,15 @@
               "id",
               "username"
             ]
+          },
+          "group": {
+            "$ref": "#/components/schemas/ReleaseGroupRef"
+          },
+          "groupedWith": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbsorbedCollageEntry"
+            }
           }
         },
         "required": [
