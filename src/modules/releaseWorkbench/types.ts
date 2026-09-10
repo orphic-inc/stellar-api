@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { GroupProjection } from '../releaseGroup';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
 
 export type ReleaseWorkbenchRef = {
@@ -114,6 +115,12 @@ export type ReleaseWorkbenchView = {
       };
     };
   }>;
+  // The group as every release-facing surface presents it (ADR-0037 §3), null
+  // for an ungrouped release — which is most of them, since `releaseGroupId` is
+  // never backfilled. Beside `release` rather than inside it: the raw relation
+  // is deleted from the spread in `load.ts`, so the projection is the only
+  // shape of the group that leaves this module.
+  group: GroupProjection | null;
   tags: Array<{ id: number; name: string; occurrences: number }>;
   myVote: 'up' | 'down' | null;
   releaseTags: ReleaseTagView[];

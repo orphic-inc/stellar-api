@@ -18,7 +18,9 @@ Four facts from the code decided the rest, and three of them were not knowable f
 
 **`distinct` cannot express the dedup, and fails in the widening direction.** Postgres groups NULLs together under `DISTINCT` and `DISTINCT ON`, unlike the `UNIQUE` constraint whose opposite behaviour ADR-0023 Decision 4 already documents. Measured against a seeded development database: `findMany({ distinct: ['releaseGroupId'] })` returned **1 row for 101 releases**, because every ungrouped release shares `NULL`. All three existing `distinct:` uses in this repository are on non-nullable foreign keys.
 
-**The group panel is not merely unconsumed — it is unreachable.** The release detail read exposes neither `releaseGroupId` nor group identity, and `GET /release-groups/:id` requires an id that no release-facing surface hands out. stellar-ui could not render that panel today even if it were written.
+**The group panel is not merely unconsumed — it is unreachable by its only consumer.** `GET /release-groups/:id` requires an id that no _documented_ release surface hands out. stellar-ui generates its types from `openapi.json`, and the hand-authored `Release` component schema there lists 17 properties, none of them the group. So the panel cannot be written against the contract.
+
+_(Amended 2026-09-10, while building the first slice. This paragraph originally said the release detail read "exposes neither `releaseGroupId` nor group identity". That is wrong at runtime: `serializeReleaseWorkbenchView` spreads the full Prisma payload, so the response has always carried `releaseGroupId` — undocumented, and invisible to a generated client. The original claim came from grepping `load.ts` for `releaseGroup`, which finds nothing because the field is never named. The decisions below are unaffected, but Decision 3's slice must **register** the projection in `lib/openapi.ts` rather than merely emit it, which the wrong premise would have let it skip.)_
 
 ## Decision
 

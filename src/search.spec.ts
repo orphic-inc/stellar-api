@@ -68,6 +68,41 @@ describe('GET /api/search/releases', () => {
     );
   });
 
+  /**
+   * ADR-0037 §4: this endpoint ATTACHES the group, it does not collapse onto
+   * it. Asserting the select rather than the body, because a mock returns what
+   * it is told — only the query proves the projection was requested.
+   */
+  it('selects the group projection on every hit', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          releaseGroup: {
+            select: expect.objectContaining({ id: true, title: true })
+          }
+        })
+      })
+    );
+  });
+
+  it('keeps pagination rather than deduping the page (ADR-0037 §4)', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?page=2&limit=5');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 5, take: 5 })
+    );
+    // `distinct` here would collapse every ungrouped release into ONE row:
+    // `releaseGroupId` is nullable and Postgres groups NULLs together, which
+    // measured as 1 row for 101 releases on a seeded database.
+    expect(prismaMock.release.findMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ distinct: expect.anything() })
+    );
+  });
+
   it('uses any-mode tag filter when tagMode=any', async () => {
     prismaMock.release.findMany.mockResolvedValue([]);
     prismaMock.release.count.mockResolvedValue(0);

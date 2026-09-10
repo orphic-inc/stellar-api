@@ -1,8 +1,13 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { releaseVisibleToViewer } from '../../modules/communityAccess';
+import {
+  groupProjectionSelect,
+  toGroupProjection
+} from '../../modules/releaseGroup';
 import { forumReadableWhere } from '../../modules/forumAccess';
 import { computeRatio } from '../../modules/ratio';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
@@ -238,8 +243,37 @@ const RELEASE_SELECT = {
   createdAt: true,
   credits: releaseCreditsSelect,
   releaseTags: { select: { tag: { select: { id: true, name: true } } } },
-  _count: { select: { consumers: true, contributors: true } }
-} as const;
+  _count: { select: { consumers: true, contributors: true } },
+  releaseGroup: { select: groupProjectionSelect }
+  // `satisfies`, not `as const`: `groupProjectionSelect` carries an `orderBy`
+  // array, and `as const` would make it readonly, which Prisma's input types
+  // reject.
+} satisfies Prisma.ReleaseSelect;
+
+/**
+ * One search hit, with its group ATTACHED rather than collapsed (ADR-0037 §4).
+ *
+ * `/search/releases` keeps its `skip`/`take` pagination and its `total`, so a
+ * cross-community duplicate is LABELLED as the same album rather than removed —
+ * collapsing a fetched page would make the count disagree with the list it
+ * counts. Honest dedup is `GET /search/release-groups`, where the group is the
+ * row and the count is therefore true.
+ *
+ * Extracted because both branches below map identically, and two copies of a
+ * projection are two things to keep in step.
+ */
+const toSearchHit = (
+  release: Prisma.ReleaseGetPayload<{ select: typeof RELEASE_SELECT }>
+) => {
+  // The raw relation is destructured out; the projection is the only shape of
+  // the group this route emits.
+  const { releaseGroup, ...rest } = release;
+  return {
+    ...withPrimaryArtist(rest),
+    tags: release.releaseTags.map((entry) => entry.tag),
+    group: toGroupProjection(releaseGroup)
+  };
+};
 
 router.get(
   '/releases',
@@ -272,15 +306,7 @@ router.get(
         take: q.limit,
         select: RELEASE_SELECT
       });
-      return paginatedResponse(
-        res,
-        data.map((release) => ({
-          ...withPrimaryArtist(release),
-          tags: release.releaseTags.map((entry) => entry.tag)
-        })),
-        count,
-        pg
-      );
+      return paginatedResponse(res, data.map(toSearchHit), count, pg);
     }
 
     const orderByMap: Record<string, unknown> = {
@@ -301,15 +327,7 @@ router.get(
       prisma.release.count({ where: scoped })
     ]);
 
-    paginatedResponse(
-      res,
-      data.map((release) => ({
-        ...withPrimaryArtist(release),
-        tags: release.releaseTags.map((entry) => entry.tag)
-      })),
-      total,
-      pg
-    );
+    paginatedResponse(res, data.map(toSearchHit), total, pg);
   })
 );
 

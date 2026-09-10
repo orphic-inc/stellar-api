@@ -7,6 +7,7 @@ import type {
 } from './types';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { buildPlainTags, buildReleaseTagPayload } from '../releaseTags';
+import { groupProjectionSelect, toGroupProjection } from '../releaseGroup';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -46,6 +47,7 @@ export const getReleaseWorkbenchView = async (
           }
         },
         voteAggregate: true,
+        releaseGroup: { select: groupProjectionSelect },
         contributions: {
           select: {
             id: true,
@@ -100,6 +102,7 @@ export const getReleaseWorkbenchView = async (
   const releaseView = { ...release };
   delete (releaseView as { releaseTags?: unknown }).releaseTags;
   delete (releaseView as { contributions?: unknown }).contributions;
+  delete (releaseView as { releaseGroup?: unknown }).releaseGroup;
 
   return {
     release: {
@@ -107,6 +110,7 @@ export const getReleaseWorkbenchView = async (
       contributions,
       voteAggregate: release.voteAggregate ?? null
     },
+    group: toGroupProjection(release.releaseGroup),
     tags,
     myVote,
     releaseTags,

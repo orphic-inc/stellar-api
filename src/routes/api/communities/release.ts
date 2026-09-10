@@ -70,6 +70,10 @@ const serializeReleaseWorkbenchView = async (
     // Additive render-at-read: raw `description` is unchanged; `descriptionHtml`
     // is the server-rendered BBCode transcription the detail view consumes (#402).
     descriptionHtml: await renderSiteBBCode(view.release.description, bbViewer),
+    // Additive (ADR-0037 §3). Identity inlines because seeing the release
+    // already entitles the viewer to it; the sibling list stays behind
+    // `resolveGroupForViewer` and is not here.
+    group: view.group,
     tags: view.tags,
     myVote: view.myVote,
     releaseTags: view.releaseTags,

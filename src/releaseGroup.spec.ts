@@ -5,7 +5,11 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
-import { identityKeyFor } from './modules/releaseGroup';
+import {
+  groupProjectionSelect,
+  identityKeyFor,
+  toGroupProjection
+} from './modules/releaseGroup';
 
 /**
  * ReleaseGroup — ADR-0023's one accepted leak surface (#265).
@@ -129,6 +133,79 @@ describe('GET /api/release-groups/:id — the leak spec', () => {
       .get('/api/release-groups/5')
       .set('x-test-no-auth', '1');
     expect([401, 404]).toContain(res.status);
+  });
+});
+
+describe('the release-facing projection (ADR-0037 §3)', () => {
+  /**
+   * The canonical-cover rule, pinned where it is stated rather than where it is
+   * consumed. `CoverArt` has no primary flag, so "oldest wins" is a read-time
+   * convention with nothing in the schema to enforce it — if this fragment
+   * quietly stops taking one row, or takes the newest, every surface showing a
+   * group changes at once and no other test would notice.
+   */
+  it('takes exactly one cover, oldest first', () => {
+    expect(groupProjectionSelect.coverArt).toEqual({
+      select: { image: true },
+      orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
+      take: 1
+    });
+  });
+
+  it('selects identity and never the member releases', () => {
+    // The sibling list is the half that stays behind `resolveGroupForViewer`.
+    // Selecting `releases` here would route it around that filter entirely.
+    expect(Object.keys(groupProjectionSelect).sort()).toEqual([
+      'artist',
+      'coverArt',
+      'id',
+      'title',
+      'year'
+    ]);
+  });
+
+  it('maps null to null, for the ungrouped release that is the common case', () => {
+    expect(toGroupProjection(null)).toBeNull();
+  });
+
+  /**
+   * `undefined` means a caller that did not select the relation, which is not
+   * the same statement as "this release has no group" — but it has the same
+   * right answer. Testing only for `null` made every release detail read a 500
+   * against a projection that omits the relation.
+   */
+  it('maps undefined to null, for a caller that did not select the relation', () => {
+    expect(toGroupProjection(undefined)).toBeNull();
+  });
+
+  it('carries the oldest cover as the image', () => {
+    expect(
+      toGroupProjection({
+        id: 12,
+        title: 'Kid A',
+        year: 2000,
+        artist: { id: 3, name: 'Radiohead' },
+        coverArt: [{ image: 'https://example.test/oldest.jpg' }]
+      })
+    ).toEqual({
+      id: 12,
+      title: 'Kid A',
+      year: 2000,
+      artist: { id: 3, name: 'Radiohead' },
+      image: 'https://example.test/oldest.jpg'
+    });
+  });
+
+  it('is null-imaged when the group has no cover art', () => {
+    expect(
+      toGroupProjection({
+        id: 12,
+        title: 'Kid A',
+        year: null,
+        artist: null,
+        coverArt: []
+      })
+    ).toMatchObject({ image: null, artist: null, year: null });
   });
 });
 

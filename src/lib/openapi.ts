@@ -3992,6 +3992,35 @@ const ReleaseCategoryEnum = z.nativeEnum(ReleaseCategory);
 // identical stringly-typed bug, and want their own change.
 const ReleaseTypeEnum = z.nativeEnum(ReleaseType);
 
+const ReleaseGroupArtistRef = z
+  .object({ id: z.number(), name: z.string() })
+  .nullable();
+
+const ReleaseGroupIdentity = registry.register(
+  'ReleaseGroupIdentity',
+  z.object({
+    id: z.number(),
+    title: z.string(),
+    artist: ReleaseGroupArtistRef,
+    year: z.number().nullable()
+  })
+);
+
+/**
+ * The group as a release-facing surface presents it (ADR-0037 §3) — identity
+ * plus the canonical cover, and never the member list, which stays behind
+ * `resolveGroupForViewer`.
+ *
+ * `.extend()` ADDS a field here rather than tightening one, which is the safe
+ * direction: narrowing an existing field generates `Base & Record<string,
+ * never>` in the client. `ReleaseGroupDetail` extends the same base the same
+ * way.
+ */
+const ReleaseGroupRef = registry.register(
+  'ReleaseGroupRef',
+  ReleaseGroupIdentity.extend({ image: z.string().nullable() })
+);
+
 const Release = registry.register(
   'Release',
   z.object({
@@ -4019,7 +4048,16 @@ const Release = registry.register(
       .nullable()
       .optional(),
     contributions: z.array(ReleaseContribution).optional(),
-    isContributor: z.boolean().optional()
+    isContributor: z.boolean().optional(),
+    // The cross-community identity node this release belongs to (ADR-0023),
+    // null for an ungrouped release — which is most of them, since the column
+    // is never backfilled. It has ALWAYS been emitted: the handler spreads the
+    // full Prisma payload. Documented here rather than left as a field the
+    // response carries and the contract denies (ADR-0037, amended 2026-09-10).
+    releaseGroupId: z.number().nullable().optional(),
+    // Identity only, additive (ADR-0037 §3). The sibling releases come from
+    // `GET /release-groups/{id}`, which filters them per viewer.
+    group: ReleaseGroupRef.nullable().optional()
   })
 );
 
@@ -4571,20 +4609,6 @@ registry.registerPath({
 // `identityKey` is deliberately absent from every shape below. It is a derived
 // internal key with one writer; exposing it would invite a client to compute
 // its own and freeze the normalization rules.
-
-const ReleaseGroupArtistRef = z
-  .object({ id: z.number(), name: z.string() })
-  .nullable();
-
-const ReleaseGroupIdentity = registry.register(
-  'ReleaseGroupIdentity',
-  z.object({
-    id: z.number(),
-    title: z.string(),
-    artist: ReleaseGroupArtistRef,
-    year: z.number().nullable()
-  })
-);
 
 const ReleaseGroupMember = registry.register(
   'ReleaseGroupMember',
@@ -9848,7 +9872,12 @@ const releaseSearchItem = z.object({
     })
     .nullable(),
   tags: z.array(refIdName),
-  _count: z.object({ consumers: z.number(), contributors: z.number() })
+  _count: z.object({ consumers: z.number(), contributors: z.number() }),
+  // Attached, not collapsed (ADR-0037 §4): this endpoint keeps its pagination
+  // and its `total`, so a cross-community duplicate is labelled as the same
+  // album rather than removed. `GET /search/release-groups` is where dedup is
+  // honest, because there the group is the row.
+  group: ReleaseGroupRef.nullable()
 });
 
 const artistSearchItem = z.object({

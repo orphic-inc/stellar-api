@@ -78,6 +78,59 @@ const toGroupIdentity = (group: {
   year: group.year
 });
 
+// ─── The release-facing projection (ADR-0037 §3) ─────────────────────────────
+//
+// Every surface that shows a release beside its group presents the group the
+// same way, from this one fragment: the release detail read, the search
+// annotation, and the collage entry list. One expression rather than three
+// agreeing ones — the ADR-0036 §2 lesson applied to a projection instead of a
+// predicate. The failure mode is milder here, a label that drifts rather than a
+// leak, but the cure costs the same.
+//
+// It carries IDENTITY ONLY and needs no access check of its own. A viewer who
+// can see the release is already entitled to its group's identity, because
+// `resolveGroupForViewer` would hand them exactly these fields for any group
+// they can see one member of. The SIBLING LIST is the half that stays behind
+// that resolver, and it is deliberately not here.
+export const groupProjectionSelect = {
+  id: true,
+  title: true,
+  year: true,
+  artist: groupArtistSelect,
+  // The oldest cover is the canonical one (ADR-0037 §3). `CoverArt` carries no
+  // primary flag, so this is a read-time convention rather than curation, and
+  // it reuses `listGroupCovers`'s ordering rather than inventing a second one.
+  coverArt: {
+    select: { image: true },
+    orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
+    take: 1
+  }
+} satisfies Prisma.ReleaseGroupSelect;
+
+export type GroupProjection = ReturnType<typeof toGroupIdentity> & {
+  image: string | null;
+};
+
+/**
+ * Nothing in, `null` out — an ungrouped release has no group to present, and
+ * `Release.releaseGroupId` is nullable and never backfilled (ADR-0023), so that
+ * is the common case rather than the exception.
+ *
+ * `undefined` is accepted as well as `null`, and the two mean different things:
+ * `null` is Prisma answering "this release has no group", `undefined` is a
+ * caller that did not select the relation at all. Both have the same right
+ * answer here, and testing only for `null` turned the second into a 500.
+ */
+export const toGroupProjection = (
+  group:
+    | Prisma.ReleaseGroupGetPayload<{ select: typeof groupProjectionSelect }>
+    | null
+    | undefined
+): GroupProjection | null =>
+  group == null
+    ? null
+    : { ...toGroupIdentity(group), image: group.coverArt[0]?.image ?? null };
+
 // Identity only. No contributions, no editions, no files — those are the
 // release-scoped read's half of the split ADR-0023 Decision 2 describes.
 const memberReleaseSelect = {
