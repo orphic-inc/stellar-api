@@ -553,7 +553,7 @@ export async function getReportStats() {
         by: ['resolvedById'],
         where: { ...resolvedWhere, resolvedById: { not: null } },
         _count: { id: true },
-        orderBy: { _count: { id: 'desc' } },
+        orderBy: [{ _count: { id: 'desc' } }, { resolvedById: 'asc' }],
         take: 20
       })
     ]

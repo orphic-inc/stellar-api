@@ -113,7 +113,7 @@ export async function validate(
     });
     const maxRevision = await prisma.wikiRevision.findFirst({
       where: { pageId },
-      orderBy: { revision: 'desc' },
+      orderBy: [{ revision: 'desc' }, { id: 'asc' }],
       select: { revision: true }
     });
     if (page && maxRevision) {

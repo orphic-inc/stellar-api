@@ -247,7 +247,7 @@ router.get(
         author: { select: { id: true, username: true } },
         createdAt: true
       },
-      orderBy: { revision: 'desc' }
+      orderBy: [{ revision: 'desc' }, { id: 'asc' }]
     });
     res.json({ currentRevision: page.revision, revisions });
   })

@@ -44,10 +44,10 @@ router.get(
       }
     }
     const categories = await prisma.forumCategory.findMany({
-      orderBy: { sort: 'asc' },
+      orderBy: [{ sort: 'asc' }, { id: 'asc' }],
       include: {
         forums: {
-          orderBy: { sort: 'asc' },
+          orderBy: [{ sort: 'asc' }, { id: 'asc' }],
           include: {
             // The pointer is kept live by the recompute in modules/forum.ts,
             // and this filter neutralises rows already stale in a deployed
@@ -86,7 +86,7 @@ router.get(
       where: { id },
       include: {
         forums: {
-          orderBy: { sort: 'asc' },
+          orderBy: [{ sort: 'asc' }, { id: 'asc' }],
           include: {
             // The pointer is kept live by the recompute in modules/forum.ts,
             // and this filter neutralises rows already stale in a deployed

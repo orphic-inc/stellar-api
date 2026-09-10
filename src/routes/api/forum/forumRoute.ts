@@ -34,7 +34,7 @@ router.get(
   requireAuth,
   authHandler(async (req, res) => {
     const forums = await prisma.forum.findMany({
-      orderBy: { sort: 'asc' },
+      orderBy: [{ sort: 'asc' }, { id: 'asc' }],
       include: {
         forumCategory: { select: { id: true, name: true } },
         lastTopic: {

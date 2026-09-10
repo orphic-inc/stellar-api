@@ -223,7 +223,7 @@ describe('getTopUsers', () => {
           disabled: false,
           contributed: { gt: 0 }
         }),
-        orderBy: { contributions: { _count: 'desc' } }
+        orderBy: [{ contributions: { _count: 'desc' } }, { id: 'asc' }]
       })
     );
   });

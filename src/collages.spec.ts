@@ -1043,7 +1043,7 @@ describe('collages Prisma contract', () => {
             select: { entries: true, subscriptions: true, bookmarks: true }
           },
           entries: expect.objectContaining({
-            orderBy: { sort: 'asc' },
+            orderBy: [{ sort: 'asc' }, { id: 'asc' }],
             include: expect.objectContaining({
               release: expect.objectContaining({
                 select: expect.objectContaining({

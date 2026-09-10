@@ -127,7 +127,7 @@ router.get(
   requireAuth,
   authHandler(async (_req, res) => {
     const ranks = await prisma.donorRank.findMany({
-      orderBy: { minDonation: 'asc' }
+      orderBy: [{ minDonation: 'asc' }, { id: 'asc' }]
     });
     res.json(ranks);
   })
@@ -874,7 +874,7 @@ router.get(
         rankLocked: true,
         secondaryRanks: {
           select: { userRankId: true },
-          orderBy: { userRankId: 'asc' }
+          orderBy: [{ userRankId: 'asc' }, { userId: 'asc' }]
         }
       }
     });
