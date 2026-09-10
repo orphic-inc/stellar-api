@@ -418,6 +418,16 @@ const RecoveryRequestBody = registry.register(
   z.object({ email: z.string().email() })
 );
 
+const ReactivationRequestBody = registry.register(
+  'ReactivationRequestBody',
+  z.object({ email: z.string().email() })
+);
+
+const ReactivationConfirmBody = registry.register(
+  'ReactivationConfirmBody',
+  z.object({ token: z.string().min(1) })
+);
+
 const RecoveryResetBody = registry.register(
   'RecoveryResetBody',
   z.object({
@@ -512,6 +522,55 @@ registry.registerPath({
     400: msgResponse(
       'Invalid or expired token, or the new password is disallowed'
     )
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/reactivation-request',
+  tags: ['Auth'],
+  summary: 'Ask staff to reinstate a disabled account',
+  description:
+    'Always answers 200 with the same generic message, whether the address ' +
+    'belongs to no account, to an active one, or to a disabled one. A ' +
+    'distinguishable response would say which accounts are disabled, and ' +
+    'therefore which members were banned. Open to ANY disabled account, ' +
+    'moderator actions included: it is an appeals channel, and filtering by ' +
+    'reason would be the same oracle by another route. A link is only sent ' +
+    'for an account that is actually disabled. Rate-limited by authLimiter.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: ReactivationRequestBody } }
+    }
+  },
+  responses: {
+    200: msgResponse(
+      'Generic acknowledgement — identical for a known, unknown, active or disabled address'
+    )
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/auth/reactivation-confirm',
+  tags: ['Auth'],
+  summary: 'Confirm a reactivation request and put it in front of staff',
+  description:
+    'Consumes the token and opens a staff-inbox conversation. Idempotent per ' +
+    'member: where an unresolved conversation already exists the token is ' +
+    'still spent and a message is appended to it, so one email round-trip ' +
+    'cannot become an unlimited supply of threads. A reactivation token is ' +
+    'not interchangeable with a password-reset one — `/auth/recovery/reset` ' +
+    'will not accept it. Staff reinstate through the existing ' +
+    '`users_disable` surface. Rate-limited by authLimiter.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: ReactivationConfirmBody } }
+    }
+  },
+  responses: {
+    200: msgResponse('The request has been sent to staff'),
+    400: msgResponse('Invalid or expired token')
   }
 });
 

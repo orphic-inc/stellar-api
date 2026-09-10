@@ -118,6 +118,8 @@
     "POST /asset",
     "POST /auth/logout",
     "POST /auth/password",
+    "POST /auth/reactivation-confirm",
+    "POST /auth/reactivation-request",
     "POST /auth/recovery/request",
     "POST /auth/recovery/reset",
     "POST /comments",
