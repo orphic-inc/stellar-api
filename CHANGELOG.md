@@ -124,6 +124,52 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Global release surfaces served release identity to authenticated
+  non-members** ([#607](https://github.com/orphic-inc/stellar-api/issues/607),
+  [ADR-0036](docs/adr/0036-release-identity-is-community-private.md)) — a route
+  that names a community in its path inherits a gate from the path. A collage,
+  a profile, a chart or the homepage had nothing to inherit and no shared rule
+  to reach for, so seven surfaces served titles, artists, years and cover art
+  from communities the caller had no access to.
+
+  **Reads now filter.** `GET /collages/{id}` omits entries whose release the
+  viewer cannot reach; `GET /profile/user/{id}` scopes the recent-contributions
+  block and the collage-shelf covers to the reader, so two members see
+  different things on the same profile; `GET /bookmarks/releases` omits a
+  bookmark whose release moved out of reach; `GET /random/release` draws from
+  the viewer's own scope, on the count as well as the pick.
+
+  **Two writes now refuse.** `POST /collages/{id}/entries` and
+  `POST /bookmarks/releases/{releaseId}` answer **404 — the same status and the
+  same message as a release that does not exist**, so the two cases cannot be
+  told apart. A 403 would confirm the id is real and private. These are the
+  sharper half: a filtered read leaks what the caller could reach anyway, but a
+  write that accepts an unreachable id let a non-member _plant_ a
+  private-community release in a global collage and publish it to everyone who
+  opened it. The bookmark route is a toggle and only its **create** arm is
+  gated — rows already written are left in place, so gating the whole route
+  would trap a member who lost community access with a bookmark they could
+  neither see nor remove.
+
+  **`GET /collages/{id}` gains `numVisibleEntries`**, additive. `numEntries`
+  keeps one meaning everywhere — it is a browse sort key and the quantity the
+  per-collage quota is enforced against — so it cannot become viewer-dependent.
+
+  **Featuring is now an act of publication.**
+  `POST /announcements/album-of-month` refuses a release outside a public
+  community at **set** time rather than filtering at read time, so the decision
+  sits with the staff member making it instead of silently emptying the
+  homepage. The same check closes a pre-existing hole: `FeaturedAlbum.groupId`
+  carries no foreign key, so a dangling feature was already possible and
+  `/home/featured` rendered null for it without explanation. The operation's
+  existing 400 covers it; no new status. The vanity-house slot is a query
+  rather than curation, so it takes the public-community predicate.
+
+  Rows already written are **not** purged. A collage entry or bookmark pointing
+  at a private-community release was never malformed — it was a row nobody
+  filtered on read — and it reappears correctly if that viewer later joins the
+  community.
+
 - **An artist's discography silently dropped every release belonging to no
   community** ([#607](https://github.com/orphic-inc/stellar-api/issues/607),
   [ADR-0036](docs/adr/0036-release-identity-is-community-private.md)) —

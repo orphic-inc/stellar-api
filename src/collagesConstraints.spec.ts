@@ -223,7 +223,7 @@ describe('collages — reads and reorders (#564)', () => {
 describe('collages — POST /collages/:id/entries (#564)', () => {
   const primeEntryAdd = () => {
     prismaMock.collage.findUnique.mockResolvedValue(activeCollage());
-    prismaMock.release.findUnique.mockResolvedValue(makeRelease({ id: 2 }));
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease({ id: 2 }));
     prismaMock.collageEntry.findUnique.mockResolvedValue(null);
     prismaMock.collageEntry.count.mockResolvedValue(0);
     prismaMock.collageEntry.aggregate.mockResolvedValue(

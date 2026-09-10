@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { makeRelease } from './test/factories';
+import { releaseVisibleToViewer } from './modules/communityAccess';
 import {
   request,
   app,
@@ -120,6 +122,7 @@ describe('GET /api/bookmarks/releases', () => {
 
 describe('POST /api/bookmarks/releases/:releaseId', () => {
   it('toggles a release bookmark on', async () => {
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
     prismaMock.bookmarkRelease.findUnique.mockResolvedValue(null);
     prismaMock.bookmarkRelease.create.mockResolvedValue({} as never);
 
@@ -127,6 +130,59 @@ describe('POST /api/bookmarks/releases/:releaseId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ bookmarked: true });
+  });
+
+  it('answers 404 for a release the caller cannot see, indistinguishably', async () => {
+    // ADR-0036 §5: the same status and the same message as a release that does
+    // not exist. A 403 here would confirm the id is real and private, which is
+    // the existence oracle resolveGroupForViewer refuses to be.
+    prismaMock.release.findFirst.mockResolvedValue(null);
+    prismaMock.bookmarkRelease.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/bookmarks/releases/42');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Release not found' });
+    expect(prismaMock.bookmarkRelease.create).not.toHaveBeenCalled();
+  });
+
+  it('scopes the visibility check to the caller', async () => {
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease());
+    prismaMock.bookmarkRelease.findUnique.mockResolvedValue(null);
+    prismaMock.bookmarkRelease.create.mockResolvedValue({} as never);
+
+    await request(app).post('/api/bookmarks/releases/42');
+
+    // Assert the QUERY, not the payload: a mock returns whatever it is told, so
+    // only the where clause proves the filter was applied.
+    expect(prismaMock.release.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 42,
+          OR: releaseVisibleToViewer(7).OR
+        })
+      })
+    );
+  });
+
+  it('still un-bookmarks a release the caller can no longer see', async () => {
+    // The toggle's DELETE arm is deliberately ungated (ADR-0036 §5 + §7).
+    // Rows already written are left in place, so gating the whole route would
+    // trap a member who lost community access with a bookmark they can neither
+    // see nor remove.
+    prismaMock.release.findFirst.mockResolvedValue(null);
+    prismaMock.bookmarkRelease.findUnique.mockResolvedValue({
+      userId: 7
+    } as never);
+    prismaMock.bookmarkRelease.deleteMany.mockResolvedValue({
+      count: 1
+    } as never);
+
+    const res = await request(app).post('/api/bookmarks/releases/42');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ bookmarked: false });
+    expect(prismaMock.bookmarkRelease.deleteMany).toHaveBeenCalled();
   });
 
   it('toggles a release bookmark off', async () => {
@@ -312,6 +368,15 @@ describe.each([
         create: jest.Mock;
         deleteMany: jest.Mock;
       };
+
+    beforeEach(() => {
+      // The releases route gained a visibility check ahead of the create
+      // (ADR-0036 §5), which answers 404 before Prisma is ever reached. Stub it
+      // OPEN so these tests keep exercising the constraint arms they are about
+      // — without this they would still pass, for the wrong reason, and #564's
+      // coverage would quietly lapse. Inert for the other three segments.
+      prismaMock.release.findFirst.mockResolvedValue(makeRelease());
+    });
 
     it('answers 404, not 500, when the path id names nothing', async () => {
       // Arm A: a foreign-key violation carries no statusCode, so before #564

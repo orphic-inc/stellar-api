@@ -4,6 +4,7 @@ import {
   resetApiTestState,
   prismaMock
 } from './test/apiTestHarness';
+import { releaseVisibleToViewer } from './modules/communityAccess';
 
 beforeEach(() => resetApiTestState());
 
@@ -26,6 +27,28 @@ describe('GET /api/random/release', () => {
     expect(res.body.id).toBe(3);
     expect(res.body.title).toBe('Kind of Blue');
     expect(res.body.artist.name).toBe('Miles Davis');
+  });
+
+  it('scopes BOTH the count and the pick to the viewer (ADR-0036 §4)', async () => {
+    prismaMock.release.count.mockResolvedValue(5);
+    prismaMock.release.findFirst.mockResolvedValue({
+      id: 3,
+      communityId: 1,
+      title: 'Kind of Blue',
+      year: 1959,
+      credits: []
+    } as never);
+
+    await request(app).get('/api/random/release');
+
+    const scope = releaseVisibleToViewer(7);
+    // The count matters as much as the pick. A count over the unfiltered table
+    // would choose a `skip` beyond the filtered set, and the endpoint would
+    // answer null for a viewer who has plenty of visible releases.
+    expect(prismaMock.release.count).toHaveBeenCalledWith({ where: scope });
+    expect(prismaMock.release.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: scope })
+    );
   });
 
   it('returns 404 when there are no releases', async () => {

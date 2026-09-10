@@ -7791,6 +7791,9 @@
                   "$ref": "#/components/schemas/CollageEntry"
                 }
               },
+              "numVisibleEntries": {
+                "type": "integer"
+              },
               "isSubscribed": {
                 "type": "boolean"
               },
@@ -7800,6 +7803,7 @@
             },
             "required": [
               "entries",
+              "numVisibleEntries",
               "isSubscribed",
               "isBookmarked"
             ]
@@ -34611,7 +34615,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body",
+            "description": "Validation error, or groupId names no release in a public community. Featuring is an act of publication (ADR-0036 §4), so a private-community release is refused at set time rather than filtered at read time — and 400 rather than 404 because the route exists and it is the body id that does not resolve. Covers a dangling groupId too: FeaturedAlbum.groupId carries no foreign key.",
             "content": {
               "application/json": {
                 "schema": {

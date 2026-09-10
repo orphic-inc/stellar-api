@@ -24,6 +24,7 @@ import {
   releaseCreditsSelect,
   withPrimaryArtist
 } from '../../modules/releaseCredits';
+import { releaseVisibleToViewer } from '../../modules/communityAccess';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import {
@@ -208,8 +209,17 @@ const entryAddBlocked = async (args: {
 }): Promise<{ status: number; msg: string } | null> => {
   const { collage, releaseId, userId, staff } = args;
 
-  const release = await prisma.release.findUnique({
-    where: { id: releaseId },
+  // The same 404, with the same message, as a release that does not exist
+  // (ADR-0036 §5). The caller named a release id rather than a community, so
+  // this is search-shaped: a 403 here would confirm the id is real and private,
+  // which is the existence oracle `resolveGroupForViewer` refuses to be.
+  //
+  // This is the sharper half of #607. A filtered READ leaks what the caller
+  // could reach anyway; a write that accepts an unreachable id lets them choose
+  // what to pull across the boundary — and publish it to everyone who opens
+  // this collage.
+  const release = await prisma.release.findFirst({
+    where: { id: releaseId, ...releaseVisibleToViewer(userId) },
     select: { id: true }
   });
   if (!release) return { status: 404, msg: 'Release not found' };
@@ -399,6 +409,12 @@ router.get(
       include: {
         ...collageInclude,
         entries: {
+          // ADR-0036 §1: a release's identity is private to its community, so
+          // an entry the viewer cannot reach is omitted rather than rendered.
+          // The rows stay in the database — they were never malformed, and one
+          // reappears correctly if this viewer later joins that community
+          // (ADR-0036 §7).
+          where: { release: releaseVisibleToViewer(authReq.user.id) },
           orderBy: { sort: 'asc' },
           include: {
             release: {
@@ -464,6 +480,13 @@ router.get(
         ...entry,
         release: withPrimaryArtist(entry.release)
       })),
+      // Additive, beside the true total rather than replacing it (ADR-0036 §6).
+      // `numEntries` keeps one meaning everywhere: it is a sort key on the
+      // browse list and the quantity the per-collage quota is enforced against,
+      // so it cannot become viewer-dependent. This is the count that matches
+      // the array above it. #605 reuses it when a release group collapses
+      // duplicates into one entry, for the same arithmetic reason.
+      numVisibleEntries: collage.entries.length,
       isSubscribed: !!subscription,
       isBookmarked: !!bookmark
     });

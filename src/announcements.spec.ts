@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { releaseInPublicCommunity } from './modules/communityAccess';
 import {
   request,
   app,
@@ -402,6 +403,54 @@ describe('announcements — missing rows answer the declared 404 (#564)', () => 
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ msg: 'Global notice not found' });
+  });
+
+  it('refuses to feature a release outside a public community (ADR-0036 §4)', async () => {
+    // Staff curation is an act of publication, so the refusal lives HERE, at
+    // the moment a person chooses the release — not as a read-time filter,
+    // which would empty the homepage slot silently with nobody accountable.
+    prismaMock.release.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/announcements/album-of-month')
+      .send({
+        groupId: 42,
+        threadId: 1,
+        title: 'Album of the Month',
+        started: '2026-09-01T00:00:00.000Z',
+        ended: '2026-09-30T00:00:00.000Z'
+      });
+
+    // 400, not 404: the route exists and it is the body id that does not
+    // resolve. The same answer covers a dangling groupId, which was already
+    // possible because FeaturedAlbum.groupId carries no foreign key.
+    expect(res.status).toBe(400);
+    expect(prismaMock.featuredAlbum.create).not.toHaveBeenCalled();
+  });
+
+  it('features a release that is in a public community', async () => {
+    prismaMock.release.findFirst.mockResolvedValue({ id: 42 } as never);
+    prismaMock.featuredAlbum.create.mockResolvedValue({ id: 1 } as never);
+
+    const res = await request(app)
+      .post('/api/announcements/album-of-month')
+      .send({
+        groupId: 42,
+        threadId: 1,
+        title: 'Album of the Month',
+        started: '2026-09-01T00:00:00.000Z',
+        ended: '2026-09-30T00:00:00.000Z'
+      });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.release.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 42,
+          OR: releaseInPublicCommunity.OR
+        })
+      })
+    );
   });
 
   it('DELETE /api/announcements/album-of-month/:albumId closes the read-write race', async () => {

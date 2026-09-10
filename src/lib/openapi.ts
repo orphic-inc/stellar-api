@@ -8635,7 +8635,10 @@ registry.registerPath({
     201: {
       description: 'Created',
       content: { 'application/json': { schema: FeaturedAlbumItem } }
-    }
+    },
+    400: validationResponse(
+      'Validation error, or groupId names no release in a public community. Featuring is an act of publication (ADR-0036 §4), so a private-community release is refused at set time rather than filtered at read time — and 400 rather than 404 because the route exists and it is the body id that does not resolve. Covers a dangling groupId too: FeaturedAlbum.groupId carries no foreign key.'
+    )
   }
 });
 
@@ -8736,6 +8739,12 @@ const CollageDetail = registry.register(
   'CollageDetail',
   Collage.extend({
     entries: z.array(CollageEntry),
+    // ADDS a field rather than tightening one: `Collage.numEntries` keeps its
+    // meaning (the true total, and a browse sort key), and this is the count
+    // matching `entries` above for THIS viewer (ADR-0036 §6). Extending with a
+    // new key is safe; extending to narrow an existing one is what generates
+    // `Base & Record<string, never>` in the client.
+    numVisibleEntries: z.number().int(),
     isSubscribed: z.boolean(),
     isBookmarked: z.boolean()
   })

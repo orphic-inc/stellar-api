@@ -11,6 +11,7 @@ import {
   withPrimaryArtist
 } from '../../modules/releaseCredits';
 import { removeConsumedReleaseBookmarks } from '../../modules/bookmark';
+import { releaseVisibleToViewer } from '../../modules/communityAccess';
 
 const router = express.Router();
 
@@ -104,7 +105,14 @@ router.get(
   requireAuth,
   authHandler(async (req, res) => {
     const bookmarks = await prisma.bookmarkRelease.findMany({
-      where: { userId: req.user.id },
+      // A bookmark on a release this viewer can no longer reach is omitted
+      // rather than deleted (ADR-0036 §1, §7). The row survives, so the
+      // bookmark returns if they rejoin that community — and the toggle below
+      // can still remove it in the meantime.
+      where: {
+        userId: req.user.id,
+        release: releaseVisibleToViewer(req.user.id)
+      },
       include: {
         release: {
           select: {
@@ -144,6 +152,20 @@ router.post(
       });
       return res.json({ bookmarked: false });
     }
+    // Only the CREATE arm is gated, never the delete above it (ADR-0036 §5).
+    // This route is a toggle, and Decision 7 leaves already-written rows in
+    // place: checking visibility before the branch would trap a member who
+    // bookmarked a release and then lost access to its community with a row
+    // they can neither see nor remove.
+    //
+    // The same 404 as a release that does not exist — the P2003 arm below
+    // already answers exactly that, so no new status appears on this operation.
+    const visible = await prisma.release.findFirst({
+      where: { id: releaseId, ...releaseVisibleToViewer(req.user.id) },
+      select: { id: true }
+    });
+    if (!visible) throw new AppError(404, 'Release not found');
+
     try {
       await prisma.bookmarkRelease.create({
         data: { userId: req.user.id, releaseId }
