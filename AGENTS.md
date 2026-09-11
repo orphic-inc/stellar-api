@@ -242,11 +242,16 @@ src/
     inviteTree.ts             # Who-invited-whom topology (#61) — pure subtree assembly + summary over inviterId adjacency rows
     rankProgression.ts        # Pure, table-driven evaluator for automated class progression: promote one step / demote / stay. Owns ALL the policy; no DB
     rankProgressionJob.ts     # The DB-bound shell around that evaluator — loads ladder + rules, builds inputs, applies the decisions
+    inactivity.ts             # Dormancy clock + pure evaluator (#279, ADR-0038): max(lastLogin, dateRegistered, reactivatedAt) → warn / disable / none. Owns the policy; no DB
+    inactivityJob.ts          # The DB-bound sweep around that evaluator — cursor-paged, `INACTIVITY_MODE` gates the WRITES not the evaluation, disables capped per cycle
+    assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
+    assetSweepJob.ts          # Background job driving that sweep
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
     communityAccess.ts        # Community membership + access (#419, ADR-0030, ADR-0033): the communityRoleUnion where-fragment (consumer ∪ contributor ∪ curator) that DEFINES membership, the hasCommunityAccess gate (ex-`isCommunityMember`) and its load-then-gate assertCommunityAccess, plus listCommunityMembers projecting the same union into a roster. Never reads announceVisibility
     releaseBrowse.ts          # listCommunityReleases — the community release browse/list read
+    releaseGroup.ts           # ReleaseGroup identity node (ADR-0023, #265): access-filtered resolver, find-or-create, attach/detach, merge/split, cover art, group log. `collapseByGroup` (ADR-0037 §2) is the read-time dedup — it applies NO access rule and inherits its safety from the caller
     releaseCredits.ts         # ReleaseArtist role credits; derives the legacy release.artist display field from the Main credit
     releaseLifecycle.ts       # Community release create/delete with history + snapshotting
     requestLifecycle.ts       # Release request + bounty lifecycle: detail, bounty history, voting, fill/update
@@ -330,6 +335,7 @@ src/
     search.ts               # Cross-domain search
     random.ts               # Random release endpoint
     siteHistory.ts          # Site history log
+    releaseGroups.ts        # ReleaseGroup reads + curation (ADR-0023/#265): resolve, find-or-create, merge/split, cover art, group log
     stylesheet.ts           # User stylesheets
     asset.ts                # GET /:hash — content-addressed binary delivery, immutable caching (ADR-0026)
     wiki.ts                 # Wiki pages, aliases, revisions
@@ -560,7 +566,6 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 
 | Model                       | Status                                 |
 | --------------------------- | -------------------------------------- |
-| `CoverArt`                  | Planned — release art management       |
 | `BitcoinDonation`           | Planned — donor system                 |
 | `Applicant`, `Thread`       | Planned — application/thread system    |
 | `Concert`, `ContestType`    | Planned — events/contests              |
@@ -568,7 +573,6 @@ These Prisma models exist in `schema.prisma` but have no API routes:
 | `Note`                      | Planned — admin messaging/content      |
 | `CurrencyConversionRate`    | Planned — economy system               |
 | `FeaturedMerch`             | Planned — merch feature                |
-| `GroupLog`                  | Planned — misc features                |
 | `ApiApplication`, `ApiUser` | Deferred indefinitely                  |
 
 ## Agent skills
