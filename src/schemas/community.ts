@@ -68,7 +68,7 @@ export const updateCommunitySchema = z.object({
   leaderId: z.number().int().positive().optional()
 });
 
-export const createGroupSchema = z.object({
+export const createReleaseSchema = z.object({
   credits: z
     .array(
       z.object({
@@ -86,7 +86,7 @@ export const createGroupSchema = z.object({
   tagIds: z.array(z.number().int().positive()).optional()
 });
 
-export const updateGroupSchema = z.object({
+export const updateReleaseSchema = z.object({
   title: z.string().min(1).max(256).optional(),
   description: z.string().min(1).optional(),
   image: z.string().url().optional(),
@@ -119,8 +119,8 @@ export const addMemberSchema = z.object({
 
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
-export type CreateGroupInput = z.infer<typeof createGroupSchema>;
-export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
+export type CreateReleaseInput = z.infer<typeof createReleaseSchema>;
+export type UpdateReleaseInput = z.infer<typeof updateReleaseSchema>;
 export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
 export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;
 export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;

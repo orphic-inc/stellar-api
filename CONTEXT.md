@@ -47,12 +47,19 @@ _Avoid_: contribution table, base contribution, release row
 The per-file rip-metadata satellite (`ReleaseFile`, 1:1 with a music Contribution): `bitrate`, `hasLog`, `hasCue`, `isScene` — the fingerprint the quality grade reads. Per-file, so distinct from the per-pressing `Edition`. The music analog of the satellite each future Contribution type attaches. Since #129 it is also client-surfaced — nested on the release-scoped contributions read (`GET /communities/:id/releases/:id/contributions`) that feeds the UI edition stack — not only read by the grade.
 _Avoid_: contribution metadata, file info, rip record
 
+**Release**:
+The community-scoped catalogue entry — one Community's record of a work, carrying its
+Editions, Contributions and files. Private to that Community: a viewer without access
+cannot see it at all. Several Releases across Communities may be the same work; what
+makes them the same is the **ReleaseGroup** above them, which holds identity, never content.
+_Avoid_: group, release group (that is the identity node above it), album row, upload
+
 **ReleaseGroup**:
 The community-agnostic _identity_ of a work — what makes "the same album" the same
 regardless of which Community catalogues it. It groups the community-scoped Releases
 that are that work; it holds identity only, never their Editions, Contributions, or
 files. Collages and search resolve sameness on the ReleaseGroup, then show only the
-Releases the viewer may access — the group never widens visibility (proposed — ADR-0023).
+Releases the viewer may access — the group never widens visibility (ADR-0023).
 _Avoid_: Work (that is the composition), master, album row, group, container
 
 **Ratio Mechanism**:

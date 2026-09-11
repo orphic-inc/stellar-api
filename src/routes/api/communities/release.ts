@@ -11,13 +11,13 @@ import {
   parsedBody
 } from '../../../middleware/validate';
 import {
-  createGroupSchema,
-  updateGroupSchema,
+  createReleaseSchema,
+  updateReleaseSchema,
   releaseVoteSchema,
   releaseTagSchema,
   releaseTagVoteSchema,
-  type CreateGroupInput,
-  type UpdateGroupInput,
+  type CreateReleaseInput,
+  type UpdateReleaseInput,
   type ReleaseVoteInput,
   type ReleaseTagInput,
   type ReleaseTagVoteInput
@@ -197,13 +197,13 @@ router.post(
   '/',
   ...requirePermission('communities_manage'),
   validateParams(communityIdParamsSchema),
-  validate(createGroupSchema),
+  validate(createReleaseSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { communityId } = parsedParams<{ communityId: number }>(res);
     const release = await createCommunityRelease({
       actorId: req.user!.id,
       communityId,
-      data: parsedBody<CreateGroupInput>(res)
+      data: parsedBody<CreateReleaseInput>(res)
     });
     res.status(201).json(release);
   })
@@ -214,14 +214,14 @@ router.put(
   '/:releaseId',
   requireAuth,
   validateParams(releaseParamsSchema),
-  validate(updateGroupSchema),
+  validate(updateReleaseSchema),
   authHandler(async (req, res) => {
     const { communityId, releaseId } = parsedParams<{
       communityId: number;
       releaseId: number;
     }>(res);
     const { title, description, image, year, editSummary } =
-      parsedBody<UpdateGroupInput>(res);
+      parsedBody<UpdateReleaseInput>(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -427,10 +427,10 @@ router.delete(
 // Attach this release to a cross-community identity node, or detach it with
 // `null` (ADR-0023, #265). The day-to-day curation verb.
 //
-// Named `release-group`, not `group`: in this router "group" already means a
-// Release — `createGroupSchema` above is the create-a-release body, inherited
-// from the legacy vocabulary where a group WAS the release. ADR-0023's group is
-// the identity one level above that, so the two must not share a word here.
+// Named `release-group`, not `group`: "group" was this router's word for the
+// Release itself — the create body above was `createGroupSchema` until #603
+// renamed it to `createReleaseSchema`. ADR-0023's group is the identity one
+// level above that, so the two must not share a word here.
 //
 // Gated by community access rather than a permission, and it REFUSES rather
 // than filtering: the path names one community, so the caller is owed a

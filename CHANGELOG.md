@@ -42,6 +42,19 @@ All notable changes to stellar-api are documented here.
 
 ### Changed
 
+- **"Group" is the identity node's word now**
+  ([#603](https://github.com/orphic-inc/stellar-api/issues/603)) — the
+  community release routes' `createGroupSchema` / `updateGroupSchema` become
+  `createReleaseSchema` / `updateReleaseSchema`, with `CreateReleaseInput` /
+  `UpdateReleaseInput` alongside. "Group" had meant the Release itself in the
+  vocabulary these routes inherited, and ADR-0023 then gave the same word to
+  the identity node one level above, leaving both senses in one router.
+  Request and response shapes are unchanged — neither schema was ever a named
+  OpenAPI component. The published description of
+  `PUT /api/communities/{communityId}/releases/{releaseId}/release-group`
+  explains the name in the past tense, and `CONTEXT.md` now defines
+  **Release** beside **ReleaseGroup** so a reader meets the pair together.
+
 - **A recovery token now says what it is for** — `AccountRecovery.purpose`
   (`PasswordReset` | `Reactivation`), defaulted so every existing row keeps its
   meaning. `resetPasswordWithToken` matched _any_ unused, unexpired row, so

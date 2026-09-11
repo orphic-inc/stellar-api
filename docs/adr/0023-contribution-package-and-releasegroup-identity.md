@@ -76,8 +76,9 @@ blueprint is the artefact a future reader will find first.
    visibility is a question for those verbs, not for the read.
 
 3. **The write refuses where the read filters,** which is the same distinction
-   one level up. `PUT /communities/:communityId/releases/:releaseId/group` names
-   one community in its path, so it is browse-shaped: `assertCommunityAccess`,
+   one level up. `PUT /communities/:communityId/releases/:releaseId/release-group`
+   (this ADR proposed `/group`; renamed at implementation — [#603](https://github.com/orphic-inc/stellar-api/issues/603))
+   names one community in its path, so it is browse-shaped: `assertCommunityAccess`,
    answering `403`. You may only group releases you can already reach. Creating
    an empty group is open to any authenticated member; the destructive verbs
    (merge/split) stay gated.
