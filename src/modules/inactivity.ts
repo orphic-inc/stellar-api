@@ -85,55 +85,85 @@ const decide = (
 ): InactivityDecision => ({ action, reason });
 
 /**
+ * Why this account is out of scope, or null if it is in scope.
+ *
+ * Returned as a reason rather than a boolean so the dry-run log can say which
+ * rule spared each account — "active donor" and "staff rank" are very different
+ * things to read in a list of thousands.
+ *
+ * Checked before either arm, so an exempt member is never WARNED either. A
+ * predicate that only guarded the disable would still mail a dormancy warning
+ * to a donor.
+ */
+const exemptionReason = (input: InactivityInput): string | null => {
+  if (input.disabled) return 'already disabled';
+  if (input.rankLevel >= STAFF_LEVEL) return 'staff rank — never auto-managed';
+  if (input.rankLocked) return 'rankLocked — engine will not touch this user';
+  if (input.isDonor) return 'active donor';
+  return null;
+};
+
+/**
+ * The never-logged-in arm: an account that registered and never came back.
+ *
+ * Keyed on the same clock as everything else, so a reinstated account is not
+ * immediately re-swept — `lastLogin` is still null after a re-enable, and only
+ * `reactivatedAt` says otherwise.
+ */
+const evaluateNeverLoggedIn = (
+  input: InactivityInput,
+  now: Date
+): InactivityDecision => {
+  if (input.adminCreated)
+    return decide('none', 'admin-created and not yet used');
+  const age = daysBetween(input.dateRegistered, now);
+  return age >= NEVER_LOGGED_IN_DAYS
+    ? decide('disable', `registered ${Math.floor(age)}d ago, never logged in`)
+    : decide('none', 'registered recently, never logged in');
+};
+
+/**
+ * The dormancy arms, for an account that has some activity to measure from.
+ *
+ * Disable is checked before warn so an account past both thresholds and already
+ * warned is disabled rather than re-warned forever.
+ */
+const evaluateDormancy = (
+  input: InactivityInput,
+  now: Date
+): InactivityDecision => {
+  const idleDays = daysBetween(lastActivityAt(input), now);
+  const idle = Math.floor(idleDays);
+
+  if (idleDays >= DISABLE_AFTER_DAYS && input.inactivityWarnedAt !== null) {
+    const warnedDays = daysBetween(input.inactivityWarnedAt, now);
+    const warned = Math.floor(warnedDays);
+    return warnedDays >= WARN_GRACE_DAYS
+      ? decide('disable', `idle ${idle}d, warned ${warned}d ago`)
+      : decide('none', `idle ${idle}d but warned only ${warned}d ago`);
+  }
+
+  if (idleDays >= WARN_AFTER_DAYS && input.inactivityWarnedAt === null) {
+    return decide('warn', `idle ${idle}d`);
+  }
+
+  return decide('none', `idle ${idle}d`);
+};
+
+/**
  * Decide what to do with one account.
  *
- * Order matters: exemptions are checked before anything else so an exempt user
- * is never warned either, and the disable arm is checked before the warn arm so
- * an account that is past both thresholds and already warned is disabled rather
- * than re-warned forever.
+ * Three questions in order, and the order is the policy: is this account in
+ * scope at all, has it ever been used, and how long has it been idle.
  */
 export const evaluateInactivity = (
   input: InactivityInput,
   now: Date
 ): InactivityDecision => {
-  if (input.disabled) return decide('none', 'already disabled');
-  if (input.rankLevel >= STAFF_LEVEL)
-    return decide('none', 'staff rank — never auto-managed');
-  if (input.rankLocked)
-    return decide('none', 'rankLocked — engine will not touch this user');
-  if (input.isDonor) return decide('none', 'active donor');
+  const exempt = exemptionReason(input);
+  if (exempt !== null) return decide('none', exempt);
 
-  // Never-logged-in sweep. Keyed on the same clock as everything else, so a
-  // reinstated account is not immediately re-swept: `lastLogin` is still null
-  // after a re-enable, and only `reactivatedAt` says otherwise.
-  if (input.lastLogin === null && input.reactivatedAt === null) {
-    if (input.adminCreated)
-      return decide('none', 'admin-created and not yet used');
-    const age = daysBetween(input.dateRegistered, now);
-    return age >= NEVER_LOGGED_IN_DAYS
-      ? decide('disable', `registered ${Math.floor(age)}d ago, never logged in`)
-      : decide('none', 'registered recently, never logged in');
-  }
-
-  const idleDays = daysBetween(lastActivityAt(input), now);
-
-  if (idleDays >= DISABLE_AFTER_DAYS && input.inactivityWarnedAt !== null) {
-    const warnedDays = daysBetween(input.inactivityWarnedAt, now);
-    if (warnedDays >= WARN_GRACE_DAYS) {
-      return decide(
-        'disable',
-        `idle ${Math.floor(idleDays)}d, warned ${Math.floor(warnedDays)}d ago`
-      );
-    }
-    return decide(
-      'none',
-      `idle ${Math.floor(idleDays)}d but warned only ${Math.floor(warnedDays)}d ago`
-    );
-  }
-
-  if (idleDays >= WARN_AFTER_DAYS && input.inactivityWarnedAt === null) {
-    return decide('warn', `idle ${Math.floor(idleDays)}d`);
-  }
-
-  return decide('none', `idle ${Math.floor(idleDays)}d`);
+  return input.lastLogin === null && input.reactivatedAt === null
+    ? evaluateNeverLoggedIn(input, now)
+    : evaluateDormancy(input, now);
 };

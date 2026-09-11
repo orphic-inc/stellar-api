@@ -171,6 +171,50 @@ const applyDisable = async (
   });
 };
 
+interface Tally {
+  warned: number;
+  disabled: number;
+  deferred: number;
+}
+
+/**
+ * Evaluate one account and apply the outcome, mutating the running tally.
+ *
+ * `mode` gates the WRITES only — every branch below still counts, because the
+ * dry-run numbers are the whole reason that mode exists.
+ */
+const applyDecision = async (
+  user: Candidate,
+  now: Date,
+  mode: 'dryRun' | 'on',
+  systemActorId: number,
+  tally: Tally
+): Promise<void> => {
+  const decision = evaluateInactivity(user, now);
+  if (decision.action === 'none') return;
+
+  if (decision.action === 'disable') {
+    // The cap bounds disables only. A warning is undone by signing in; a
+    // disable needs someone with `users_disable` to reverse it.
+    if (tally.disabled >= inactivityConfig.maxDisablesPerCycle) {
+      tally.deferred += 1;
+      return;
+    }
+    if (mode === 'on') await applyDisable(user, decision.reason, systemActorId);
+    tally.disabled += 1;
+  } else {
+    if (mode === 'on') await applyWarn(user);
+    tally.warned += 1;
+  }
+
+  log.info(mode === 'dryRun' ? 'Would act on user' : 'Acted on user', {
+    mode,
+    action: decision.action,
+    userId: user.id,
+    reason: decision.reason
+  });
+};
+
 export const runInactivityCycle = async (
   now: Date = new Date()
 ): Promise<{ warned: number; disabled: number; deferred: number }> => {
@@ -183,10 +227,8 @@ export const runInactivityCycle = async (
     return { warned: 0, disabled: 0, deferred: 0 };
   }
 
+  const tally: Tally = { warned: 0, disabled: 0, deferred: 0 };
   let cursor: number | undefined;
-  let warned = 0;
-  let disabled = 0;
-  let deferred = 0;
 
   // Paged with a cursor rather than a single `take`: a bare limit would mean the
   // same first N users are the only ones ever evaluated, and everyone past them
@@ -196,43 +238,21 @@ export const runInactivityCycle = async (
     if (batch.length === 0) break;
 
     for (const user of batch) {
-      const decision = evaluateInactivity(user, now);
-      if (decision.action === 'none') continue;
-
-      if (decision.action === 'disable') {
-        if (disabled >= inactivityConfig.maxDisablesPerCycle) {
-          deferred += 1;
-          continue;
-        }
-        if (mode === 'on') {
-          await applyDisable(user, decision.reason, systemActorId);
-        }
-        disabled += 1;
-      } else {
-        if (mode === 'on') await applyWarn(user);
-        warned += 1;
-      }
-
-      log.info(mode === 'dryRun' ? 'Would act on user' : 'Acted on user', {
-        mode,
-        action: decision.action,
-        userId: user.id,
-        reason: decision.reason
-      });
+      await applyDecision(user, now, mode, systemActorId, tally);
     }
 
     cursor = batch[batch.length - 1].id;
     if (batch.length < BATCH_SIZE) break;
   }
 
-  if (deferred > 0) {
+  if (tally.deferred > 0) {
     log.warn('Inactivity disable cap reached', {
       cap: inactivityConfig.maxDisablesPerCycle,
-      deferred
+      deferred: tally.deferred
     });
   }
-  log.info('Inactivity cycle complete', { mode, warned, disabled, deferred });
-  return { warned, disabled, deferred };
+  log.info('Inactivity cycle complete', { mode, ...tally });
+  return tally;
 };
 
 export const startInactivityJob = (): void => {
