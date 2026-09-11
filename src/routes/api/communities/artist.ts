@@ -32,6 +32,7 @@ import {
   artistAliasSchema,
   artistTagSchema,
   vanityHouseSchema,
+  type VanityHouseInput,
   type ArtistInput,
   type UpdateArtistInput,
   type SimilarArtistInput,
@@ -98,11 +99,10 @@ router.put(
   '/:id/vanity-house',
   ...requirePermission('news_manage'),
   validateParams(artistIdParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  validate(vanityHouseSchema),
+  asyncHandler(async (_req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const parsed = vanityHouseSchema.safeParse(req.body);
-    if (!parsed.success)
-      return res.status(400).json({ msg: 'vanityHouse (boolean) required' });
+    const { vanityHouse } = parsedBody<VanityHouseInput>(res);
     const artist = await prisma.artist.findUnique({
       where: { id, deletedAt: null }
     });
@@ -111,7 +111,7 @@ router.put(
     try {
       updated = await prisma.artist.update({
         where: { id },
-        data: { vanityHouse: parsed.data.vanityHouse },
+        data: { vanityHouse },
         include: { _count: { select: { credits: true } } }
       });
     } catch (err) {

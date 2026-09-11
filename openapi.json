@@ -34652,7 +34652,7 @@
             }
           },
           "400": {
-            "description": "Invalid path parameters",
+            "description": "Invalid path parameters or request body",
             "content": {
               "application/json": {
                 "schema": {
