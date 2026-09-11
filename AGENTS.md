@@ -186,6 +186,8 @@ Copy `.env.default` → `.env`.
 | `INACTIVITY_MODE`                   | Dormancy sweep: `off` (default) / `dryRun` / `on` (#279, ADR-0038). `dryRun` evaluates everything and writes nothing                    |
 | `INACTIVITY_MAX_DISABLES_PER_CYCLE` | Ceiling on disables per run (#279; default 50). Warns are uncapped — signing in undoes one                                              |
 | `INACTIVITY_INTERVAL_MS`            | Dormancy sweep interval (#279; default 86400000 = 24h)                                                                                  |
+| `INVITE_GRANT_MODE`                 | Invite handout: `off` (default) / `dryRun` / `on` (#282, ADR-0039). `dryRun` evaluates everything and writes nothing                    |
+| `INVITE_GRANT_INTERVAL_MS`          | How often the handout job wakes (default 86400000 = 24h). NOT the accrual period — that is 14 days per member, in code                  |
 
 ## Architecture
 
@@ -244,6 +246,8 @@ src/
     rankProgressionJob.ts     # The DB-bound shell around that evaluator — loads ladder + rules, builds inputs, applies the decisions
     inactivity.ts             # Dormancy clock + pure evaluator (#279, ADR-0038): max(lastLogin, dateRegistered, reactivatedAt) → warn / disable / none. Owns the policy; no DB
     inactivityJob.ts          # The DB-bound sweep around that evaluator — cursor-paged, `INACTIVITY_MODE` gates the WRITES not the evaluation, disables capped per cycle
+    inviteGrant.ts            # Invite handout evaluator (#282, ADR-0039) — pure: rank rate/cap + balance + clock + standing → grant / advance / none. Accrual, NOT top-up; no back-pay; a period with no room is spent. Owns the policy; no DB
+    inviteGrantJob.ts         # The DB-bound sweep around that evaluator — the ONLY writer that raises `inviteCount`. Conditional-increment writes (never an absolute value), one audit row per cycle
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick

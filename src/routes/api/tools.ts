@@ -90,6 +90,8 @@ const formatRank = (
   personalCollageLimit: r.personalCollageLimit,
   authorStylesheetLimit: r.authorStylesheetLimit,
   assetLimit: r.assetLimit,
+  inviteGrantPerPeriod: r.inviteGrantPerPeriod,
+  inviteCap: r.inviteCap,
   displayStaff: r.displayStaff,
   staffGroupId: r.staffGroupId,
   primaryUserCount: r._count.users,
@@ -154,6 +156,8 @@ router.post(
       personalCollageLimit,
       authorStylesheetLimit,
       assetLimit,
+      inviteGrantPerPeriod,
+      inviteCap,
       displayStaff,
       staffGroupId
     } = parsedBody<CreateRankInput>(res);
@@ -195,6 +199,12 @@ router.post(
           // N → cap. `?? 0` would collapse null to none, silently downgrading an
           // uncapped rank, so branch on undefined instead.
           assetLimit: assetLimit === undefined ? 0 : assetLimit,
+          // #282 fail-closed: a rank created without an explicit allowance earns
+          // and holds nothing, so adding a class never opens the faucet by
+          // accident. Plain `?? 0` is right here — unlike assetLimit, null is
+          // not a meaningful state.
+          inviteGrantPerPeriod: inviteGrantPerPeriod ?? 0,
+          inviteCap: inviteCap ?? 0,
           displayStaff: displayStaff ?? false,
           staffGroupId: effectiveStaffGroupId
         },
@@ -249,6 +259,8 @@ router.put(
       personalCollageLimit,
       authorStylesheetLimit,
       assetLimit,
+      inviteGrantPerPeriod,
+      inviteCap,
       displayStaff,
       staffGroupId
     } = parsedBody<UpdateRankInput>(res);
@@ -294,6 +306,8 @@ router.put(
           // `!== undefined` keeps an explicit null (unlimited) while skipping an
           // absent field — the tri-state the create path handles differently.
           ...(assetLimit !== undefined && { assetLimit }),
+          ...(inviteGrantPerPeriod !== undefined && { inviteGrantPerPeriod }),
+          ...(inviteCap !== undefined && { inviteCap }),
           ...(displayStaff !== undefined && { displayStaff }),
           ...(effectiveStaffGroupId !== undefined && {
             staffGroupId: effectiveStaffGroupId

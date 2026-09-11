@@ -170,6 +170,10 @@ jest.mock('../modules/config', () => ({
   // whole harness fails at import — createApp() runs at app.ts module scope.
   // `off` matches the real default, so the sweep stays inert in route tests.
   inactivity: { mode: 'off', maxDisablesPerCycle: 50, intervalMs: 86400000 },
+  // Same reason as `inactivity` above — startInviteGrantJob reads `.mode` at
+  // import. `off` matches the real default, so the faucet stays shut in route
+  // tests; inviteGrantJob.spec.ts mutates this object to exercise the modes.
+  inviteGrant: { mode: 'off', intervalMs: 86400000 },
   sentry: { dsn: '' },
   email: {
     smtpHost: '',

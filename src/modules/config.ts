@@ -157,6 +157,37 @@ export const inactivity = {
   intervalMs: parseInt(process.env.INACTIVITY_INTERVAL_MS ?? '86400000', 10)
 };
 
+/**
+ * Class-based invite handout (#282, ADR-0039). Operational dials only — the
+ * accrual period, the tenure floor and the standing gate are constants in
+ * `modules/inviteGrant.ts`, and the per-rank rate and cap are columns on
+ * `UserRank`. Nothing that defines who earns what lives here.
+ *
+ * `mode` defaults to `off` and gates the WRITES, not the evaluation, so
+ * `dryRun` reports what a live pass would do against real membership. That
+ * number is the only thing that makes turning it on a considered decision:
+ * before this job existed nothing in the codebase ever raised `inviteCount`,
+ * so the first live pass has no precedent to compare against.
+ *
+ * `intervalMs` is how often the job WAKES, which is deliberately not the
+ * accrual period. A daily tick against a 14-day per-member clock means each
+ * member grants on their own anniversary — roughly a fourteenth of the site per
+ * pass rather than the whole membership in one — and nobody waits up to 13 days
+ * for a site-wide boundary to come round.
+ *
+ * There is no per-cycle ceiling. `UserRank.inviteCap` already bounds what any
+ * member can hold, and unlike the inactivity sweep this job does nothing
+ * destructive: an over-grant is subtractable, a disable needs staff to undo.
+ */
+export const inviteGrant = {
+  mode: (['off', 'dryRun', 'on'] as const).includes(
+    process.env.INVITE_GRANT_MODE as 'off' | 'dryRun' | 'on'
+  )
+    ? (process.env.INVITE_GRANT_MODE as 'off' | 'dryRun' | 'on')
+    : ('off' as const),
+  intervalMs: parseInt(process.env.INVITE_GRANT_INTERVAL_MS ?? '86400000', 10)
+};
+
 export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };

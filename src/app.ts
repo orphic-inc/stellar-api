@@ -36,6 +36,7 @@ import { startRankProgressionJob } from './modules/rankProgressionJob';
 import { startAssetSweepJob } from './modules/assetSweepJob';
 import { startMembershipJob } from './modules/membershipJob';
 import { startInactivityJob } from './modules/inactivityJob';
+import { startInviteGrantJob } from './modules/inviteGrantJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -273,6 +274,7 @@ export const createApp = () => {
     startAssetSweepJob();
     startMembershipJob();
     startInactivityJob();
+    startInviteGrantJob();
   }
 
   return app;
