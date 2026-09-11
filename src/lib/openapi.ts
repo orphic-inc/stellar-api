@@ -8797,6 +8797,13 @@ const Collage = registry.register(
  * `releaseId` for delete and by `id` for reorder, and `userId` is here because
  * delete permission is per row — two entries that collapse into one can have
  * two different adders.
+ *
+ * `user` is here for the same reason one level on (#617): per-row permission
+ * means a viewer who may remove the representative is not thereby allowed to
+ * remove what it absorbed, so the UI has to say WHICH copy it cannot remove and
+ * whose it is. With `userId` alone it could only count them. Required, matching
+ * `CollageEntry.user`, because the one route that emits `groupedWith` already
+ * selects it on every entry.
  */
 const AbsorbedCollageEntry = registry.register(
   'AbsorbedCollageEntry',
@@ -8806,6 +8813,7 @@ const AbsorbedCollageEntry = registry.register(
     communityId: z.number().int().nullable(),
     title: z.string(),
     userId: z.number().int(),
+    user: z.object({ id: z.number().int(), username: z.string() }),
     addedAt: z.string()
   })
 );
