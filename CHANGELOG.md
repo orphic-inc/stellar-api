@@ -251,6 +251,23 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **`PUT /artists/{id}/vanity-house` answered a 400 its own contract did not
+  allow** ([#600](https://github.com/orphic-inc/stellar-api/issues/600)) — the
+  route validated its body by hand, `vanityHouseSchema.safeParse(req.body)`
+  followed by `{ msg: 'vanityHouse (boolean) required' }`. It was the last such
+  branch in the repo, against 130 `validate()` call sites. Since #567 derived
+  each operation's 400 from its gate stamps, this one has published that 400 as
+  `ValidationError`, where `errors` is **required** — a key the hand-rolled
+  branch never sent.
+
+  It now runs `validate(vanityHouseSchema)` like every other route, so a bad
+  body answers `{ msg: 'Validation failed', errors: { vanityHouse: [...] } }`.
+  The `msg` key survives with generic text rather than being replaced, and the
+  400's declared schema does not move, so no generated type changes downstream;
+  the only spec diff is the derived description, now `Invalid path parameters or
+request body` to match its sibling `PUT /artists/{id}`. The `404` and its
+  P2025 translation are untouched.
+
 - **Global release surfaces served release identity to authenticated
   non-members** ([#607](https://github.com/orphic-inc/stellar-api/issues/607),
   [ADR-0036](docs/adr/0036-release-identity-is-community-private.md)) — a route

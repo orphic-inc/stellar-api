@@ -625,6 +625,44 @@ describe('DELETE /api/artists/:id', () => {
   });
 });
 
+// ─── #600: the body validation answers the envelope it publishes ─────────────
+//
+// This route hand-rolled `vanityHouseSchema.safeParse(req.body)` and answered a
+// bare `{ msg: 'vanityHouse (boolean) required' }` — the last such branch in the
+// repo, against 130 `validate()` call sites. Its own operation declares the 400
+// as `ValidationError`, where `errors` is REQUIRED, so the handler contradicted
+// the spec it publishes. The fix is `validate(vanityHouseSchema)`; these pin the
+// envelope so the branch cannot quietly regress to a single message again.
+describe('artists — vanity-house body validation (#600)', () => {
+  beforeEach(() => {
+    setCurrentUserPermissions({ news_manage: true });
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ news_manage: true })
+    );
+  });
+
+  it('answers the field-level envelope, not a single message', async () => {
+    const res = await request(app)
+      .put('/api/artists/1/vanity-house')
+      .send({ vanityHouse: 'yes' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      msg: 'Validation failed',
+      errors: { vanityHouse: expect.arrayContaining([expect.any(String)]) }
+    });
+    expect(prismaMock.artist.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing body before it reads the artist', async () => {
+    const res = await request(app).put('/api/artists/1/vanity-house').send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toHaveProperty('vanityHouse');
+    expect(prismaMock.artist.update).not.toHaveBeenCalled();
+  });
+});
+
 // ─── #564: constraint violations must not answer 500 ─────────────────────────
 //
 // Six sites on this surface, against a queue entry of three. The three the
