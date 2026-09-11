@@ -7733,6 +7733,21 @@
           "userId": {
             "type": "integer"
           },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
           "addedAt": {
             "type": "string"
           }
@@ -7743,6 +7758,7 @@
           "communityId",
           "title",
           "userId",
+          "user",
           "addedAt"
         ]
       },

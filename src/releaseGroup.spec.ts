@@ -229,6 +229,7 @@ describe('collapseByGroup (ADR-0037 §2)', () => {
     id,
     releaseId,
     userId,
+    user: { id: userId, username: 'member' + userId },
     addedAt: new Date('2026-01-0' + id),
     sort: id * 10,
     release: {
@@ -270,9 +271,21 @@ describe('collapseByGroup (ADR-0037 §2)', () => {
         communityId: 7,
         title: 'Kid A',
         userId: 9,
+        user: { id: 9, username: 'member9' },
         addedAt: new Date('2026-01-02')
       }
     ]);
+  });
+
+  it("names the absorbed row's own adder, not the representative's (#617)", () => {
+    // The whole point of carrying `user`: the two rows have DIFFERENT adders,
+    // and a UI refusing the delete has to say whose copy is in the way. With
+    // `userId` alone it could only count them.
+    const g = group(12, 'Kid A');
+    const out = collapseByGroup([entry(1, 100, 7, g), entry(2, 200, 9, g)]);
+
+    expect(out[0].user).toEqual({ id: 7, username: 'member7' });
+    expect(out[0].groupedWith[0].user).toEqual({ id: 9, username: 'member9' });
   });
 
   it('never emits the raw releaseGroup relation', () => {

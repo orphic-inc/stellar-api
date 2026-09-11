@@ -138,6 +138,13 @@ export const toGroupProjection = (
  * say who put it there, because delete permission is per row: the collage
  * owner, THAT entry's adder, or staff. Two entries that collapse into one can
  * have two different adders, which is why nothing is dropped.
+ *
+ * `user` beside `userId` so a collapsed row can NAME the adder it is blocked by
+ * (#617), not merely count them. `CollageEntry` carries both and the detail row
+ * already renders `added by {user.username}` for the representative; without
+ * this the same line could name one adder and not the other. It is no wider a
+ * disclosure than that: `groupedWith` is built only from rows this viewer may
+ * already see.
  */
 export type AbsorbedEntry = {
   id: number;
@@ -145,6 +152,7 @@ export type AbsorbedEntry = {
   communityId: number | null;
   title: string;
   userId: number;
+  user: { id: number; username: string };
   addedAt: Date;
 };
 
@@ -152,6 +160,9 @@ type CollapsibleEntry = {
   id: number;
   releaseId: number;
   userId: number;
+  // REQUIRED, so a caller cannot collapse entries it did not select the adder
+  // for and silently emit a `groupedWith` that cannot name anyone (#617).
+  user: { id: number; username: string };
   addedAt: Date;
   release: {
     id: number;
@@ -208,6 +219,7 @@ export const collapseByGroup = <E extends CollapsibleEntry>(entries: E[]) => {
         communityId: release.communityId,
         title: release.title,
         userId: entry.userId,
+        user: entry.user,
         addedAt: entry.addedAt
       });
       continue;

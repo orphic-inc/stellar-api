@@ -8,6 +8,24 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
+- **A collapsed collage row can name the adder it is blocked by**
+  ([#617](https://github.com/orphic-inc/stellar-api/issues/617),
+  [ADR-0037](docs/adr/0037-group-dedup-is-a-read-time-projection.md) §2) —
+  `AbsorbedCollageEntry` gains `user` (`{ id, username }`) beside the `userId`
+  it already carried, matching `CollageEntry`, which has had both all along.
+
+  Per-row delete permission is the collage owner, **that row's own adder**, or
+  staff, so a viewer who may remove the representative is not thereby allowed to
+  remove what it absorbed. With `userId` alone a UI could only count the copies
+  it cannot remove; it can now say whose they are, which is the difference
+  between a rule a member can act on and one they can only accept. The detail
+  row already rendered `added by {user.username}` for the representative, so the
+  same line could name one adder and not the other.
+
+  Additive, and no wider a disclosure: `groupedWith` is built only from entries
+  the viewer may already see. No new query either — the detail read already
+  selected `user` on every entry, and the collapse was discarding it.
+
 - **Inactivity lifecycle — a dormancy sweep, and a way back in**
   ([#279](https://github.com/orphic-inc/stellar-api/issues/279),
   [ADR-0038](docs/adr/0038-inactivity-is-a-clock-not-a-timestamp.md)) —
