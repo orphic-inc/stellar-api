@@ -37,6 +37,8 @@ export function makeUserRank(
     id: 1,
     name: 'User',
     level: 1000,
+    inviteGrantPerPeriod: 0,
+    inviteCap: 0,
     color: '',
     badge: '',
     permissions: {
@@ -97,6 +99,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     userSettingsId: 1,
     profileId: 1,
     inviteCount: 0,
+    lastInviteGrantAt: null,
     contributed: BigInt(0),
     consumed: BigInt(0),
     lastLogin: null,

@@ -6,6 +6,32 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **The invite economy has a source**
+  ([#282](https://github.com/orphic-inc/stellar-api/issues/282),
+  [ADR-0039](docs/adr/0039-invite-supply-is-class-based-accrual.md)) — a
+  periodic sweep adds invites to members by class. `UserRank` gains
+  `inviteGrantPerPeriod` and `inviteCap` (both `Int`, default `0`), surfaced on
+  all four `/tools/user-ranks` routes; `User` gains `lastInviteGrantAt`.
+
+  Until now `inviteCount` was a one-way counter: `createInvite` decremented it
+  and nothing incremented it, so the founding SysOp's 100 from `/install` was
+  the entire supply an instance would ever have. Neither half of the older
+  assumption held — no staff route granted invites, and rank progression granted
+  none either.
+
+  A member accrues `inviteGrantPerPeriod` every 14 days, clamped at
+  `inviteCap`, once they clear a 30-day tenure floor and stand above `poor`
+  governance standing (`computeStanding`, ADR-0004). The clock is per member and
+  does not back-pay: a gap grants one period, never a backlog. A period a member
+  had no room for is spent rather than banked, so holding at the cap earns no
+  faster than spending.
+
+  Additive and inert on merge. `INVITE_GRANT_MODE` defaults to `off` and every
+  existing rank defaults to a rate of `0`, so nothing changes until staff turn
+  both on; `dryRun` evaluates the whole membership and writes nothing.
+
 ## [0.9.4] — 2026-09-11
 
 ### Added

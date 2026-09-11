@@ -24,6 +24,10 @@ export const createRankSchema = z.object({
   // Nullable, unlike the count-only sibling limits above, because null is the
   // uncapped tier staff hold.
   assetLimit: z.number().int().min(0).nullable().optional(),
+  // #282: 0 = this class earns / holds no invites. Not nullable — there is no
+  // "unlimited" tier for an invite faucet, unlike assetLimit directly above.
+  inviteGrantPerPeriod: z.number().int().min(0).optional(),
+  inviteCap: z.number().int().min(0).optional(),
   displayStaff: z.boolean().optional(),
   staffGroupId: z.number().int().positive().nullable().optional()
 });
@@ -40,6 +44,8 @@ export const updateRankSchema = z
     personalCollageLimit: z.number().int().min(0).optional(),
     authorStylesheetLimit: z.number().int().min(0).optional(),
     assetLimit: z.number().int().min(0).nullable().optional(),
+    inviteGrantPerPeriod: z.number().int().min(0).optional(),
+    inviteCap: z.number().int().min(0).optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().positive().nullable().optional()
   })

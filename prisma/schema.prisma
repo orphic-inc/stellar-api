@@ -346,6 +346,17 @@ model UserRank {
   /// (uncapped). Default 0, so a rank created without an explicit value can
   /// upload nothing rather than everything.
   assetLimit            Int?                @default(0)
+  /// Invites added to a member of this rank each handout period (#282,
+  /// ADR-0039). `0` means this class earns none, and is the default precisely
+  /// so a rank that predates the feature hands out nothing until staff opts it
+  /// in. Never null — unlike `assetLimit` directly above, there is no
+  /// "unlimited" state here: an uncapped invite faucet is not a thing we want
+  /// expressible.
+  inviteGrantPerPeriod  Int                 @default(0)
+  /// Ceiling the accrual clamps to. `0` means a member of this rank holds no
+  /// invites, so a nonzero grant with a zero cap is inert rather than
+  /// contradictory. Same `0`-means-none reading as the field above.
+  inviteCap             Int                 @default(0)
   displayStaff          Boolean             @default(false)
   staffGroupId          Int?
   staffGroup            StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
@@ -433,6 +444,19 @@ model User {
   profileId             Int                 @unique
   profile               Profile             @relation(fields: [profileId], references: [id])
   inviteCount           Int                 @default(0)
+  // Accrual clock for the class-based invite handout (#282, ADR-0039). NOT a
+  // "last time invites changed" stamp: it moves only when the handout job
+  // evaluates the member as eligible, so spending an invite never resets it.
+  //
+  // null means "never evaluated" and the job falls back to `dateRegistered` as
+  // the clock origin, which is why registerUser does not write this field and
+  // the migration needs no backfill.
+  //
+  // It also advances for an eligible member who was clamped at their cap: a
+  // period you had no room for is SPENT, not banked. Without that, holding at
+  // cap and then spending would grant immediately on the next pass, which is
+  // top-up-to-cap semantics wearing accrual's clothes.
+  lastInviteGrantAt     DateTime?
   contributed           BigInt              @default(0)
   consumed              BigInt              @default(0)
   lastLogin             DateTime?
