@@ -4478,6 +4478,12 @@
             "type": "integer",
             "nullable": true
           },
+          "inviteGrantPerPeriod": {
+            "type": "integer"
+          },
+          "inviteCap": {
+            "type": "integer"
+          },
           "displayStaff": {
             "type": "boolean"
           },
@@ -4507,6 +4513,8 @@
           "personalCollageLimit",
           "authorStylesheetLimit",
           "assetLimit",
+          "inviteGrantPerPeriod",
+          "inviteCap",
           "displayStaff",
           "staffGroupId",
           "primaryUserCount",
@@ -22916,6 +22924,14 @@
                     "nullable": true,
                     "minimum": 0
                   },
+                  "inviteGrantPerPeriod": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inviteCap": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
                   "displayStaff": {
                     "type": "boolean"
                   },
@@ -23359,6 +23375,14 @@
                   "assetLimit": {
                     "type": "integer",
                     "nullable": true,
+                    "minimum": 0
+                  },
+                  "inviteGrantPerPeriod": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inviteCap": {
+                    "type": "integer",
                     "minimum": 0
                   },
                   "displayStaff": {

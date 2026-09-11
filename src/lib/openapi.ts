@@ -4172,6 +4172,11 @@ const UserRank = registry.register(
     personalCollageLimit: z.number().int(),
     authorStylesheetLimit: z.number().int(),
     assetLimit: z.number().int().nullable(),
+    // #282 invite faucet. Not nullable: unlike assetLimit there is no uncapped
+    // tier, and 0 (the default every pre-existing rank carries) means this
+    // class neither earns nor holds invites.
+    inviteGrantPerPeriod: z.number().int(),
+    inviteCap: z.number().int(),
     displayStaff: z.boolean(),
     staffGroupId: z.number().int().nullable(),
     primaryUserCount: z.number().int(),
