@@ -70,8 +70,8 @@ import {
 import {
   createCommunitySchema,
   updateCommunitySchema,
-  createGroupSchema,
-  updateGroupSchema,
+  createReleaseSchema,
+  updateReleaseSchema,
   releaseVoteSchema,
   releaseTagSchema,
   releaseTagVoteSchema,
@@ -4536,7 +4536,7 @@ registry.registerPath({
     'Requires `communities_manage`. At least one artist credit is required.',
   request: {
     params: z.object({ communityId: z.string() }),
-    body: { content: { 'application/json': { schema: createGroupSchema } } }
+    body: { content: { 'application/json': { schema: createReleaseSchema } } }
   },
   responses: {
     201: {
@@ -4562,7 +4562,7 @@ registry.registerPath({
       communityId: z.string(),
       releaseId: z.string()
     }),
-    body: { content: { 'application/json': { schema: updateGroupSchema } } }
+    body: { content: { 'application/json': { schema: updateReleaseSchema } } }
   },
   responses: {
     200: {
@@ -4995,8 +4995,9 @@ registry.registerPath({
   summary: 'Attach a release to a release group, or detach it',
   description:
     'Pass `releaseGroupId: null` to detach. Named `release-group` rather ' +
-    'than `group` because in the community routes "group" already means a ' +
-    'release, inherited from the legacy vocabulary.\n\n' +
+    'than `group` because "group" was long used in the community routes for ' +
+    'the release itself; `ReleaseGroup` is the identity node one level above.' +
+    '\n\n' +
     'Gated by **community access, not a permission**, and it refuses rather ' +
     'than filtering: the path names one community, so the caller is owed a ' +
     'straight answer. You may only group releases you can already reach.',

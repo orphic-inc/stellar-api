@@ -1,14 +1,14 @@
 import { ArtistRole, ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
-import type { CreateGroupInput } from '../schemas/community';
+import type { CreateReleaseInput } from '../schemas/community';
 import { snapshotRelease } from './releaseWorkbench/snapshot';
 import { attachTagWithVotes, buildPlainTags } from './releaseTags';
 
 export const createCommunityRelease = async (input: {
   actorId: number;
   communityId: number;
-  data: CreateGroupInput;
+  data: CreateReleaseInput;
 }) => {
   const community = await prisma.community.findUnique({
     where: { id: input.communityId }

@@ -21163,7 +21163,7 @@
           "Communities"
         ],
         "summary": "Attach a release to a release group, or detach it",
-        "description": "Pass `releaseGroupId: null` to detach. Named `release-group` rather than `group` because in the community routes \"group\" already means a release, inherited from the legacy vocabulary.\n\nGated by **community access, not a permission**, and it refuses rather than filtering: the path names one community, so the caller is owed a straight answer. You may only group releases you can already reach.",
+        "description": "Pass `releaseGroupId: null` to detach. Named `release-group` rather than `group` because \"group\" was long used in the community routes for the release itself; `ReleaseGroup` is the identity node one level above.\n\nGated by **community access, not a permission**, and it refuses rather than filtering: the path names one community, so the caller is owed a straight answer. You may only group releases you can already reach.",
         "parameters": [
           {
             "schema": {
