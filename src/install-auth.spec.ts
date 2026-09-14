@@ -203,7 +203,7 @@ describe('API auth/profile/user flows', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ msg: 'Account disabled' });
+    expect(res.body).toMatchObject({ msg: 'Account disabled' });
   });
 
   it('logs in successfully and returns a user plus auth cookie', async () => {

@@ -165,29 +165,30 @@ before concluding a branch is failing.
 
 Copy `.env.default` → `.env`.
 
-| Variable                            | Purpose                                                                                                                                 |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `STELLAR_PSQL_URI`                  | PostgreSQL connection string                                                                                                            |
-| `STELLAR_AUTH_JWT_SECRET`           | JWT signing secret                                                                                                                      |
-| `STELLAR_HTTP_PORT`                 | Server port (default 8080)                                                                                                              |
-| `STELLAR_HTTP_CORS_ORIGIN`          | Allowed CORS origin                                                                                                                     |
-| `STELLAR_TRUST_PROXY_HOPS`          | Reverse-proxy hops in front of the API (#542; default 1 — the shipped nginx topology; set 0 for proxy-less local dev)                   |
-| `STELLAR_LOG_LEVEL`                 | Winston log level (default `info`)                                                                                                      |
-| `KORIN_API_URL`                     | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)                                                             |
-| `KORIN_PULL_KEY`                    | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013)                                                |
-| `KORIN_POLL_INTERVAL_MS`            | IRC metrics poll + announce push interval (default 300000 = 5 min)                                                                      |
-| `STELLAR_SERVICE_KEY`               | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed                                                    |
-| `STELLAR_SITE_NAME`                 | Site name resolved into Golden Rules `${site_name}` (PRD-09; default `Stellar`)                                                         |
-| `STELLAR_IRC_URL`                   | UI route `${irc}` resolves to (PRD-09; default `/irc`)                                                                                  |
-| `STELLAR_DISABLED_CHANNEL`          | IRC channel `${disabled_channel}` resolves to (PRD-09; default `#disabled`)                                                             |
-| `STELLAR_STAFFPM_PATH`              | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                                                                      |
-| `STELLAR_PUBLIC_KB_BASE`            | Public wiki root for `${*_article}` guidance links — korin.pink, readable pre-account (PRD-09, #126; default `https://korin.pink/wiki`) |
-| `STELLAR_ASSET_MAX_BYTES`           | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                                                             |
-| `INACTIVITY_MODE`                   | Dormancy sweep: `off` (default) / `dryRun` / `on` (#279, ADR-0038). `dryRun` evaluates everything and writes nothing                    |
-| `INACTIVITY_MAX_DISABLES_PER_CYCLE` | Ceiling on disables per run (#279; default 50). Warns are uncapped — signing in undoes one                                              |
-| `INACTIVITY_INTERVAL_MS`            | Dormancy sweep interval (#279; default 86400000 = 24h)                                                                                  |
-| `INVITE_GRANT_MODE`                 | Invite handout: `off` (default) / `dryRun` / `on` (#282, ADR-0039). `dryRun` evaluates everything and writes nothing                    |
-| `INVITE_GRANT_INTERVAL_MS`          | Handout job wake interval (default 86400000 = 24h). Distinct from the accrual period — that is 14 days per member, in code              |
+| Variable                            | Purpose                                                                                                                                       |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STELLAR_PSQL_URI`                  | PostgreSQL connection string                                                                                                                  |
+| `STELLAR_AUTH_JWT_SECRET`           | JWT signing secret                                                                                                                            |
+| `STELLAR_HTTP_PORT`                 | Server port (default 8080)                                                                                                                    |
+| `STELLAR_HTTP_CORS_ORIGIN`          | Allowed CORS origin                                                                                                                           |
+| `STELLAR_TRUST_PROXY_HOPS`          | Reverse-proxy hops in front of the API (#542; default 1 — the shipped nginx topology; set 0 for proxy-less local dev)                         |
+| `STELLAR_LOG_LEVEL`                 | Winston log level (default `info`)                                                                                                            |
+| `KORIN_API_URL`                     | korin.pink IRC metrics API base URL (ADR-0013; polling disabled when unset)                                                                   |
+| `KORIN_PULL_KEY`                    | Key stellar presents to korin (`x-pull-key`) for metrics pull + announce push (ADR-0013)                                                      |
+| `KORIN_POLL_INTERVAL_MS`            | IRC metrics poll + announce push interval (default 300000 = 5 min)                                                                            |
+| `STELLAR_SERVICE_KEY`               | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed                                                          |
+| `STELLAR_SITE_NAME`                 | Site name resolved into Golden Rules `${site_name}` (PRD-09; default `Stellar`)                                                               |
+| `STELLAR_IRC_URL`                   | UI route `${irc}` resolves to (PRD-09; default `/irc`)                                                                                        |
+| `STELLAR_DISABLED_CHANNEL`          | IRC channel `${disabled_channel}` resolves to (PRD-09; default `#disabled`)                                                                   |
+| `STELLAR_IRC_GUIDE_URL`             | Public page on reaching IRC, named to disabled members at login and in the deactivation email (#622; default `${STELLAR_PUBLIC_KB_BASE}/irc`) |
+| `STELLAR_STAFFPM_PATH`              | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                                                                            |
+| `STELLAR_PUBLIC_KB_BASE`            | Public wiki root for `${*_article}` guidance links — korin.pink, readable pre-account (PRD-09, #126; default `https://korin.pink/wiki`)       |
+| `STELLAR_ASSET_MAX_BYTES`           | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                                                                   |
+| `INACTIVITY_MODE`                   | Dormancy sweep: `off` (default) / `dryRun` / `on` (#279, ADR-0038). `dryRun` evaluates everything and writes nothing                          |
+| `INACTIVITY_MAX_DISABLES_PER_CYCLE` | Ceiling on disables per run (#279; default 50). Warns are uncapped — signing in undoes one                                                    |
+| `INACTIVITY_INTERVAL_MS`            | Dormancy sweep interval (#279; default 86400000 = 24h)                                                                                        |
+| `INVITE_GRANT_MODE`                 | Invite handout: `off` (default) / `dryRun` / `on` (#282, ADR-0039). `dryRun` evaluates everything and writes nothing                          |
+| `INVITE_GRANT_INTERVAL_MS`          | Handout job wake interval (default 86400000 = 24h). Distinct from the accrual period — that is 14 days per member, in code                    |
 
 ## Architecture
 

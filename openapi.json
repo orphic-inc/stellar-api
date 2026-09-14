@@ -35,6 +35,25 @@
           "error"
         ]
       },
+      "AccountDisabledResponse": {
+        "type": "object",
+        "properties": {
+          "msg": {
+            "type": "string"
+          },
+          "disabledChannel": {
+            "type": "string"
+          },
+          "ircGuideUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "msg",
+          "disabledChannel",
+          "ircGuideUrl"
+        ]
+      },
       "ValidationError": {
         "type": "object",
         "properties": {
@@ -8637,7 +8656,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MsgResponse"
+                  "$ref": "#/components/schemas/AccountDisabledResponse"
                 }
               }
             }

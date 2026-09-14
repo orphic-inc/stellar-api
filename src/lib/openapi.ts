@@ -181,6 +181,18 @@ registry.register('MsgResponse', z.object({ msg: z.string() }));
 
 registry.register('ErrorResponse', z.object({ error: z.string() }));
 
+// POST /auth's disabled 403 (#622). Its own component because MsgResponse is
+// shared by every msgResponse() call site, and widening it would claim every
+// error in the API carries a channel. Extends only by ADDING keys, which is safe.
+const AccountDisabledResponse = registry.register(
+  'AccountDisabledResponse',
+  z.object({
+    msg: z.string(),
+    disabledChannel: z.string(),
+    ircGuideUrl: z.string()
+  })
+);
+
 registry.register(
   'ValidationError',
   z.object({
@@ -335,7 +347,14 @@ registry.registerPath({
       }
     },
     400: msgResponse('Invalid credentials'),
-    403: msgResponse('Account disabled')
+    403: {
+      // Carries where to ask for reinstatement: the IRC channel and a public
+      // guide to reaching it (#622).
+      description: 'Account disabled',
+      content: {
+        'application/json': { schema: AccountDisabledResponse }
+      }
+    }
   }
 });
 
