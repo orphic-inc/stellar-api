@@ -53,7 +53,8 @@ describe('password denylist enforcement', () => {
       username: 'weakling',
       email: 'weakling@example.com',
       password: 'password',
-      registrationMode: 'open'
+      registrationMode: 'open',
+      maxUsers: 7000
     });
 
     expect(result.ok).toBe(false);
@@ -72,7 +73,8 @@ describe('password denylist enforcement', () => {
         username: `user-${attempt}`,
         email: `${attempt}@example.com`,
         password: attempt,
-        registrationMode: 'open'
+        registrationMode: 'open',
+        maxUsers: 7000
       });
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.reason).toBe('bad_password');
@@ -87,7 +89,8 @@ describe('password denylist enforcement', () => {
       username: 'sensible',
       email: 'sensible@example.com',
       password: 'correct-horse-battery-staple',
-      registrationMode: 'open'
+      registrationMode: 'open',
+      maxUsers: 7000
     });
 
     expect(result.ok).toBe(true);

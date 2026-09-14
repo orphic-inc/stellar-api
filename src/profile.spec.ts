@@ -271,6 +271,42 @@ describe('POST /api/profile/referral/create-invite', () => {
     expect(res.status).toBe(403);
   });
 
+  it('refuses with 403 and never spends an invite when the site is full (#624)', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({ maxUsers: 50 } as never);
+    prismaMock.user.count.mockResolvedValue(50);
+
+    const res = await request(app)
+      .post('/api/profile/referral/create-invite')
+      .send({ email: 'newuser@example.com' });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      msg: 'The site is full, so invites cannot be sent right now. Your invite was not used.'
+    });
+    expect(prismaMock.user.count).toHaveBeenCalledWith({
+      where: { disabled: false }
+    });
+    // The invite is spent inside createInvite; not reaching it is the proof.
+    expect(createInviteMock).not.toHaveBeenCalled();
+  });
+
+  it('sends the invite while a seat is still free (#624)', async () => {
+    prismaMock.siteSettings.upsert.mockResolvedValue({ maxUsers: 50 } as never);
+    prismaMock.user.count.mockResolvedValue(49);
+    createInviteMock.mockResolvedValue({
+      ok: true,
+      inviteKey: 'abc123',
+      emailSent: true
+    } as never);
+
+    const res = await request(app)
+      .post('/api/profile/referral/create-invite')
+      .send({ email: 'newuser@example.com' });
+
+    expect(res.status).toBe(201);
+    expect(createInviteMock).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 409 when invite already sent to that address', async () => {
     createInviteMock.mockResolvedValue({
       ok: false,

@@ -12,7 +12,7 @@ import { installLimiter } from '../../middleware/rateLimiter';
 import { requirePermission } from '../../middleware/permissions';
 import { validate, parsedBody } from '../../middleware/validate';
 import { installSchema, type InstallInput } from '../../schemas/install';
-import { getSettings, markInstalled } from '../../modules/settings';
+import { getSettings, isSiteFull, markInstalled } from '../../modules/settings';
 import { seedDefaultCommunity } from '../../modules/bootstrap';
 import { seedAll } from '../../modules/seedAll';
 import { AppError } from '../../lib/errors';
@@ -116,6 +116,13 @@ router.get(
     res.json({
       installed: settings.installedAt != null,
       registrationStatus: settings.registrationStatus,
+      // Lets the register page say "full" before a visitor fills in the form
+      // (#624). A boolean, never the counts: this endpoint is anonymous. Not
+      // counted while closed, which already refuses; best-effort, since only
+      // registerUser's locked check is authoritative.
+      registrationFull:
+        settings.registrationStatus !== 'closed' &&
+        (await isSiteFull(settings.maxUsers)),
       configWarnings: getConfigWarnings().map((item) => item.message),
       setupChecklist: getSetupChecklist(settings as SettingsWithDismissals)
     });

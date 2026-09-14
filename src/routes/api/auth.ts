@@ -105,6 +105,14 @@ router.post(
   })
 );
 
+// A policy refusal like `registration_closed`, not a 503: being full is a
+// normal state of the site, not an outage (#624). The refusal happens before
+// any write, so a presented invite stays pending — and the invitee is told so.
+const registrationFullMsg = (mode: 'open' | 'invite' | 'closed') =>
+  mode === 'invite'
+    ? 'Registration is full: the site has reached its member limit. Your invite is still valid.'
+    : 'Registration is full: the site has reached its member limit.';
+
 // POST /api/auth/register — public self-registration
 router.post(
   '/register',
@@ -121,6 +129,7 @@ router.post(
       email,
       password,
       registrationMode: settings.registrationStatus,
+      maxUsers: settings.maxUsers,
       inviteKey
     });
     if (!result.ok) {
@@ -129,6 +138,10 @@ router.post(
           return res
             .status(403)
             .json({ msg: 'Registration is currently closed' });
+        case 'registration_full':
+          return res
+            .status(403)
+            .json({ msg: registrationFullMsg(settings.registrationStatus) });
         case 'invite_required':
           return res
             .status(403)

@@ -30,7 +30,8 @@ const makeDisabledUser = async () => {
     username: 'dormant',
     email: 'dormant@example.com',
     password: 'password1',
-    registrationMode: 'open'
+    registrationMode: 'open',
+    maxUsers: 7000
   });
   if (!result.ok) throw new Error('fixture registration failed');
   await testPrisma.user.update({

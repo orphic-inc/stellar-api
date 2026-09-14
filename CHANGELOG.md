@@ -32,6 +32,38 @@ All notable changes to stellar-api are documented here.
   existing rank defaults to a rate of `0`, so nothing changes until staff turn
   both on; `dryRun` evaluates the whole membership and writes nothing.
 
+### Changed
+
+- **`maxUsers` is enforced**
+  ([#624](https://github.com/orphic-inc/stellar-api/issues/624),
+  [ADR-0040](docs/adr/0040-capacity-is-counted-in-enabled-seats.md)). Until now
+  the setting was defaulted, reported and nagged about by the install checklist,
+  and `registerUser` never read it.
+
+  **Upgrade note: compare `maxUsers` with your enabled user count before
+  deploying.** An instance whose enabled accounts already reach the limit stops
+  accepting registrations and invites as soon as this ships. There is no mode
+  switch; raise the limit in site settings if it is wrong.
+
+  A seat is an **enabled** account. Disabling one, including through the
+  dormancy sweep, frees a seat, and re-enabling takes it back. Only
+  self-registration is capped, and it is exact: a transaction-scoped advisory
+  lock means concurrent registrations cannot overshoot the last seat. Staff
+  account creation (`POST /api/users`) and re-enabling
+  (`POST /api/users/{id}/enable`) are deliberate, audited actions and are not
+  capped.
+
+  - `POST /api/auth/register` answers `403 { msg }` when the site is full. The
+    refusal writes nothing, so a presented invite stays valid.
+  - `POST /api/profile/referral/create-invite` answers `403 { msg }` when the
+    site is full, without spending the member's invite.
+  - `GET /api/install` gains `registrationFull: boolean` so the register page can
+    say so before a visitor fills in the form. It exposes no counts, and it is
+    always `false` while registration is closed.
+
+  No status code is new on either operation; both `403` descriptions are
+  widened.
+
 ## [0.9.4] — 2026-09-11
 
 ### Added

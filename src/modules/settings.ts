@@ -19,6 +19,28 @@ export const DEFAULTS = {
   dismissedLaunchChecklist: [] as string[]
 };
 
+/**
+ * A seat is an enabled account (#624, ADR-0040). Disabling one frees a seat and
+ * re-enabling takes it back, so the dormancy sweep (#279) returns capacity. The
+ * System user is `disabled`, so it never holds one.
+ *
+ * Takes a client so `registerUser` can count inside its locked transaction;
+ * every other reader is best-effort and uses the default.
+ */
+export function countSeats(client: Tx = prisma) {
+  return client.user.count({ where: { disabled: false } });
+}
+
+/**
+ * Whether every seat under `maxUsers` is taken. Best-effort: nothing is locked,
+ * so it answers "was full a moment ago". Only `registerUser` takes a seat, and
+ * it re-checks under a lock rather than trusting this.
+ */
+export async function isSiteFull(maxUsers?: number) {
+  const limit = maxUsers ?? (await getSettings()).maxUsers;
+  return (await countSeats()) >= limit;
+}
+
 export async function getSettings() {
   return prisma.siteSettings.upsert({
     where: { id: 1 },

@@ -1,15 +1,16 @@
 import { prisma } from '../lib/prisma';
-import { getSettings } from './settings';
+import { countSeats, getSettings } from './settings';
 import { SYSTEM_USERNAME } from './bootstrap';
 
 /**
  * The reserved System user is site machinery, not a member: it owns built-in
  * fixtures, can never log in, and nobody signed up as it. Counting it inflates
- * `totalUsers` by one and eats a slot against `maxUsers`.
+ * `totalUsers` by one.
  *
  * Only the total needs this. `enabledUsers` already excludes it (System is
  * `disabled`), and the active-window counts filter on `lastLogin`, which System
- * never sets.
+ * never sets. `enabledUsers` is also the seat count `maxUsers` is enforced
+ * against (#624), so it reads through the same `countSeats`.
  */
 const EXCLUDE_SYSTEM = { username: { not: SYSTEM_USERNAME } };
 
@@ -39,7 +40,7 @@ export const getSystemStats = async () => {
     settings
   ] = await Promise.all([
     prisma.user.count({ where: EXCLUDE_SYSTEM }),
-    prisma.user.count({ where: { disabled: false } }),
+    countSeats(),
     prisma.user.count({ where: { lastLogin: { gte: startOfToday } } }),
     prisma.user.count({ where: { lastLogin: { gte: startOfWeek } } }),
     prisma.user.count({ where: { lastLogin: { gte: startOfMonth } } }),

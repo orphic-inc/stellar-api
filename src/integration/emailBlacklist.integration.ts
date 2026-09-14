@@ -29,7 +29,8 @@ const register = (username: string, email: string) =>
     username,
     email,
     password: 'correct-horse-battery-staple',
-    registrationMode: 'open'
+    registrationMode: 'open',
+    maxUsers: 7000
   });
 
 describe('email blacklist enforcement', () => {

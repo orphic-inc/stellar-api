@@ -19,7 +19,8 @@ const registerFixtureUser = async (
     username,
     email,
     password,
-    registrationMode: 'open'
+    registrationMode: 'open',
+    maxUsers: 7000
   });
   expect(result.ok).toBe(true);
   if (!result.ok) {
@@ -34,7 +35,8 @@ describe('registerUser', () => {
       username: 'alice',
       email: 'alice@example.com',
       password: 'password1',
-      registrationMode: 'open'
+      registrationMode: 'open',
+      maxUsers: 7000
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -62,7 +64,8 @@ describe('registerUser', () => {
       username: 'alice',
       email: 'other@example.com',
       password: 'password1',
-      registrationMode: 'open'
+      registrationMode: 'open',
+      maxUsers: 7000
     });
     expect(result).toEqual({ ok: false, reason: 'user_exists' });
   });
@@ -72,7 +75,8 @@ describe('registerUser', () => {
       username: 'bob',
       email: 'bob@example.com',
       password: 'password2',
-      registrationMode: 'open'
+      registrationMode: 'open',
+      maxUsers: 7000
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;

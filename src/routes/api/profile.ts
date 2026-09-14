@@ -8,6 +8,7 @@ import {
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
+import { isSiteFull } from '../../modules/settings';
 import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
 import {
@@ -217,6 +218,14 @@ router.post(
   validate(inviteSchema),
   authHandler(async (req, res) => {
     const { email, reason } = parsedBody<InviteInput>(res);
+    // A courtesy, not the gate (#624, ADR-0040 §3): refusing before
+    // createInvite keeps the member's invite instead of spending it on someone
+    // registration will turn away. Unlocked, so it can race; registerUser is
+    // what actually holds the line.
+    if (await isSiteFull())
+      return res.status(403).json({
+        msg: 'The site is full, so invites cannot be sent right now. Your invite was not used.'
+      });
     const result = await createInvite(req.user.id, email, reason ?? '');
     if (!result.ok) {
       if (result.reason === 'no_invites')
