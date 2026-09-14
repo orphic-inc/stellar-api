@@ -64,6 +64,26 @@ All notable changes to stellar-api are documented here.
   No status code is new on either operation; both `403` descriptions are
   widened.
 
+- **A disabled login says where to go**
+  ([#622](https://github.com/orphic-inc/stellar-api/issues/622)).
+  `POST /api/auth` answered a disabled account with `403 { msg: "Account
+disabled" }` and nothing more, although the login screen is the one place such
+  a member is sure to be standing. Staff reinstate accounts on IRC, so the
+  `403` now names that destination:
+  `{ msg, disabledChannel, ircGuideUrl }`. `msg` is unchanged, and the body is
+  its own registered schema, `AccountDisabledResponse`.
+
+  `ircGuideUrl` is a new `site` value, `STELLAR_IRC_GUIDE_URL`, defaulting to
+  `${STELLAR_PUBLIC_KB_BASE}/irc`, and it is also the site-variable token
+  `irc_guide_article`. It is deliberately not `${irc}`: that resolves to `/irc`,
+  a UI route that needs a session a disabled member does not have
+  ([#630](https://github.com/orphic-inc/stellar-api/issues/630)).
+
+  The dormancy sweep's deactivation email names the same channel and guide. It
+  used to link `/reactivate`, a page that does not exist. The in-app reactivation
+  routes themselves are withdrawn separately
+  ([#629](https://github.com/orphic-inc/stellar-api/issues/629)).
+
 ## [0.9.4] — 2026-09-11
 
 ### Added

@@ -107,12 +107,22 @@ export const http = {
 // so onboarding and IRC prose cannot live in the in-app wiki without locking
 // applicants out of the front door. IRC is korin's system, so korin documents it
 // and we link (#126).
+const publicKbBase =
+  process.env.STELLAR_PUBLIC_KB_BASE || 'https://korin.pink/wiki';
+
 export const site = {
   name: process.env.STELLAR_SITE_NAME || 'Stellar',
   ircUrl: process.env.STELLAR_IRC_URL || '/irc',
   disabledChannel: process.env.STELLAR_DISABLED_CHANNEL || '#disabled',
   staffPmPath: process.env.STELLAR_STAFFPM_PATH || '/inbox/staff',
-  publicKbBase: process.env.STELLAR_PUBLIC_KB_BASE || 'https://korin.pink/wiki'
+  publicKbBase,
+  // Where a disabled member learns to reach `disabledChannel` (#622). On the
+  // PUBLIC KB, for the same reason as the Interview: a disabled member has no
+  // session, so nothing in-app can reach them. Not `ircUrl` — that is a UI
+  // route, and every UI route but the public five requires a session (#630).
+  ircGuideUrl:
+    process.env.STELLAR_IRC_GUIDE_URL ||
+    `${publicKbBase.replace(/\/+$/, '')}/irc`
 };
 
 export const economy = {

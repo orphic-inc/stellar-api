@@ -194,7 +194,8 @@ jest.mock('../modules/config', () => ({
     ircUrl: '/irc',
     disabledChannel: '#disabled',
     staffPmPath: '/inbox/staff',
-    publicKbBase: 'https://kb.stellargra.ph'
+    publicKbBase: 'https://kb.stellargra.ph',
+    ircGuideUrl: 'https://kb.stellargra.ph/irc'
   }
 }));
 

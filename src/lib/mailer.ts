@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { email as emailConfig } from '../modules/config';
+import { email as emailConfig, site } from '../modules/config';
 import { getLogger } from '../modules/logging';
 
 const log = getLogger('mailer');
@@ -82,9 +82,10 @@ export async function sendInactivityDisabledEmail(
     from: emailConfig.fromAddress,
     to,
     subject: 'Your account has been deactivated',
-    // Points at the reactivation flow rather than at login, which would only
-    // return the 403 that brought them here.
-    text: `Your account has been deactivated after a long period of inactivity.\n\nIf you would like it back, you can ask staff to reinstate it:\n\n${emailConfig.siteUrl}/reactivate\n\nNothing has been deleted.`
+    // Names the same destination as the disabled login's 403 (#622): staff
+    // reinstate on IRC. Not a login link, which would only return that 403,
+    // and not an in-app page — a disabled member has no session to reach one.
+    text: `Your account has been deactivated after a long period of inactivity. This is routine, and nothing has been deleted.\n\nIf you would like it back, ask staff in ${site.disabledChannel} on IRC and they can reinstate it. How to connect:\n\n${site.ircGuideUrl}`
   });
   return true;
 }

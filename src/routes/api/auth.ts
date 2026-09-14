@@ -4,7 +4,11 @@ import { RecoveryPurpose } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
-import { auth as authConfig, email as emailConfig } from '../../modules/config';
+import {
+  auth as authConfig,
+  email as emailConfig,
+  site
+} from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
@@ -378,8 +382,16 @@ router.post(
         ip,
         email: redacted
       });
+      // The one place a disabled member is sure to be standing, so it says
+      // where to go (#622): staff reinstate on IRC. Both values are the same
+      // for every disabled account and already public — this discloses nothing
+      // the 403 did not. `msg` is unchanged for clients that only read it.
       if (result.reason === 'disabled')
-        return res.status(403).json({ msg: 'Account disabled' });
+        return res.status(403).json({
+          msg: 'Account disabled',
+          disabledChannel: site.disabledChannel,
+          ircGuideUrl: site.ircGuideUrl
+        });
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 

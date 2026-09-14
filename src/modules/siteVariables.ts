@@ -61,6 +61,10 @@ export async function resolveSiteVariables(
     forum_rules_article: '/wiki/forum-rules',
     staff_rules_article: '/wiki/staff-rules',
     irc_rules_article: `${kb}/irc/etiquette`,
+    // How to reach IRC at all, for someone with no session: the destination the
+    // disabled login and the deactivation email name (#622). Config-backed
+    // rather than built from `kb` here, so those two read the same value.
+    irc_guide_article: site.ircGuideUrl,
     // the seeded Bugs forum (id-based; resolved by name)
     bugs_forum: bugsForum ? `/forums/${bugsForum.id}` : '/forums'
   };
