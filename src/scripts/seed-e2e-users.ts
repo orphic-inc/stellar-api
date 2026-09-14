@@ -100,7 +100,9 @@ async function upsertUser(a: UpsertArgs): Promise<number> {
       username: a.username,
       ...data,
       userSettingsId: settings.id,
-      profileId: profile.id
+      profileId: profile.id,
+      // Every account has a row (#633); setInviter below links it.
+      inviteTree: { create: { inviterId: null } }
     },
     select: { id: true }
   });

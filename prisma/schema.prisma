@@ -644,6 +644,10 @@ model Invite {
 // at their inviter. Subtrees are read with a recursive walk over `inviterId`;
 // depth/ordering are derived at read time (no denormalized tree columns). The
 // same edges are what ADR-0004 Contagion traverses.
+//
+// EVERY account has exactly one row (#633, ADR-0042): `inviterId` is null for a
+// member nobody invited. Every `user.create` nests the row, and
+// `userCreateInviteTree.spec.ts` fails CI on one that does not.
 model InviteTree {
   id        Int      @id @default(autoincrement())
   userId    Int      @unique

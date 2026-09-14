@@ -552,7 +552,9 @@ export async function seedSystemUser(client: PrismaClient): Promise<number> {
       userSettingsId: userSettings.id,
       profileId: profile.id,
       disabled: true,
-      rankLocked: true
+      rankLocked: true,
+      // Every account has a row, the System user included (#633, ADR-0042).
+      inviteTree: { create: { inviterId: null } }
     },
     select: { id: true }
   });

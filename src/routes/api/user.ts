@@ -115,7 +115,15 @@ const recoveryRequestsQuerySchema = z.object({
 });
 type RecoveryRequestsQuery = z.infer<typeof recoveryRequestsQuerySchema>;
 
-const inviteTreeQuerySchema = z.object({ ...paginationBase });
+const inviteTreeQuerySchema = z.object({
+  ...paginationBase,
+  // Every account has a row since #633; the default lists invited members only.
+  // Not z.coerce.boolean(), which reads the query string "false" as true.
+  all: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .default(false)
+});
 const ratioWatchQuerySchema = z.object({ ...paginationBase });
 const registrationLogQuerySchema = z.object({ ...paginationBase });
 
@@ -448,7 +456,8 @@ router.get(
   validateQuery(inviteTreeQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsedPage(res);
-    const { rows, total } = await getInviteTree(pg);
+    const { all } = parsedQuery<z.infer<typeof inviteTreeQuerySchema>>(res);
+    const { rows, total } = await getInviteTree(pg, all);
     paginatedResponse(res, rows, total, pg);
   })
 );

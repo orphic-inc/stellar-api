@@ -8496,7 +8496,16 @@ registry.registerPath({
   method: 'get',
   path: '/users/invite-tree',
   tags: ['Staff'],
-  request: { query: z.object({ page: z.string().optional() }) },
+  description:
+    'Every account has an invite-tree row (#633). By default only members ' +
+    'someone invited are listed; `all=true` includes members nobody invited, ' +
+    'whose `inviterId` and `inviter` are null.',
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      all: z.enum(['true', 'false']).optional()
+    })
+  },
   responses: {
     200: {
       description: 'Paginated invite tree',
