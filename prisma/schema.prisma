@@ -63,10 +63,13 @@ enum FileType {
   txt
 }
 
+/// An invite's lifecycle (#627, ADR-0041). `expired` covers a lapse (past
+/// `expires`, or a disabled inviter) and is refunded to the inviter; the address
+/// can then be invited again by reusing the row.
 enum InviteStatus {
   pending
   accepted
-  rejected
+  expired
 }
 
 enum RegistrationStatus {
@@ -628,8 +631,12 @@ model Invite {
   expires   DateTime
   reason    String       @default("")
   status    InviteStatus @default(pending)
+  // When this row was last sent. A re-invite reuses the row and resets it.
+  // Rows from before #627 were backfilled as `expires - 30 days`.
+  createdAt DateTime     @default(now())
 
-  @@index([status])
+  // The sweep's claim predicate is `status = pending AND expires <= now`.
+  @@index([status, expires])
   @@map("invites")
 }
 

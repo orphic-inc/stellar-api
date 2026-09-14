@@ -87,17 +87,17 @@ describe('POST /api/auth/register — capacity (#624)', () => {
     expect(lockAt).toBeLessThan(countAt);
   });
 
-  it('tells an invitee their invite is still valid, and leaves it pending', async () => {
+  it('tells an invitee when their invite expires, and leaves it pending', async () => {
     settingsWith('invite', 3);
+    // The clock keeps running while the site is full (#627), so the message
+    // names the expiry instead of promising the invite is still valid.
+    const expires = new Date(Date.now() + 2 * 86_400_000);
     prismaMock.invite.findUnique.mockResolvedValueOnce({
-      id: 3,
-      inviterId: 5,
-      inviteKey: 'held-key',
       email: 'late@example.com',
-      expires: new Date(),
-      reason: 'Referral',
+      expires,
+      inviter: { disabled: false },
       status: 'pending'
-    });
+    } as never);
     passPreChecks();
     prismaMock.user.count.mockResolvedValueOnce(3);
 
@@ -110,9 +110,9 @@ describe('POST /api/auth/register — capacity (#624)', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({
-      msg: 'Registration is full: the site has reached its member limit. Your invite is still valid.'
+      msg: `Registration is full: the site has reached its member limit. Your invite is valid until ${expires.toUTCString()}.`
     });
-    expect(prismaMock.invite.update).not.toHaveBeenCalled();
+    expect(prismaMock.invite.updateMany).not.toHaveBeenCalled();
   });
 
   it('admits the registration that takes the last seat', async () => {

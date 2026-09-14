@@ -118,11 +118,11 @@ describe('invites list (invite pool)', () => {
         },
         {
           inviterId: inviter.id,
-          inviteKey: `sk-rejected-${Date.now()}`,
+          inviteKey: `sk-expired-${Date.now()}`,
           email: 'q@x.com',
           expires: new Date(),
           reason: '',
-          status: 'rejected'
+          status: 'expired'
         }
       ]
     });

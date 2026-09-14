@@ -9,6 +9,7 @@ import { getDefaultStylesheetName } from './stylesheet';
 import { normalizePassword } from './badPasswords';
 import { isEmailBlacklisted } from './emailBlacklist';
 import { countSeats } from './settings';
+import { isInviteLapsed, livePendingInviteWhere } from './inviteExpiry';
 
 /**
  * Is this password on the denylist?
@@ -138,7 +139,13 @@ type RegisterResult =
         | 'invite_required'
         | 'invalid_invite'
         | 'invite_email_mismatch'
-        | 'registration_full';
+        | 'invite_expired';
+    }
+  | {
+      ok: false;
+      reason: 'registration_full';
+      /** Present when an invite was presented, so the refusal can say how long it stays valid. */
+      inviteExpires?: Date;
     }
   | { ok: true; user: AuthUser };
 
@@ -161,6 +168,59 @@ export type RegisterOptions = {
  */
 const REGISTRATION_SEAT_LOCK_KEY = 624_001;
 
+/** Thrown inside the registration transaction to roll back the user it created. */
+class InviteLapsedDuringRegistration extends Error {}
+
+type InviteCheck =
+  | {
+      ok: false;
+      reason: 'invalid_invite' | 'invite_email_mismatch' | 'invite_expired';
+    }
+  | { ok: true; expires: Date };
+
+/**
+ * Pre-validate a presented invite key for an early exit before any writes. The
+ * consumption itself is a claim inside the registration transaction, because
+ * the sweep can expire this invite between this read and that write (#627).
+ *
+ * The email match is checked before the lapse, so a key that is not yours says
+ * nothing about whether it is still live. A disabled inviter answers as a
+ * lapse, not as `invalid_invite`: the sweep will mark that invite `expired`
+ * within the hour, and the reply must not change when it does.
+ */
+const checkInvite = async (
+  inviteKey: string,
+  email: string,
+  now: Date
+): Promise<InviteCheck> => {
+  const invite = await prisma.invite.findUnique({
+    where: { inviteKey },
+    select: {
+      email: true,
+      status: true,
+      expires: true,
+      inviter: { select: { disabled: true } }
+    }
+  });
+  if (!invite || invite.status === 'accepted') {
+    return { ok: false, reason: 'invalid_invite' };
+  }
+  if (invite.email.toLowerCase() !== email.toLowerCase()) {
+    return { ok: false, reason: 'invite_email_mismatch' };
+  }
+  const lapsed = isInviteLapsed(
+    {
+      status: invite.status,
+      expires: invite.expires,
+      inviterDisabled: invite.inviter.disabled
+    },
+    now
+  );
+  return lapsed
+    ? { ok: false, reason: 'invite_expired' }
+    : { ok: true, expires: invite.expires };
+};
+
 type LoginResult =
   | { ok: false; reason: 'not_found' | 'disabled' | 'wrong_password' }
   | { ok: true; user: AuthUser };
@@ -178,18 +238,12 @@ export const registerUser = async ({
     return { ok: false, reason: 'registration_closed' };
   }
 
+  let inviteExpires: Date | undefined;
   if (registrationMode === 'invite') {
     if (!inviteKey) return { ok: false, reason: 'invite_required' };
-    // Pre-validate for an early exit before any writes. The actual
-    // consumption (status → accepted) happens inside the user-creation
-    // transaction below, making the two operations atomic.
-    const invite = await prisma.invite.findUnique({ where: { inviteKey } });
-    if (!invite || invite.status !== 'pending') {
-      return { ok: false, reason: 'invalid_invite' };
-    }
-    if (invite.email.toLowerCase() !== email.toLowerCase()) {
-      return { ok: false, reason: 'invite_email_mismatch' };
-    }
+    const invite = await checkInvite(inviteKey, email, new Date());
+    if (!invite.ok) return invite;
+    inviteExpires = invite.expires;
   }
 
   // 2. Uniqueness / quality checks
@@ -222,7 +276,7 @@ export const registerUser = async ({
 
   // 3. Atomic: create user + consume invite in one transaction so a crash
   //    between the two can never leave the invite permanently open.
-  return prisma.$transaction(async (tx): Promise<RegisterResult> => {
+  const created = prisma.$transaction(async (tx): Promise<RegisterResult> => {
     // Capacity (#624, ADR-0040). Lock, THEN count: under READ COMMITTED each
     // statement sees rows committed before it began, so a caller that waited
     // on the lock counts the seat its predecessor just took. Counting before
@@ -230,7 +284,11 @@ export const registerUser = async ({
     // Refusing here returns before any write, so the invite is left pending.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REGISTRATION_SEAT_LOCK_KEY}::bigint)`;
     if ((await countSeats(tx)) >= maxUsers) {
-      return { ok: false, reason: 'registration_full' };
+      return {
+        ok: false,
+        reason: 'registration_full',
+        ...(inviteExpires ? { inviteExpires } : {})
+      };
     }
 
     const defaultTheme = await getDefaultStylesheetName(tx);
@@ -254,13 +312,24 @@ export const registerUser = async ({
     });
 
     if (registrationMode === 'invite' && inviteKey) {
-      await tx.invite.update({
-        where: { inviteKey },
+      // A claim, not a plain update: if the sweep expired and refunded this
+      // invite since the pre-check, accepting it too would count it twice.
+      // Throwing rolls back the user created above.
+      const { count } = await tx.invite.updateMany({
+        where: { inviteKey, ...livePendingInviteWhere(new Date()) },
         data: { status: 'accepted' }
       });
+      if (count === 0) throw new InviteLapsedDuringRegistration();
     }
 
     return { ok: true, user: toAuthUser(newUser) };
+  });
+
+  return created.catch((err: unknown): RegisterResult => {
+    if (err instanceof InviteLapsedDuringRegistration) {
+      return { ok: false, reason: 'invite_expired' };
+    }
+    throw err;
   });
 };
 

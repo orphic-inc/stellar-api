@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import type {
   NotificationMethod,
   Prisma,
@@ -13,8 +12,6 @@ import { sanitizePlain } from '../lib/sanitize';
 // shared render-at-read seam — the API is the single source of transcription
 // (#398/#402).
 import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
-import { sendInviteEmail } from '../lib/mailer';
-import { getLogger } from './logging';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
 import { computeStanding } from './standing';
@@ -30,8 +27,6 @@ import {
 } from './reputation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const log = getLogger('profile');
 
 type ViewerContext = {
   viewerId: number | null;
@@ -1272,58 +1267,6 @@ export const updateProfile = async (
   return getProfileById(userId, userId, bbViewer);
 };
 
-type CreateInviteResult =
-  | { ok: true; inviteKey: string; emailSent: boolean }
-  | { ok: false; reason: 'no_invites' | 'already_invited' };
-
-export const createInvite = async (
-  inviterId: number,
-  email: string,
-  reason: string
-): Promise<CreateInviteResult> => {
-  const normalizedEmail = sanitizePlain(email).trim().toLowerCase();
-  const normalizedReason = sanitizePlain(reason).trim();
-
-  const inviter = await prisma.user.findUnique({
-    where: { id: inviterId },
-    select: { inviteCount: true }
-  });
-  if (!inviter || inviter.inviteCount <= 0) {
-    return { ok: false, reason: 'no_invites' };
-  }
-
-  const existing = await prisma.invite.findFirst({
-    where: { email: normalizedEmail }
-  });
-  if (existing) {
-    return { ok: false, reason: 'already_invited' };
-  }
-
-  const inviteKey = crypto.randomBytes(20).toString('hex');
-  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  await prisma.$transaction([
-    prisma.invite.create({
-      data: {
-        inviterId,
-        inviteKey,
-        email: normalizedEmail,
-        expires,
-        reason: normalizedReason
-      }
-    }),
-    prisma.user.update({
-      where: { id: inviterId },
-      data: { inviteCount: { decrement: 1 } }
-    })
-  ]);
-
-  let emailSent = false;
-  try {
-    emailSent = await sendInviteEmail(normalizedEmail, inviteKey);
-  } catch (err) {
-    log.error('Failed to send invite email', { to: normalizedEmail, err });
-  }
-
-  return { ok: true, inviteKey, emailSent };
-};
+// Moved to modules/invite.ts with the invite lifecycle (#627); re-exported so
+// existing importers and the route-test harness's profile mock keep working.
+export { createInvite } from './invite';

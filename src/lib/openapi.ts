@@ -367,7 +367,8 @@ registry.registerPath({
     'Ungated — no session, no permission — so the 403 here is the handler ' +
     "speaking, not middleware: it is the site's registration policy " +
     'refusing — closed, full (#624), or a problem with the invite. A full ' +
-    'site refuses before any write, so a presented invite stays valid. The ' +
+    'site refuses before any write, so a presented invite stays pending — but ' +
+    'its clock keeps running, and the message names when it expires (#627). The ' +
     '400 is the submission itself being unusable. A request-body validation failure ' +
     'also answers 400, carrying an `errors` object this schema does not ' +
     'show.',
@@ -390,7 +391,9 @@ registry.registerPath({
     403: msgResponse(
       'Registration is closed, the site is full (enabled accounts have ' +
         'reached `maxUsers`), or the invite key is missing, invalid, ' +
-        'already used, or issued for a different email address'
+        'already used, issued for a different email address, or expired. ' +
+        'An invite expires three days after it is sent, or as soon as its ' +
+        'inviter is disabled (#627)'
     )
   }
 });
@@ -2051,7 +2054,10 @@ registry.registerPath({
       'No invites remaining, or the site is full (#624) — in which case the ' +
         "caller's invite is not spent"
     ),
-    409: msgResponse('Invite already exists')
+    409: msgResponse(
+      'A live invite already exists for that address. An expired one does ' +
+        'not block it: the address can be invited again (#627)'
+    )
   }
 });
 
@@ -8442,7 +8448,9 @@ const InviteItem = registry.register(
     email: z.string(),
     expires: z.string(),
     reason: z.string(),
-    status: z.nativeEnum(InviteStatus)
+    status: z.nativeEnum(InviteStatus),
+    // When the invite was last sent; a re-invite reuses the row (#627).
+    createdAt: z.string()
   })
 );
 

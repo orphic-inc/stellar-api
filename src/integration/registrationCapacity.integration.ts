@@ -53,7 +53,7 @@ describe('registerUser capacity', () => {
     const taken = await seats();
     const inviter = await register('inviter', taken + 1);
     if (!inviter.ok) throw new Error('fixture registration failed');
-    await testPrisma.invite.create({
+    const invite0 = await testPrisma.invite.create({
       data: {
         inviterId: inviter.user.id,
         inviteKey: 'held-key',
@@ -67,7 +67,13 @@ describe('registerUser capacity', () => {
       inviteKey: 'held-key'
     });
 
-    expect(refused).toEqual({ ok: false, reason: 'registration_full' });
+    // The clock keeps running while full (#627), so the refusal carries the
+    // expiry for the message to name.
+    expect(refused).toEqual({
+      ok: false,
+      reason: 'registration_full',
+      inviteExpires: new Date(invite0.expires)
+    });
     const invite = await testPrisma.invite.findUnique({
       where: { inviteKey: 'held-key' }
     });
