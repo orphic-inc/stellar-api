@@ -147,7 +147,9 @@ export const createUser = async (
         userRankId: rankId,
         userSettingsId: settings.id,
         profileId: profile.id,
-        contributed: 5_368_709_120n // 5 GiB startup buffer
+        contributed: 5_368_709_120n, // 5 GiB startup buffer
+        // Staff-created: nobody invited them (#633, ADR-0042).
+        inviteTree: { create: { inviterId: null } }
       },
       select: { id: true, username: true, email: true }
     });
@@ -201,9 +203,18 @@ export const getSnatchList = async (
   return items;
 };
 
-export const getInviteTree = async (pg: { skip: number; limit: number }) => {
+/**
+ * The staff invite-tree list. Every account has a row since #633, so by default
+ * this lists only members someone invited; `all` includes the null-inviter rows.
+ */
+export const getInviteTree = async (
+  pg: { skip: number; limit: number },
+  all = false
+) => {
+  const where = all ? {} : { inviterId: { not: null } };
   const [rows, total] = await Promise.all([
     prisma.inviteTree.findMany({
+      where,
       include: {
         user: { select: { id: true, username: true } },
         inviter: { select: { id: true, username: true } }
@@ -212,7 +223,7 @@ export const getInviteTree = async (pg: { skip: number; limit: number }) => {
       skip: pg.skip,
       take: pg.limit
     }),
-    prisma.inviteTree.count()
+    prisma.inviteTree.count({ where })
   ]);
 
   return { rows, total };

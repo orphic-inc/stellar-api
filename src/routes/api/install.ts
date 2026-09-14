@@ -215,7 +215,9 @@ router.post(
           userSettingsId: userSettings.id,
           profileId: profile.id,
           inviteCount: 100,
-          contributed: STARTUP_BUFFER
+          contributed: STARTUP_BUFFER,
+          // The founding SysOp is the root of every invite tree (#633).
+          inviteTree: { create: { inviterId: null } }
         },
         select: authUserSelect
       });

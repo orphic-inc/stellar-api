@@ -34240,6 +34240,7 @@
         "tags": [
           "Staff"
         ],
+        "description": "Every account has an invite-tree row (#633). By default only members someone invited are listed; `all=true` includes members nobody invited, whose `inviterId` and `inviter` are null.",
         "parameters": [
           {
             "schema": {
@@ -34247,6 +34248,18 @@
             },
             "required": false,
             "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "all",
             "in": "query"
           }
         ],

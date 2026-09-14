@@ -176,7 +176,7 @@ type InviteCheck =
       ok: false;
       reason: 'invalid_invite' | 'invite_email_mismatch' | 'invite_expired';
     }
-  | { ok: true; expires: Date };
+  | { ok: true; expires: Date; inviterId: number };
 
 /**
  * Pre-validate a presented invite key for an early exit before any writes. The
@@ -199,6 +199,7 @@ const checkInvite = async (
       email: true,
       status: true,
       expires: true,
+      inviterId: true,
       inviter: { select: { disabled: true } }
     }
   });
@@ -218,7 +219,7 @@ const checkInvite = async (
   );
   return lapsed
     ? { ok: false, reason: 'invite_expired' }
-    : { ok: true, expires: invite.expires };
+    : { ok: true, expires: invite.expires, inviterId: invite.inviterId };
 };
 
 type LoginResult =
@@ -239,11 +240,13 @@ export const registerUser = async ({
   }
 
   let inviteExpires: Date | undefined;
+  let inviterId: number | null = null;
   if (registrationMode === 'invite') {
     if (!inviteKey) return { ok: false, reason: 'invite_required' };
     const invite = await checkInvite(inviteKey, email, new Date());
     if (!invite.ok) return invite;
     inviteExpires = invite.expires;
+    inviterId = invite.inviterId;
   }
 
   // 2. Uniqueness / quality checks
@@ -306,7 +309,11 @@ export const registerUser = async ({
         userRankId: defaultRank.id,
         userSettingsId: settings.id,
         profileId: profile.id,
-        contributed: 5_368_709_120n
+        contributed: 5_368_709_120n,
+        // Every account has an InviteTree row (#633, ADR-0042). The inviter is
+        // the one the pre-check read; the claim below guarantees the same row,
+        // and a lost claim rolls this edge back with the user.
+        inviteTree: { create: { inviterId } }
       },
       select: authUserSelect
     });

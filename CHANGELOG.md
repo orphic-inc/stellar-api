@@ -134,6 +134,29 @@ disabled" }` and nothing more, although the login screen is the one place such
   registration cannot accept an invite the sweep has just refunded, and two
   concurrent sends cannot overdraw a balance.
 
+- **Registration records who invited whom**
+  ([#633](https://github.com/orphic-inc/stellar-api/issues/633),
+  [ADR-0042](docs/adr/0042-every-account-has-an-invite-tree-row.md)). Nothing
+  wrote `InviteTree`, so on a real instance the invite tree, Contagion and the
+  CRS `invite` dimension all read an empty table. Invite registration now writes
+  the edge in the same transaction as the invite claim.
+
+  **Every account now has exactly one row**, with `inviterId` null for members
+  nobody invited: open registration, staff-created accounts, the founding SysOp
+  and the System user. A structural spec fails CI on any `user.create` that does
+  not write it.
+
+  The migration backfills every existing account. It recovers the inviter from
+  the accepted invite to the member's registration email, found through email
+  history. The match excludes the inviter and anyone who registered before the
+  invite was sent, and dates each row at `dateRegistered`.
+
+  **Expect a step in CRS on deploy:** inviters gain their existing invitees in
+  the `invite` dimension, and `crsHistory` will show the jump.
+
+  `GET /users/invite-tree` now lists invited members by default. The new
+  optional `all=true` includes everyone.
+
 ## [0.9.4] — 2026-09-11
 
 ### Added

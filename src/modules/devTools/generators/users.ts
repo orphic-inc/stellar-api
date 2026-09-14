@@ -233,7 +233,9 @@ export async function generateUsers(
           1,
           254,
           rng
-        )}`
+        )}`,
+        // Every account has a row (#633); the invite chain below links it.
+        inviteTree: { create: { inviterId: null } }
       }
     });
 
@@ -325,13 +327,11 @@ export async function generateUsers(
           { id: invite.id }
         );
 
-        await prisma.inviteTree
-          .create({
-            data: { userId: inviteeId, inviterId }
-          })
-          .catch(() => {
-            /* skip if already exists */
-          });
+        // The row already exists (created with the user), so link it.
+        await prisma.inviteTree.update({
+          where: { userId: inviteeId },
+          data: { inviterId }
+        });
       } catch {
         // Invite key collision — skip this invite
       }
