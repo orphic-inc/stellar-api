@@ -106,10 +106,17 @@ router.post(
 // A policy refusal like `registration_closed`, not a 503: being full is a
 // normal state of the site, not an outage (#624). The refusal happens before
 // any write, so a presented invite stays pending — and the invitee is told so.
-const registrationFullMsg = (mode: 'open' | 'invite' | 'closed') =>
-  mode === 'invite'
-    ? 'Registration is full: the site has reached its member limit. Your invite is still valid.'
+// An invite's clock keeps running while the site is full (#627), so the
+// refusal says when it runs out rather than promising it is still valid.
+const registrationFullMsg = (inviteExpires?: Date) =>
+  inviteExpires
+    ? `Registration is full: the site has reached its member limit. Your invite is valid until ${inviteExpires.toUTCString()}.`
     : 'Registration is full: the site has reached its member limit.';
+
+// A lapsed key (#627), including one whose inviter is disabled: the same words
+// for both, so the reply does not change when the sweep marks the row.
+const INVITE_EXPIRED_MSG =
+  'This invite has expired. Ask the member who invited you to send a new one.';
 
 // POST /api/auth/register — public self-registration
 router.post(
@@ -139,7 +146,7 @@ router.post(
         case 'registration_full':
           return res
             .status(403)
-            .json({ msg: registrationFullMsg(settings.registrationStatus) });
+            .json({ msg: registrationFullMsg(result.inviteExpires) });
         case 'invite_required':
           return res
             .status(403)
@@ -152,6 +159,8 @@ router.post(
           return res
             .status(403)
             .json({ msg: 'Invite key is not valid for this email address' });
+        case 'invite_expired':
+          return res.status(403).json({ msg: INVITE_EXPIRED_MSG });
         case 'bad_password':
           return res.status(400).json({ msg: 'Password is not allowed' });
         case 'email_blacklisted':

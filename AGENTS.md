@@ -189,6 +189,7 @@ Copy `.env.default` → `.env`.
 | `INACTIVITY_INTERVAL_MS`            | Dormancy sweep interval (#279; default 86400000 = 24h)                                                                                        |
 | `INVITE_GRANT_MODE`                 | Invite handout: `off` (default) / `dryRun` / `on` (#282, ADR-0039). `dryRun` evaluates everything and writes nothing                          |
 | `INVITE_GRANT_INTERVAL_MS`          | Handout job wake interval (default 86400000 = 24h). Distinct from the accrual period — that is 14 days per member, in code                    |
+| `INVITE_EXPIRY_INTERVAL_MS`         | Invite expiry sweep interval (#627, ADR-0041; default 3600000 = 1h). No mode switch; the 3-day invite lifetime is in code                     |
 
 ## Architecture
 
@@ -248,7 +249,9 @@ src/
     inactivity.ts             # Dormancy clock + pure evaluator (#279, ADR-0038): max(lastLogin, dateRegistered, reactivatedAt) → warn / disable / none. Owns the policy; no DB
     inactivityJob.ts          # The DB-bound sweep around that evaluator — cursor-paged, `INACTIVITY_MODE` gates the WRITES not the evaluation, disables capped per cycle
     inviteGrant.ts            # Invite handout evaluator (#282, ADR-0039) — pure: rate/cap + balance + clock + standing → grant / advance / none. Accrual, not top-up; no back-pay; a capped period is spent. Owns the policy; no DB
-    inviteGrantJob.ts         # The DB-bound sweep around that evaluator — the single writer that raises `inviteCount`. Conditional-increment writes rather than absolute values, one audit row per cycle
+    inviteGrantJob.ts         # The DB-bound sweep around that evaluator — the single writer that accrues `inviteCount` (expiry refunds are not accrual). Conditional-increment writes rather than absolute values, one audit row per cycle
+    inviteExpiry.ts           # Invite lapse rule (#627, ADR-0041) — pure: `INVITE_TTL_DAYS`, `isInviteLapsed` and the claim where-fragments shared by registration, re-invite and the sweep
+    inviteExpiryJob.ts        # Hourly sweep, no mode switch: claims each lapsed invite (`pending → expired`) and refunds it, one transaction per invite. The claim pays the refund, so it happens once
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick

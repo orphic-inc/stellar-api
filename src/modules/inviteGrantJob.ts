@@ -7,7 +7,9 @@
  *
  * Three things here are deliberate and not obvious from the issue:
  *
- *  - This job is the ONLY writer that raises `inviteCount`. Before it,
+ *  - This job is the ONLY writer that ACCRUES `inviteCount` (amended #627: an
+ *    expired invite is also refunded, by inviteExpiryJob, but a refund returns
+ *    an invite already spent rather than creating one). Before it,
  *    `createInvite` decremented and nothing incremented: the founding SysOp's
  *    100 from `/install` was the entire supply. So the fail-closed defaults are
  *    load-bearing rather than ceremonial — `INVITE_GRANT_MODE=off` plus every

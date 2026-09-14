@@ -198,6 +198,20 @@ export const inviteGrant = {
   intervalMs: parseInt(process.env.INVITE_GRANT_INTERVAL_MS ?? '86400000', 10)
 };
 
+/**
+ * Invite expiry sweep (#627, ADR-0041). One operational dial: how often the
+ * sweep wakes. The invite lifetime is `INVITE_TTL_DAYS` in
+ * `modules/inviteExpiry.ts`, because it decides when refunds happen.
+ *
+ * There is deliberately no `mode`. The sweep only returns spent invites, and the
+ * gates refuse a lapsed key regardless, so an `off` sweep would leave invites
+ * dead but unrefunded. Hourly by default, because an invite lives three days and
+ * a daily tick would hold a refund back for up to a third of that.
+ */
+export const inviteExpiry = {
+  intervalMs: parseInt(process.env.INVITE_EXPIRY_INTERVAL_MS ?? '3600000', 10)
+};
+
 export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };

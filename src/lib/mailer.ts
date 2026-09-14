@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { email as emailConfig, site } from '../modules/config';
 import { getLogger } from '../modules/logging';
+import { INVITE_TTL_DAYS } from '../modules/inviteExpiry';
 
 const log = getLogger('mailer');
 
@@ -27,7 +28,7 @@ export async function sendInviteEmail(
     from: emailConfig.fromAddress,
     to,
     subject: "You've been invited",
-    text: `You have been invited to join the site. Register here:\n\n${emailConfig.siteUrl}/register?inviteKey=${inviteKey}\n\nThis invitation expires in 30 days.`
+    text: `You have been invited to join the site. Register here:\n\n${emailConfig.siteUrl}/register?inviteKey=${inviteKey}\n\nThis invitation expires in ${INVITE_TTL_DAYS} days.`
   });
   return true;
 }

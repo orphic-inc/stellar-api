@@ -26,6 +26,8 @@ Four further facts from the code decided the rest, and none is stated in #282.
 
 A member of a rank gains `UserRank.inviteGrantPerPeriod` invites every period, clamped at `UserRank.inviteCap`. The balance is never _set_ to the cap.
 
+_(Amended 2026-09-14, by [#627](https://github.com/orphic-inc/stellar-api/issues/627) and [ADR-0041](0041-an-invite-lapses-and-is-returned.md). This job is no longer the only code path that raises `inviteCount`: a lapsed invite is refunded to its inviter. The cap bounds **accrual**, not holdings, so a refund is added in full even when it takes a balance past the cap, and this job's `lte cap - amount` predicate then withholds accrual until the member spends back under. The faucet is still the only source of **new** invites, since a refund returns one that was already spent.)_
+
 The rejected alternative, topping each balance up to its cap, is idempotent and needs no state: a missed run heals on the next pass and a double run is a no-op. Accrual buys a distinction that top-up cannot express — the rate of replenishment is a separate dial from the ceiling, so a class can hold many invites while earning them slowly. The cost is that the job is no longer safe to run twice, which forces decision 2.
 
 ### 2. The clock is per member, persisted, and does not back-pay

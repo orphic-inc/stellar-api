@@ -173,6 +173,8 @@ jest.mock('../modules/config', () => ({
   // import. `off` matches the real default, so the faucet stays shut in route
   // tests; inviteGrantJob.spec.ts mutates this object to exercise the modes.
   inviteGrant: { mode: 'off', intervalMs: 86400000 },
+  // startInviteExpiryJob reads `.intervalMs` at import, like the two above.
+  inviteExpiry: { intervalMs: 3600000 },
   sentry: { dsn: '' },
   email: {
     smtpHost: '',

@@ -37,6 +37,7 @@ import { startAssetSweepJob } from './modules/assetSweepJob';
 import { startMembershipJob } from './modules/membershipJob';
 import { startInactivityJob } from './modules/inactivityJob';
 import { startInviteGrantJob } from './modules/inviteGrantJob';
+import { startInviteExpiryJob } from './modules/inviteExpiryJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -275,6 +276,7 @@ export const createApp = () => {
     startMembershipJob();
     startInactivityJob();
     startInviteGrantJob();
+    startInviteExpiryJob();
   }
 
   return app;

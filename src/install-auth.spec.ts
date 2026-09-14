@@ -118,10 +118,10 @@ describe('API auth/profile/user flows', () => {
       inviterId: 5,
       inviteKey: 'abc123',
       email: 'other@example.com',
-      expires: new Date(),
-      reason: 'Referral',
+      expires: new Date(Date.now() + 86_400_000),
+      inviter: { disabled: false },
       status: 'pending'
-    });
+    } as never);
     const wrongEmail = await request(app).post('/api/auth/register').send({
       username: 'invite-user',
       email: 'invite@example.com',
@@ -135,10 +135,10 @@ describe('API auth/profile/user flows', () => {
       inviterId: 5,
       inviteKey: 'good-key',
       email: 'invite@example.com',
-      expires: new Date(),
-      reason: 'Referral',
+      expires: new Date(Date.now() + 86_400_000),
+      inviter: { disabled: false },
       status: 'pending'
-    });
+    } as never);
     prismaMock.user.findFirst.mockResolvedValueOnce(null);
     prismaMock.badPassword.findUnique.mockResolvedValueOnce(null);
     prismaMock.userRank.findFirst.mockResolvedValueOnce(makeUserRank());
@@ -175,7 +175,7 @@ describe('API auth/profile/user flows', () => {
         secondaryRanks: []
       })
     );
-    prismaMock.invite.update.mockResolvedValueOnce({} as never);
+    prismaMock.invite.updateMany.mockResolvedValueOnce({ count: 1 });
 
     const accepted = await request(app).post('/api/auth/register').send({
       username: 'invite-user',
@@ -185,8 +185,8 @@ describe('API auth/profile/user flows', () => {
     });
 
     expect(accepted.status).toBe(201);
-    expect(prismaMock.invite.update).toHaveBeenCalledWith({
-      where: { inviteKey: 'good-key' },
+    expect(prismaMock.invite.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ inviteKey: 'good-key' }),
       data: { status: 'accepted' }
     });
   });

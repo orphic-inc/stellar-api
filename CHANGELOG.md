@@ -104,6 +104,36 @@ disabled" }` and nothing more, although the login screen is the one place such
   any unused `Reactivation` tokens, since nothing can consume them. The `purpose`
   column stays, and the password reset still filters on it.
 
+### Fixed
+
+- **Invites expire, and a lapsed invite goes back to its inviter**
+  ([#627](https://github.com/orphic-inc/stellar-api/issues/627),
+  [ADR-0041](docs/adr/0041-an-invite-lapses-and-is-returned.md)).
+  `Invite.expires` was written and never read, so an invite key stayed usable
+  forever. An invite now lasts **3 days**. Invites sent before this release
+  keep the 30 days their email promised.
+
+  An invite lapses when its date passes, or as soon as its inviter is disabled.
+  A lapsed key answers `POST /auth/register` with `403` and the new message
+  "This invite has expired. Ask the member who invited you to send a new one."
+
+  An hourly sweep marks each lapsed invite `expired` and returns it to the
+  inviter's `inviteCount`, even past `inviteCap`, with a System PM and an
+  `invite.expired` audit row. It has no mode switch
+  (`INVITE_EXPIRY_INTERVAL_MS`, default 1h). The address can then be invited
+  again, by anyone; `POST /profile/referral/create-invite` reuses the row
+  rather than answering `409`, and still answers `409` for a live invite.
+
+  Contract changes: `InviteStatus` is now `pending | accepted | expired`
+  (`rejected` was never written; the migration maps any such row to
+  `expired`), and `InviteItem` gains `createdAt`. In invite mode, the full-site
+  `403` now says "Your invite is valid until {date}" instead of "Your invite is
+  still valid", because the clock keeps running while the site is full.
+
+  Accepting an invite and spending one are now conditional writes, so a
+  registration cannot accept an invite the sweep has just refunded, and two
+  concurrent sends cannot overdraw a balance.
+
 ## [0.9.4] — 2026-09-11
 
 ### Added
