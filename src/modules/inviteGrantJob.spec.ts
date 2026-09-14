@@ -58,24 +58,32 @@ interface RowOver {
   rank?: { id: number; level: number; perPeriod: number; cap: number };
 }
 
-const row = (over: RowOver = {}) => ({
-  id: over.id ?? 1,
-  inviteCount: over.inviteCount ?? 0,
-  lastInviteGrantAt:
-    over.lastInviteGrantAt === undefined
-      ? daysAgo(PERIOD_DAYS)
-      : over.lastInviteGrantAt,
-  dateRegistered: over.dateRegistered ?? daysAgo(400),
-  disabled: false,
-  banDate: over.banDate ?? null,
-  userRank: {
-    id: over.rank?.id ?? 2,
-    level: over.rank?.level ?? 150,
-    inviteGrantPerPeriod: over.rank?.perPeriod ?? 2,
-    inviteCap: over.rank?.cap ?? 6
-  },
-  warnings: over.warnings ?? []
-});
+const DEFAULT_RANK = { id: 2, level: 150, perPeriod: 2, cap: 6 };
+
+/**
+ * Defaults spread over the overrides rather than `??` per field, so an
+ * explicit `null` (a member who has never been granted) survives while an
+ * omitted key still falls back.
+ */
+const row = ({ rank, ...over }: RowOver = {}) => {
+  const r = { ...DEFAULT_RANK, ...rank };
+  return {
+    id: 1,
+    inviteCount: 0,
+    lastInviteGrantAt: daysAgo(PERIOD_DAYS) as Date | null,
+    dateRegistered: daysAgo(400),
+    banDate: null as Date | null,
+    warnings: [] as Array<{ expiresAt: Date | null }>,
+    ...over,
+    disabled: false,
+    userRank: {
+      id: r.id,
+      level: r.level,
+      inviteGrantPerPeriod: r.perPeriod,
+      inviteCap: r.cap
+    }
+  };
+};
 
 /** One page of members, then an empty page to end the cursor loop. */
 const mockPages = (rows: ReturnType<typeof row>[]) => {
