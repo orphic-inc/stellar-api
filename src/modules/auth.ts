@@ -341,20 +341,19 @@ export const changeEmail = async (
 export const generateRecoveryToken = (): string =>
   crypto.randomBytes(32).toString('hex');
 
-// Persists a recovery token for userId: expires that purpose's pending tokens
+// Persists a password-reset token for userId: expires pending reset tokens
 // first, then inserts a fresh record valid for 2 hours. Call only after email
 // delivery succeeds to avoid orphaned rows when SMTP is unconfigured.
 //
-// The invalidation is scoped BY PURPOSE (#279). Expiring every pending token
-// would mean asking to be reinstated silently kills a password reset already in
-// flight — two unrelated flows, one of which the user may be halfway through.
+// The invalidation stays scoped BY PURPOSE (ADR-0038 §2) even with one purpose
+// left, so a second flow added later cannot silently expire a reset in flight.
 export const persistRecoveryToken = async (
   userId: number,
-  token: string,
-  purpose: RecoveryPurpose = RecoveryPurpose.PasswordReset
+  token: string
 ): Promise<void> => {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const purpose = RecoveryPurpose.PasswordReset;
 
   await prisma.$transaction([
     prisma.accountRecovery.updateMany({
@@ -371,9 +370,8 @@ export const resetPasswordWithToken = async (
   token: string,
   newPassword: string
 ): Promise<void> => {
-  // `purpose` is the whole point of the column (#279): without it a
-  // reactivation link mailed to a dormant address would also set that
-  // account's password, and that address is the likeliest to be stale.
+  // Filtered on `purpose` so a token minted for any other flow can never set a
+  // password (ADR-0038 §2). PasswordReset is the only purpose today (#629).
   const recovery = await prisma.accountRecovery.findFirst({
     where: {
       token,
@@ -434,62 +432,4 @@ export const loginUser = async (
   });
 
   return { ok: true, user: toAuthUser(authUser) };
-};
-
-/**
- * Consume a reactivation token and put the request in front of staff (#279).
- *
- * Idempotent per user: if the member already has an unresolved staff-inbox
- * conversation, the token is still spent and a message is appended to it rather
- * than opening a second thread. Keying on "any open ticket owned by this user"
- * is safe here precisely because they are disabled — they cannot open one by
- * any other route, since every other path requires a session.
- *
- * The token is consumed either way. Leaving it usable on the "already has a
- * ticket" path would turn one email round-trip into an unlimited supply of
- * appends.
- */
-export const confirmReactivation = async (token: string): Promise<void> => {
-  const recovery = await prisma.accountRecovery.findFirst({
-    where: {
-      token,
-      purpose: RecoveryPurpose.Reactivation,
-      usedAt: null,
-      expiresAt: { gt: new Date() }
-    }
-  });
-  if (!recovery) throw new AppError(400, 'Invalid or expired token');
-
-  const existing = await prisma.staffInboxConversation.findFirst({
-    where: { userId: recovery.userId, status: { not: 'Resolved' } },
-    orderBy: { id: 'desc' },
-    select: { id: true }
-  });
-
-  const body =
-    'I would like my account reinstated. This request was confirmed from the ' +
-    'email address on the account.';
-
-  await prisma.$transaction([
-    prisma.accountRecovery.update({
-      where: { id: recovery.id },
-      data: { usedAt: new Date() }
-    }),
-    existing
-      ? prisma.staffInboxMessage.create({
-          data: {
-            conversationId: existing.id,
-            senderId: recovery.userId,
-            body
-          }
-        })
-      : prisma.staffInboxConversation.create({
-          data: {
-            subject: 'Reactivation request',
-            userId: recovery.userId,
-            status: 'Unanswered',
-            messages: { create: { senderId: recovery.userId, body } }
-          }
-        })
-  ]);
 };

@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { RecoveryPurpose } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
@@ -24,16 +23,12 @@ import {
   changeEmailSchema,
   recoveryRequestSchema,
   recoveryResetSchema,
-  reactivationRequestSchema,
-  reactivationConfirmSchema,
   type LoginInput,
   type RegisterInput,
   type ChangePasswordInput,
   type ChangeEmailInput,
   type RecoveryRequestInput,
-  type RecoveryResetInput,
-  type ReactivationRequestInput,
-  type ReactivationConfirmInput
+  type RecoveryResetInput
 } from '../../schemas/auth';
 import {
   authUserSelect,
@@ -44,11 +39,10 @@ import {
   changeEmail,
   generateRecoveryToken,
   persistRecoveryToken,
-  resetPasswordWithToken,
-  confirmReactivation
+  resetPasswordWithToken
 } from '../../modules/auth';
 import { getSettings } from '../../modules/settings';
-import { sendRecoveryEmail, sendReactivationEmail } from '../../lib/mailer';
+import { sendRecoveryEmail } from '../../lib/mailer';
 import { getLogger } from '../../modules/logging';
 import { z } from 'zod';
 
@@ -260,58 +254,6 @@ router.post(
     const { token, newPassword } = parsedBody<RecoveryResetInput>(res);
     await resetPasswordWithToken(token, newPassword);
     res.json({ msg: 'Password reset successfully' });
-  })
-);
-
-// POST /api/auth/reactivation-request — ask staff to reinstate a disabled account
-router.post(
-  '/reactivation-request',
-  authLimiter,
-  validate(reactivationRequestSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { email } = parsedBody<ReactivationRequestInput>(res);
-    // The same sentence for every input. A disabled account is already
-    // distinguishable at login — loginUser answers 403 before it even checks
-    // the password — but that is no reason to add a second oracle here.
-    const genericMsg =
-      'If that account exists, a reactivation link has been sent';
-
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      select: { id: true, email: true, disabled: true }
-    });
-
-    // Open to ANY disabled account, moderator actions included. It is an
-    // appeals channel, and the route cannot filter by reason without becoming
-    // an oracle for who was banned. An enabled account mints nothing: there is
-    // nothing to reinstate, and a ticket would be noise.
-    if (user?.disabled) {
-      const token = generateRecoveryToken();
-      const confirmUrl = `${emailConfig.siteUrl}/reactivate?token=${token}`;
-      // Only persist once the mail is away, matching /recovery/request.
-      const sent = await sendReactivationEmail(user.email, confirmUrl);
-      if (sent) {
-        await persistRecoveryToken(
-          user.id,
-          token,
-          RecoveryPurpose.Reactivation
-        );
-      }
-    }
-
-    res.json({ msg: genericMsg });
-  })
-);
-
-// POST /api/auth/reactivation-confirm — consume the token, open a staff ticket
-router.post(
-  '/reactivation-confirm',
-  authLimiter,
-  validate(reactivationConfirmSchema),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { token } = parsedBody<ReactivationConfirmInput>(res);
-    await confirmReactivation(token);
-    res.json({ msg: 'Your request has been sent to staff' });
   })
 );
 

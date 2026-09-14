@@ -2366,15 +2366,12 @@ model UserSession {
 
 /// What a recovery token is allowed to do (#279, ADR-0038).
 ///
-/// Without this the table is a single pool of interchangeable tokens:
-/// resetPasswordWithToken matches any unused, unexpired row, so a reactivation
-/// link mailed to a dormant account would also set that account's password.
-/// That address has been unused for months and is the likeliest to be stale or
-/// compromised, which is exactly where password-reset power should not be
-/// handed out as a side effect.
+/// resetPasswordWithToken filters on it, so a token minted for any other flow
+/// can never set a password. #279 added Reactivation for an in-app appeal; #629
+/// withdrew that flow (reactivation happens on IRC) and the value with it. The
+/// column stays so a future purpose is one value, not a new column.
 enum RecoveryPurpose {
   PasswordReset
-  Reactivation
 }
 
 model AccountRecovery {
@@ -2384,8 +2381,8 @@ model AccountRecovery {
   token     String          @unique
   expiresAt DateTime
   usedAt    DateTime?
-  // Defaulted so every pre-#279 row keeps the only meaning it ever had. Both
-  // consumers filter on it -- a token is useless at the other's endpoint.
+  // Defaulted so every pre-#279 row keeps the only meaning it ever had. The
+  // password reset filters on it.
   purpose   RecoveryPurpose @default(PasswordReset)
   createdAt DateTime        @default(now())
 

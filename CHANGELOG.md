@@ -84,6 +84,26 @@ disabled" }` and nothing more, although the login screen is the one place such
   routes themselves are withdrawn separately
   ([#629](https://github.com/orphic-inc/stellar-api/issues/629)).
 
+### Removed
+
+- **The in-app reactivation token flow is withdrawn**
+  ([#629](https://github.com/orphic-inc/stellar-api/issues/629),
+  [ADR-0038](docs/adr/0038-inactivity-is-a-clock-not-a-timestamp.md) §2–3
+  amended). `POST /auth/reactivation-request` and
+  `POST /auth/reactivation-confirm` are gone, along with the
+  `ReactivationRequestBody` and `ReactivationConfirmBody` schemas, the
+  reactivation email and the `Reactivation request` staff ticket.
+
+  Reactivation happens on IRC: a disabled member asks staff in
+  `${disabled_channel}`, and staff reinstate from the UI through
+  `POST /users/:id/enable`, which still stamps `reactivatedAt`. No UI ever called
+  the token routes, and the link they mailed pointed at `/reactivate`, a page
+  that does not exist.
+
+  `RecoveryPurpose` loses its `Reactivation` value. The migration first deletes
+  any unused `Reactivation` tokens, since nothing can consume them. The `purpose`
+  column stays, and the password reset still filters on it.
+
 ## [0.9.4] — 2026-09-11
 
 ### Added

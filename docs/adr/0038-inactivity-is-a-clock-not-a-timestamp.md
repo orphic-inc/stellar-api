@@ -30,11 +30,15 @@ The never-logged-in sweep reads the same clock, because `lastLogin` is **still n
 
 ### 2. Recovery tokens carry a purpose, and it is a column rather than convention
 
+_(Amended 2026-09-14, by [#629](https://github.com/orphic-inc/stellar-api/issues/629). `Reactivation` is withdrawn with the flow it served — see the amendment to Decision 3 — so `RecoveryPurpose` has one value, `PasswordReset`, and `persistRecoveryToken` takes no purpose argument. The column stays and the reset still filters on it, so a token minted for any future flow cannot set a password; a future purpose is one enum value rather than a new column. Existing `Reactivation` rows are deleted by the migration, since nothing can consume them. The paragraphs below are the decision as taken on 2026-09-10.)_
+
 `AccountRecovery.purpose` (`PasswordReset` | `Reactivation`), defaulted so every pre-existing row keeps the only meaning it has had. Both consumers filter on it, and `persistRecoveryToken` scopes its invalidation by purpose so asking to be reinstated does not silently expire a password reset already in flight.
 
 This is the one place the implementation refuses #279's "no new models" instruction, and it is a column, not a model. Without it a reactivation link is a password-reset link: the two are indistinguishable to every consumer. That link is mailed to an address dormant for four months, which is the address most likely to be stale or compromised, and handing it password-reset power as a side effect is an escalation nobody chose.
 
 ### 3. Appeals are open to every disabled account, including moderator actions
+
+_(Amended 2026-09-14, by [#629](https://github.com/orphic-inc/stellar-api/issues/629). **Superseded: there is no in-app appeal.** `POST /auth/reactivation-request` and `POST /auth/reactivation-confirm` are removed. A disabled member joins `${disabled_channel}` on IRC and talks to staff, and staff reinstate from the UI through `POST /users/:id/enable`, which stamps `reactivatedAt` exactly as Decision 1 requires. The token flow was surplus beside that path: no UI ever consumed it, and the link it mailed pointed at a `/reactivate` page that does not exist. [#622](https://github.com/orphic-inc/stellar-api/issues/622) had already repointed the disabled login and the deactivation email at the IRC destination. The paragraphs below are the decision as taken on 2026-09-10; the reasoning about not keying anything on a disable reason still holds.)_
 
 `POST /auth/reactivation-request` does not ask why an account is disabled. It answers with one generic sentence for an unknown address, an active account and a disabled one alike, and mints a token only for the last.
 
