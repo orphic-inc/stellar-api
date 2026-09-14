@@ -123,28 +123,26 @@ interface Tally {
   byRank: Record<number, number>;
 }
 
+/** A batch's decisions, reduced to the two writes they cost. */
+interface BatchPlan {
+  /** Grant sets keyed by rank — one `updateMany` each. */
+  grantsByRank: Map<number, { ids: number[]; amount: number; cap: number }>;
+  /** Eligible but clamped: the clock advances and nothing is added. */
+  advanceIds: number[];
+}
+
 /**
- * Apply one batch's decisions.
+ * Decide one batch and fold the outcome into the tally.
  *
- * Two `updateMany` calls rather than one write per member: the grant set is
- * keyed by rank (every member of a rank receives the same amount and shares the
- * same cap predicate), and the advance set needs no amount at all.
+ * Grants bucket by rank because every member of a rank receives the same amount
+ * and shares the same cap predicate, so a whole rank settles in one write; the
+ * advance set needs no amount at all.
  *
- * The grant predicate repeats the evaluator's room check on purpose. It is not
- * redundant — the evaluator decided against a balance we read, and this decides
- * against the balance at write time. A member who spends in between simply
- * keeps their invite and is skipped, rather than having our stale absolute
- * value written over their spend.
+ * Nothing here touches the database. That is what lets `dryRun` produce a tally
+ * identical to the one a live pass would produce.
  */
-const applyBatch = async (
-  batch: Candidate[],
-  now: Date,
-  tally: Tally
-): Promise<void> => {
-  const grantsByRank = new Map<
-    number,
-    { ids: number[]; amount: number; cap: number }
-  >();
+const planBatch = (batch: Candidate[], now: Date, tally: Tally): BatchPlan => {
+  const grantsByRank: BatchPlan['grantsByRank'] = new Map();
   const advanceIds: number[] = [];
 
   for (const member of batch) {
@@ -168,6 +166,25 @@ const applyBatch = async (
       tally.withheld += 1;
     }
   }
+
+  return { grantsByRank, advanceIds };
+};
+
+/**
+ * Persist one batch's plan.
+ *
+ * The grant predicate repeats the evaluator's room check on purpose. It is not
+ * redundant — the evaluator decided against a balance we read, and this decides
+ * against the balance at write time. A member who spends in between simply
+ * keeps their invite and is skipped, rather than having our stale absolute
+ * value written over their spend.
+ */
+const applyBatch = async (
+  batch: Candidate[],
+  now: Date,
+  tally: Tally
+): Promise<void> => {
+  const { grantsByRank, advanceIds } = planBatch(batch, now, tally);
 
   if (inviteGrantConfig.mode !== 'on') return;
 
