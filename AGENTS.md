@@ -246,7 +246,7 @@ src/
     rankProgressionJob.ts     # The DB-bound shell around that evaluator — loads ladder + rules, builds inputs, applies the decisions
     inactivity.ts             # Dormancy clock + pure evaluator (#279, ADR-0038): max(lastLogin, dateRegistered, reactivatedAt) → warn / disable / none. Owns the policy; no DB
     inactivityJob.ts          # The DB-bound sweep around that evaluator — cursor-paged, `INACTIVITY_MODE` gates the WRITES not the evaluation, disables capped per cycle
-    inviteGrant.ts            # Invite handout evaluator (#282, ADR-0039) — pure: rank rate/cap + balance + clock + standing → grant / advance / none. Accrual rather than top-up; no back-pay; a period with no room is spent. Owns the policy; no DB
+    inviteGrant.ts            # Invite handout evaluator (#282, ADR-0039) — pure: rate/cap + balance + clock + standing → grant / advance / none. Accrual, not top-up; no back-pay; a capped period is spent. Owns the policy; no DB
     inviteGrantJob.ts         # The DB-bound sweep around that evaluator — the single writer that raises `inviteCount`. Conditional-increment writes rather than absolute values, one audit row per cycle
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
