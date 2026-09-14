@@ -147,7 +147,6 @@ jest.mock('../modules/staff', () => ({
 jest.mock('../lib/mailer', () => ({
   sendInviteEmail: jest.fn().mockResolvedValue(true),
   sendRecoveryEmail: jest.fn().mockResolvedValue(true),
-  sendReactivationEmail: jest.fn().mockResolvedValue(true),
   sendInactivityWarningEmail: jest.fn().mockResolvedValue(true),
   sendInactivityDisabledEmail: jest.fn().mockResolvedValue(true)
 }));
