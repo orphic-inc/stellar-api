@@ -627,6 +627,9 @@ router.get(
 );
 
 // POST /api/users — admin creates a user account (no session issued)
+// Deliberately NOT capped by `maxUsers` (#624, ADR-0040 §2): staff creation is
+// an audited decision, and only self-registration is guarded against growth
+// nobody chose.
 router.post(
   '/',
   ...requirePermission('users_edit'),
@@ -840,6 +843,8 @@ router.post(
 );
 
 // POST /api/users/:id/enable
+// Takes a seat but is deliberately NOT capped by `maxUsers` (#624, ADR-0040 §2):
+// a full site must still be able to reinstate a wrongly disabled member.
 router.post(
   '/:id/enable',
   ...requirePermission('users_disable'),

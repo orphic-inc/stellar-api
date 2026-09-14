@@ -347,8 +347,9 @@ registry.registerPath({
   description:
     'Ungated — no session, no permission — so the 403 here is the handler ' +
     "speaking, not middleware: it is the site's registration policy " +
-    'refusing, and every branch of it concerns the invite. The 400 is the ' +
-    'submission itself being unusable. A request-body validation failure ' +
+    'refusing — closed, full (#624), or a problem with the invite. A full ' +
+    'site refuses before any write, so a presented invite stays valid. The ' +
+    '400 is the submission itself being unusable. A request-body validation failure ' +
     'also answers 400, carrying an `errors` object this schema does not ' +
     'show.',
   request: {
@@ -368,7 +369,8 @@ registry.registerPath({
         'or the address is not accepted'
     ),
     403: msgResponse(
-      'Registration is closed, or the invite key is missing, invalid, ' +
+      'Registration is closed, the site is full (enabled accounts have ' +
+        'reached `maxUsers`), or the invite key is missing, invalid, ' +
         'already used, or issued for a different email address'
     )
   }
@@ -621,6 +623,9 @@ registry.registerPath({
           schema: z.object({
             installed: z.boolean(),
             registrationStatus: z.enum(['open', 'invite', 'closed']),
+            // Enabled accounts have reached `maxUsers` (#624). Always false
+            // while closed; best-effort, since POST /auth/register re-checks.
+            registrationFull: z.boolean(),
             // Asymmetric on purpose (#333): the handler flattens configWarnings
             // to `.message`, but setupChecklist keeps its `id` because that is
             // what a dismissal writes to `dismissedLaunchChecklist`. Declaring
@@ -2082,7 +2087,10 @@ registry.registerPath({
         }
       }
     },
-    403: msgResponse('No invites remaining'),
+    403: msgResponse(
+      'No invites remaining, or the site is full (#624) — in which case the ' +
+        "caller's invite is not spent"
+    ),
     409: msgResponse('Invite already exists')
   }
 });

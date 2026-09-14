@@ -219,7 +219,7 @@ src/
     ratioPolicy.ts          # Ratio policy evaluation
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
-    settings.ts             # Site settings helpers
+    settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)
     stats.ts                # Stats query helpers
     top10.ts                # Ranked list logic: binomial scoring, TTL caching, snapshots
     user.ts                 # User query helpers

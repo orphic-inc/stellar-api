@@ -116,6 +116,68 @@ describe('GET /api/install', () => {
     expect(res.body.installed).toBe(false);
   });
 
+  describe('registrationFull (#624)', () => {
+    const settingsWith = (
+      registrationStatus: 'open' | 'invite' | 'closed',
+      maxUsers: number
+    ) =>
+      prismaMock.siteSettings.upsert.mockResolvedValue({
+        id: 1,
+        approvedDomains: [],
+        registrationStatus,
+        maxUsers,
+        dismissedLaunchChecklist: [],
+        installedAt: new Date(),
+        updatedAt: new Date()
+      } as never);
+
+    it('is true once enabled accounts reach maxUsers', async () => {
+      settingsWith('invite', 10);
+      prismaMock.user.count.mockResolvedValue(10);
+
+      const res = await request(app).get('/api/install');
+
+      expect(res.body.registrationFull).toBe(true);
+      expect(prismaMock.user.count).toHaveBeenCalledWith({
+        where: { disabled: false }
+      });
+    });
+
+    it('is false while a seat is free', async () => {
+      settingsWith('open', 10);
+      prismaMock.user.count.mockResolvedValue(9);
+
+      const res = await request(app).get('/api/install');
+
+      expect(res.body.registrationFull).toBe(false);
+    });
+
+    it('is false and counts nothing while registration is closed', async () => {
+      settingsWith('closed', 10);
+      prismaMock.user.count.mockResolvedValue(10);
+
+      const res = await request(app).get('/api/install');
+
+      expect(res.body.registrationFull).toBe(false);
+      expect(prismaMock.user.count).not.toHaveBeenCalled();
+    });
+
+    it('exposes a boolean only, never the counts', async () => {
+      settingsWith('open', 10);
+      prismaMock.user.count.mockResolvedValue(4);
+
+      const res = await request(app).get('/api/install');
+
+      expect(Object.keys(res.body).sort()).toEqual([
+        'configWarnings',
+        'installed',
+        'registrationFull',
+        'registrationStatus',
+        'setupChecklist'
+      ]);
+    });
+  });
+
   it('includes configWarnings in the response', async () => {
     prismaMock.userRank.count.mockResolvedValue(0);
     prismaMock.user.count.mockResolvedValue(0);

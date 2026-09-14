@@ -8,6 +8,7 @@ import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
 import { getDefaultStylesheetName } from './stylesheet';
 import { normalizePassword } from './badPasswords';
 import { isEmailBlacklisted } from './emailBlacklist';
+import { countSeats } from './settings';
 
 /**
  * Is this password on the denylist?
@@ -136,7 +137,8 @@ type RegisterResult =
         | 'registration_closed'
         | 'invite_required'
         | 'invalid_invite'
-        | 'invite_email_mismatch';
+        | 'invite_email_mismatch'
+        | 'registration_full';
     }
   | { ok: true; user: AuthUser };
 
@@ -146,8 +148,18 @@ export type RegisterOptions = {
   password: string;
   /** Passed from getSettings().registrationStatus — the module does not read settings itself. */
   registrationMode: 'open' | 'invite' | 'closed';
+  /** Passed from getSettings().maxUsers, for the same reason. Required: an omitted cap would be an unenforced one (#624). */
+  maxUsers: number;
   inviteKey?: string;
 };
+
+/**
+ * Serializes self-registration so the last seat goes to exactly one caller
+ * (#624, ADR-0040). A transaction-scoped Postgres advisory lock: released on
+ * commit or rollback, so no path can leak it. The value is arbitrary but must
+ * not be reused for any other lock.
+ */
+const REGISTRATION_SEAT_LOCK_KEY = 624_001;
 
 type LoginResult =
   | { ok: false; reason: 'not_found' | 'disabled' | 'wrong_password' }
@@ -158,6 +170,7 @@ export const registerUser = async ({
   email,
   password,
   registrationMode,
+  maxUsers,
   inviteKey
 }: RegisterOptions): Promise<RegisterResult> => {
   // 1. Mode gate — no DB required
@@ -209,7 +222,17 @@ export const registerUser = async ({
 
   // 3. Atomic: create user + consume invite in one transaction so a crash
   //    between the two can never leave the invite permanently open.
-  const user = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx): Promise<RegisterResult> => {
+    // Capacity (#624, ADR-0040). Lock, THEN count: under READ COMMITTED each
+    // statement sees rows committed before it began, so a caller that waited
+    // on the lock counts the seat its predecessor just took. Counting before
+    // the lock would let concurrent callers all see the same last free seat.
+    // Refusing here returns before any write, so the invite is left pending.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REGISTRATION_SEAT_LOCK_KEY}::bigint)`;
+    if ((await countSeats(tx)) >= maxUsers) {
+      return { ok: false, reason: 'registration_full' };
+    }
+
     const defaultTheme = await getDefaultStylesheetName(tx);
     const settings = await tx.userSettings.create({
       data: { siteAppearance: defaultTheme }
@@ -237,10 +260,8 @@ export const registerUser = async ({
       });
     }
 
-    return newUser;
+    return { ok: true, user: toAuthUser(newUser) };
   });
-
-  return { ok: true, user: toAuthUser(user) };
 };
 
 export const changePassword = async (
