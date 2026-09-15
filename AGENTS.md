@@ -190,6 +190,7 @@ Copy `.env.default` → `.env`.
 | `INVITE_GRANT_MODE`                 | Invite handout: `off` (default) / `dryRun` / `on` (#282, ADR-0039). `dryRun` evaluates everything and writes nothing                          |
 | `INVITE_GRANT_INTERVAL_MS`          | Handout job wake interval (default 86400000 = 24h). Distinct from the accrual period — that is 14 days per member, in code                    |
 | `INVITE_EXPIRY_INTERVAL_MS`         | Invite expiry sweep interval (#627, ADR-0041; default 3600000 = 1h). No mode switch; the 3-day invite lifetime is in code                     |
+| `RATIO_POLICY_INTERVAL_MS`          | Ratio policy sweep interval (#646, ADR-0044; default 86400000 = 24h). No mode switch; lifts ratio-caused disables                             |
 
 ## Architecture
 
@@ -220,6 +221,7 @@ src/
     ratio.ts                # Ratio calculation helpers
     ratioPolicy.ts          # Ratio policy evaluation
     ratioPolicyRules.ts     # Ratio state machine (#646, ADR-0044) — pure: row, ratio and clock → one transition; no DB
+    ratioPolicyJob.ts       # Daily sweep, no mode switch (#646): applies ratioPolicyRules to WATCH and RATIO-disabled rows, one caught evaluation each
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
     settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)

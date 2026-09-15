@@ -212,6 +212,20 @@ export const inviteExpiry = {
   intervalMs: parseInt(process.env.INVITE_EXPIRY_INTERVAL_MS ?? '3600000', 10)
 };
 
+/**
+ * Ratio policy sweep (#646, ADR-0044 §4–5). One operational dial: how often it
+ * wakes. The watch length and the 10 GiB limit are in `ratioPolicyRules.ts`.
+ *
+ * There is deliberately no `mode`. Every transition applies an existing rule on
+ * a clock rather than at the member's next download, and a switch defaulting to
+ * `off` would leave recovered members disabled on every instance that never
+ * flipped it. Daily, like the legacy schedule: a condition that took a 14-day
+ * watch to reach does not need an hourly lift.
+ */
+export const ratioPolicy = {
+  intervalMs: parseInt(process.env.RATIO_POLICY_INTERVAL_MS ?? '86400000', 10)
+};
+
 export const sentry = {
   dsn: process.env.STELLAR_SENTRY_DSN ?? ''
 };

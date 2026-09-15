@@ -176,6 +176,7 @@ jest.mock('../modules/config', () => ({
   inviteGrant: { mode: 'off', intervalMs: 86400000 },
   // startInviteExpiryJob reads `.intervalMs` at import, like the two above.
   inviteExpiry: { intervalMs: 3600000 },
+  ratioPolicy: { intervalMs: 86400000 },
   sentry: { dsn: '' },
   email: {
     smtpHost: '',

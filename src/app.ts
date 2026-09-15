@@ -38,6 +38,7 @@ import { startMembershipJob } from './modules/membershipJob';
 import { startInactivityJob } from './modules/inactivityJob';
 import { startInviteGrantJob } from './modules/inviteGrantJob';
 import { startInviteExpiryJob } from './modules/inviteExpiryJob';
+import { startRatioPolicyJob } from './modules/ratioPolicyJob';
 
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
@@ -277,6 +278,7 @@ export const createApp = () => {
     startInactivityJob();
     startInviteGrantJob();
     startInviteExpiryJob();
+    startRatioPolicyJob();
   }
 
   return app;
