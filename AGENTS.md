@@ -219,6 +219,7 @@ src/
     profile.ts              # Profile update logic
     ratio.ts                # Ratio calculation helpers
     ratioPolicy.ts          # Ratio policy evaluation
+    ratioPolicyRules.ts     # Ratio state machine (#646, ADR-0044) — pure: row, ratio and clock → one transition; no DB
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
     settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)

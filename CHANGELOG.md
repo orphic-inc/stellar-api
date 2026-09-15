@@ -159,6 +159,22 @@ All notable changes to stellar-api are documented here.
   Contract changes: `RatioPolicyState` (`GET /profile/me/ratio`'s `policy`,
   `GET /ratio-policy/{userId}`) and `RatioWatchItem` gain `disabledCause`.
 
+- **Members are told about every ratio policy transition, and each is audited**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646),
+  [ADR-0044](docs/adr/0044-a-ratio-disable-records-its-cause.md)). Starting a
+  ratio watch, disabling downloads, restoring them and leaving a watch each send
+  the member a System PM with their ratio, their required ratio and a link to
+  the ratio rules, and write an audit row (`ratioPolicy.watch_started`,
+  `.download_disabled`, `.download_restored`, `.watch_cleared`) carrying the
+  numbers at the time. Until now a member reached a download disable with no
+  notice.
+
+  The rules moved into a pure module, and every automatic transition is now a
+  claim on the row as it was read, so a staff override landing mid-evaluation,
+  or two evaluations after back-to-back downloads, can no longer be overwritten
+  or doubled. A ratio-caused disable is lifted once the ratio meets its
+  requirement; nothing applies that on a schedule yet (the sweep follows).
+
 ### Changed
 
 - **A cancelled invite holds its address until its original expiry**
