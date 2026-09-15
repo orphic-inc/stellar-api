@@ -252,7 +252,7 @@ src/
     inviteGrantJob.ts         # The DB-bound sweep around that evaluator — the single writer that accrues `inviteCount` (expiry refunds are not accrual). Conditional-increment writes rather than absolute values, one audit row per cycle
     inviteExpiry.ts           # Invite lapse rule (#627, ADR-0041) — pure: `INVITE_TTL_DAYS`, `isInviteLapsed` and the claim where-fragments shared by registration, re-invite and the sweep
     inviteExpiryJob.ts        # Hourly sweep, no mode switch: claims each lapsed invite (`pending → expired`) and refunds it, one transaction per invite. The claim pays the refund, so it happens once
-    inviteControls.ts         # Staff invite controls (#636), behind `invites_edit`: revoke/restore `canInvite` (balance kept) and set `inviteCount` as a compare-and-set against the count staff saw. Staff reason → audit; optional member message → System PM after commit
+    inviteControls.ts         # Staff invite controls (#636), behind `invites_edit`: revoke/restore `canInvite` (balance kept), set `inviteCount` as a compare-and-set against the count staff saw, and cancel a pending invite (a `pending → cancelled` claim that refunds, like the expiry sweep's). Staff reason → audit; optional member message → System PM after commit
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick

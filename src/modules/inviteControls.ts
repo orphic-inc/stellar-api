@@ -1,8 +1,9 @@
 /**
  * Staff invite controls (#636): revoke or restore one member's invite
- * privileges, and set their invite count. Both sit behind `invites_edit`.
+ * privileges, set their invite count, and cancel a pending invite from the
+ * pool. All sit behind `invites_edit`.
  *
- * Three things here are deliberate and not obvious from the issue:
+ * Four things here are deliberate and not obvious from the issue:
  *
  *  - Setting the count is a COMPARE-AND-SET. Every other `inviteCount` writer
  *    (the send, the handout, the #627 refund) writes relative to the current
@@ -17,6 +18,10 @@
  *    member and is sent as a System PM after the write commits, so a failed PM
  *    cannot undo the change. The two are different texts on purpose, and the
  *    message is not copied into the audit row.
+ *  - A cancel always refunds. ADR-0041's rule generalises: an invite that leaves
+ *    `pending` without being accepted returns to its inviter, whoever ended it.
+ *    Like the sweep's, the refund belongs to the `pending → cancelled` claim, so
+ *    exactly one of cancel, expiry or acceptance wins and pays at most once.
  */
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
@@ -136,6 +141,69 @@ export const setInviteCount = async (
       'Your invite count was changed',
       withStaffPmPointer(
         `${message}\n\nYou now have ${inviteCount} ${inviteCount === 1 ? 'invite' : 'invites'}.`
+      )
+    );
+  }
+};
+
+export interface CancelInviteInput {
+  reason: string;
+  message?: string;
+}
+
+const INVITE_NOT_FOUND = 'Invite not found';
+const INVITE_NOT_PENDING = 'This invite is no longer pending';
+
+/**
+ * Claim any `pending` row, including one past `expires` that the sweep has not
+ * reached yet: the stored status then records the staff act, and the refund is
+ * still paid once, because the sweep's claim also requires `pending`.
+ */
+export const cancelInvite = async (
+  actorId: number,
+  inviteId: number,
+  { reason, message }: CancelInviteInput
+): Promise<void> => {
+  const invite = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.invite.updateMany({
+      where: { id: inviteId, status: 'pending' },
+      data: { status: 'cancelled' }
+    });
+    if (count === 0) {
+      const exists = await tx.invite.findUnique({
+        where: { id: inviteId },
+        select: { id: true }
+      });
+      throw exists
+        ? new AppError(409, INVITE_NOT_PENDING)
+        : new AppError(404, INVITE_NOT_FOUND);
+    }
+
+    const cancelled = await tx.invite.findUniqueOrThrow({
+      where: { id: inviteId },
+      select: { inviterId: true, email: true }
+    });
+    await tx.user.update({
+      where: { id: cancelled.inviterId },
+      data: { inviteCount: { increment: 1 } }
+    });
+    await audit(tx, actorId, 'invite.cancelled', 'Invite', inviteId, {
+      by: 'staff',
+      inviterId: cancelled.inviterId,
+      email: cancelled.email,
+      refunded: true,
+      reason,
+      messaged: message !== undefined
+    });
+    return cancelled;
+  });
+
+  if (message !== undefined) {
+    await notifyMember(
+      invite.inviterId,
+      'An invite you sent was cancelled',
+      withStaffPmPointer(
+        `${message}\n\nYour invite to ${invite.email} has been returned to you.`
       )
     );
   }

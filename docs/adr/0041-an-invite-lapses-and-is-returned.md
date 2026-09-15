@@ -81,6 +81,15 @@ _(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issue
 
 `InviteStatus` is `pending | accepted | expired`. Nothing wrote `rejected`. Postgres cannot drop an enum value in place, so the migration rebuilds the type and maps any `rejected` row to `expired` inside the cast. A revoke, if one is ever wanted, is one value and its own issue.
 
+_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). That value is `cancelled`, for staff cancelling an invite from the pool. #640's member withdraw will use it too. It is not named `revoked`, which now names the per-member privilege flag. This section's rules apply to it as they do to `expired`:_
+
+- _**§2:** a `cancelled` invite has lapsed._
+- _**§3:** the refund rule generalises to "an invite that leaves `pending` without being accepted returns to its inviter", whoever ended it. The cancel is a conditional `pending → cancelled` claim that pays an uncapped refund in the same transaction. It claims any `pending` row, including one past `expires` the sweep has not reached, so exactly one of cancel, expiry or acceptance wins._
+- _**§5:** a re-invite reuses an `expired` or `cancelled` row._
+- _**§6:** the key holder is answered `invite_expired`, so the reply cannot confirm a moderation act, and a cancel racing registration lands there through the accept claim anyway._
+
+_Unlike an expiry, the inviter is PMed only when staff write a message.)_
+
 ## Consequences
 
 The invite contract changes. `InviteStatus` loses `rejected` and gains `expired`, `InviteItem` gains `createdAt`, registration has a new `403` message, and the full-site message names a date. stellar-ui consumes these in [ui#328](https://github.com/orphic-inc/stellar-ui/issues/328). That issue also fixes an invite pool filter that sent uppercase statuses and answered `400` for every choice.

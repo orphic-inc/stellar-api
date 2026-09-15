@@ -54,3 +54,45 @@ describe('GET /api/users/invites — status filter', () => {
     );
   });
 });
+
+describe('GET /api/users/invites — email search and ordering (#636)', () => {
+  beforeEach(() => {
+    resetApiTestState();
+    setCurrentUserPermissions({ invites_manage: true });
+    prismaMock.invite.findMany.mockResolvedValue([] as never);
+    prismaMock.invite.count.mockResolvedValue(0 as never);
+  });
+
+  it('matches a case-insensitive substring, combined with status', async () => {
+    const res = await request(app).get(
+      '/api/users/invites?status=pending&email=%20@Example.org%20'
+    );
+
+    expect(res.status).toBe(200);
+    const where = {
+      status: 'pending',
+      email: { contains: '@Example.org', mode: 'insensitive' }
+    };
+    expect(prismaMock.invite.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where })
+    );
+    expect(prismaMock.invite.count).toHaveBeenCalledWith({ where });
+  });
+
+  it('rejects a search shorter than three characters', async () => {
+    const res = await request(app).get('/api/users/invites?email=ab');
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toHaveProperty('email');
+  });
+
+  it('breaks expires ties on id, so pages cannot overlap', async () => {
+    await request(app).get('/api/users/invites');
+
+    expect(prismaMock.invite.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ expires: 'desc' }, { id: 'desc' }]
+      })
+    );
+  });
+});

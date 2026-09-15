@@ -1,12 +1,12 @@
 /**
- * Staff invite controls at the route level (#636): revoking invite privileges
- * and setting the invite count. Its own file because moderation.spec.ts is past
- * the size Codacy flags.
+ * Staff invite controls at the route level (#636): revoking invite privileges,
+ * setting the invite count, and cancelling a pending invite. Its own file
+ * because moderation.spec.ts is past the size Codacy flags.
  *
  * What a mocked Prisma can show: the shape of each write (the count edit must
- * stay a compare-and-set), the audit row, when the member is PMed, and the
- * status each outcome answers. The send refusal and the lapse of a revoked
- * member's invites against a real database are inviteExpiry.integration.ts's.
+ * stay a compare-and-set, the cancel a claim on `pending`), the audit row, when
+ * the member is PMed, and the status each outcome answers. The same rules
+ * against a real database are inviteControls.integration.ts's.
  */
 import {
   request,
@@ -236,5 +236,108 @@ describe('PUT /api/users/:id/invite-count', () => {
     grant({ users_edit: true, invites_manage: true });
     const res = await request(app).put('/api/users/9/invite-count').send(edit);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/users/invites/:inviteId/cancel', () => {
+  const cancel = { reason: 'Sold on a forum' };
+  const claimed = () => {
+    prismaMock.invite.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.invite.findUniqueOrThrow.mockResolvedValue({
+      inviterId: 12,
+      email: 'buyer@example.com'
+    } as never);
+    prismaMock.user.update.mockResolvedValue({} as never);
+  };
+
+  it('claims the pending row, refunds the inviter and audits it', async () => {
+    claimed();
+
+    const res = await request(app)
+      .post('/api/users/invites/5/cancel')
+      .send(cancel);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      msg: 'Invite cancelled and returned to its inviter'
+    });
+    // A claim, not an update by id: an invite the sweep or a registration
+    // already took must not be cancelled, or refunded, a second time.
+    expect(prismaMock.invite.updateMany).toHaveBeenCalledWith({
+      where: { id: 5, status: 'pending' },
+      data: { status: 'cancelled' }
+    });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 12 },
+      data: { inviteCount: { increment: 1 } }
+    });
+    expect(auditMetadata()).toMatchObject({
+      action: 'invite.cancelled',
+      metadata: {
+        by: 'staff',
+        inviterId: 12,
+        email: 'buyer@example.com',
+        refunded: true,
+        reason: 'Sold on a forum',
+        messaged: false
+      }
+    });
+    expect(sendSystemMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('PMs the inviter when staff write a message', async () => {
+    claimed();
+
+    await request(app)
+      .post('/api/users/invites/5/cancel')
+      .send({ ...cancel, message: 'Please do not trade invites.' });
+
+    expect(sendSystemMessageMock).toHaveBeenCalledWith(
+      12,
+      'An invite you sent was cancelled',
+      'Please do not trade invites.\n\nYour invite to buyer@example.com has ' +
+        `been returned to you.\n\n${STAFF_PM_LINE}`
+    );
+  });
+
+  it('answers 409 for an invite that is no longer pending, and refunds nothing', async () => {
+    prismaMock.invite.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.invite.findUnique.mockResolvedValue({ id: 5 } as never);
+
+    const res = await request(app)
+      .post('/api/users/invites/5/cancel')
+      .send({ ...cancel, message: 'x' });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ msg: 'This invite is no longer pending' });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    expect(sendSystemMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for an invite that does not exist', async () => {
+    prismaMock.invite.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.invite.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/users/invites/5/cancel')
+      .send(cancel);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Invite not found' });
+  });
+
+  it('requires invites_edit — viewing the pool is not enough', async () => {
+    grant({ invites_manage: true });
+    const res = await request(app)
+      .post('/api/users/invites/5/cancel')
+      .send(cancel);
+    expect(res.status).toBe(403);
+    expect(prismaMock.invite.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 without a reason', async () => {
+    const res = await request(app).post('/api/users/invites/5/cancel').send({});
+    expect(res.status).toBe(400);
   });
 });

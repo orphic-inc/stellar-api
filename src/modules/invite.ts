@@ -14,7 +14,11 @@ import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
-import { inviteExpiresAt, isInviteLapsed } from './inviteExpiry';
+import {
+  inviteExpiresAt,
+  isInviteLapsed,
+  LAPSED_INVITE_STATUSES
+} from './inviteExpiry';
 import {
   expireLapsedInvite,
   notifyInviteExpired,
@@ -87,10 +91,10 @@ const writeInvite = (
       const actor = { actorId: inviterId, by: 'createInvite' };
       if (await expireLapsedInvite(tx, lapsed, now, actor)) expired = lapsed;
 
-      // Reuse only a row that is expired NOW. A concurrent re-invite that got
-      // here first has already flipped it back to pending.
+      // Reuse only a row that is expired or cancelled NOW. A concurrent
+      // re-invite that got here first has already flipped it back to pending.
       const { count } = await tx.invite.updateMany({
-        where: { id: existing.id, status: 'expired' },
+        where: { id: existing.id, status: { in: [...LAPSED_INVITE_STATUSES] } },
         data: { ...fields, inviterId, status: 'pending' }
       });
       if (count === 0) throw new InviteRefused('already_invited');

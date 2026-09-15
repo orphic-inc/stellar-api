@@ -54,6 +54,7 @@ import {
   rankLockSchema,
   canInviteSchema,
   inviteCountSchema,
+  cancelInviteSchema,
   donorRankSchema,
   grantDonorSchema,
   ircNickVerifySchema,
@@ -66,6 +67,7 @@ import {
   type RankLockInput,
   type CanInviteInput,
   type InviteCountInput,
+  type CancelInviteInput,
   type DonorRankInput,
   type GrantDonorInput,
   type IrcNickVerifyInput
@@ -88,7 +90,11 @@ import {
   type StatsPeriodQuery
 } from '../../schemas/statsHistory';
 import { getUserStatHistory } from '../../modules/statsHistory';
-import { setCanInvite, setInviteCount } from '../../modules/inviteControls';
+import {
+  setCanInvite,
+  setInviteCount,
+  cancelInvite
+} from '../../modules/inviteControls';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -426,9 +432,16 @@ router.get(
 // any other bad query value, and the cast is gone.
 const invitesQuerySchema = z.object({
   ...paginationBase,
-  status: z.nativeEnum(InviteStatus).optional()
+  status: z.nativeEnum(InviteStatus).optional(),
+  // Case-insensitive substring (#636), so a domain like `@example.org` finds
+  // every invite to it. The pool already returns full addresses to this
+  // permission, so a filter reveals nothing new.
+  email: z.string().trim().min(3).max(254).optional()
 });
 type InvitesQuery = z.infer<typeof invitesQuerySchema>;
+const inviteIdParamsSchema = z.object({
+  inviteId: z.coerce.number().int().positive()
+});
 
 // GET /api/users/invites — invite pool (must be before /:id)
 router.get(
@@ -437,13 +450,18 @@ router.get(
   validateQuery(invitesQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const pg = parsedPage(res);
-    const { status } = parsedQuery<InvitesQuery>(res);
-    const where = status ? { status } : {};
+    const { status, email } = parsedQuery<InvitesQuery>(res);
+    const where: Prisma.InviteWhereInput = {
+      ...(status ? { status } : {}),
+      ...(email ? { email: { contains: email, mode: 'insensitive' } } : {})
+    };
     const [invites, total] = await Promise.all([
       prisma.invite.findMany({
         where,
         include: { inviter: { select: { id: true, username: true } } },
-        orderBy: { expires: 'desc' },
+        // `id` breaks ties, or rows sharing an `expires` can repeat or vanish
+        // across pages.
+        orderBy: [{ expires: 'desc' }, { id: 'desc' }],
         skip: pg.skip,
         take: pg.limit
       }),
@@ -451,6 +469,24 @@ router.get(
     ]);
     const safe = invites.map(({ inviteKey: _k, ...rest }) => rest);
     paginatedResponse(res, safe, total, pg);
+  })
+);
+
+// POST /api/users/invites/:inviteId/cancel — cancel a pending invite and return
+// it to its inviter (#636). 409 once it is no longer pending.
+router.post(
+  '/invites/:inviteId/cancel',
+  ...requirePermission('invites_edit'),
+  validateParams(inviteIdParamsSchema),
+  validate(cancelInviteSchema),
+  authHandler(async (req, res) => {
+    const { inviteId } = parsedParams<{ inviteId: number }>(res);
+    await cancelInvite(
+      req.user.id,
+      inviteId,
+      parsedBody<CancelInviteInput>(res)
+    );
+    res.json({ msg: 'Invite cancelled and returned to its inviter' });
   })
 );
 
