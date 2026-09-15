@@ -95,7 +95,7 @@ describe('POST /api/auth/register — capacity (#624)', () => {
     prismaMock.invite.findUnique.mockResolvedValueOnce({
       email: 'late@example.com',
       expires,
-      inviter: { disabled: false },
+      inviter: { disabled: false, canInvite: true },
       status: 'pending'
     } as never);
     passPreChecks();

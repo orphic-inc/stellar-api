@@ -120,7 +120,8 @@ jest.mock('../modules/pm', () => ({
   resolveTicket: jest.fn(),
   unresolveTicket: jest.fn(),
   assignTicket: jest.fn(),
-  bulkResolveTickets: jest.fn()
+  bulkResolveTickets: jest.fn(),
+  sendSystemMessage: jest.fn()
 }));
 
 jest.mock('../modules/staffInbox', () => ({

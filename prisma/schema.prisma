@@ -487,6 +487,11 @@ model User {
   // RatioPolicyState; future abuse suspensions may gate it for unrelated reasons.
   // Read as a hard gate on the download hot path (downloads.ts). See #294.
   canDownload           Boolean             @default(true)
+  // Staff-revoked invite privileges (#636). Unlike canDownload, staff is the
+  // only writer (PUT /users/:id/can-invite). While false the member cannot send,
+  // does not accrue (inviteGrant.ts), and their pending invites lapse
+  // (inviteExpiry.ts). The balance is kept, and is inert until restored.
+  canInvite             Boolean             @default(true)
   // Staff-pinned rank: when true the automated progression engine
   // (rankProgressionJob) will not promote or demote this user (USER_CLASSES_PLAN
   // §4). Set by staff via the manual override; the evaluator treats it as a freeze.

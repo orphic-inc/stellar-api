@@ -13,7 +13,8 @@
  *    member within an invite's three days is almost always a moderation act,
  *    and a disabled member should not keep bringing people in. It answers the
  *    key holder exactly as an ordinary lapse does, so the reply cannot reveal
- *    that the inviter was disabled.
+ *    that the inviter was disabled. An inviter whose invite privileges staff
+ *    revoked (`canInvite = false`, #636) is the same case, for the same reason.
  *  - `expired` is a stored status, but a `pending` row past `expires` has
  *    lapsed too. The sweep runs hourly, and the gates must not honour a key in
  *    the gap between expiry and the sweep reaching it.
@@ -33,6 +34,7 @@ export interface InviteLapseInput {
   status: InviteStatus;
   expires: Date;
   inviterDisabled: boolean;
+  inviterCanInvite: boolean;
 }
 
 /**
@@ -45,7 +47,11 @@ export const isInviteLapsed = (
 ): boolean => {
   if (invite.status === 'expired') return true;
   if (invite.status !== 'pending') return false;
-  return invite.expires.getTime() <= now.getTime() || invite.inviterDisabled;
+  return (
+    invite.expires.getTime() <= now.getTime() ||
+    invite.inviterDisabled ||
+    !invite.inviterCanInvite
+  );
 };
 
 /**
@@ -57,12 +63,16 @@ export const lapsedPendingInviteWhere = (
   now: Date
 ): Prisma.InviteWhereInput => ({
   status: 'pending',
-  OR: [{ expires: { lte: now } }, { inviter: { disabled: true } }]
+  OR: [
+    { expires: { lte: now } },
+    { inviter: { disabled: true } },
+    { inviter: { canInvite: false } }
+  ]
 });
 
 /** The complement for pending rows: a key registration may still accept. */
 export const livePendingInviteWhere = (now: Date): Prisma.InviteWhereInput => ({
   status: 'pending',
   expires: { gt: now },
-  inviter: { disabled: false }
+  inviter: { disabled: false, canInvite: true }
 });

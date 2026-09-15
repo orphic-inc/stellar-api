@@ -190,6 +190,7 @@ export const DEFAULT_RANKS = [
       staff_inbox_manage: true,
       tags_manage: true,
       invites_manage: true,
+      invites_edit: true,
       recovery_manage: true,
       users_edit: true,
       users_warn: true,

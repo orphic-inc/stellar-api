@@ -29,6 +29,7 @@ const base = (over: Partial<InviteGrantInput> = {}): InviteGrantInput => ({
   dateRegistered: daysAgo(365),
   standing: 'clean',
   disabled: false,
+  canInvite: true,
   rankLevel: 150,
   ...over
 });
@@ -56,6 +57,15 @@ describe('evaluateInviteGrant — exemptions', () => {
     const d = evaluateInviteGrant(base({ perPeriod: 2, cap: 0 }), NOW);
     expect(d.action).toBe('none');
     expect(d.reason).toBe('rank holds no invites');
+  });
+
+  it('skips a member whose invite privileges staff revoked, without spending the period (#636)', () => {
+    // 'none', not 'advance': the clock stays put, exactly as for standing, so a
+    // restore grants at most one period rather than a backlog.
+    const d = evaluateInviteGrant(base({ canInvite: false }), NOW);
+    expect(d.action).toBe('none');
+    expect(d.amount).toBe(0);
+    expect(d.reason).toBe('invite privileges revoked');
   });
 });
 

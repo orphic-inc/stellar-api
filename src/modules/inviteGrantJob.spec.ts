@@ -54,6 +54,7 @@ interface RowOver {
   lastInviteGrantAt?: Date | null;
   dateRegistered?: Date;
   banDate?: Date | null;
+  canInvite?: boolean;
   warnings?: Array<{ expiresAt: Date | null }>;
   rank?: { id: number; level: number; perPeriod: number; cap: number };
 }
@@ -73,6 +74,7 @@ const row = ({ rank, ...over }: RowOver = {}) => {
     lastInviteGrantAt: daysAgo(PERIOD_DAYS) as Date | null,
     dateRegistered: daysAgo(400),
     banDate: null as Date | null,
+    canInvite: true,
     warnings: [] as Array<{ expiresAt: Date | null }>,
     ...over,
     disabled: false,
@@ -143,6 +145,8 @@ describe('runInviteGrantCycle — writes', () => {
     // cap 6 - amount 2: a member who spends between our read and this write
     // simply falls out of the predicate instead of being overwritten.
     expect(call.where.inviteCount).toEqual({ lte: 4 });
+    // A revoke landing between our read and this write is not granted over.
+    expect(call.where).toMatchObject({ canInvite: true });
     expect(call.data.inviteCount).toEqual({ increment: 2 });
     expect(call.data.lastInviteGrantAt).toBe(NOW);
   });
@@ -178,6 +182,19 @@ describe('runInviteGrantCycle — writes', () => {
     ]);
     const tally = await runInviteGrantCycle(NOW);
 
+    expect(tally.withheld).toBe(1);
+    expect(tally.granted).toBe(0);
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('skips a revoked member and counts them apart from standing (#636)', async () => {
+    mockPages([
+      row({ id: 1, canInvite: false }),
+      row({ id: 2, warnings: [{ expiresAt: null }, { expiresAt: null }] })
+    ]);
+    const tally = await runInviteGrantCycle(NOW);
+
+    expect(tally.revoked).toBe(1);
     expect(tally.withheld).toBe(1);
     expect(tally.granted).toBe(0);
     expect(prismaMock.user.updateMany).not.toHaveBeenCalled();

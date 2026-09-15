@@ -70,6 +70,8 @@ export interface InviteGrantInput {
   /** From `computeStanding` — the ADR-0004 producer, not a local flag. */
   standing: Standing;
   disabled: boolean;
+  /** `User.canInvite`. False when staff revoked invite privileges (#636). */
+  canInvite: boolean;
   /** Rank level; staff and above are never auto-managed. */
   rankLevel: number;
 }
@@ -117,6 +119,9 @@ const exemptionReason = (input: InviteGrantInput): string | null => {
     return 'staff rank — creates accounts directly';
   if (input.perPeriod <= 0) return 'rank earns no invites';
   if (input.cap <= 0) return 'rank holds no invites';
+  // Like standing, and deliberately 'none' rather than 'advance': the clock
+  // stays put, so lifting either grants at most one period (no back-pay).
+  if (!input.canInvite) return 'invite privileges revoked';
   if (DENIED_STANDINGS.includes(input.standing))
     return `${input.standing} standing`;
   return null;

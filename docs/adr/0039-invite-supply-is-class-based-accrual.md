@@ -54,6 +54,8 @@ No grant below the `neutral` tier — so `poor` (2+ active warnings) and `hammer
 
 `standing.ts` and `ruleImpact` already drifted into two structurally-identical copies of `Standing`; a third reading of "who is in bad standing", written inline in a job's `where` clause, is how that becomes unrecoverable. This is the same instinct as [ADR-0001](0001-granular-permission-checks.md)'s ban on ad-hoc role checks.
 
+_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). Staff can revoke one member's invite privileges (`User.canInvite = false`). A revoked member is exempt in the same way as `poor` standing: the decision is `none` and the clock does not move, so a restore grants at most one period. The two stay separate reasons. The cycle tally counts revokes as `revoked`, and `withheld` keeps meaning standing only. The grant write also requires `canInvite: true`, so a revoke landing between the read and the write is not granted over.)_
+
 Withholding a grant is also the right severity. Contagion is _"suspect, never condemned"_, and this is the matching consequence: the member keeps every invite they already hold, and simply earns none while the site is unhappy with them.
 
 Separately, a **30-day tenure floor is a constant in `inviteGrant.ts`**, overridable by no rank row. The rate and cap are admin-editable columns, which is a typo surface, and standing does not cover it — a day-old account is `clean`. `inactivity.ts` keeps its thresholds in code so that changing them is a review rather than an environment variable someone mistypes into 11; the floor is the same argument aimed at a form field.

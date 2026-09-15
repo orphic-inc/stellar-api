@@ -37,6 +37,8 @@ An invite has lapsed when it is `expired`, or `pending` past `expires`, or `pend
 
 The disabled-inviter arm exists because a disable within three days of a send is almost always a staff act, and a member disabled for abuse should not keep bringing people in. The cost falls on the rare invitee of a member the inactivity sweep caught, and anyone can re-invite them at once.
 
+_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). An inviter whose invite privileges staff revoked (`User.canInvite = false`) is the rule's second inviter-side arm, for the reason the disabled-inviter arm gives. `isInviteLapsed` and both where-fragments carry it, so registration, re-invites and the sweep still agree. The key holder is answered `invite_expired`, and a revoke frees the member's pending invites within the hour. As with a disable, restoring the flag does not revive an invite the sweep has already expired.)_
+
 ### 3. The transition pays the refund, and the refund ignores the cap
 
 Whoever moves a row from `pending` to `expired` refunds it. The claim is a conditional `updateMany` over the lapse predicate, and only a claim that moved one row increments the inviter, in the same transaction. The sweep is the usual writer. A re-invite of a lapsed address that nobody has expired yet is the other, and the claim keeps the refund exactly-once between them.
@@ -72,6 +74,8 @@ A full site does not pause the clock. Pausing needs a record of when the site wa
 ### 7. The inviter is told, after the commit
 
 Every lapse writes an `invite.expired` audit row. The original inviter gets a System PM, sent after the transaction commits so a failed PM cannot undo a refund. `sendSystemMessage` refuses disabled recipients, which is the intended outcome. A member re-inviting their own address gets no PM, since they are the one who did it.
+
+_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). An inviter whose invite privileges are revoked gets no PM either, from the sweep or from a re-invite. Their invites lapsed because of the revoke, not because time ran out, and "you can invite that address again" would be false. The refund and the audit row are unchanged. Staff can PM the member about the revoke itself.)_
 
 ### 8. `rejected` is dropped
 

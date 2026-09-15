@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { externalStylesheetUrl } from './stylesheet';
 import { avatarUrl } from './profile';
+import { STAFF_INVITE_COUNT_MAX } from '../modules/inviteControls';
 
 export const adminCreateUserSchema = z.object({
   username: z.string().min(1, 'Username is required').max(32),
@@ -48,6 +49,27 @@ export const setRankSchema = z.object({
 
 export const rankLockSchema = z.object({
   rankLocked: z.boolean()
+});
+
+// Staff invite controls (#636). `reason` is staff-only and goes to the audit
+// row; `message`, when sent, is PMed to the member.
+const staffReason = z.string().trim().min(1, 'Reason is required');
+const memberMessage = z.string().trim().min(1).optional();
+
+export const canInviteSchema = z.object({
+  canInvite: z.boolean(),
+  reason: staffReason,
+  message: memberMessage
+});
+
+const inviteCount = z.number().int().min(0).max(STAFF_INVITE_COUNT_MAX);
+
+export const inviteCountSchema = z.object({
+  inviteCount,
+  // Required: the write is a compare-and-set against the count the caller saw.
+  expectedInviteCount: z.number().int().min(0),
+  reason: staffReason,
+  message: memberMessage
 });
 
 export const donorRankSchema = z.object({
@@ -104,6 +126,8 @@ export type WarnUserInput = z.infer<typeof warnUserSchema>;
 export type ModerationNoteInput = z.infer<typeof moderationNoteSchema>;
 export type SetRankInput = z.infer<typeof setRankSchema>;
 export type RankLockInput = z.infer<typeof rankLockSchema>;
+export type CanInviteInput = z.infer<typeof canInviteSchema>;
+export type InviteCountInput = z.infer<typeof inviteCountSchema>;
 export type DonorRankInput = z.infer<typeof donorRankSchema>;
 export type GrantDonorInput = z.infer<typeof grantDonorSchema>;
 export type IrcNickVerifyInput = z.infer<typeof ircNickVerifySchema>;

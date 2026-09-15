@@ -9,6 +9,7 @@ import {
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
 import { isSiteFull } from '../../modules/settings';
+import { site } from '../../modules/config';
 import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
 import {
@@ -211,6 +212,8 @@ router.put(
   })
 );
 
+const INVITES_REVOKED_MSG = `Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: ${site.staffPmPath}`;
+
 // POST /api/profile/referral/create-invite
 router.post(
   '/referral/create-invite',
@@ -230,6 +233,8 @@ router.post(
     if (!result.ok) {
       if (result.reason === 'no_invites')
         return res.status(403).json({ msg: 'No invites remaining' });
+      if (result.reason === 'invites_revoked')
+        return res.status(403).json({ msg: INVITES_REVOKED_MSG });
       return res
         .status(409)
         .json({ msg: 'An invite has already been sent to that address' });
