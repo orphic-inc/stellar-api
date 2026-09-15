@@ -9,7 +9,7 @@
  * happens exactly once.
  */
 import crypto from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, RatioPolicyStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
@@ -26,10 +26,20 @@ import {
   notifyInviteExpired,
   type LapsedInvite
 } from './inviteExpiryJob';
+import {
+  firstInviteRefusal,
+  isOnRatioWatch,
+  type InviteGateInput,
+  type InviteGateRefusal
+} from './inviteGates';
+import { computeStanding } from './standing';
+import { DAY_MS } from './inviteGrant';
+import { getRatioStats } from './ratio';
+import { isSiteFull } from './settings';
 
 const log = getLogger('invite');
 
-type RefusalReason = 'no_invites' | 'already_invited' | 'invites_revoked';
+type RefusalReason = InviteGateRefusal | 'already_invited';
 
 type CreateInviteResult =
   | { ok: true; inviteKey: string; emailSent: boolean }
@@ -60,6 +70,69 @@ type ExistingInvite = NonNullable<
 >;
 
 /**
+ * The spend's claim on the inviter: the gates a staff decision can close, plus
+ * the balance. Exported so a database test can hold the claim on its own, apart
+ * from the pre-check in `createInvite` that would otherwise hide it.
+ */
+export const inviteSpendWhere = {
+  inviteCount: { gt: 0 },
+  canInvite: true,
+  canDownload: true
+} satisfies Prisma.UserWhereInput;
+
+/**
+ * Load one member's state and answer the send gates (#637, ADR-0043).
+ *
+ * Standing, ratio watch and capacity are read here and not in the spend: none
+ * is a staff decision that must land atomically, and a member whose ratio or
+ * warnings change mid-send gains nothing worth a lock (the ADR-0040 §3
+ * argument). The ratio is computed only for a member whose row says `WATCH`.
+ */
+export const getInviteRefusal = async (
+  userId: number,
+  now: Date = new Date()
+): Promise<InviteGateRefusal | null> => {
+  const [user, policy, siteFull] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        canInvite: true,
+        canDownload: true,
+        inviteCount: true,
+        banDate: true,
+        dateRegistered: true,
+        warnings: { select: { expiresAt: true } }
+      }
+    }),
+    prisma.ratioPolicyState.findUnique({
+      where: { userId },
+      select: { status: true }
+    }),
+    isSiteFull()
+  ]);
+  const status = policy?.status ?? null;
+  const meetsRequirement =
+    status === RatioPolicyStatus.WATCH
+      ? (await getRatioStats(userId)).meetsRequirement
+      : true;
+
+  const input: InviteGateInput = {
+    canInvite: user.canInvite,
+    canDownload: user.canDownload,
+    standing: computeStanding({
+      warnings: user.warnings,
+      banned: user.banDate !== null,
+      accountAgeDays: (now.getTime() - user.dateRegistered.getTime()) / DAY_MS,
+      now
+    }),
+    onRatioWatch: isOnRatioWatch(status, meetsRequirement),
+    siteFull,
+    balance: user.inviteCount
+  };
+  return firstInviteRefusal(input);
+};
+
+/**
  * Write the invite and spend one, atomically. Returns the invite this call
  * expired on the way, if any, so the caller can notify its inviter once the
  * transaction has committed.
@@ -69,10 +142,9 @@ type ExistingInvite = NonNullable<
  * balance. Because it runs after any refund, a member re-inviting their own
  * lapsed address is never refused for a balance the refund just restored.
  *
- * `canInvite` is in the same predicate (#636), so a revoke landing mid-send
- * refuses the write rather than racing it. Only when the spend misses do we
- * read which half failed; a revoked member hears about the revoke, not about a
- * balance they cannot use anyway.
+ * `canInvite` (#636) and `canDownload` (#637) are in the same predicate, so a
+ * staff decision landing mid-send refuses the write rather than racing it. Only
+ * when the spend misses do we read which part failed, in the gates' order.
  */
 const writeInvite = (
   inviterId: number,
@@ -106,16 +178,20 @@ const writeInvite = (
     }
 
     const spent = await tx.user.updateMany({
-      where: { id: inviterId, inviteCount: { gt: 0 }, canInvite: true },
+      where: { id: inviterId, ...inviteSpendWhere },
       data: { inviteCount: { decrement: 1 } }
     });
     if (spent.count === 0) {
       const inviter = await tx.user.findUnique({
         where: { id: inviterId },
-        select: { canInvite: true }
+        select: { canInvite: true, canDownload: true }
       });
       throw new InviteRefused(
-        inviter?.canInvite === false ? 'invites_revoked' : 'no_invites'
+        inviter?.canInvite === false
+          ? 'invites_revoked'
+          : inviter?.canDownload === false
+            ? 'downloads_disabled'
+            : 'no_invites'
       );
     }
 
@@ -150,6 +226,31 @@ const refusalFor = (err: unknown): RefusalReason | null => {
   return null;
 };
 
+/**
+ * Everything that refuses before the write, so nothing is spent: the send gates
+ * first, then the address. A member who cannot send at all is told why, not
+ * that the address is taken.
+ *
+ * Except an empty balance the write itself refills. Re-inviting your own lapsed
+ * invite that the sweep has not reached refunds you inside the same
+ * transaction, before the spend (ADR-0041), so it pays for itself. The spend
+ * predicate still has the last word on the balance.
+ */
+const refuseBeforeWrite = async (
+  inviterId: number,
+  existing: ExistingInvite | null,
+  now: Date
+): Promise<RefusalReason | null> => {
+  const taken = isAddressTaken(existing, now);
+  const refusal = await getInviteRefusal(inviterId, now);
+  const refundsSelf =
+    !taken &&
+    existing?.inviterId === inviterId &&
+    existing.status === 'pending';
+  if (refusal && !(refusal === 'no_invites' && refundsSelf)) return refusal;
+  return taken ? 'already_invited' : null;
+};
+
 export const createInvite = async (
   inviterId: number,
   email: string,
@@ -159,9 +260,8 @@ export const createInvite = async (
   const now = new Date();
 
   const existing = await findInviteByEmail(normalizedEmail);
-  if (isAddressTaken(existing, now)) {
-    return { ok: false, reason: 'already_invited' };
-  }
+  const refused = await refuseBeforeWrite(inviterId, existing, now);
+  if (refused) return { ok: false, reason: refused };
 
   const inviteKey = crypto.randomBytes(20).toString('hex');
   const fields = {

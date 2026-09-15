@@ -1,0 +1,92 @@
+/**
+ * Table-driven tests for the pure invite send gates (#637, ADR-0043).
+ *
+ * No DB mock: the module has no I/O. Each gate is pinned alone, and every pair
+ * is pinned in order, because the order is the decision — a revoked member on a
+ * full site must hear about the revoke. Loading the state against a real
+ * database is inviteGates.integration.ts's.
+ */
+import { RatioPolicyStatus } from '@prisma/client';
+import {
+  firstInviteRefusal,
+  isOnRatioWatch,
+  INVITE_GATE_ORDER,
+  type InviteGateInput,
+  type InviteGateRefusal
+} from './inviteGates';
+
+const OPEN: InviteGateInput = {
+  canInvite: true,
+  canDownload: true,
+  standing: 'clean',
+  onRatioWatch: false,
+  siteFull: false,
+  balance: 1
+};
+
+/** The one change to OPEN that closes each gate. */
+const CLOSE: Record<InviteGateRefusal, Partial<InviteGateInput>> = {
+  invites_revoked: { canInvite: false },
+  downloads_disabled: { canDownload: false },
+  poor_standing: { standing: 'poor' },
+  ratio_watch: { onRatioWatch: true },
+  site_full: { siteFull: true },
+  no_invites: { balance: 0 }
+};
+
+describe('firstInviteRefusal', () => {
+  it('lets a member with every gate open send', () => {
+    expect(firstInviteRefusal(OPEN)).toBeNull();
+  });
+
+  it.each(INVITE_GATE_ORDER)('refuses %s on its own', (reason) => {
+    expect(firstInviteRefusal({ ...OPEN, ...CLOSE[reason] })).toBe(reason);
+  });
+
+  const pairs = INVITE_GATE_ORDER.flatMap((earlier, i) =>
+    INVITE_GATE_ORDER.slice(i + 1).map((later) => [earlier, later] as const)
+  );
+
+  it.each(pairs)('names %s over %s', (earlier, later) => {
+    expect(
+      firstInviteRefusal({ ...OPEN, ...CLOSE[later], ...CLOSE[earlier] })
+    ).toBe(earlier);
+  });
+
+  it('orders staff decisions, then member state, then capacity and balance', () => {
+    expect(INVITE_GATE_ORDER).toEqual([
+      'invites_revoked',
+      'downloads_disabled',
+      'poor_standing',
+      'ratio_watch',
+      'site_full',
+      'no_invites'
+    ]);
+  });
+
+  it.each([
+    ['pristine', null],
+    ['clean', null],
+    ['neutral', null],
+    ['poor', 'poor_standing'],
+    ['hammer', 'poor_standing']
+  ] as const)(
+    'reads %s standing the way the handout does',
+    (standing, expected) => {
+      expect(firstInviteRefusal({ ...OPEN, standing })).toBe(expected);
+    }
+  );
+});
+
+describe('isOnRatioWatch', () => {
+  it.each([
+    [RatioPolicyStatus.WATCH, false, true],
+    // Recovered without a download: the row still says WATCH.
+    [RatioPolicyStatus.WATCH, true, false],
+    [RatioPolicyStatus.OK, false, false],
+    [RatioPolicyStatus.DOWNLOAD_DISABLED, false, false],
+    [null, false, false]
+  ] as const)('status %s, meets requirement %s → %s', (status, meets, on) => {
+    expect(isOnRatioWatch(status, meets)).toBe(on);
+  });
+});

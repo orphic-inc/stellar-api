@@ -253,6 +253,7 @@ src/
     inviteExpiry.ts           # Invite lapse rule (#627, ADR-0041) — pure: `INVITE_TTL_DAYS`, `isInviteLapsed` and the claim where-fragments shared by registration, re-invite and the sweep
     inviteExpiryJob.ts        # Hourly sweep, no mode switch: claims each lapsed invite (`pending → expired`) and refunds it, one transaction per invite. The claim pays the refund, so it happens once
     inviteControls.ts         # Staff invite controls (#636): revoke `canInvite`, compare-and-set `inviteCount`, cancel with a refund; a member's withdraw shares the claim
+    inviteGates.ts            # Invite send gates (#637, ADR-0043) — pure: the first refusal, in order, for the send and the eligibility read
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick

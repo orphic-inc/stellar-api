@@ -1,6 +1,7 @@
 /**
  * A member's own invites at the route level (#640): the list of invites that
- * can still be used, and withdrawing one.
+ * can still be used, and withdrawing one. Also whether they can send one at all
+ * (#637).
  *
  * What a mocked Prisma can show: that the list uses the live predicate and is
  * scoped to the caller, that the withdraw is the shared cancel claim scoped to
@@ -22,6 +23,54 @@ beforeEach(() => {
     (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
   );
   prismaMock.auditLog.create.mockResolvedValue({} as never);
+});
+
+describe('GET /api/profile/me/invites/eligibility', () => {
+  const member = (overrides: Record<string, unknown> = {}) => {
+    prismaMock.user.findUniqueOrThrow.mockResolvedValue({
+      canInvite: true,
+      canDownload: true,
+      inviteCount: 2,
+      banDate: null,
+      dateRegistered: new Date('2025-01-01T00:00:00Z'),
+      warnings: [],
+      ...overrides
+    } as never);
+    prismaMock.ratioPolicyState.findUnique.mockResolvedValue(null);
+    prismaMock.siteSettings.upsert.mockResolvedValue({ maxUsers: 50 } as never);
+    prismaMock.user.count.mockResolvedValue(10);
+  };
+
+  it('answers canSend with no reason when every gate is open', async () => {
+    member();
+
+    const res = await request(app).get('/api/profile/me/invites/eligibility');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ canSend: true, reason: null, msg: null });
+    // The caller's own state, never another member's.
+    expect(prismaMock.user.findUniqueOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: TEST_USER_ID } })
+    );
+    expect(prismaMock.ratioPolicyState.findUnique).toHaveBeenCalledWith({
+      where: { userId: TEST_USER_ID },
+      select: { status: true }
+    });
+  });
+
+  it('answers the first refusal with the words the send would use', async () => {
+    member({ canDownload: false, inviteCount: 0 });
+    prismaMock.user.count.mockResolvedValue(50);
+
+    const res = await request(app).get('/api/profile/me/invites/eligibility');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      canSend: false,
+      reason: 'downloads_disabled',
+      msg: 'Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff'
+    });
+  });
 });
 
 describe('GET /api/profile/me/invites', () => {

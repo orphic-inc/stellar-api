@@ -2043,6 +2043,36 @@
           "suspect"
         ]
       },
+      "InviteEligibility": {
+        "type": "object",
+        "properties": {
+          "canSend": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "invites_revoked",
+              "downloads_disabled",
+              "poor_standing",
+              "ratio_watch",
+              "site_full",
+              "no_invites",
+              null
+            ]
+          },
+          "msg": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "canSend",
+          "reason",
+          "msg"
+        ]
+      },
       "OwnInviteItem": {
         "type": "object",
         "properties": {
@@ -13075,7 +13105,7 @@
             }
           },
           "403": {
-            "description": "No invites remaining, the site is full (#624), or staff revoked the caller's invite privileges (#636). In the last two the caller's invite is not spent",
+            "description": "A send gate refused (#637): invite privileges revoked (#636), download access disabled, active warnings (poor standing), ratio watch, the site is full (#624), or no invites remaining. The first that applies is reported, in that order, and no invite is spent. `GET /profile/me/invites/eligibility` answers the same gates first",
             "content": {
               "application/json": {
                 "schema": {
@@ -13096,6 +13126,42 @@
           },
           "429": {
             "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/profile/me/invites/eligibility": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Whether you can send an invite right now",
+        "description": "Self only (#637). Runs the same gates as `POST /profile/referral/create-invite`, in the same order, and `msg` is the words that send would answer. `reason` and `msg` are null exactly when `canSend` is true. Does not check an address: a send can still be refused `409` for one already invited.",
+        "responses": {
+          "200": {
+            "description": "Your invite eligibility",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteEligibility"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
             "content": {
               "application/json": {
                 "schema": {
