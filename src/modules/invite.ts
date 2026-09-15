@@ -23,7 +23,7 @@ import {
 
 const log = getLogger('invite');
 
-type RefusalReason = 'no_invites' | 'already_invited';
+type RefusalReason = 'no_invites' | 'already_invited' | 'invites_revoked';
 
 type CreateInviteResult =
   | { ok: true; inviteKey: string; emailSent: boolean }
@@ -45,7 +45,7 @@ const findInviteByEmail = (email: string) =>
       email: true,
       status: true,
       expires: true,
-      inviter: { select: { disabled: true } }
+      inviter: { select: { disabled: true, canInvite: true } }
     }
   });
 
@@ -62,6 +62,11 @@ type ExistingInvite = NonNullable<
  * member racing two sends with one invite left gets one, not a negative
  * balance. Because it runs after any refund, a member re-inviting their own
  * lapsed address is never refused for a balance the refund just restored.
+ *
+ * `canInvite` is in the same predicate (#636), so a revoke landing mid-send
+ * refuses the write rather than racing it. Only when the spend misses do we
+ * read which half failed; a revoked member hears about the revoke, not about a
+ * balance they cannot use anyway.
  */
 const writeInvite = (
   inviterId: number,
@@ -94,10 +99,18 @@ const writeInvite = (
     }
 
     const spent = await tx.user.updateMany({
-      where: { id: inviterId, inviteCount: { gt: 0 } },
+      where: { id: inviterId, inviteCount: { gt: 0 }, canInvite: true },
       data: { inviteCount: { decrement: 1 } }
     });
-    if (spent.count === 0) throw new InviteRefused('no_invites');
+    if (spent.count === 0) {
+      const inviter = await tx.user.findUnique({
+        where: { id: inviterId },
+        select: { canInvite: true }
+      });
+      throw new InviteRefused(
+        inviter?.canInvite === false ? 'invites_revoked' : 'no_invites'
+      );
+    }
 
     return expired;
   });
@@ -109,7 +122,8 @@ const isAddressTaken = (existing: ExistingInvite | null, now: Date): boolean =>
     {
       status: existing.status,
       expires: existing.expires,
-      inviterDisabled: existing.inviter.disabled
+      inviterDisabled: existing.inviter.disabled,
+      inviterCanInvite: existing.inviter.canInvite
     },
     now
   );

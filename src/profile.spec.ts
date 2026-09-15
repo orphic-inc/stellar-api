@@ -307,6 +307,22 @@ describe('POST /api/profile/referral/create-invite', () => {
     expect(createInviteMock).toHaveBeenCalledTimes(1);
   });
 
+  it('returns 403 naming Staff PM when invite privileges are revoked (#636)', async () => {
+    createInviteMock.mockResolvedValue({
+      ok: false,
+      reason: 'invites_revoked'
+    });
+
+    const res = await request(app)
+      .post('/api/profile/referral/create-invite')
+      .send({ email: 'newuser@example.com' });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      msg: 'Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: /inbox/staff'
+    });
+  });
+
   it('returns 409 when invite already sent to that address', async () => {
     createInviteMock.mockResolvedValue({
       ok: false,

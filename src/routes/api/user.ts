@@ -52,6 +52,8 @@ import {
   moderationNoteSchema,
   setRankSchema,
   rankLockSchema,
+  canInviteSchema,
+  inviteCountSchema,
   donorRankSchema,
   grantDonorSchema,
   ircNickVerifySchema,
@@ -62,6 +64,8 @@ import {
   type ModerationNoteInput,
   type SetRankInput,
   type RankLockInput,
+  type CanInviteInput,
+  type InviteCountInput,
   type DonorRankInput,
   type GrantDonorInput,
   type IrcNickVerifyInput
@@ -84,6 +88,7 @@ import {
   type StatsPeriodQuery
 } from '../../schemas/statsHistory';
 import { getUserStatHistory } from '../../modules/statsHistory';
+import { setCanInvite, setInviteCount } from '../../modules/inviteControls';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -958,6 +963,39 @@ router.put(
       rankLocked
     });
     res.json({ msg: rankLocked ? 'Rank locked' : 'Rank unlocked' });
+  })
+);
+
+// PUT /api/users/:id/can-invite — revoke or restore one member's invite
+// privileges (#636). The balance is kept; see modules/inviteControls.ts.
+router.put(
+  '/:id/can-invite',
+  ...requirePermission('invites_edit'),
+  validateParams(userIdParamsSchema),
+  validate(canInviteSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    const body = parsedBody<CanInviteInput>(res);
+    await setCanInvite(req.user.id, id, body);
+    res.json({
+      msg: body.canInvite
+        ? 'Invite privileges restored'
+        : 'Invite privileges revoked'
+    });
+  })
+);
+
+// PUT /api/users/:id/invite-count — set one member's invite count (#636). A
+// compare-and-set against `expectedInviteCount`: 409 when it has moved.
+router.put(
+  '/:id/invite-count',
+  ...requirePermission('invites_edit'),
+  validateParams(userIdParamsSchema),
+  validate(inviteCountSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    await setInviteCount(req.user.id, id, parsedBody<InviteCountInput>(res));
+    res.json({ msg: 'Invite count updated' });
   })
 );
 

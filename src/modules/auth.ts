@@ -38,6 +38,7 @@ export const authUserSelect = {
   isArtist: true,
   isDonor: true,
   canDownload: true,
+  canInvite: true,
   inviteCount: true,
   dateRegistered: true,
   lastLogin: true,
@@ -185,7 +186,7 @@ type InviteCheck =
  *
  * The email match is checked before the lapse, so a key that is not yours says
  * nothing about whether it is still live. A disabled inviter answers as a
- * lapse, not as `invalid_invite`: the sweep will mark that invite `expired`
+ * lapse, not as `invalid_invite` (so does a revoked one, #636): the sweep will mark that invite `expired`
  * within the hour, and the reply must not change when it does.
  */
 const checkInvite = async (
@@ -200,7 +201,7 @@ const checkInvite = async (
       status: true,
       expires: true,
       inviterId: true,
-      inviter: { select: { disabled: true } }
+      inviter: { select: { disabled: true, canInvite: true } }
     }
   });
   if (!invite || invite.status === 'accepted') {
@@ -213,7 +214,8 @@ const checkInvite = async (
     {
       status: invite.status,
       expires: invite.expires,
-      inviterDisabled: invite.inviter.disabled
+      inviterDisabled: invite.inviter.disabled,
+      inviterCanInvite: invite.inviter.canInvite
     },
     now
   );

@@ -74,13 +74,20 @@ describe('POST /api/auth/register — invite expiry (#627)', () => {
       email: 'invitee@example.com',
       status: 'pending',
       expires: new Date(Date.now() + 86_400_000),
-      inviter: { disabled: false },
+      inviter: { disabled: false, canInvite: true },
       ...over
     } as never);
 
   it.each([
     ['past its expiry', { expires: new Date(Date.now() - 1000) }],
-    ['from a disabled inviter', { inviter: { disabled: true } }],
+    [
+      'from a disabled inviter',
+      { inviter: { disabled: true, canInvite: true } }
+    ],
+    [
+      'from an inviter whose invite privileges are revoked (#636)',
+      { inviter: { disabled: false, canInvite: false } }
+    ],
     ['already marked expired', { status: 'expired' }]
   ])('refuses an invite %s with the expired message', async (_, over) => {
     inviteRow(over);
@@ -131,7 +138,7 @@ describe('POST /api/auth/register — invite expiry (#627)', () => {
         inviteKey: 'the-key',
         status: 'pending',
         expires: { gt: expect.any(Date) },
-        inviter: { disabled: false }
+        inviter: { disabled: false, canInvite: true }
       },
       data: { status: 'accepted' }
     });

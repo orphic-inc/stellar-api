@@ -189,6 +189,11 @@ export const PERMISSION_GROUPS = [
         description: 'Access invite pool and invite tree tools.'
       },
       {
+        key: 'invites_edit',
+        label: 'Edit invites',
+        description: "Change a member's invite count and invite privileges."
+      },
+      {
         key: 'ratio_policy_manage',
         label: 'Manage ratio policy',
         description: 'Manage ratio policy tools and ratio watch.'

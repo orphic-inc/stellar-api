@@ -41,6 +41,8 @@ import {
   ircNickVerifySchema,
   setRankSchema,
   rankLockSchema,
+  canInviteSchema,
+  inviteCountSchema,
   staffBioSchema,
   dncSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
@@ -316,6 +318,8 @@ const AuthUser = registry.register(
     isArtist: z.boolean().optional(),
     isDonor: z.boolean().optional(),
     canDownload: z.boolean().optional(),
+    // False when staff revoked invite privileges (#636); sending then answers 403.
+    canInvite: z.boolean().optional(),
     contributed: z.string().optional(),
     consumed: z.string().optional(),
     ratio: z.number().optional(),
@@ -947,6 +951,8 @@ const PublicProfile = registry.register(
     warned: z.string().nullable(),
     standing: z.enum(['pristine', 'clean', 'neutral', 'poor', 'hammer']),
     inviteCount: z.number().nullable(),
+    // Owner or staff only, like inviteCount; null for anyone else (#636).
+    canInvite: z.boolean().nullable(),
     staffBio: z.string().nullable(),
     stats: ProfileStats,
     userRank: UserRankSummary.extend({
@@ -1665,6 +1671,52 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'put',
+  path: '/users/{id}/can-invite',
+  tags: ['Users'],
+  summary: "Staff: revoke or restore a member's invite privileges",
+  description:
+    'Requires `invites_edit` (#636). While revoked the member cannot send ' +
+    '(403), earns no invites from the handout, and their pending invites ' +
+    'lapse and are refunded. The balance is kept. `reason` is recorded in the ' +
+    'audit log for staff; `message`, when present, is sent to the member as a ' +
+    'System PM. Idempotent: writing the current value still succeeds.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: canInviteSchema } } }
+  },
+  responses: {
+    200: msgResponse('Invite privileges revoked or restored'),
+    404: msgResponse('User not found')
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/users/{id}/invite-count',
+  tags: ['Users'],
+  summary: "Staff: set a member's invite count",
+  description:
+    'Requires `invites_edit` (#636). A compare-and-set: the write applies ' +
+    'only while the balance still equals `expectedInviteCount`, so a spend, ' +
+    'grant or refund that landed since the caller read it is never ' +
+    'overwritten. Not bounded by the rank `inviteCap`. `reason` is recorded ' +
+    'in the audit log; `message`, when present, is sent to the member as a ' +
+    'System PM naming the new balance.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: inviteCountSchema } } }
+  },
+  responses: {
+    200: msgResponse('Invite count updated'),
+    404: msgResponse('User not found'),
+    409: msgResponse(
+      'The balance no longer equals `expectedInviteCount`; reload and retry'
+    )
+  }
+});
+
+registry.registerPath({
   method: 'get',
   path: '/users/settings',
   tags: ['Users'],
@@ -2051,8 +2103,9 @@ registry.registerPath({
       }
     },
     403: msgResponse(
-      'No invites remaining, or the site is full (#624) — in which case the ' +
-        "caller's invite is not spent"
+      'No invites remaining, the site is full (#624), or staff revoked the ' +
+        "caller's invite privileges (#636). In the last two the caller's " +
+        'invite is not spent'
     ),
     409: msgResponse(
       'A live invite already exists for that address. An expired one does ' +

@@ -16,7 +16,6 @@ import {
   CURRENT_SESSION_ID
 } from './test/apiTestHarness';
 import { makeUser, asUserMock } from './test/factories';
-import { updateProfile } from './modules/profile';
 import { sendRecoveryEmail } from './lib/mailer';
 
 const sendRecoveryEmailMock = sendRecoveryEmail as jest.Mock;
@@ -119,7 +118,7 @@ describe('API auth/profile/user flows', () => {
       inviteKey: 'abc123',
       email: 'other@example.com',
       expires: new Date(Date.now() + 86_400_000),
-      inviter: { disabled: false },
+      inviter: { disabled: false, canInvite: true },
       status: 'pending'
     } as never);
     const wrongEmail = await request(app).post('/api/auth/register').send({
@@ -136,7 +135,7 @@ describe('API auth/profile/user flows', () => {
       inviteKey: 'good-key',
       email: 'invite@example.com',
       expires: new Date(Date.now() + 86_400_000),
-      inviter: { disabled: false },
+      inviter: { disabled: false, canInvite: true },
       status: 'pending'
     } as never);
     prismaMock.user.findFirst.mockResolvedValueOnce(null);
@@ -721,7 +720,7 @@ describe('API auth/profile/user flows', () => {
       staffBio: null,
       recentContributions: [],
       recentSnatches: []
-    } as Awaited<ReturnType<typeof updateProfile>>);
+    } as never);
 
     const res = await request(app).put('/api/profile/me').send({
       profileTitle: 'New Title',
@@ -820,7 +819,7 @@ describe('API auth/profile/user flows', () => {
       recentSnatches: [],
       inviteTree: [],
       community: null
-    });
+    } as never);
 
     const res = await request(app).get('/api/profile/me');
 
@@ -897,7 +896,7 @@ describe('API auth/profile/user flows', () => {
       userSettings: undefined,
       inviteTree: [],
       community: null
-    });
+    } as never);
 
     const res = await request(app).get('/api/profile/user/target-user');
 

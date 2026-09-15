@@ -78,6 +78,7 @@ const loadBatch = async (
       lastInviteGrantAt: true,
       dateRegistered: true,
       disabled: true,
+      canInvite: true,
       banDate: true,
       userRank: {
         select: {
@@ -102,6 +103,7 @@ const loadBatch = async (
     lastInviteGrantAt: r.lastInviteGrantAt,
     dateRegistered: r.dateRegistered,
     disabled: r.disabled,
+    canInvite: r.canInvite,
     rankLevel: r.userRank.level,
     standing: computeStanding({
       warnings: r.warnings,
@@ -121,6 +123,8 @@ interface Tally {
   atCap: number;
   /** Denied by standing. Called out separately because it is the governance arm. */
   withheld: number;
+  /** Invite privileges revoked by staff (#636). Kept apart from `withheld`, which means standing. */
+  revoked: number;
   /** Per-rank grant counts, so a misconfigured class is visible in the tally. */
   byRank: Record<number, number>;
 }
@@ -164,6 +168,8 @@ const planBatch = (batch: Candidate[], now: Date, tally: Tally): BatchPlan => {
     } else if (decision.action === 'advance') {
       advanceIds.push(member.id);
       tally.atCap += 1;
+    } else if (!member.canInvite) {
+      tally.revoked += 1;
     } else if (isStandingDenied(member.standing)) {
       tally.withheld += 1;
     }
@@ -194,7 +200,9 @@ const applyBatch = async (
     await prisma.user.updateMany({
       where: {
         id: { in: bucket.ids },
-        inviteCount: { lte: bucket.cap - bucket.amount }
+        inviteCount: { lte: bucket.cap - bucket.amount },
+        // A revoke between our read and this write must not be granted over.
+        canInvite: true
       },
       data: {
         inviteCount: { increment: bucket.amount },
@@ -222,6 +230,7 @@ export const runInviteGrantCycle = async (
     invites: 0,
     atCap: 0,
     withheld: 0,
+    revoked: 0,
     byRank: {}
   };
 

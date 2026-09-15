@@ -82,15 +82,27 @@ const expiredBody = (email: string) =>
  * Tell the inviter. Call only AFTER the transaction commits, so a failed PM can
  * never roll back a refund. A disabled inviter is refused by
  * `sendSystemMessage` itself, which is the intended outcome.
+ *
+ * An inviter whose invite privileges are revoked (#636) gets no PM either. Their
+ * pending invites lapse because of the revoke, not because time ran out, and
+ * "you can invite that address again" would be false. Staff tell them about the
+ * revoke itself. Read at send time, so a restore before the PM is honoured.
  */
 export const notifyInviteExpired = async (invite: LapsedInvite) => {
-  await sendSystemMessage(
-    invite.inviterId,
-    EXPIRED_SUBJECT,
-    expiredBody(invite.email)
-  ).catch((err) =>
-    log.error('Invite expiry PM failed', { inviteId: invite.id, err })
-  );
+  try {
+    const inviter = await prisma.user.findUnique({
+      where: { id: invite.inviterId },
+      select: { canInvite: true }
+    });
+    if (inviter?.canInvite === false) return;
+    await sendSystemMessage(
+      invite.inviterId,
+      EXPIRED_SUBJECT,
+      expiredBody(invite.email)
+    );
+  } catch (err) {
+    log.error('Invite expiry PM failed', { inviteId: invite.id, err });
+  }
 };
 
 interface Tally {

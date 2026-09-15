@@ -178,6 +178,7 @@ const PROFILE_BASE_SELECT = {
   banDate: true,
   warnings: { select: { expiresAt: true } },
   inviteCount: true,
+  canInvite: true,
   staffBio: true,
   contributed: true,
   consumed: true,
@@ -1007,6 +1008,8 @@ const buildProfileView = async (
     warned: user.warned?.toISOString() ?? null,
     standing,
     inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
+    // Same visibility as the balance it governs (#636): a revoke is not public.
+    canInvite: viewer.isOwner || viewer.isStaff ? user.canInvite : null,
     staffBio: user.staffBio ?? null,
     stats: {
       contributed: canSeeUploaded ? user.contributed.toString() : null,

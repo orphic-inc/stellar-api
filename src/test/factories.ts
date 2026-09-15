@@ -110,6 +110,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     isArtist: false,
     isDonor: false,
     canDownload: true,
+    canInvite: true,
     rankLocked: false,
     adminComment: null,
     staffBio: null,

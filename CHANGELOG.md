@@ -32,6 +32,37 @@ All notable changes to stellar-api are documented here.
   existing rank defaults to a rate of `0`, so nothing changes until staff turn
   both on; `dryRun` evaluates the whole membership and writes nothing.
 
+- **Staff can revoke a member's invite privileges and set their invite count**
+  ([#636](https://github.com/orphic-inc/stellar-api/issues/636)). Until now the
+  only staff lever on a member's invites was disabling the whole account, and no
+  route wrote `inviteCount`. Both new routes require a new permission,
+  `invites_edit`. `invites_manage` stays the read permission for the pool and
+  the tree.
+
+  **Upgrade note:** the seeded Staff rank includes `invites_edit`, but an
+  existing install's ranks do not. Grant it in the rank permissions manager.
+  Administrators are unaffected.
+
+  - `PUT /api/users/{id}/can-invite` with `{ canInvite, reason, message? }`
+    revokes or restores. `User` gains `canInvite` (default `true`). While
+    revoked, the member cannot send, earns nothing from the invite handout, and
+    their pending invites lapse and are refunded without the usual expiry PM.
+    The balance is kept.
+  - `PUT /api/users/{id}/invite-count` with
+    `{ inviteCount, expectedInviteCount, reason, message? }` sets the count, up
+    to 1000 and regardless of the rank cap. It is a compare-and-set, and answers
+    `409` when the balance moved since the caller read it, so a concurrent spend
+    or refund is never overwritten.
+
+  On both routes `reason` is required and goes to the audit log. An optional
+  `message` is sent to the member as a System PM.
+
+  Contract changes: `POST /api/profile/referral/create-invite` answers a revoked
+  member `403` with a message pointing to Staff PM, and the invite is not
+  spent. `AuthUser` gains `canInvite`. The profile view gains `canInvite`,
+  visible to the owner and staff like `inviteCount` and `null` otherwise.
+  `PermissionKey` gains `invites_edit`.
+
 ### Changed
 
 - **`maxUsers` is enforced**

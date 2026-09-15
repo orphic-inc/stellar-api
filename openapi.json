@@ -227,6 +227,9 @@
           "canDownload": {
             "type": "boolean"
           },
+          "canInvite": {
+            "type": "boolean"
+          },
           "contributed": {
             "type": "string"
           },
@@ -1201,6 +1204,10 @@
             "type": "number",
             "nullable": true
           },
+          "canInvite": {
+            "type": "boolean",
+            "nullable": true
+          },
           "staffBio": {
             "type": "string",
             "nullable": true
@@ -1294,6 +1301,7 @@
           "warned",
           "standing",
           "inviteCount",
+          "canInvite",
           "staffBio",
           "stats",
           "userRank",
@@ -1359,6 +1367,10 @@
           },
           "inviteCount": {
             "type": "number",
+            "nullable": true
+          },
+          "canInvite": {
+            "type": "boolean",
             "nullable": true
           },
           "staffBio": {
@@ -1457,6 +1469,7 @@
           "warned",
           "standing",
           "inviteCount",
+          "canInvite",
           "staffBio",
           "stats",
           "userRank",
@@ -4372,6 +4385,7 @@
           "users_view_email",
           "recovery_manage",
           "invites_manage",
+          "invites_edit",
           "ratio_policy_manage",
           "site_history_manage",
           "ip_bans_manage",
@@ -11562,6 +11576,247 @@
         ]
       }
     },
+    "/users/{id}/can-invite": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: revoke or restore a member's invite privileges",
+        "description": "Requires `invites_edit` (#636). While revoked the member cannot send (403), earns no invites from the handout, and their pending invites lapse and are refunded. The balance is kept. `reason` is recorded in the audit log for staff; `message`, when present, is sent to the member as a System PM. Idempotent: writing the current value still succeeds.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "canInvite": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "canInvite",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invite privileges revoked or restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing invites_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{id}/invite-count": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: set a member's invite count",
+        "description": "Requires `invites_edit` (#636). A compare-and-set: the write applies only while the balance still equals `expectedInviteCount`, so a spend, grant or refund that landed since the caller read it is never overwritten. Not bounded by the rank `inviteCap`. `reason` is recorded in the audit log; `message`, when present, is sent to the member as a System PM naming the new balance.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inviteCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "expectedInviteCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "inviteCount",
+                  "expectedInviteCount",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invite count updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing invites_edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The balance no longer equals `expectedInviteCount`; reload and retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
     "/users/settings": {
       "get": {
         "tags": [
@@ -12792,7 +13047,7 @@
             }
           },
           "403": {
-            "description": "No invites remaining, or the site is full (#624) — in which case the caller's invite is not spent",
+            "description": "No invites remaining, the site is full (#624), or staff revoked the caller's invite privileges (#636). In the last two the caller's invite is not spent",
             "content": {
               "application/json": {
                 "schema": {
@@ -22749,6 +23004,9 @@
                       "invites_manage": {
                         "type": "boolean"
                       },
+                      "invites_edit": {
+                        "type": "boolean"
+                      },
                       "ratio_policy_manage": {
                         "type": "boolean"
                       },
@@ -23201,6 +23459,9 @@
                         "type": "boolean"
                       },
                       "invites_manage": {
+                        "type": "boolean"
+                      },
+                      "invites_edit": {
                         "type": "boolean"
                       },
                       "ratio_policy_manage": {
