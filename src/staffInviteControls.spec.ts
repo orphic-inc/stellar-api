@@ -302,7 +302,7 @@ describe('POST /api/users/invites/:inviteId/cancel', () => {
 
   it('answers 409 for an invite that is no longer pending, and refunds nothing', async () => {
     prismaMock.invite.updateMany.mockResolvedValue({ count: 0 });
-    prismaMock.invite.findUnique.mockResolvedValue({ id: 5 } as never);
+    prismaMock.invite.findFirst.mockResolvedValue({ id: 5 } as never);
 
     const res = await request(app)
       .post('/api/users/invites/5/cancel')
@@ -317,7 +317,7 @@ describe('POST /api/users/invites/:inviteId/cancel', () => {
 
   it('answers 404 for an invite that does not exist', async () => {
     prismaMock.invite.updateMany.mockResolvedValue({ count: 0 });
-    prismaMock.invite.findUnique.mockResolvedValue(null);
+    prismaMock.invite.findFirst.mockResolvedValue(null);
 
     const res = await request(app)
       .post('/api/users/invites/5/cancel')

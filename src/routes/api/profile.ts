@@ -9,6 +9,13 @@ import {
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
 import { isSiteFull } from '../../modules/settings';
+import { listOwnPendingInvites } from '../../modules/invite';
+import { withdrawInvite } from '../../modules/inviteControls';
+import {
+  parsedPage,
+  paginatedResponse,
+  paginationBase
+} from '../../lib/pagination';
 import { site } from '../../modules/config';
 import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
@@ -20,10 +27,13 @@ import { getPolicyState } from '../../modules/ratioPolicy';
 import { resolveViewer } from '../../modules/bbcodeRender';
 import { requireAuth } from '../../middleware/auth';
 import { audit } from '../../lib/audit';
+import { z } from 'zod';
 import {
   validate,
+  validateParams,
   validateQuery,
   parsedBody,
+  parsedParams,
   parsedQuery
 } from '../../middleware/validate';
 import {
@@ -133,6 +143,36 @@ router.get(
   authHandler(async (req, res) => {
     const { period } = parsedQuery<ReputationHistoryPeriodQuery>(res);
     res.json(await getCrsHistory(req.user.id, period as CrsHistoryPeriod));
+  })
+);
+
+const ownInvitesQuerySchema = z.object({ ...paginationBase });
+const inviteIdParamsSchema = z.object({
+  inviteId: z.coerce.number().int().positive()
+});
+
+// GET /api/profile/me/invites — your invites that can still be used (#640)
+router.get(
+  '/me/invites',
+  requireAuth,
+  validateQuery(ownInvitesQuerySchema),
+  authHandler(async (req, res) => {
+    const pg = parsedPage(res);
+    const { rows, total } = await listOwnPendingInvites(req.user.id, pg);
+    paginatedResponse(res, rows, total, pg);
+  })
+);
+
+// POST /api/profile/me/invites/:inviteId/withdraw — take back your own pending
+// invite and get it refunded (#640). 404 for anyone else's invite.
+router.post(
+  '/me/invites/:inviteId/withdraw',
+  requireAuth,
+  validateParams(inviteIdParamsSchema),
+  authHandler(async (req, res) => {
+    const { inviteId } = parsedParams<{ inviteId: number }>(res);
+    await withdrawInvite(req.user.id, inviteId);
+    res.json({ msg: 'Invite withdrawn and returned to you' });
   })
 );
 

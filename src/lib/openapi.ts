@@ -2110,8 +2110,75 @@ registry.registerPath({
         'invite is not spent'
     ),
     409: msgResponse(
-      'A live invite already exists for that address. An expired (#627) or ' +
-        'cancelled (#636) one does not block it: the address can be invited again'
+      'A live invite already exists for that address, or a cancelled one has ' +
+        'not reached its original expiry (#640). An expired one does not ' +
+        'block it: the address can be invited again (#627)'
+    )
+  }
+});
+
+const OwnInviteItem = registry.register(
+  'OwnInviteItem',
+  z.object({
+    id: z.number(),
+    email: z.string(),
+    reason: z.string(),
+    // When the invite was last sent; a re-invite reuses the row (#627).
+    createdAt: z.string(),
+    expires: z.string()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/invites',
+  tags: ['Profile'],
+  summary: 'Your invites that can still be used',
+  description:
+    'Self only (#640). Pending invites that registration would still accept: ' +
+    'not past `expires`, and sent while you are enabled and hold invite ' +
+    'privileges, so a revoked member gets an empty list. Soonest to lapse ' +
+    'first, then by `id`. Not a history: accepted invitees are in your invite ' +
+    'tree.',
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated list of your live pending invites',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(OwnInviteItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/profile/me/invites/{inviteId}/withdraw',
+  tags: ['Profile'],
+  summary: 'Withdraw one of your pending invites',
+  description:
+    'Self only (#640). Moves your `pending` invite to `cancelled` and returns ' +
+    'it to your `inviteCount`. The key holder is then answered ' +
+    "`invite_expired`. The address stays taken until the invite's original " +
+    '`expires`, so it cannot be re-invited by anyone before then. Needs no ' +
+    'invite privileges: a revoked member can withdraw.',
+  request: { params: z.object({ inviteId: z.string() }) },
+  responses: {
+    200: msgResponse('Invite withdrawn and returned to you'),
+    404: msgResponse('No such invite, or it is not yours'),
+    409: msgResponse(
+      'The invite is yours but no longer pending: already accepted, expired ' +
+        'or cancelled'
     )
   }
 });
@@ -8544,8 +8611,9 @@ registry.registerPath({
   description:
     'Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` ' +
     "and returns it to its inviter's `inviteCount`, uncapped. The key holder " +
-    'is then answered `invite_expired`, as for any lapse, and the address can ' +
-    'be invited again. A pending invite past `expires` that the sweep has not ' +
+    'is then answered `invite_expired`, as for any lapse. The address can be ' +
+    "invited again once the invite's original `expires` passes (#640). A " +
+    'pending invite past `expires` that the sweep has not ' +
     'reached yet can be cancelled too. `reason` is recorded in the audit log; ' +
     '`message`, when present, is sent to the inviter as a System PM.',
   request: {

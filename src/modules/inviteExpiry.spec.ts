@@ -1,6 +1,7 @@
 import {
   INVITE_TTL_DAYS,
   inviteExpiresAt,
+  isAddressFree,
   isInviteLapsed,
   type InviteLapseInput
 } from './inviteExpiry';
@@ -62,6 +63,33 @@ describe('isInviteLapsed', () => {
         }),
         now
       )
+    ).toBe(false);
+  });
+});
+
+describe('isAddressFree', () => {
+  const earlier = new Date(now.getTime() - 1);
+
+  it("holds a cancelled invite's address until its original expiry (#640)", () => {
+    // Otherwise send → withdraw → send could mail one address without limit.
+    expect(isAddressFree(invite({ status: 'cancelled' }), now)).toBe(false);
+    expect(
+      isAddressFree(invite({ status: 'cancelled', expires: now }), now)
+    ).toBe(true);
+  });
+
+  it('frees an expired address whatever its date', () => {
+    expect(isAddressFree(invite({ status: 'expired' }), now)).toBe(true);
+  });
+
+  it('frees a lapsed pending address and holds a live one', () => {
+    expect(isAddressFree(invite({ expires: earlier }), now)).toBe(true);
+    expect(isAddressFree(invite(), now)).toBe(false);
+  });
+
+  it('never frees an accepted address', () => {
+    expect(
+      isAddressFree(invite({ status: 'accepted', expires: earlier }), now)
     ).toBe(false);
   });
 });

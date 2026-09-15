@@ -90,6 +90,10 @@ _(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issue
 
 _Unlike an expiry, the inviter is PMed only when staff write a message.)_
 
+_(Extended 2026-09-15, by [#640](https://github.com/orphic-inc/stellar-api/issues/640). A member can withdraw their own pending invite. The withdraw is the same `pending → cancelled` claim, scoped to the caller's invites, so another member's invite answers 404. It refunds, audits with `by: 'inviter'` and sends no PM. It needs no invite privileges._
+
+_**§5 changes:** a `cancelled` row holds its address until its original `expires`. Its key is refused at once, but the address is not free for a re-invite until then. Without this, a withdraw's refund would let a member send, withdraw and send again, mailing one address without limit. "Is this key usable" (`isInviteLapsed`) and "is this address free" (`isAddressFree`) are now separate rules in `inviteExpiry.ts`. The rule applies to staff cancels too.)_
+
 ## Consequences
 
 The invite contract changes. `InviteStatus` loses `rejected` and gains `expired`, `InviteItem` gains `createdAt`, registration has a new `403` message, and the full-site message names a date. stellar-ui consumes these in [ui#328](https://github.com/orphic-inc/stellar-ui/issues/328). That issue also fixes an invite pool filter that sent uppercase statuses and answered `400` for every choice.

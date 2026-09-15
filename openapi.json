@@ -2043,6 +2043,33 @@
           "suspect"
         ]
       },
+      "OwnInviteItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "email": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "reason",
+          "createdAt",
+          "expires"
+        ]
+      },
       "DonorRewards": {
         "type": "object",
         "properties": {
@@ -13058,7 +13085,172 @@
             }
           },
           "409": {
-            "description": "A live invite already exists for that address. An expired (#627) or cancelled (#636) one does not block it: the address can be invited again",
+            "description": "A live invite already exists for that address, or a cancelled one has not reached its original expiry (#640). An expired one does not block it: the address can be invited again (#627)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/profile/me/invites": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Your invites that can still be used",
+        "description": "Self only (#640). Pending invites that registration would still accept: not past `expires`, and sent while you are enabled and hold invite privileges, so a revoked member gets an empty list. Soonest to lapse first, then by `id`. Not a history: accepted invitees are in your invite tree.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of your live pending invites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnInviteItem"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/profile/me/invites/{inviteId}/withdraw": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Withdraw one of your pending invites",
+        "description": "Self only (#640). Moves your `pending` invite to `cancelled` and returns it to your `inviteCount`. The key holder is then answered `invite_expired`. The address stays taken until the invite's original `expires`, so it cannot be re-invited by anyone before then. Needs no invite privileges: a revoked member can withdraw.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "inviteId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite withdrawn and returned to you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such invite, or it is not yours",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invite is yours but no longer pending: already accepted, expired or cancelled",
             "content": {
               "application/json": {
                 "schema": {
@@ -34523,7 +34715,7 @@
           "Staff"
         ],
         "summary": "Staff: cancel a pending invite",
-        "description": "Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` and returns it to its inviter's `inviteCount`, uncapped. The key holder is then answered `invite_expired`, as for any lapse, and the address can be invited again. A pending invite past `expires` that the sweep has not reached yet can be cancelled too. `reason` is recorded in the audit log; `message`, when present, is sent to the inviter as a System PM.",
+        "description": "Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` and returns it to its inviter's `inviteCount`, uncapped. The key holder is then answered `invite_expired`, as for any lapse. The address can be invited again once the invite's original `expires` passes (#640). A pending invite past `expires` that the sweep has not reached yet can be cancelled too. `reason` is recorded in the audit log; `message`, when present, is sent to the inviter as a System PM.",
         "parameters": [
           {
             "schema": {

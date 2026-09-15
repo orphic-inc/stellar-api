@@ -5,7 +5,8 @@
  * places that must agree on it: registration (refuse the key), `createInvite`
  * (free the address for a re-invite) and the sweep (mark it and refund). No DB
  * and no I/O; the Prisma where-fragments below are plain objects that restate
- * the same rule for the writes.
+ * the same rule for the writes. Since #640 "is the address free" is a second,
+ * stricter rule for cancelled invites: see `isAddressFree`.
  *
  * Three things here are deliberate and not obvious from the issue:
  *
@@ -16,8 +17,8 @@
  *    that the inviter was disabled. An inviter whose invite privileges staff
  *    revoked (`canInvite = false`, #636) is the same case, for the same reason.
  *  - `expired` and `cancelled` (#636) are stored statuses, but a `pending` row
- *    past `expires` has lapsed too. The sweep runs hourly, and the gates must not honour a key in
- *    the gap between expiry and the sweep reaching it.
+ *    past `expires` has lapsed too. The sweep runs hourly, and the gates must
+ *    not honour a key in the gap between expiry and the sweep reaching it.
  *  - The TTL is a constant, not configuration (ADR-0038 §4's rule: thresholds
  *    are code). It also decides when refunds happen, so it moves by review.
  */
@@ -38,10 +39,11 @@ export interface InviteLapseInput {
 }
 
 /**
- * The stored statuses of an invite that ended unused: it ran out, or staff
- * cancelled it (#636). Both have lapsed, both were refunded when they left
- * `pending`, and both free their address for a re-invite. A cancel answers the
+ * The stored statuses of an invite that ended unused: it ran out, or it was
+ * cancelled, by staff (#636) or withdrawn by its inviter (#640). Both have
+ * lapsed and both were refunded when they left `pending`. A cancel answers the
  * key holder exactly as an expiry does, so it cannot confirm a moderation act.
+ * They differ on when the address is free again: see `isAddressFree`.
  */
 export const LAPSED_INVITE_STATUSES: readonly InviteStatus[] = [
   'expired',
@@ -64,6 +66,32 @@ export const isInviteLapsed = (
     !invite.inviterCanInvite
   );
 };
+
+/**
+ * Whether a row's address can be invited again. Not the same question as
+ * `isInviteLapsed`, which asks whether its KEY is still usable.
+ *
+ * A cancelled invite's key dies at once, but its address stays taken until the
+ * invite's original `expires` (#640). A withdraw refunds, so without this a
+ * member could send, withdraw and send again in a loop, mailing one address as
+ * often as they liked at no cost. Holding the address for the lifetime the
+ * first send already claimed keeps it to one invite email per address per
+ * lifetime, as #627 had it. A typo is unaffected: the corrected address is a
+ * different row.
+ */
+export const isAddressFree = (invite: InviteLapseInput, now: Date): boolean =>
+  invite.status === 'cancelled'
+    ? invite.expires.getTime() <= now.getTime()
+    : isInviteLapsed(invite, now);
+
+/**
+ * The rows a re-invite may take over, as a where fragment: `isAddressFree` for
+ * rows no longer `pending`. A lapsed `pending` row is expired first by the
+ * caller, through the claim below, and then matches.
+ */
+export const reusableInviteWhere = (now: Date): Prisma.InviteWhereInput => ({
+  OR: [{ status: 'expired' }, { status: 'cancelled', expires: { lte: now } }]
+});
 
 /**
  * `isInviteLapsed` restricted to rows still marked `pending`, as a where
