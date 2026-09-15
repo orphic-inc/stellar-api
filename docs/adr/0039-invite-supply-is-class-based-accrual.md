@@ -58,6 +58,8 @@ _(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issue
 
 Withholding a grant is also the right severity. Contagion is _"suspect, never condemned"_, and this is the matching consequence: the member keeps every invite they already hold, and simply earns none while the site is unhappy with them.
 
+_(Extended 2026-09-15, by [#637](https://github.com/orphic-inc/stellar-api/issues/637) and [ADR-0043](0043-sending-an-invite-is-gated-on-the-inviter.md). The same tiers now also refuse sending, through this section's `isStandingDenied`, so the handout and the send share one reading of bad standing. The member still keeps their balance; they cannot spend it until the warnings expire.)_
+
 Separately, a **30-day tenure floor is a constant in `inviteGrant.ts`**, overridable by no rank row. The rate and cap are admin-editable columns, which is a typo surface, and standing does not cover it — a day-old account is `clean`. `inactivity.ts` keeps its thresholds in code so that changing them is a review rather than an environment variable someone mistypes into 11; the floor is the same argument aimed at a form field.
 
 ### 5. Rate and cap are per-rank columns; the period and the tick are not

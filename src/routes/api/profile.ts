@@ -8,8 +8,8 @@ import {
   createInvite
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
-import { isSiteFull } from '../../modules/settings';
-import { listOwnPendingInvites } from '../../modules/invite';
+import { listOwnPendingInvites, getInviteRefusal } from '../../modules/invite';
+import type { InviteGateRefusal } from '../../modules/inviteGates';
 import { withdrawInvite } from '../../modules/inviteControls';
 import {
   parsedPage,
@@ -151,6 +151,36 @@ const inviteIdParamsSchema = z.object({
   inviteId: z.coerce.number().int().positive()
 });
 
+// The words for each send gate (#637, ADR-0043). The POST refusal and the
+// eligibility read both use this map, so the page that explains a refusal says
+// exactly what the send would.
+const INVITE_REFUSAL_MSG: Record<InviteGateRefusal, string> = {
+  invites_revoked: `Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: ${site.staffPmPath}`,
+  downloads_disabled: `Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: ${site.staffPmPath}`,
+  poor_standing:
+    'You have active warnings, so invites cannot be sent until they expire. Your invite was not used.',
+  ratio_watch:
+    'You are on ratio watch, so invites cannot be sent until your ratio meets its requirement. Your invite was not used.',
+  site_full:
+    'The site is full, so invites cannot be sent right now. Your invite was not used.',
+  no_invites: 'No invites remaining'
+};
+
+// GET /api/profile/me/invites/eligibility — can you send an invite right now,
+// and if not, why (#637). Same gates and words as the send.
+router.get(
+  '/me/invites/eligibility',
+  requireAuth,
+  authHandler(async (req, res) => {
+    const reason = await getInviteRefusal(req.user.id);
+    res.json({
+      canSend: reason === null,
+      reason,
+      msg: reason === null ? null : INVITE_REFUSAL_MSG[reason]
+    });
+  })
+);
+
 // GET /api/profile/me/invites — your invites that can still be used (#640)
 router.get(
   '/me/invites',
@@ -252,8 +282,6 @@ router.put(
   })
 );
 
-const INVITES_REVOKED_MSG = `Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: ${site.staffPmPath}`;
-
 // POST /api/profile/referral/create-invite
 router.post(
   '/referral/create-invite',
@@ -261,23 +289,15 @@ router.post(
   validate(inviteSchema),
   authHandler(async (req, res) => {
     const { email, reason } = parsedBody<InviteInput>(res);
-    // A courtesy, not the gate (#624, ADR-0040 §3): refusing before
-    // createInvite keeps the member's invite instead of spending it on someone
-    // registration will turn away. Unlocked, so it can race; registerUser is
-    // what actually holds the line.
-    if (await isSiteFull())
-      return res.status(403).json({
-        msg: 'The site is full, so invites cannot be sent right now. Your invite was not used.'
-      });
+    // Every gate, capacity included (#624, #637), is answered inside
+    // createInvite before it writes, so a refused member keeps their invite.
     const result = await createInvite(req.user.id, email, reason ?? '');
     if (!result.ok) {
-      if (result.reason === 'no_invites')
-        return res.status(403).json({ msg: 'No invites remaining' });
-      if (result.reason === 'invites_revoked')
-        return res.status(403).json({ msg: INVITES_REVOKED_MSG });
-      return res
-        .status(409)
-        .json({ msg: 'An invite has already been sent to that address' });
+      if (result.reason === 'already_invited')
+        return res
+          .status(409)
+          .json({ msg: 'An invite has already been sent to that address' });
+      return res.status(403).json({ msg: INVITE_REFUSAL_MSG[result.reason] });
     }
     await audit(
       prisma,

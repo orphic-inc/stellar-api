@@ -23,6 +23,7 @@ import {
   RequestActionType
 } from '@prisma/client';
 import { appVersion } from './version';
+import { INVITE_GATE_ORDER } from '../modules/inviteGates';
 import type { Operation } from './openapiCompleteness';
 import { type GateKind, expectedCodes, type Gate } from './routeGate';
 import {
@@ -2105,15 +2106,47 @@ registry.registerPath({
       }
     },
     403: msgResponse(
-      'No invites remaining, the site is full (#624), or staff revoked the ' +
-        "caller's invite privileges (#636). In the last two the caller's " +
-        'invite is not spent'
+      'A send gate refused (#637): invite privileges revoked (#636), download ' +
+        'access disabled, active warnings (poor standing), ratio watch, the ' +
+        'site is full (#624), or no invites remaining. The first that applies ' +
+        'is reported, in that order, and no invite is spent. ' +
+        '`GET /profile/me/invites/eligibility` answers the same gates first'
     ),
     409: msgResponse(
       'A live invite already exists for that address, or a cancelled one has ' +
         'not reached its original expiry (#640). An expired one does not ' +
         'block it: the address can be invited again (#627)'
     )
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/invites/eligibility',
+  tags: ['Profile'],
+  summary: 'Whether you can send an invite right now',
+  description:
+    'Self only (#637). Runs the same gates as ' +
+    '`POST /profile/referral/create-invite`, in the same order, and `msg` is ' +
+    'the words that send would answer. `reason` and `msg` are null exactly ' +
+    'when `canSend` is true. Does not check an address: a send can still be ' +
+    'refused `409` for one already invited.',
+  responses: {
+    200: {
+      description: 'Your invite eligibility',
+      content: {
+        'application/json': {
+          schema: registry.register(
+            'InviteEligibility',
+            z.object({
+              canSend: z.boolean(),
+              reason: z.enum(INVITE_GATE_ORDER).nullable(),
+              msg: z.string().nullable()
+            })
+          )
+        }
+      }
+    }
   }
 });
 

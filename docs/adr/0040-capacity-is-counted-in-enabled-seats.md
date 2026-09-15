@@ -44,6 +44,8 @@ Two other checks read the same count **without** the lock, because neither takes
 
 `registerUser` takes `maxUsers` as a required option, just as it takes `registrationMode`. It does not read settings itself, and an omitted cap would be an unenforced one.
 
+_(Extended 2026-09-15, by [#637](https://github.com/orphic-inc/stellar-api/issues/637) and [ADR-0043](0043-sending-an-invite-is-gated-on-the-inviter.md). The send's capacity check moved from the route into `createInvite`'s send gates, still before anything is written. It now refuses after the member's own gates, so a revoked member on a full site hears about the revoke. A permission to invite past capacity was considered and declined, keeping Decision 2's staff path as the only growth past the cap.)_
+
 ### 4. A full site answers `403`, and nothing is written
 
 Both routes answer `403 { msg }`. That is a policy refusal, like `registration_closed`, which is already `403` on the same route. `503` was rejected: being full is a normal state of the site, not an outage, and it would page anyone monitoring 5xx rates. Registration refuses before its transaction writes anything, so a presented invite stays `pending`. Invite creation refuses before `createInvite` runs, so `inviteCount` is never decremented.

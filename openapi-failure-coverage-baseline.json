@@ -47,6 +47,7 @@
     "GET /posts",
     "GET /profile",
     "GET /profile/me/invites",
+    "GET /profile/me/invites/eligibility",
     "GET /profile/me/reputation",
     "GET /profile/me/reputation/history",
     "GET /ratio-policy/{userId}",

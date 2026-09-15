@@ -96,6 +96,33 @@ All notable changes to stellar-api are documented here.
   expiry, so sending, withdrawing and resending cannot mail one address
   repeatedly. See `### Changed`.
 
+- **Sending an invite is gated on the inviter's standing, ratio watch and
+  download access**
+  ([#637](https://github.com/orphic-inc/stellar-api/issues/637),
+  [ADR-0043](docs/adr/0043-sending-an-invite-is-gated-on-the-inviter.md)).
+  `POST /api/profile/referral/create-invite` now also refuses, with `403` and
+  no invite spent:
+  - `canDownload = false` — "Your download access is disabled…", naming Staff
+    PM;
+  - `poor` or `hammer` governance standing, the tiers that already withhold the
+    invite handout — "You have active warnings…";
+  - a member on ratio watch whose ratio, read at send time, is still short —
+    "You are on ratio watch…". A member whose ratio recovered is not refused,
+    even before their watch status catches up.
+
+  When several refusals apply, the member hears the first of: revoked, download
+  access disabled, standing, ratio watch, site full, no invites remaining, then
+  an address already invited. Capacity previously refused before everything
+  else.
+
+  - `GET /api/profile/me/invites/eligibility` answers
+    `{ canSend, reason, msg }` from the same gates, with the words the send would
+    use, so a client can explain a refusal before the member submits. It does
+    not check an address.
+
+  Contract changes: the create-invite `403` covers three more reasons. The new
+  schema `InviteEligibility` carries `reason` as an enum of the six gates.
+
 ### Changed
 
 - **A cancelled invite holds its address until its original expiry**
