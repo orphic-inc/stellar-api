@@ -1,7 +1,8 @@
 /**
  * Staff invite controls (#636): revoke or restore one member's invite
  * privileges, set their invite count, and cancel a pending invite from the
- * pool. All sit behind `invites_edit`.
+ * pool. All sit behind `invites_edit`. A member withdrawing their own invite
+ * (#640) shares the cancel's claim, scoped to their invites.
  *
  * Four things here are deliberate and not obvious from the issue:
  *
@@ -154,24 +155,37 @@ export interface CancelInviteInput {
 const INVITE_NOT_FOUND = 'Invite not found';
 const INVITE_NOT_PENDING = 'This invite is no longer pending';
 
+interface Cancellation {
+  actorId: number;
+  /** Set for a member withdrawing their own invite (#640); unset for staff. */
+  inviterId?: number;
+  meta: Record<string, unknown>;
+}
+
 /**
- * Claim any `pending` row, including one past `expires` that the sweep has not
- * reached yet: the stored status then records the staff act, and the refund is
- * still paid once, because the sweep's claim also requires `pending`.
+ * The one `pending → cancelled` claim, shared by the staff cancel and the
+ * member withdraw so neither can drift from the other.
+ *
+ * It claims any `pending` row, including one past `expires` that the sweep has
+ * not reached yet: the stored status then records who ended it, and the refund
+ * is still paid once, because the sweep's claim also requires `pending`.
+ *
+ * A member's claim and re-read are scoped to their own invites, so another
+ * member's invite answers 404, exactly like one that does not exist.
  */
-export const cancelInvite = async (
-  actorId: number,
+const claimCancellation = (
   inviteId: number,
-  { reason, message }: CancelInviteInput
-): Promise<void> => {
-  const invite = await prisma.$transaction(async (tx) => {
+  { actorId, inviterId, meta }: Cancellation
+) =>
+  prisma.$transaction(async (tx) => {
+    const scope = inviterId === undefined ? {} : { inviterId };
     const { count } = await tx.invite.updateMany({
-      where: { id: inviteId, status: 'pending' },
+      where: { id: inviteId, status: 'pending', ...scope },
       data: { status: 'cancelled' }
     });
     if (count === 0) {
-      const exists = await tx.invite.findUnique({
-        where: { id: inviteId },
+      const exists = await tx.invite.findFirst({
+        where: { id: inviteId, ...scope },
         select: { id: true }
       });
       throw exists
@@ -188,14 +202,22 @@ export const cancelInvite = async (
       data: { inviteCount: { increment: 1 } }
     });
     await audit(tx, actorId, 'invite.cancelled', 'Invite', inviteId, {
-      by: 'staff',
+      ...meta,
       inviterId: cancelled.inviterId,
       email: cancelled.email,
-      refunded: true,
-      reason,
-      messaged: message !== undefined
+      refunded: true
     });
     return cancelled;
+  });
+
+export const cancelInvite = async (
+  actorId: number,
+  inviteId: number,
+  { reason, message }: CancelInviteInput
+): Promise<void> => {
+  const invite = await claimCancellation(inviteId, {
+    actorId,
+    meta: { by: 'staff', reason, messaged: message !== undefined }
   });
 
   if (message !== undefined) {
@@ -207,4 +229,20 @@ export const cancelInvite = async (
       )
     );
   }
+};
+
+/**
+ * A member withdrawing their own pending invite (#640). No `canInvite` gate:
+ * a revoked member may withdraw, and the refund is inert until restored. No PM,
+ * since the member did it.
+ */
+export const withdrawInvite = async (
+  memberId: number,
+  inviteId: number
+): Promise<void> => {
+  await claimCancellation(inviteId, {
+    actorId: memberId,
+    inviterId: memberId,
+    meta: { by: 'inviter' }
+  });
 };

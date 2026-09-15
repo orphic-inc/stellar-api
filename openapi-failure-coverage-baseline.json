@@ -46,6 +46,7 @@
     "GET /notifications/unread-count",
     "GET /posts",
     "GET /profile",
+    "GET /profile/me/invites",
     "GET /profile/me/reputation",
     "GET /profile/me/reputation/history",
     "GET /ratio-policy/{userId}",

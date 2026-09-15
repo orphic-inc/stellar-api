@@ -14,10 +14,12 @@ import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { sendInviteEmail } from '../lib/mailer';
 import { getLogger } from './logging';
+import type { PageParams } from '../lib/pagination';
 import {
   inviteExpiresAt,
-  isInviteLapsed,
-  LAPSED_INVITE_STATUSES
+  isAddressFree,
+  reusableInviteWhere,
+  livePendingInviteWhere
 } from './inviteExpiry';
 import {
   expireLapsedInvite,
@@ -91,10 +93,11 @@ const writeInvite = (
       const actor = { actorId: inviterId, by: 'createInvite' };
       if (await expireLapsedInvite(tx, lapsed, now, actor)) expired = lapsed;
 
-      // Reuse only a row that is expired or cancelled NOW. A concurrent
-      // re-invite that got here first has already flipped it back to pending.
+      // Reuse only a row whose address is free NOW. A concurrent re-invite
+      // that got here first has already flipped it back to pending, and a
+      // cancelled row holds its address until its original expiry (#640).
       const { count } = await tx.invite.updateMany({
-        where: { id: existing.id, status: { in: [...LAPSED_INVITE_STATUSES] } },
+        where: { id: existing.id, ...reusableInviteWhere(now) },
         data: { ...fields, inviterId, status: 'pending' }
       });
       if (count === 0) throw new InviteRefused('already_invited');
@@ -119,10 +122,10 @@ const writeInvite = (
     return expired;
   });
 
-/** An address is free to invite when it has no row, or its row has lapsed. */
+/** An address is free to invite when it has no row, or its row frees it. */
 const isAddressTaken = (existing: ExistingInvite | null, now: Date): boolean =>
   existing !== null &&
-  !isInviteLapsed(
+  !isAddressFree(
     {
       status: existing.status,
       expires: existing.expires,
@@ -196,4 +199,37 @@ export const createInvite = async (
   }
 
   return { ok: true, inviteKey, emailSent };
+};
+
+/**
+ * A member's own invites that can still be used (#640), soonest to lapse first.
+ *
+ * Live pending only, by the same predicate registration accepts on, so the
+ * list never offers an invite the gates already refuse. Not a history: a
+ * re-invite reuses the row and rewrites `inviterId`, so a past invite would
+ * silently move to another member's list.
+ */
+export const listOwnPendingInvites = async (
+  inviterId: number,
+  pg: PageParams,
+  now: Date = new Date()
+) => {
+  const where = { ...livePendingInviteWhere(now), inviterId };
+  const [rows, total] = await Promise.all([
+    prisma.invite.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        reason: true,
+        createdAt: true,
+        expires: true
+      },
+      orderBy: [{ expires: 'asc' }, { id: 'asc' }],
+      skip: pg.skip,
+      take: pg.limit
+    }),
+    prisma.invite.count({ where })
+  ]);
+  return { rows, total };
 };

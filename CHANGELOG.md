@@ -81,7 +81,29 @@ All notable changes to stellar-api are documented here.
   Contract changes: `InviteStatus` gains `cancelled`. The pool's OpenAPI query
   now documents `limit` and `email`.
 
+- **A member can see and withdraw their own pending invites**
+  ([#640](https://github.com/orphic-inc/stellar-api/issues/640),
+  [ADR-0041](docs/adr/0041-an-invite-lapses-and-is-returned.md) extended).
+  - `GET /api/profile/me/invites` lists the caller's invites that can still be
+    used, soonest to lapse first, as the new `OwnInviteItem`
+    (`id, email, reason, createdAt, expires`). A revoked member's list is empty.
+  - `POST /api/profile/me/invites/{inviteId}/withdraw` cancels one and returns
+    it to the caller's `inviteCount`. It answers `404` for an invite that is not
+    the caller's and `409` once it is no longer pending. The key holder is
+    answered `invite_expired`.
+
+  A withdrawn or staff-cancelled invite holds its address until its original
+  expiry, so sending, withdrawing and resending cannot mail one address
+  repeatedly. See `### Changed`.
+
 ### Changed
+
+- **A cancelled invite holds its address until its original expiry**
+  ([#640](https://github.com/orphic-inc/stellar-api/issues/640)). The staff
+  cancel shipped earlier in this release freed the address at once. Now
+  `POST /api/profile/referral/create-invite` answers `409` for an address whose
+  invite was cancelled or withdrawn until that invite's `expires` passes. The
+  key itself is still refused straight away.
 
 - **`maxUsers` is enforced**
   ([#624](https://github.com/orphic-inc/stellar-api/issues/624),
