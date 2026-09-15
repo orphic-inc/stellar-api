@@ -193,19 +193,23 @@ const claimCancellation = (
         : new AppError(404, INVITE_NOT_FOUND);
     }
 
+    // Read after the claim, which holds the row: only a spent invite is
+    // returned (ADR-0043 §5).
     const cancelled = await tx.invite.findUniqueOrThrow({
       where: { id: inviteId },
-      select: { inviterId: true, email: true }
+      select: { inviterId: true, email: true, spent: true }
     });
-    await tx.user.update({
-      where: { id: cancelled.inviterId },
-      data: { inviteCount: { increment: 1 } }
-    });
+    if (cancelled.spent) {
+      await tx.user.update({
+        where: { id: cancelled.inviterId },
+        data: { inviteCount: { increment: 1 } }
+      });
+    }
     await audit(tx, actorId, 'invite.cancelled', 'Invite', inviteId, {
       ...meta,
       inviterId: cancelled.inviterId,
       email: cancelled.email,
-      refunded: true
+      refunded: cancelled.spent
     });
     return cancelled;
   });
@@ -214,7 +218,7 @@ export const cancelInvite = async (
   actorId: number,
   inviteId: number,
   { reason, message }: CancelInviteInput
-): Promise<void> => {
+): Promise<{ refunded: boolean }> => {
   const invite = await claimCancellation(inviteId, {
     actorId,
     meta: { by: 'staff', reason, messaged: message !== undefined }
@@ -225,10 +229,13 @@ export const cancelInvite = async (
       invite.inviterId,
       'An invite you sent was cancelled',
       withStaffPmPointer(
-        `${message}\n\nYour invite to ${invite.email} has been returned to you.`
+        invite.spent
+          ? `${message}\n\nYour invite to ${invite.email} has been returned to you.`
+          : `${message}\n\nYour invite to ${invite.email} was cancelled.`
       )
     );
   }
+  return { refunded: invite.spent };
 };
 
 /**
@@ -239,10 +246,11 @@ export const cancelInvite = async (
 export const withdrawInvite = async (
   memberId: number,
   inviteId: number
-): Promise<void> => {
-  await claimCancellation(inviteId, {
+): Promise<{ refunded: boolean }> => {
+  const { spent } = await claimCancellation(inviteId, {
     actorId: memberId,
     inviterId: memberId,
     meta: { by: 'inviter' }
   });
+  return { refunded: spent };
 };

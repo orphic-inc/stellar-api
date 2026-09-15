@@ -47,7 +47,12 @@ describe('GET /api/profile/me/invites/eligibility', () => {
     const res = await request(app).get('/api/profile/me/invites/eligibility');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ canSend: true, reason: null, msg: null });
+    expect(res.body).toEqual({
+      canSend: true,
+      reason: null,
+      msg: null,
+      unlimited: false
+    });
     // The caller's own state, never another member's.
     expect(prismaMock.user.findUniqueOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: TEST_USER_ID } })
@@ -68,7 +73,8 @@ describe('GET /api/profile/me/invites/eligibility', () => {
     expect(res.body).toEqual({
       canSend: false,
       reason: 'downloads_disabled',
-      msg: 'Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff'
+      msg: 'Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff',
+      unlimited: false
     });
   });
 });
@@ -125,7 +131,8 @@ describe('POST /api/profile/me/invites/:inviteId/withdraw', () => {
     prismaMock.invite.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.invite.findUniqueOrThrow.mockResolvedValue({
       inviterId: TEST_USER_ID,
-      email: 'typo@example.con'
+      email: 'typo@example.con',
+      spent: true
     } as never);
     prismaMock.user.update.mockResolvedValue({} as never);
 

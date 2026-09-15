@@ -21,7 +21,8 @@ const OPEN: InviteGateInput = {
   standing: 'clean',
   onRatioWatch: false,
   siteFull: false,
-  balance: 1
+  balance: 1,
+  unlimited: false
 };
 
 /** The one change to OPEN that closes each gate. */
@@ -74,6 +75,23 @@ describe('firstInviteRefusal', () => {
     'reads %s standing the way the handout does',
     (standing, expected) => {
       expect(firstInviteRefusal({ ...OPEN, standing })).toBe(expected);
+    }
+  );
+});
+
+describe('firstInviteRefusal for an unlimited sender (ADR-0043 §5)', () => {
+  const UNLIMITED = { ...OPEN, unlimited: true, balance: 0 };
+
+  it('never refuses them for the balance', () => {
+    expect(firstInviteRefusal(UNLIMITED)).toBeNull();
+  });
+
+  it.each(INVITE_GATE_ORDER.filter((reason) => reason !== 'no_invites'))(
+    'still refuses %s',
+    (reason) => {
+      expect(firstInviteRefusal({ ...UNLIMITED, ...CLOSE[reason] })).toBe(
+        reason
+      );
     }
   );
 });

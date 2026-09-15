@@ -195,6 +195,12 @@ export const PERMISSION_GROUPS = [
           "Change a member's invite count and invite privileges, and cancel pending invites."
       },
       {
+        key: 'invites_unlimited',
+        label: 'Unlimited invites',
+        description:
+          'Send invites without spending from the invite balance. Every other invite gate still applies.'
+      },
+      {
         key: 'ratio_policy_manage',
         label: 'Manage ratio policy',
         description: 'Manage ratio policy tools and ratio watch.'

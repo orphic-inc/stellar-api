@@ -123,6 +123,29 @@ All notable changes to stellar-api are documented here.
   Contract changes: the create-invite `403` covers three more reasons. The new
   schema `InviteEligibility` carries `reason` as an enum of the six gates.
 
+- **Unlimited invites**
+  ([#637](https://github.com/orphic-inc/stellar-api/issues/637),
+  [ADR-0043](docs/adr/0043-sending-an-invite-is-gated-on-the-inviter.md) §5).
+  A new permission, `invites_unlimited`, lets a rank send invites without
+  spending from `inviteCount`. It skips only the "No invites remaining" refusal;
+  revoked privileges, disabled downloads, standing, ratio watch and a full site
+  still refuse. `admin` implies it.
+
+  **Upgrade note:** no seeded rank grants it explicitly, so on an existing
+  install only `admin` ranks have it until it is granted in the rank permissions
+  manager.
+
+  `Invite` gains `spent` (default `true`; every existing row was paid for). An
+  unlimited send writes `false`, and expiry, re-invite, staff cancel and member
+  withdraw refund only a spent invite, so removing the permission and then
+  withdrawing cannot mint one. The stored balance still accrues from the
+  handout and is what the member falls back to.
+
+  Contract changes: `InviteEligibility` gains `unlimited`. `PermissionKey` gains
+  `invites_unlimited`. For an unspent invite, `POST /profile/me/invites/{id}/withdraw`
+  answers `Invite withdrawn` and `POST /users/invites/{id}/cancel` answers
+  `Invite cancelled`, without "returned". `inviteCount` is unchanged everywhere.
+
 ### Changed
 
 - **A cancelled invite holds its address until its original expiry**

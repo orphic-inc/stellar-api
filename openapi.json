@@ -2065,12 +2065,16 @@
           "msg": {
             "type": "string",
             "nullable": true
+          },
+          "unlimited": {
+            "type": "boolean"
           }
         },
         "required": [
           "canSend",
           "reason",
-          "msg"
+          "msg",
+          "unlimited"
         ]
       },
       "OwnInviteItem": {
@@ -4443,6 +4447,7 @@
           "recovery_manage",
           "invites_manage",
           "invites_edit",
+          "invites_unlimited",
           "ratio_policy_manage",
           "site_history_manage",
           "ip_bans_manage",
@@ -13105,7 +13110,7 @@
             }
           },
           "403": {
-            "description": "A send gate refused (#637): invite privileges revoked (#636), download access disabled, active warnings (poor standing), ratio watch, the site is full (#624), or no invites remaining. The first that applies is reported, in that order, and no invite is spent. `GET /profile/me/invites/eligibility` answers the same gates first",
+            "description": "A send gate refused (#637): invite privileges revoked (#636), download access disabled, active warnings (poor standing), ratio watch, the site is full (#624), or no invites remaining. The first that applies is reported, in that order, and no invite is spent. A caller with `invites_unlimited` is never refused for the balance, and spends nothing. `GET /profile/me/invites/eligibility` answers the same gates first",
             "content": {
               "application/json": {
                 "schema": {
@@ -13263,7 +13268,7 @@
           "Profile"
         ],
         "summary": "Withdraw one of your pending invites",
-        "description": "Self only (#640). Moves your `pending` invite to `cancelled` and returns it to your `inviteCount`. The key holder is then answered `invite_expired`. The address stays taken until the invite's original `expires`, so it cannot be re-invited by anyone before then. Needs no invite privileges: a revoked member can withdraw.",
+        "description": "Self only (#640). Moves your `pending` invite to `cancelled` and returns it to your `inviteCount`, unless it was sent without spending one (`invites_unlimited`, #637). The key holder is then answered `invite_expired`. The address stays taken until the invite's original `expires`, so it cannot be re-invited by anyone before then. Needs no invite privileges: a revoked member can withdraw.",
         "parameters": [
           {
             "schema": {
@@ -13276,7 +13281,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Invite withdrawn and returned to you",
+            "description": "`Invite withdrawn and returned to you`, or `Invite withdrawn` for an invite that was not spent",
             "content": {
               "application/json": {
                 "schema": {
@@ -23266,6 +23271,9 @@
                       "invites_edit": {
                         "type": "boolean"
                       },
+                      "invites_unlimited": {
+                        "type": "boolean"
+                      },
                       "ratio_policy_manage": {
                         "type": "boolean"
                       },
@@ -23721,6 +23729,9 @@
                         "type": "boolean"
                       },
                       "invites_edit": {
+                        "type": "boolean"
+                      },
+                      "invites_unlimited": {
                         "type": "boolean"
                       },
                       "ratio_policy_manage": {
@@ -34781,7 +34792,7 @@
           "Staff"
         ],
         "summary": "Staff: cancel a pending invite",
-        "description": "Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` and returns it to its inviter's `inviteCount`, uncapped. The key holder is then answered `invite_expired`, as for any lapse. The address can be invited again once the invite's original `expires` passes (#640). A pending invite past `expires` that the sweep has not reached yet can be cancelled too. `reason` is recorded in the audit log; `message`, when present, is sent to the inviter as a System PM.",
+        "description": "Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` and returns it to its inviter's `inviteCount`, uncapped, if it was spent (an `invites_unlimited` send is not, #637). The key holder is then answered `invite_expired`, as for any lapse. The address can be invited again once the invite's original `expires` passes (#640). A pending invite past `expires` that the sweep has not reached yet can be cancelled too. `reason` is recorded in the audit log; `message`, when present, is sent to the inviter as a System PM.",
         "parameters": [
           {
             "schema": {
@@ -34816,7 +34827,7 @@
         },
         "responses": {
           "200": {
-            "description": "Invite cancelled and returned to its inviter",
+            "description": "`Invite cancelled and returned to its inviter`, or `Invite cancelled` for an invite that was not spent",
             "content": {
               "application/json": {
                 "schema": {

@@ -39,6 +39,8 @@ export interface InviteGateInput {
   siteFull: boolean;
   /** `User.inviteCount`. */
   balance: number;
+  /** `invites_unlimited` (ADR-0043 §5): skips `no_invites`, and nothing else. */
+  unlimited: boolean;
 }
 
 const REFUSES: Record<InviteGateRefusal, (input: InviteGateInput) => boolean> =
@@ -48,7 +50,7 @@ const REFUSES: Record<InviteGateRefusal, (input: InviteGateInput) => boolean> =
     poor_standing: (i) => isStandingDenied(i.standing),
     ratio_watch: (i) => i.onRatioWatch,
     site_full: (i) => i.siteFull,
-    no_invites: (i) => i.balance <= 0
+    no_invites: (i) => !i.unlimited && i.balance <= 0
   };
 
 export const firstInviteRefusal = (
