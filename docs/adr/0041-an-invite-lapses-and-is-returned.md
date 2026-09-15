@@ -96,7 +96,7 @@ _**§5 changes:** a `cancelled` row holds its address until its original `expire
 
 ## Consequences
 
-The invite contract changes. `InviteStatus` loses `rejected` and gains `expired`, `InviteItem` gains `createdAt`, registration has a new `403` message, and the full-site message names a date. stellar-ui consumes these in [ui#328](https://github.com/orphic-inc/stellar-ui/issues/328). That issue also fixes an invite pool filter that sent uppercase statuses and answered `400` for every choice.
+The invite contract changes. `InviteStatus` loses `rejected` and gains `expired`, `InviteItem` gains `createdAt`, registration has a new `403` message, and the full-site message names a date. stellar-ui consumes these in [ui#330](https://github.com/orphic-inc/stellar-ui/issues/330). _(Corrected 2026-09-15: this pointed at ui#328, which is the automated contract-drift report and never tracked this work.)_ The invite pool filter that sent uppercase statuses, and was answered `400` for every choice, is fixed in [ui#329](https://github.com/orphic-inc/stellar-ui/issues/329) with the `cancelled` status.
 
 `inviteCount` now has three writers: the send spends, the faucet accrues, and a lapse refunds. The faucet stays the only source of new invites.
 
