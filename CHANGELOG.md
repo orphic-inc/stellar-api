@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-09-15
+
 ### Added
 
 - **The invite economy has a source**
@@ -2727,7 +2729,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/orphic-inc/stellar-api/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/orphic-inc/stellar-api/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/orphic-inc/stellar-api/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/orphic-inc/stellar-api/compare/v0.9.1...v0.9.2
