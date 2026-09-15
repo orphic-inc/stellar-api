@@ -12,6 +12,7 @@ import {
   FileType,
   InviteStatus,
   NotificationType,
+  RatioDisableCause,
   RatioPolicyStatus,
   ReleaseCategory,
   ReleaseType,
@@ -7720,6 +7721,9 @@ const RatioPolicyState = registry.register(
     watchStartedAt: z.string().nullable(),
     watchExpiresAt: z.string().nullable(),
     downloadDisabledAt: z.string().nullable(),
+    // Why downloads are disabled (#646); null unless DOWNLOAD_DISABLED. A RATIO
+    // disable lifts when the ratio recovers; a STAFF one only by staff.
+    disabledCause: z.nativeEnum(RatioDisableCause).nullable(),
     lastEvaluatedAt: z.string()
   })
 );
@@ -7788,6 +7792,13 @@ registry.registerPath({
   method: 'post',
   path: '/ratio-policy/{userId}/override',
   tags: ['RatioPolicy'],
+  description:
+    'Requires `ratio_policy_manage`. An absolute write: staff always win over ' +
+    'the automatic transitions. `DOWNLOAD_DISABLED` records `disabledCause: ' +
+    'STAFF`, which never lifts on its own; `OK` and `WATCH` clear the cause. ' +
+    "A staff `WATCH` starts from the member's current `consumed`, so the " +
+    '10 GiB rule applies (#646). `reason` is required and recorded in the ' +
+    'audit log; `message`, when present, is sent to the member as a System PM.',
   request: {
     params: z.object({ userId: z.string() }),
     body: {
@@ -8792,6 +8803,7 @@ const RatioWatchItem = registry.register(
     watchStartedAt: z.string().nullable(),
     watchExpiresAt: z.string().nullable(),
     downloadDisabledAt: z.string().nullable(),
+    disabledCause: z.nativeEnum(RatioDisableCause).nullable(),
     lastEvaluatedAt: z.string()
   })
 );

@@ -6478,6 +6478,15 @@
             "type": "string",
             "nullable": true
           },
+          "disabledCause": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "RATIO",
+              "STAFF",
+              null
+            ]
+          },
           "lastEvaluatedAt": {
             "type": "string"
           }
@@ -6487,6 +6496,7 @@
           "watchStartedAt",
           "watchExpiresAt",
           "downloadDisabledAt",
+          "disabledCause",
           "lastEvaluatedAt"
         ]
       },
@@ -7557,6 +7567,15 @@
             "type": "string",
             "nullable": true
           },
+          "disabledCause": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "RATIO",
+              "STAFF",
+              null
+            ]
+          },
           "lastEvaluatedAt": {
             "type": "string"
           }
@@ -7568,6 +7587,7 @@
           "watchStartedAt",
           "watchExpiresAt",
           "downloadDisabledAt",
+          "disabledCause",
           "lastEvaluatedAt"
         ]
       },
@@ -32329,6 +32349,7 @@
         "tags": [
           "RatioPolicy"
         ],
+        "description": "Requires `ratio_policy_manage`. An absolute write: staff always win over the automatic transitions. `DOWNLOAD_DISABLED` records `disabledCause: STAFF`, which never lifts on its own; `OK` and `WATCH` clear the cause. A staff `WATCH` starts from the member's current `consumed`, so the 10 GiB rule applies (#646). `reason` is required and recorded in the audit log; `message`, when present, is sent to the member as a System PM.",
         "parameters": [
           {
             "schema": {
@@ -32352,10 +32373,19 @@
                       "WATCH",
                       "DOWNLOAD_DISABLED"
                     ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
-                  "status"
+                  "status",
+                  "reason"
                 ]
               }
             }

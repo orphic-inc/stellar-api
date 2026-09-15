@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { RatioPolicyStatus } from '@prisma/client';
 import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
@@ -8,12 +7,15 @@ import {
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
-import { asyncHandler } from '../../modules/asyncHandler';
+import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   getPolicyState,
   overridePolicyStatus
 } from '../../modules/ratioPolicy';
-import { ratioPolicyOverrideSchema } from '../../schemas/ratioPolicy';
+import {
+  ratioPolicyOverrideSchema,
+  type RatioPolicyOverrideInput
+} from '../../schemas/ratioPolicy';
 
 const router = Router();
 
@@ -33,16 +35,20 @@ router.get(
   })
 );
 
-// POST /api/ratio-policy/:userId/override — staff: set policy status
+// POST /api/ratio-policy/:userId/override — staff: set policy status, audited
+// with a required reason (#646)
 router.post(
   '/:userId/override',
   ...requirePermission('ratio_policy_manage'),
   validateParams(userIdParamsSchema),
   validate(ratioPolicyOverrideSchema),
-  asyncHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { userId } = parsedParams<{ userId: number }>(res);
-    const { status } = parsedBody<{ status: RatioPolicyStatus }>(res);
-    const state = await overridePolicyStatus(userId, status);
+    const state = await overridePolicyStatus(
+      req.user.id,
+      userId,
+      parsedBody<RatioPolicyOverrideInput>(res)
+    );
     res.json(state);
   })
 );

@@ -146,6 +146,19 @@ All notable changes to stellar-api are documented here.
   answers `Invite withdrawn` and `POST /users/invites/{id}/cancel` answers
   `Invite cancelled`, without "returned". `inviteCount` is unchanged everywhere.
 
+- **A download disable records why**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646),
+  [ADR-0044](docs/adr/0044-a-ratio-disable-records-its-cause.md)).
+  `RatioPolicyState` gains `disabledCause` (`RATIO | STAFF`, null unless
+  `DOWNLOAD_DISABLED`): the automatic disable records `RATIO`, a staff override
+  `STAFF`. Existing disables are backfilled from `watchStartedAt`, which the
+  automatic path kept and the override cleared. The staff override now writes a
+  `ratioPolicy.override` audit row, and an optional `message` is sent to the
+  member as a System PM.
+
+  Contract changes: `RatioPolicyState` (`GET /profile/me/ratio`'s `policy`,
+  `GET /ratio-policy/{userId}`) and `RatioWatchItem` gain `disabledCause`.
+
 ### Changed
 
 - **A cancelled invite holds its address until its original expiry**
@@ -204,6 +217,13 @@ disabled" }` and nothing more, although the login screen is the one place such
   used to link `/reactivate`, a page that does not exist. The in-app reactivation
   routes themselves are withdrawn separately
   ([#629](https://github.com/orphic-inc/stellar-api/issues/629)).
+
+- **The ratio policy override requires a reason**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646)).
+  `POST /api/ratio-policy/{userId}/override` takes
+  `{ status, reason, message? }` and answers `400` without `reason`.
+  **Breaking for stellar-ui's ratio policy panel**, which sends `status` only,
+  until it follows.
 
 ### Removed
 
@@ -277,6 +297,16 @@ disabled" }` and nothing more, although the login screen is the one place such
 
   `GET /users/invite-tree` now lists invited members by default. The new
   optional `all=true` includes everyone.
+
+- **A staff-started ratio watch reaches the 10 GiB rule**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646)). The override
+  wrote `consumedAtWatchStart: null`, which the evaluator read as nothing
+  consumed, so a watch set by staff could only end by expiry. It now starts from
+  the member's current `consumed`.
+- **`GET /api/users/ratio-watch` no longer leaks the whole policy row**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646)). It used
+  `include`, returning the undocumented `consumedAtWatchStart`; it now selects
+  the `RatioWatchItem` fields.
 
 ## [0.9.4] — 2026-09-11
 

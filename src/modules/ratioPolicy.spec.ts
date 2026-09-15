@@ -2,7 +2,7 @@
  * Unit tests for the ratio policy state machine.
  */
 
-import { RatioPolicyStatus } from '@prisma/client';
+import { RatioPolicyStatus, RatioDisableCause } from '@prisma/client';
 
 const mockPrismaUser = {
   findUniqueOrThrow: jest.fn(),
@@ -11,6 +11,8 @@ const mockPrismaUser = {
 };
 const mockPrismaPolicy = {
   findUnique: jest.fn(),
+  findMany: jest.fn(),
+  count: jest.fn(),
   upsert: jest.fn(),
   update: jest.fn()
 };
@@ -32,8 +34,17 @@ jest.mock('./logging', () => ({
   getLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() })
 }));
 
-import { evaluateRatioPolicy, overridePolicyStatus } from './ratioPolicy';
+jest.mock('../lib/audit', () => ({ audit: jest.fn() }));
+jest.mock('./pm', () => ({ sendSystemMessage: jest.fn() }));
+
+import {
+  evaluateRatioPolicy,
+  listRatioWatch,
+  overridePolicyStatus
+} from './ratioPolicy';
 import { getRatioStats } from './ratio';
+import { audit } from '../lib/audit';
+import { sendSystemMessage } from './pm';
 
 const mockGetRatioStats = getRatioStats as jest.MockedFunction<
   typeof getRatioStats
@@ -162,7 +173,8 @@ describe('evaluateRatioPolicy', () => {
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: RatioPolicyStatus.DOWNLOAD_DISABLED
+          status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+          disabledCause: RatioDisableCause.RATIO
         })
       })
     );
@@ -193,7 +205,8 @@ describe('evaluateRatioPolicy', () => {
     expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: RatioPolicyStatus.DOWNLOAD_DISABLED
+          status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+          disabledCause: RatioDisableCause.RATIO
         })
       })
     );
@@ -250,44 +263,153 @@ describe('evaluateRatioPolicy', () => {
 // ─── overridePolicyStatus ─────────────────────────────────────────────────────
 
 describe('overridePolicyStatus', () => {
+  const mockAudit = audit as jest.Mock;
+  const mockPm = sendSystemMessage as jest.Mock;
+  const override = (status: RatioPolicyStatus, message?: string) =>
+    overridePolicyStatus(7, 1, { status, reason: 'appeal upheld', message });
+
   beforeEach(() => {
     jest.resetAllMocks();
-    mockTransaction.mockImplementation((ops: unknown[]) => Promise.all(ops));
+    // The override is an interactive transaction; run it against the mocks.
+    mockTransaction.mockImplementation(((cb: (tx: unknown) => unknown) =>
+      cb({
+        user: mockPrismaUser,
+        ratioPolicyState: mockPrismaPolicy
+      })) as never);
+    mockPrismaUser.findUnique.mockResolvedValue({ consumed: 12n * GiB });
+    mockPrismaPolicy.findUnique.mockResolvedValue(null);
+    mockPrismaPolicy.upsert.mockImplementation(
+      async ({ create }: { create: Record<string, unknown> }) =>
+        makeState(create)
+    );
+    mockPrismaUser.update.mockResolvedValue({});
+    mockPm.mockResolvedValue({ ok: true });
   });
 
-  it('throws 404 when user not found', async () => {
+  const written = () =>
+    (
+      mockPrismaPolicy.upsert.mock.calls[0][0] as {
+        update: Record<string, unknown>;
+      }
+    ).update;
+
+  it('throws 404 when user not found, writing nothing', async () => {
     mockPrismaUser.findUnique.mockResolvedValue(null);
-    await expect(
-      overridePolicyStatus(1, RatioPolicyStatus.OK)
-    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(override(RatioPolicyStatus.OK)).rejects.toMatchObject({
+      statusCode: 404
+    });
+    expect(mockPrismaPolicy.upsert).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
   });
 
-  it('sets canDownload=false when overriding to DOWNLOAD_DISABLED', async () => {
-    mockPrismaUser.findUnique.mockResolvedValue({ id: 1 });
-    mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({
+  it('disables downloads with cause STAFF', async () => {
+    const view = await override(RatioPolicyStatus.DOWNLOAD_DISABLED);
+
+    expect(written()).toMatchObject({
+      status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+      disabledCause: RatioDisableCause.STAFF,
+      watchStartedAt: null
+    });
+    expect(mockPrismaUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { canDownload: false }
+    });
+    expect(view.disabledCause).toBe(RatioDisableCause.STAFF);
+  });
+
+  it.each([RatioPolicyStatus.OK, RatioPolicyStatus.WATCH])(
+    'clears the cause and restores downloads when set to %s',
+    async (status) => {
+      mockPrismaPolicy.findUnique.mockResolvedValue({
         status: RatioPolicyStatus.DOWNLOAD_DISABLED,
-        downloadDisabledAt: new Date()
-      })
-    );
-    mockPrismaUser.update.mockResolvedValue({});
+        disabledCause: RatioDisableCause.RATIO
+      });
 
-    await overridePolicyStatus(1, RatioPolicyStatus.DOWNLOAD_DISABLED);
+      await override(status);
 
-    expect(mockPrismaUser.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { canDownload: false } })
-    );
+      expect(written()).toMatchObject({ status, disabledCause: null });
+      expect(mockPrismaUser.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { canDownload: true }
+      });
+    }
+  );
+
+  it("starts a staff watch from the member's current consumed, so the 10 GiB rule applies", async () => {
+    await override(RatioPolicyStatus.WATCH);
+
+    expect(written()).toMatchObject({
+      status: RatioPolicyStatus.WATCH,
+      consumedAtWatchStart: 12n * GiB,
+      watchStartedAt: expect.any(Date),
+      watchExpiresAt: expect.any(Date)
+    });
   });
 
-  it('sets canDownload=true when restoring to OK', async () => {
-    mockPrismaUser.findUnique.mockResolvedValue({ id: 1 });
-    mockPrismaPolicy.upsert.mockResolvedValue(makeState());
-    mockPrismaUser.update.mockResolvedValue({});
+  it('audits from and to, with the reason, as the acting staff member', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue({
+      status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+      disabledCause: RatioDisableCause.RATIO
+    });
 
-    await overridePolicyStatus(1, RatioPolicyStatus.OK);
+    await override(RatioPolicyStatus.DOWNLOAD_DISABLED);
 
-    expect(mockPrismaUser.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { canDownload: true } })
+    expect(mockAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      7,
+      'ratioPolicy.override',
+      'User',
+      1,
+      {
+        from: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        fromCause: RatioDisableCause.RATIO,
+        to: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        toCause: RatioDisableCause.STAFF,
+        reason: 'appeal upheld',
+        messaged: false
+      }
     );
+    expect(mockPm).not.toHaveBeenCalled();
+  });
+
+  it('PMs the member only when staff write a message, pointing to Staff PM', async () => {
+    await override(RatioPolicyStatus.DOWNLOAD_DISABLED, 'Shared your account.');
+
+    expect(mockPm).toHaveBeenCalledWith(
+      1,
+      'Your downloads have been disabled',
+      'Shared your account.\n\nIf you have questions, contact staff through Staff PM: /inbox/staff'
+    );
+    expect(mockAudit.mock.calls[0][5]).toMatchObject({ messaged: true });
+  });
+});
+
+// ─── listRatioWatch ───────────────────────────────────────────────────────────
+
+describe('listRatioWatch', () => {
+  it('selects the documented fields, disabledCause included, and nothing else (#646)', async () => {
+    jest.resetAllMocks();
+    mockPrismaPolicy.findMany.mockResolvedValue([]);
+    mockPrismaPolicy.count.mockResolvedValue(0);
+
+    await listRatioWatch({ page: 1, limit: 25, skip: 0 });
+
+    const args = mockPrismaPolicy.findMany.mock.calls[0][0];
+    expect(args).not.toHaveProperty('include');
+    expect(Object.keys(args.select).sort()).toEqual([
+      'disabledCause',
+      'downloadDisabledAt',
+      'lastEvaluatedAt',
+      'status',
+      'user',
+      'userId',
+      'watchExpiresAt',
+      'watchStartedAt'
+    ]);
+    expect(args.where).toEqual({
+      status: {
+        in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.DOWNLOAD_DISABLED]
+      }
+    });
   });
 });

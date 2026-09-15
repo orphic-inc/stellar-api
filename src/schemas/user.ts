@@ -51,10 +51,10 @@ export const rankLockSchema = z.object({
   rankLocked: z.boolean()
 });
 
-// Staff invite controls (#636). `reason` is staff-only and goes to the audit
-// row; `message`, when sent, is PMed to the member.
-const staffReason = z.string().trim().min(1, 'Reason is required');
-const memberMessage = z.string().trim().min(1).optional();
+// Staff controls on one member (#636, #646). `reason` is staff-only and goes to
+// the audit row; `message`, when sent, is PMed to the member.
+export const staffReason = z.string().trim().min(1, 'Reason is required');
+export const memberMessage = z.string().trim().min(1).optional();
 
 export const canInviteSchema = z.object({
   canInvite: z.boolean(),

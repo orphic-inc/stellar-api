@@ -223,6 +223,11 @@ enum RatioPolicyStatus {
   DOWNLOAD_DISABLED
 }
 
+enum RatioDisableCause {
+  RATIO
+  STAFF
+}
+
 // Ratio-exempt Contribution flags (PRD-06 #4). Read at consumption time by the
 // accounting path (downloads.ts). Mutually exclusive by construction — a single
 // enum encodes that a Contribution can't be both Freepass and Neutralpass.
@@ -1868,14 +1873,19 @@ model DownloadAccessGrant {
 }
 
 model RatioPolicyState {
-  userId               Int               @id
-  user                 User              @relation(fields: [userId], references: [id])
-  status               RatioPolicyStatus @default(OK)
+  userId               Int                @id
+  user                 User               @relation(fields: [userId], references: [id])
+  status               RatioPolicyStatus  @default(OK)
   watchStartedAt       DateTime?
   watchExpiresAt       DateTime?
   consumedAtWatchStart BigInt?
   downloadDisabledAt   DateTime?
-  lastEvaluatedAt      DateTime          @default(now())
+  // Why downloads are disabled (#646), set only while DOWNLOAD_DISABLED. Only a
+  // RATIO disable lifts itself when the ratio recovers; a STAFF disable is
+  // reversed by staff only. Rows from before #646 were backfilled from
+  // watchStartedAt, which the automatic disable keeps and the override nulls.
+  disabledCause        RatioDisableCause?
+  lastEvaluatedAt      DateTime           @default(now())
 
   @@map("ratio_policy_states")
 }

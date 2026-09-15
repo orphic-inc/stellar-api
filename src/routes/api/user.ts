@@ -26,6 +26,7 @@ import {
 import { requireAuth } from '../../middleware/auth';
 import { requireServiceKey } from '../../middleware/serviceAuth';
 import { getReputation } from '../../modules/reputation';
+import { listRatioWatch } from '../../modules/ratioPolicy';
 import {
   requirePermission,
   loadPermissions,
@@ -39,12 +40,7 @@ import {
   parsedParams,
   parsedQuery
 } from '../../middleware/validate';
-import {
-  Prisma,
-  InviteStatus,
-  StatSnapshotPeriod,
-  RatioPolicyStatus
-} from '@prisma/client';
+import { Prisma, InviteStatus, StatSnapshotPeriod } from '@prisma/client';
 import {
   adminCreateUserSchema,
   userSettingsSchema,
@@ -534,24 +530,10 @@ router.get(
   '/ratio-watch',
   ...requirePermission('ratio_policy_manage'),
   validateQuery(ratioWatchQuerySchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (_req: Request, res: Response) => {
     const pg = parsedPage(res);
-    const where = {
-      status: {
-        in: [RatioPolicyStatus.WATCH, RatioPolicyStatus.DOWNLOAD_DISABLED]
-      }
-    };
-    const [entries, total] = await Promise.all([
-      prisma.ratioPolicyState.findMany({
-        where,
-        include: { user: { select: { id: true, username: true } } },
-        orderBy: { watchStartedAt: 'desc' },
-        skip: pg.skip,
-        take: pg.limit
-      }),
-      prisma.ratioPolicyState.count({ where })
-    ]);
-    paginatedResponse(res, entries, total, pg);
+    const { rows, total } = await listRatioWatch(pg);
+    paginatedResponse(res, rows, total, pg);
   })
 );
 
