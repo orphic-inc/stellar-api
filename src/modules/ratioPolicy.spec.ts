@@ -14,7 +14,8 @@ const mockPrismaPolicy = {
   findMany: jest.fn(),
   count: jest.fn(),
   upsert: jest.fn(),
-  update: jest.fn()
+  update: jest.fn(),
+  updateMany: jest.fn()
 };
 const mockTransaction = jest.fn((ops: unknown[]) => Promise.all(ops));
 
@@ -36,12 +37,17 @@ jest.mock('./logging', () => ({
 
 jest.mock('../lib/audit', () => ({ audit: jest.fn() }));
 jest.mock('./pm', () => ({ sendSystemMessage: jest.fn() }));
+jest.mock('./rankProgressionJob', () => ({
+  resolveSystemActorId: jest.fn()
+}));
 
 import {
+  applyRatioRules,
   evaluateRatioPolicy,
   listRatioWatch,
   overridePolicyStatus
 } from './ratioPolicy';
+import { resolveSystemActorId } from './rankProgressionJob';
 import { getRatioStats } from './ratio';
 import { audit } from '../lib/audit';
 import { sendSystemMessage } from './pm';
@@ -71,192 +77,200 @@ const makeState = (overrides = {}) => ({
   watchExpiresAt: null,
   consumedAtWatchStart: null,
   downloadDisabledAt: null,
+  disabledCause: null,
   lastEvaluatedAt: new Date(),
   ...overrides
 });
 
 // ─── evaluateRatioPolicy ──────────────────────────────────────────────────────
 
-describe('evaluateRatioPolicy', () => {
+describe('applyRatioRules', () => {
+  const mockAudit = audit as jest.Mock;
+  const mockPm = sendSystemMessage as jest.Mock;
+  const SYSTEM_ID = 99;
+
   beforeEach(() => {
     jest.resetAllMocks();
-    mockTransaction.mockImplementation((ops: unknown[]) => Promise.all(ops));
+    mockTransaction.mockImplementation(((cb: (tx: unknown) => unknown) =>
+      cb({
+        user: mockPrismaUser,
+        ratioPolicyState: mockPrismaPolicy
+      })) as never);
+    (resolveSystemActorId as jest.Mock).mockResolvedValue(SYSTEM_ID);
+    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({ consumed: 20n * GiB });
+    mockPrismaPolicy.updateMany.mockResolvedValue({ count: 1 });
+    mockPrismaUser.update.mockResolvedValue({});
+    mockPm.mockResolvedValue({ ok: true });
   });
 
-  it('OK + meets requirement: only refreshes lastEvaluatedAt', async () => {
-    mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 7n * GiB
-    });
+  const short = () =>
+    mockGetRatioStats.mockResolvedValue(
+      makeStats({ ratio: 0.1, requiredRatio: 0.3, meetsRequirement: false })
+    );
+  const meets = () =>
+    mockGetRatioStats.mockResolvedValue(
+      makeStats({ ratio: 0.5, requiredRatio: 0.3, meetsRequirement: true })
+    );
+
+  it('makes no transition when none applies: refreshes lastEvaluatedAt only', async () => {
+    meets();
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
-    await evaluateRatioPolicy(1);
+    expect(await evaluateRatioPolicy(1)).toBeUndefined();
 
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ lastEvaluatedAt: expect.any(Date) })
-      })
-    );
-    expect(mockPrismaUser.update).not.toHaveBeenCalled();
+    expect(mockPrismaPolicy.updateMany).toHaveBeenCalledTimes(1);
+    expect(mockPrismaPolicy.updateMany).toHaveBeenCalledWith({
+      where: { userId: 1 },
+      data: { lastEvaluatedAt: expect.any(Date) }
+    });
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
+    expect(mockPm).not.toHaveBeenCalled();
   });
 
-  it('OK + fails requirement: transitions to WATCH', async () => {
-    mockGetRatioStats.mockResolvedValue(
-      makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
+  const STARTED_AT = new Date('2026-09-01T00:00:00Z');
+  /** A short member whose watch has run out: the rules disable them. */
+  const expiredWatch = async () => {
+    short();
+    mockPrismaPolicy.upsert.mockResolvedValue(
+      makeState({
+        status: RatioPolicyStatus.WATCH,
+        watchStartedAt: STARTED_AT,
+        watchExpiresAt: new Date(Date.now() - 1),
+        consumedAtWatchStart: 19n * GiB
+      })
     );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 7n * GiB
+    expect(await applyRatioRules(1, 'sweep')).toEqual({
+      kind: 'download_disabled',
+      trigger: 'watch_expired'
     });
+  };
+
+  it('claims a transition on the row as it was read', async () => {
+    await expiredWatch();
+
+    expect(mockPrismaPolicy.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 1,
+        status: RatioPolicyStatus.WATCH,
+        disabledCause: null,
+        watchStartedAt: STARTED_AT
+      },
+      data: expect.objectContaining({
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        disabledCause: RatioDisableCause.RATIO
+      })
+    });
+    expect(mockPrismaUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { canDownload: false }
+    });
+  });
+
+  it('audits the claimed transition as the SysOp, with the numbers, then PMs it', async () => {
+    await expiredWatch();
+
+    expect(mockAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      SYSTEM_ID,
+      'ratioPolicy.download_disabled',
+      'User',
+      1,
+      {
+        from: RatioPolicyStatus.WATCH,
+        fromCause: null,
+        to: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        toCause: RatioDisableCause.RATIO,
+        ratio: 0.1,
+        requiredRatio: 0.3,
+        by: 'sweep',
+        trigger: 'watch_expired'
+      }
+    );
+    expect(mockPm).toHaveBeenCalledWith(
+      1,
+      'Your downloads have been disabled',
+      expect.stringContaining(
+        'Your ratio watch ended with your ratio still short'
+      )
+    );
+  });
+
+  it('writes nothing else, and sends no PM, when the claim finds the row already moved', async () => {
+    short();
+    mockPrismaPolicy.upsert.mockResolvedValue(makeState());
+    mockPrismaPolicy.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValue({ count: 1 });
+
+    expect(await evaluateRatioPolicy(1)).toBeUndefined();
+
+    expect(mockPrismaUser.update).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
+    expect(mockPm).not.toHaveBeenCalled();
+  });
+
+  it('starts a watch after a download, with its end date in the PM', async () => {
+    short();
     mockPrismaPolicy.upsert.mockResolvedValue(makeState());
 
-    await evaluateRatioPolicy(1);
+    expect(await applyRatioRules(1, 'download')).toEqual({
+      kind: 'watch_started'
+    });
 
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: RatioPolicyStatus.WATCH,
-          watchStartedAt: expect.any(Date),
-          watchExpiresAt: expect.any(Date),
-          consumedAtWatchStart: 7n * GiB
-        })
-      })
+    expect(mockAudit.mock.calls[0][2]).toBe('ratioPolicy.watch_started');
+    expect(mockAudit.mock.calls[0][5]).toMatchObject({ by: 'download' });
+    expect(mockPm).toHaveBeenCalledWith(
+      1,
+      'You are on ratio watch',
+      expect.stringMatching(
+        /^Your ratio is 0\.10; your required ratio is 0\.30\. You are on ratio watch until .+ GMT\./
+      )
     );
   });
 
-  it('WATCH + ratio restored: transitions to OK, re-enables canDownload', async () => {
-    mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: true }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 9n * GiB
-    });
+  it('never starts a watch from the sweep', async () => {
+    short();
+    mockPrismaPolicy.upsert.mockResolvedValue(makeState());
+
+    expect(await applyRatioRules(1, 'sweep')).toBeNull();
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('lifts a RATIO disable once the ratio meets its requirement', async () => {
+    meets();
     mockPrismaPolicy.upsert.mockResolvedValue(
       makeState({
-        status: RatioPolicyStatus.WATCH,
-        watchExpiresAt: new Date(Date.now() + 86400000),
-        consumedAtWatchStart: 7n * GiB
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        disabledCause: RatioDisableCause.RATIO
       })
     );
-    mockPrismaPolicy.update.mockResolvedValue({});
-    mockPrismaUser.update.mockResolvedValue({});
 
-    await evaluateRatioPolicy(1);
-
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: RatioPolicyStatus.OK })
-      })
-    );
-    expect(mockPrismaUser.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { canDownload: true } })
+    expect(await applyRatioRules(1, 'sweep')).toEqual({
+      kind: 'download_restored'
+    });
+    expect(mockPrismaUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { canDownload: true }
+    });
+    expect(mockPm).toHaveBeenCalledWith(
+      1,
+      'Your downloads have been restored',
+      expect.any(String)
     );
   });
 
-  it('WATCH + 10 GiB downloaded during watch: immediate DOWNLOAD_DISABLED', async () => {
-    mockGetRatioStats.mockResolvedValue(
-      makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
-    );
-    const watchStart = 5n * GiB;
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: watchStart + 10n * GiB
-    });
+  it('commits the transition even when the PM fails', async () => {
+    meets();
     mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({
-        status: RatioPolicyStatus.WATCH,
-        watchExpiresAt: new Date(Date.now() + 86400000),
-        consumedAtWatchStart: watchStart
-      })
+      makeState({ status: RatioPolicyStatus.WATCH, watchStartedAt: new Date() })
     );
-    mockPrismaPolicy.update.mockResolvedValue({});
-    mockPrismaUser.update.mockResolvedValue({});
+    mockPm.mockRejectedValue(new Error('smtp down'));
 
-    await evaluateRatioPolicy(1);
-
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: RatioPolicyStatus.DOWNLOAD_DISABLED,
-          disabledCause: RatioDisableCause.RATIO
-        })
-      })
-    );
-    expect(mockPrismaUser.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { canDownload: false } })
-    );
-  });
-
-  it('WATCH + expired watch period: transitions to DOWNLOAD_DISABLED', async () => {
-    mockGetRatioStats.mockResolvedValue(
-      makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
-    );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 6n * GiB
+    await expect(applyRatioRules(1, 'download')).resolves.toEqual({
+      kind: 'watch_cleared'
     });
-    mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({
-        status: RatioPolicyStatus.WATCH,
-        watchExpiresAt: new Date(Date.now() - 1), // already expired
-        consumedAtWatchStart: 5n * GiB // only 1 GiB during watch
-      })
-    );
-    mockPrismaPolicy.update.mockResolvedValue({});
-    mockPrismaUser.update.mockResolvedValue({});
-
-    await evaluateRatioPolicy(1);
-
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: RatioPolicyStatus.DOWNLOAD_DISABLED,
-          disabledCause: RatioDisableCause.RATIO
-        })
-      })
-    );
-    expect(mockPrismaUser.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { canDownload: false } })
-    );
-  });
-
-  it('WATCH + still within window and below limit: only refreshes timestamp', async () => {
-    mockGetRatioStats.mockResolvedValue(
-      makeStats({ meetsRequirement: false, requiredRatio: 0.15 })
-    );
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 6n * GiB
-    });
-    mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({
-        status: RatioPolicyStatus.WATCH,
-        watchExpiresAt: new Date(Date.now() + 86400000),
-        consumedAtWatchStart: 5n * GiB // only 1 GiB during watch
-      })
-    );
-
-    await evaluateRatioPolicy(1);
-
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ lastEvaluatedAt: expect.any(Date) })
-      })
-    );
-    expect(mockPrismaUser.update).not.toHaveBeenCalled();
-  });
-
-  it('DOWNLOAD_DISABLED: no status change, only refreshes timestamp', async () => {
-    mockGetRatioStats.mockResolvedValue(makeStats({ meetsRequirement: false }));
-    mockPrismaUser.findUniqueOrThrow.mockResolvedValue({
-      consumed: 50n * GiB
-    });
-    mockPrismaPolicy.upsert.mockResolvedValue(
-      makeState({ status: RatioPolicyStatus.DOWNLOAD_DISABLED })
-    );
-
-    await evaluateRatioPolicy(1);
-
-    expect(mockPrismaPolicy.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ lastEvaluatedAt: expect.any(Date) })
-      })
-    );
-    expect(mockPrismaUser.update).not.toHaveBeenCalled();
+    expect(mockAudit).toHaveBeenCalledTimes(1);
   });
 });
 
