@@ -88,7 +88,9 @@ describe('POST /api/auth/register — invite expiry (#627)', () => {
       'from an inviter whose invite privileges are revoked (#636)',
       { inviter: { disabled: false, canInvite: false } }
     ],
-    ['already marked expired', { status: 'expired' }]
+    ['already marked expired', { status: 'expired' }],
+    // Answered as a lapse, so the reply cannot confirm a staff cancel (#636).
+    ['cancelled by staff', { status: 'cancelled' }]
   ])('refuses an invite %s with the expired message', async (_, over) => {
     inviteRow(over);
 

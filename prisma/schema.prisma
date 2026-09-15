@@ -70,6 +70,10 @@ enum InviteStatus {
   pending
   accepted
   expired
+  // Staff cancelled it from the invite pool (#636). Lapsed like `expired`, and
+  // refunded by the same claim rule: an invite that leaves `pending` without
+  // being accepted returns to its inviter.
+  cancelled
 }
 
 enum RegistrationStatus {

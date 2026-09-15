@@ -43,6 +43,7 @@ import {
   rankLockSchema,
   canInviteSchema,
   inviteCountSchema,
+  cancelInviteSchema,
   staffBioSchema,
   dncSchema,
   // pmDraftSchema and massPmSchema live in schemas/user.ts, not schemas/pm.ts.
@@ -397,7 +398,8 @@ registry.registerPath({
         'reached `maxUsers`), or the invite key is missing, invalid, ' +
         'already used, issued for a different email address, or expired. ' +
         'An invite expires three days after it is sent, or as soon as its ' +
-        'inviter is disabled (#627)'
+        'inviter is disabled (#627) or has invite privileges revoked, and a ' +
+        'cancelled invite answers the same way (#636)'
     )
   }
 });
@@ -2108,8 +2110,8 @@ registry.registerPath({
         'invite is not spent'
     ),
     409: msgResponse(
-      'A live invite already exists for that address. An expired one does ' +
-        'not block it: the address can be invited again (#627)'
+      'A live invite already exists for that address. An expired (#627) or ' +
+        'cancelled (#636) one does not block it: the address can be invited again'
     )
   }
 });
@@ -8511,10 +8513,15 @@ registry.registerPath({
   method: 'get',
   path: '/users/invites',
   tags: ['Staff'],
+  description:
+    'Requires `invites_manage`. Ordered by `expires` descending, then `id` ' +
+    'descending. `email` is a case-insensitive substring match (#636).',
   request: {
     query: z.object({
       page: z.string().optional(),
-      status: z.nativeEnum(InviteStatus).optional()
+      limit: z.string().optional(),
+      status: z.nativeEnum(InviteStatus).optional(),
+      email: z.string().min(3).max(254).optional()
     })
   },
   responses: {
@@ -8526,6 +8533,31 @@ registry.registerPath({
         }
       }
     }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/invites/{inviteId}/cancel',
+  tags: ['Staff'],
+  summary: 'Staff: cancel a pending invite',
+  description:
+    'Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` ' +
+    "and returns it to its inviter's `inviteCount`, uncapped. The key holder " +
+    'is then answered `invite_expired`, as for any lapse, and the address can ' +
+    'be invited again. A pending invite past `expires` that the sweep has not ' +
+    'reached yet can be cancelled too. `reason` is recorded in the audit log; ' +
+    '`message`, when present, is sent to the inviter as a System PM.',
+  request: {
+    params: z.object({ inviteId: z.string() }),
+    body: { content: { 'application/json': { schema: cancelInviteSchema } } }
+  },
+  responses: {
+    200: msgResponse('Invite cancelled and returned to its inviter'),
+    404: msgResponse('Invite not found'),
+    409: msgResponse(
+      'The invite is no longer pending: already accepted, expired or cancelled'
+    )
   }
 });
 

@@ -63,6 +63,24 @@ All notable changes to stellar-api are documented here.
   visible to the owner and staff like `inviteCount` and `null` otherwise.
   `PermissionKey` gains `invites_edit`.
 
+- **Staff can cancel a pending invite and search the invite pool by email**
+  ([#636](https://github.com/orphic-inc/stellar-api/issues/636),
+  [ADR-0041](docs/adr/0041-an-invite-lapses-and-is-returned.md) extended).
+  - `POST /api/users/invites/{inviteId}/cancel` with `{ reason, message? }`
+    (`invites_edit`) moves a pending invite to a new status, `cancelled`, and
+    returns it to its inviter, uncapped. It answers `409` once the invite is no
+    longer pending and `404` for no invite. The key holder is answered
+    `invite_expired`, as for any lapse, and the address can be invited again.
+    `reason` goes to the audit log (`invite.cancelled`), and an optional
+    `message` is sent to the inviter as a System PM.
+  - `GET /api/users/invites` gains `email`, a case-insensitive substring filter
+    (3–254 characters) that combines with `status`. The list is now ordered by
+    `expires` then `id`, so pages no longer overlap when invites share an
+    expiry.
+
+  Contract changes: `InviteStatus` gains `cancelled`. The pool's OpenAPI query
+  now documents `limit` and `email`.
+
 ### Changed
 
 - **`maxUsers` is enforced**

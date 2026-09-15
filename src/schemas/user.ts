@@ -72,6 +72,11 @@ export const inviteCountSchema = z.object({
   message: memberMessage
 });
 
+export const cancelInviteSchema = z.object({
+  reason: staffReason,
+  message: memberMessage
+});
+
 export const donorRankSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   minDonation: z.number().positive(),
@@ -128,6 +133,7 @@ export type SetRankInput = z.infer<typeof setRankSchema>;
 export type RankLockInput = z.infer<typeof rankLockSchema>;
 export type CanInviteInput = z.infer<typeof canInviteSchema>;
 export type InviteCountInput = z.infer<typeof inviteCountSchema>;
+export type CancelInviteInput = z.infer<typeof cancelInviteSchema>;
 export type DonorRankInput = z.infer<typeof donorRankSchema>;
 export type GrantDonorInput = z.infer<typeof grantDonorSchema>;
 export type IrcNickVerifyInput = z.infer<typeof ircNickVerifySchema>;

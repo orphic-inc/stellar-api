@@ -42,9 +42,12 @@ describe('isInviteLapsed', () => {
     expect(isInviteLapsed(invite({ inviterCanInvite: false }), now)).toBe(true);
   });
 
-  it('treats a stored expired status as lapsed whatever its date', () => {
-    expect(isInviteLapsed(invite({ status: 'expired' }), now)).toBe(true);
-  });
+  it.each(['expired', 'cancelled'] as const)(
+    'treats a stored %s status as lapsed whatever its date',
+    (status) => {
+      expect(isInviteLapsed(invite({ status }), now)).toBe(true);
+    }
+  );
 
   it('never lapses an accepted invite, even past its date or with a disabled inviter', () => {
     // An accepted invite was used. Treating it as lapsed would free the address

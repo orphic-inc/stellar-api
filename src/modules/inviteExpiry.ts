@@ -15,8 +15,8 @@
  *    key holder exactly as an ordinary lapse does, so the reply cannot reveal
  *    that the inviter was disabled. An inviter whose invite privileges staff
  *    revoked (`canInvite = false`, #636) is the same case, for the same reason.
- *  - `expired` is a stored status, but a `pending` row past `expires` has
- *    lapsed too. The sweep runs hourly, and the gates must not honour a key in
+ *  - `expired` and `cancelled` (#636) are stored statuses, but a `pending` row
+ *    past `expires` has lapsed too. The sweep runs hourly, and the gates must not honour a key in
  *    the gap between expiry and the sweep reaching it.
  *  - The TTL is a constant, not configuration (ADR-0038 §4's rule: thresholds
  *    are code). It also decides when refunds happen, so it moves by review.
@@ -38,6 +38,17 @@ export interface InviteLapseInput {
 }
 
 /**
+ * The stored statuses of an invite that ended unused: it ran out, or staff
+ * cancelled it (#636). Both have lapsed, both were refunded when they left
+ * `pending`, and both free their address for a re-invite. A cancel answers the
+ * key holder exactly as an expiry does, so it cannot confirm a moderation act.
+ */
+export const LAPSED_INVITE_STATUSES: readonly InviteStatus[] = [
+  'expired',
+  'cancelled'
+];
+
+/**
  * Whether an invite can no longer be used. An `accepted` invite has not
  * lapsed — it was used — so it never frees its address.
  */
@@ -45,7 +56,7 @@ export const isInviteLapsed = (
   invite: InviteLapseInput,
   now: Date
 ): boolean => {
-  if (invite.status === 'expired') return true;
+  if (LAPSED_INVITE_STATUSES.includes(invite.status)) return true;
   if (invite.status !== 'pending') return false;
   return (
     invite.expires.getTime() <= now.getTime() ||

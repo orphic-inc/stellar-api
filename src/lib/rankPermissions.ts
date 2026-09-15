@@ -191,7 +191,8 @@ export const PERMISSION_GROUPS = [
       {
         key: 'invites_edit',
         label: 'Edit invites',
-        description: "Change a member's invite count and invite privileges."
+        description:
+          "Change a member's invite count and invite privileges, and cancel pending invites."
       },
       {
         key: 'ratio_policy_manage',
