@@ -119,7 +119,7 @@ The dropped protected-chrome CSS boundary (ADR-0003 Arm 1, superseded by the 202
 _Avoid_: chrome lock, protected chrome, sandbox, shadow root, reset wrapper
 
 **Standing**:
-A member's five-rung governance tier — `pristine | clean | neutral | poor | hammer` — computed on read from active **Warnings**, ban state, and account tenure (never a stored column). It _scales_ rule impact on the CRS (pristine amplifies compliance rewards, hammer amplifies violation penalties); it is not a **Dimension Scorer** and never gates access (ADR-0004).
+A member's five-rung governance tier — `pristine | clean | neutral | poor | hammer` — computed on read from active **Warnings**, ban state, and account tenure (never a stored column). It _scales_ rule impact on the CRS (pristine amplifies compliance rewards, hammer amplifies violation penalties); it is not a **Dimension Scorer**. It does not gate downloads, content or permissions (ADR-0004). The one exception is invites: at `poor` and `hammer` it withholds the invite handout and refuses sending (ADR-0039 §4, ADR-0043).
 _Avoid_: reputation tier, warning level, standing score, rank
 
 **Contagion**:
@@ -162,7 +162,7 @@ _Avoid_: applying a theme, selecting a stylesheet, using a skin
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 - A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
 - IRC identity is the **Verified IRC Link** (`User.ircNick`, proven via **Nick Verification**), not a per-user secret — the retired `IRCKey` / `AnnounceKey` are not revived (ADR-0015). The **Release-Announce Feed** is pushed to **korin.pink** and delivered **notify-and-link** (#136). Neither the announce channel nor **IRCScore** touches the **Identity State** on the session-authed download path — they are out-of-band signals, never a download grant.
-- **Standing** is computed on read from **Warnings** / ban state / tenure and _scales_ rule impact on the CRS via `ruleImpact`; it is never a **Dimension Scorer** and never gates access (enforcement stays granular permissions). A member's own **confirmed** ban-evasion feeds the terminal `hammer` rung, whereas invite-tree **Contagion** feeds only a graded suspicion — suspect is not condemned.
+- **Standing** is computed on read from **Warnings** / ban state / tenure and _scales_ rule impact on the CRS via `ruleImpact`; it is not a **Dimension Scorer**, and it does not gate downloads, content or permissions (enforcement stays granular permissions). Invites are the exception: `poor` and `hammer` withhold the invite handout and refuse invite sends (ADR-0039 §4, ADR-0043). A member's own **confirmed** ban-evasion feeds the terminal `hammer` rung, whereas invite-tree **Contagion** feeds only a graded suspicion — suspect is not condemned.
 
 ## Flagged Ambiguities
 
