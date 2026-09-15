@@ -71,14 +71,19 @@ type ExistingInvite = NonNullable<
 
 /**
  * The spend's claim on the inviter: the gates a staff decision can close, plus
- * the balance. Exported so a database test can hold the claim on its own, apart
- * from the pre-check in `createInvite` that would otherwise hide it.
+ * the balance unless the sender is unlimited. Exported so a database test can
+ * hold the claim on its own, apart from the pre-check in `createInvite` that
+ * would otherwise hide it.
  */
-export const inviteSpendWhere = {
-  inviteCount: { gt: 0 },
-  canInvite: true,
-  canDownload: true
-} satisfies Prisma.UserWhereInput;
+export const inviteSpendWhere = (unlimited: boolean) =>
+  ({
+    ...(unlimited ? {} : { inviteCount: { gt: 0 } }),
+    canInvite: true,
+    canDownload: true
+  }) satisfies Prisma.UserWhereInput;
+
+/** An invite this send expired on the way, and whether that returned one. */
+export type ExpiredInvite = LapsedInvite & { refunded: boolean };
 
 /**
  * Load one member's state and answer the send gates (#637, ADR-0043).
@@ -90,6 +95,7 @@ export const inviteSpendWhere = {
  */
 export const getInviteRefusal = async (
   userId: number,
+  unlimited: boolean,
   now: Date = new Date()
 ): Promise<InviteGateRefusal | null> => {
   const [user, policy, siteFull] = await Promise.all([
@@ -127,7 +133,8 @@ export const getInviteRefusal = async (
     }),
     onRatioWatch: isOnRatioWatch(status, meetsRequirement),
     siteFull,
-    balance: user.inviteCount
+    balance: user.inviteCount,
+    unlimited
   };
   return firstInviteRefusal(input);
 };
@@ -145,6 +152,9 @@ export const getInviteRefusal = async (
  * `canInvite` (#636) and `canDownload` (#637) are in the same predicate, so a
  * staff decision landing mid-send refuses the write rather than racing it. Only
  * when the spend misses do we read which part failed, in the gates' order.
+ *
+ * An unlimited sender (ADR-0043 §5) still takes the claim, decrementing by
+ * zero, so those two gates hold for them too; the row records `spent: false`.
  */
 const writeInvite = (
   inviterId: number,
@@ -152,9 +162,11 @@ const writeInvite = (
   existing: ExistingInvite | null,
   fields: Omit<Prisma.InviteUncheckedCreateInput, 'email' | 'inviterId'>,
   now: Date
-): Promise<LapsedInvite | null> =>
+): Promise<ExpiredInvite | null> =>
   prisma.$transaction(async (tx) => {
-    let expired: LapsedInvite | null = null;
+    let expired: ExpiredInvite | null = null;
+    // Read off the row being written, so the flag and the spend cannot disagree.
+    const unlimited = fields.spent === false;
 
     if (existing) {
       const lapsed = {
@@ -163,7 +175,8 @@ const writeInvite = (
         email: existing.email
       };
       const actor = { actorId: inviterId, by: 'createInvite' };
-      if (await expireLapsedInvite(tx, lapsed, now, actor)) expired = lapsed;
+      const claim = await expireLapsedInvite(tx, lapsed, now, actor);
+      if (claim) expired = { ...lapsed, refunded: claim.refunded };
 
       // Reuse only a row whose address is free NOW. A concurrent re-invite
       // that got here first has already flipped it back to pending, and a
@@ -178,8 +191,8 @@ const writeInvite = (
     }
 
     const spent = await tx.user.updateMany({
-      where: { id: inviterId, ...inviteSpendWhere },
-      data: { inviteCount: { decrement: 1 } }
+      where: { id: inviterId, ...inviteSpendWhere(unlimited) },
+      data: { inviteCount: { decrement: unlimited ? 0 : 1 } }
     });
     if (spent.count === 0) {
       const inviter = await tx.user.findUnique({
@@ -239,10 +252,11 @@ const refusalFor = (err: unknown): RefusalReason | null => {
 const refuseBeforeWrite = async (
   inviterId: number,
   existing: ExistingInvite | null,
+  unlimited: boolean,
   now: Date
 ): Promise<RefusalReason | null> => {
   const taken = isAddressTaken(existing, now);
-  const refusal = await getInviteRefusal(inviterId, now);
+  const refusal = await getInviteRefusal(inviterId, unlimited, now);
   const refundsSelf =
     !taken &&
     existing?.inviterId === inviterId &&
@@ -251,16 +265,21 @@ const refuseBeforeWrite = async (
   return taken ? 'already_invited' : null;
 };
 
+/**
+ * Send an invite. `unlimited` is the caller's `invites_unlimited`, resolved by
+ * the route: this module never reads permissions.
+ */
 export const createInvite = async (
   inviterId: number,
   email: string,
-  reason: string
+  reason: string,
+  { unlimited = false }: { unlimited?: boolean } = {}
 ): Promise<CreateInviteResult> => {
   const normalizedEmail = sanitizePlain(email).trim().toLowerCase();
   const now = new Date();
 
   const existing = await findInviteByEmail(normalizedEmail);
-  const refused = await refuseBeforeWrite(inviterId, existing, now);
+  const refused = await refuseBeforeWrite(inviterId, existing, unlimited, now);
   if (refused) return { ok: false, reason: refused };
 
   const inviteKey = crypto.randomBytes(20).toString('hex');
@@ -268,10 +287,11 @@ export const createInvite = async (
     inviteKey,
     expires: inviteExpiresAt(now),
     reason: sanitizePlain(reason).trim(),
-    createdAt: now
+    createdAt: now,
+    spent: !unlimited
   };
 
-  let expired: LapsedInvite | null;
+  let expired: ExpiredInvite | null;
   try {
     expired = await writeInvite(
       inviterId,

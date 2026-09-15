@@ -481,12 +481,16 @@ router.post(
   validate(cancelInviteSchema),
   authHandler(async (req, res) => {
     const { inviteId } = parsedParams<{ inviteId: number }>(res);
-    await cancelInvite(
+    const { refunded } = await cancelInvite(
       req.user.id,
       inviteId,
       parsedBody<CancelInviteInput>(res)
     );
-    res.json({ msg: 'Invite cancelled and returned to its inviter' });
+    res.json({
+      msg: refunded
+        ? 'Invite cancelled and returned to its inviter'
+        : 'Invite cancelled'
+    });
   })
 );
 

@@ -40,9 +40,13 @@ export interface LapsedInvite {
 /**
  * Claim one lapsed invite and refund it, inside the caller's transaction.
  *
- * Returns whether THIS call made the transition. `false` means the row was no
- * longer a lapsed pending invite at write time — already expired by someone
- * else, accepted, or still live — and nothing was written.
+ * Returns the claim when THIS call made the transition, or `null` when the row
+ * was no longer a lapsed pending invite at write time — already expired by
+ * someone else, accepted, or still live — and nothing was written.
+ *
+ * Only a spent invite is refunded (ADR-0043 §5). `spent` is read from the row
+ * after the claim, which holds its lock, so a concurrent re-invite cannot
+ * rewrite it for a new sender in between.
  *
  * The refund is a plain increment with no cap predicate: it returns an invite
  * that was already the member's, and the cap bounds accrual, not holdings
@@ -54,29 +58,40 @@ export const expireLapsedInvite = async (
   invite: LapsedInvite,
   now: Date,
   actor: { actorId: number; by: string }
-): Promise<boolean> => {
+): Promise<{ refunded: boolean } | null> => {
   const { count } = await tx.invite.updateMany({
     where: { id: invite.id, ...lapsedPendingInviteWhere(now) },
     data: { status: 'expired' }
   });
-  if (count === 0) return false;
+  if (count === 0) return null;
 
-  await tx.user.update({
-    where: { id: invite.inviterId },
-    data: { inviteCount: { increment: 1 } }
+  const { spent } = await tx.invite.findUniqueOrThrow({
+    where: { id: invite.id },
+    select: { spent: true }
   });
+  if (spent) {
+    await tx.user.update({
+      where: { id: invite.inviterId },
+      data: { inviteCount: { increment: 1 } }
+    });
+  }
   await audit(tx, actor.actorId, 'invite.expired', 'Invite', invite.id, {
     by: actor.by,
     inviterId: invite.inviterId,
     email: invite.email,
-    refunded: true
+    refunded: spent
   });
-  return true;
+  return { refunded: spent };
 };
 
-const EXPIRED_SUBJECT = 'Your invite expired and has been returned';
-const expiredBody = (email: string) =>
-  `Your invite to ${email} expired before it was used, so it has been returned to you. You can invite that address again.`;
+const expiredSubject = (refunded: boolean) =>
+  refunded
+    ? 'Your invite expired and has been returned'
+    : 'Your invite expired';
+const expiredBody = (email: string, refunded: boolean) =>
+  refunded
+    ? `Your invite to ${email} expired before it was used, so it has been returned to you. You can invite that address again.`
+    : `Your invite to ${email} expired before it was used. You can invite that address again.`;
 
 /**
  * Tell the inviter. Call only AFTER the transaction commits, so a failed PM can
@@ -88,7 +103,9 @@ const expiredBody = (email: string) =>
  * "you can invite that address again" would be false. Staff tell them about the
  * revoke itself. Read at send time, so a restore before the PM is honoured.
  */
-export const notifyInviteExpired = async (invite: LapsedInvite) => {
+export const notifyInviteExpired = async (
+  invite: LapsedInvite & { refunded: boolean }
+) => {
   try {
     const inviter = await prisma.user.findUnique({
       where: { id: invite.inviterId },
@@ -97,8 +114,8 @@ export const notifyInviteExpired = async (invite: LapsedInvite) => {
     if (inviter?.canInvite === false) return;
     await sendSystemMessage(
       invite.inviterId,
-      EXPIRED_SUBJECT,
-      expiredBody(invite.email)
+      expiredSubject(invite.refunded),
+      expiredBody(invite.email, invite.refunded)
     );
   } catch (err) {
     log.error('Invite expiry PM failed', { inviteId: invite.id, err });
@@ -138,7 +155,7 @@ const expireOne = async (
     );
     if (!claimed) return;
     tally.expired += 1;
-    await notifyInviteExpired(invite);
+    await notifyInviteExpired({ ...invite, refunded: claimed.refunded });
   } catch (err) {
     tally.failed += 1;
     log.error('Invite expiry failed', { inviteId: invite.id, err });

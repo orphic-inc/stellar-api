@@ -49,6 +49,8 @@ The refund is a plain `increment: 1`, **even past `inviteCap`**. A refund return
 
 A disabled inviter is refunded too. The balance is inert while they are disabled, and it matters only if staff re-enable them, which is a judgement that they are acceptable again. Taking invites from a disabled member is a separate decision for the disable path, not a special case here.
 
+_(Extended 2026-09-15, by [#637](https://github.com/orphic-inc/stellar-api/issues/637) and [ADR-0043](0043-sending-an-invite-is-gated-on-the-inviter.md) §5. A sender with `invites_unlimited` spends nothing, so their invite records `Invite.spent = false`. Every claim above — expiry, re-invite, cancel and withdraw — still makes the transition exactly once, but increments the inviter only for a spent row. `spent` is read after the claim, which holds the row, so a re-invite refunds by the old send's flag before writing the new one. The audit row's `refunded` records which happened, and the PM and route words drop "returned" for an unspent invite.)_
+
 ### 4. The sweep is always on and runs hourly
 
 `inviteExpiryJob` claims each lapsed invite in its own transaction, so one bad row is logged rather than aborting the cycle. It pages on `id > cursor`, and a new `(status, expires)` index serves the query.

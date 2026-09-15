@@ -218,7 +218,7 @@ describe('createInvite send gates', () => {
 
     const claim = (id: number) =>
       testPrisma.user.updateMany({
-        where: { id, ...inviteSpendWhere },
+        where: { id, ...inviteSpendWhere(false) },
         data: { inviteCount: { decrement: 1 } }
       });
 

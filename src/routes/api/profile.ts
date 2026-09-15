@@ -26,6 +26,8 @@ import {
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { resolveViewer } from '../../modules/bbcodeRender';
 import { requireAuth } from '../../middleware/auth';
+import { loadPermissions } from '../../middleware/permissions';
+import { hasPermission } from '../../lib/rankPermissions';
 import { audit } from '../../lib/audit';
 import { z } from 'zod';
 import {
@@ -166,17 +168,26 @@ const INVITE_REFUSAL_MSG: Record<InviteGateRefusal, string> = {
   no_invites: 'No invites remaining'
 };
 
+// `invites_unlimited` (ADR-0043 §5) is resolved here and passed down: the
+// invite module never reads permissions.
+const hasUnlimitedInvites = async (
+  req: Parameters<typeof loadPermissions>[0],
+  res: Response
+) => hasPermission(await loadPermissions(req, res), 'invites_unlimited');
+
 // GET /api/profile/me/invites/eligibility — can you send an invite right now,
 // and if not, why (#637). Same gates and words as the send.
 router.get(
   '/me/invites/eligibility',
   requireAuth,
   authHandler(async (req, res) => {
-    const reason = await getInviteRefusal(req.user.id);
+    const unlimited = await hasUnlimitedInvites(req, res);
+    const reason = await getInviteRefusal(req.user.id, unlimited);
     res.json({
       canSend: reason === null,
       reason,
-      msg: reason === null ? null : INVITE_REFUSAL_MSG[reason]
+      msg: reason === null ? null : INVITE_REFUSAL_MSG[reason],
+      unlimited
     });
   })
 );
@@ -194,15 +205,20 @@ router.get(
 );
 
 // POST /api/profile/me/invites/:inviteId/withdraw — take back your own pending
-// invite and get it refunded (#640). 404 for anyone else's invite.
+// invite and get it refunded if it was spent (#640, #637). 404 for anyone
+// else's invite.
 router.post(
   '/me/invites/:inviteId/withdraw',
   requireAuth,
   validateParams(inviteIdParamsSchema),
   authHandler(async (req, res) => {
     const { inviteId } = parsedParams<{ inviteId: number }>(res);
-    await withdrawInvite(req.user.id, inviteId);
-    res.json({ msg: 'Invite withdrawn and returned to you' });
+    const { refunded } = await withdrawInvite(req.user.id, inviteId);
+    res.json({
+      msg: refunded
+        ? 'Invite withdrawn and returned to you'
+        : 'Invite withdrawn'
+    });
   })
 );
 
@@ -291,7 +307,9 @@ router.post(
     const { email, reason } = parsedBody<InviteInput>(res);
     // Every gate, capacity included (#624, #637), is answered inside
     // createInvite before it writes, so a refused member keeps their invite.
-    const result = await createInvite(req.user.id, email, reason ?? '');
+    const result = await createInvite(req.user.id, email, reason ?? '', {
+      unlimited: await hasUnlimitedInvites(req, res)
+    });
     if (!result.ok) {
       if (result.reason === 'already_invited')
         return res

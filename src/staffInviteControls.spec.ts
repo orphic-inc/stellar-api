@@ -245,7 +245,8 @@ describe('POST /api/users/invites/:inviteId/cancel', () => {
     prismaMock.invite.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.invite.findUniqueOrThrow.mockResolvedValue({
       inviterId: 12,
-      email: 'buyer@example.com'
+      email: 'buyer@example.com',
+      spent: true
     } as never);
     prismaMock.user.update.mockResolvedValue({} as never);
   };

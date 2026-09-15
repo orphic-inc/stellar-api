@@ -69,6 +69,8 @@ It skips only `no_invites` and the spend. Every other gate applies, so a SysOp w
 
 Checking the permission at refund time was rejected: grant, send, revoke and withdraw would mint an invite.
 
+An unlimited sender still takes the spend's claim, decrementing by zero, so `canInvite` and `canDownload` refuse them atomically as they do anyone else. Ending an unspent invite writes the same audit row with `refunded: false`. The expiry PM, the staff cancel PM and both route messages then leave out "returned", which would be false.
+
 The handout does not change. An unlimited member's stored balance keeps accruing to the cap, as the real fallback if the permission is removed. `inviteCount` stays the stored number in every response, and the eligibility response gains `unlimited: boolean`. `null` already means "hidden" on the profile.
 
 ### 6. No permission to invite past capacity

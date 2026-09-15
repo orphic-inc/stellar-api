@@ -643,6 +643,10 @@ model Invite {
   // When this row was last sent. A re-invite reuses the row and resets it.
   // Rows from before #627 were backfilled as `expires - 30 days`.
   createdAt DateTime     @default(now())
+  // Whether this send paid an invite (#637, ADR-0043 §5). False only for a
+  // sender with `invites_unlimited`. Every refund pays only when true, so an
+  // unspent invite is never returned. A re-invite rewrites it for the new send.
+  spent     Boolean      @default(true)
 
   // The sweep's claim predicate is `status = pending AND expires <= now`.
   @@index([status, expires])

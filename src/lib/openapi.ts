@@ -2109,8 +2109,10 @@ registry.registerPath({
       'A send gate refused (#637): invite privileges revoked (#636), download ' +
         'access disabled, active warnings (poor standing), ratio watch, the ' +
         'site is full (#624), or no invites remaining. The first that applies ' +
-        'is reported, in that order, and no invite is spent. ' +
-        '`GET /profile/me/invites/eligibility` answers the same gates first'
+        'is reported, in that order, and no invite is spent. A caller with ' +
+        '`invites_unlimited` is never refused for the balance, and spends ' +
+        'nothing. `GET /profile/me/invites/eligibility` answers the same gates ' +
+        'first'
     ),
     409: msgResponse(
       'A live invite already exists for that address, or a cancelled one has ' +
@@ -2141,7 +2143,10 @@ registry.registerPath({
             z.object({
               canSend: z.boolean(),
               reason: z.enum(INVITE_GATE_ORDER).nullable(),
-              msg: z.string().nullable()
+              msg: z.string().nullable(),
+              // `invites_unlimited` (ADR-0043 §5): sends spend nothing, and
+              // `no_invites` never refuses. Every other reason still can.
+              unlimited: z.boolean()
             })
           )
         }
@@ -2201,13 +2206,17 @@ registry.registerPath({
   summary: 'Withdraw one of your pending invites',
   description:
     'Self only (#640). Moves your `pending` invite to `cancelled` and returns ' +
-    'it to your `inviteCount`. The key holder is then answered ' +
+    'it to your `inviteCount`, unless it was sent without spending one ' +
+    '(`invites_unlimited`, #637). The key holder is then answered ' +
     "`invite_expired`. The address stays taken until the invite's original " +
     '`expires`, so it cannot be re-invited by anyone before then. Needs no ' +
     'invite privileges: a revoked member can withdraw.',
   request: { params: z.object({ inviteId: z.string() }) },
   responses: {
-    200: msgResponse('Invite withdrawn and returned to you'),
+    200: msgResponse(
+      '`Invite withdrawn and returned to you`, or `Invite withdrawn` for an ' +
+        'invite that was not spent'
+    ),
     404: msgResponse('No such invite, or it is not yours'),
     409: msgResponse(
       'The invite is yours but no longer pending: already accepted, expired ' +
@@ -8643,7 +8652,8 @@ registry.registerPath({
   summary: 'Staff: cancel a pending invite',
   description:
     'Requires `invites_edit` (#636). Moves a `pending` invite to `cancelled` ' +
-    "and returns it to its inviter's `inviteCount`, uncapped. The key holder " +
+    "and returns it to its inviter's `inviteCount`, uncapped, if it was spent " +
+    '(an `invites_unlimited` send is not, #637). The key holder ' +
     'is then answered `invite_expired`, as for any lapse. The address can be ' +
     "invited again once the invite's original `expires` passes (#640). A " +
     'pending invite past `expires` that the sweep has not ' +
@@ -8654,7 +8664,10 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: cancelInviteSchema } } }
   },
   responses: {
-    200: msgResponse('Invite cancelled and returned to its inviter'),
+    200: msgResponse(
+      '`Invite cancelled and returned to its inviter`, or `Invite cancelled` ' +
+        'for an invite that was not spent'
+    ),
     404: msgResponse('Invite not found'),
     409: msgResponse(
       'The invite is no longer pending: already accepted, expired or cancelled'
