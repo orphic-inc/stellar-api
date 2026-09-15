@@ -221,7 +221,7 @@ src/
     ratio.ts                # Ratio calculation helpers
     ratioPolicy.ts          # Ratio policy evaluation
     ratioPolicyRules.ts     # Ratio state machine (#646, ADR-0044) — pure: row, ratio and clock → one transition; no DB
-    ratioPolicyJob.ts       # Daily sweep, no mode switch (#646): applies ratioPolicyRules to WATCH and RATIO-disabled rows, one caught evaluation each
+    ratioPolicyJob.ts       # Daily sweep, no mode switch (#646): applies ratioPolicyRules to watched and ratio-disabled members, one caught evaluation each
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
     settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)
