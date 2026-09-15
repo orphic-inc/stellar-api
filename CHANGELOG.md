@@ -175,6 +175,21 @@ All notable changes to stellar-api are documented here.
   or doubled. A ratio-caused disable is lifted once the ratio meets its
   requirement; nothing applies that on a schedule yet (the sweep follows).
 
+- **Ratio-caused download disables lift on their own**
+  ([#646](https://github.com/orphic-inc/stellar-api/issues/646),
+  [ADR-0044](docs/adr/0044-a-ratio-disable-records-its-cause.md)). A daily sweep
+  applies the ratio rules to members on watch and members whose downloads were
+  disabled by the ratio policy: a disable lifts to `OK` once the ratio meets its
+  requirement, a watch whose ratio recovered ends, and a watch that expired with
+  the ratio still short disables downloads now rather than at the member's next
+  download. A staff disable is never lifted, and the sweep never starts a watch.
+  Until now a recovered member stayed disabled until staff noticed.
+
+  Live on deploy, with no mode switch: `RATIO_POLICY_INTERVAL_MS` (default
+  86400000 = 24h) sets the interval. **Expect a first-run batch** of lifts,
+  cleared watches and disables, each with its PM and audit row. The disable PM
+  now says downloads come back automatically.
+
 ### Changed
 
 - **A cancelled invite holds its address until its original expiry**

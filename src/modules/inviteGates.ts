@@ -61,10 +61,9 @@ export const firstInviteRefusal = (
 /**
  * On watch, for inviting: the stored status AND the ratio read now.
  *
- * The status alone goes stale. `evaluateRatioPolicy` runs only after a
- * download, so a member who recovers by contributing stays `WATCH` in the row
- * until they next download. A watch that ran out without a download also stays
- * `WATCH`, and still refuses here while the ratio is short.
+ * The status alone can be stale: it moves after a download or on the daily
+ * ratio policy sweep (#646), so a member who recovers by contributing can still
+ * read `WATCH` for up to a day. The fresh ratio read covers that gap.
  */
 export const isOnRatioWatch = (
   status: RatioPolicyStatus | null,

@@ -70,7 +70,7 @@ const transitionMessage = (
     case 'download_disabled':
       return {
         subject: 'Your downloads have been disabled',
-        body: `${t.trigger === 'download_limit' ? 'You downloaded 10 GiB while on ratio watch' : 'Your ratio watch ended'} with your ratio still short, so your downloads have been disabled. ${numbers}${rules}`
+        body: `${t.trigger === 'download_limit' ? 'You downloaded 10 GiB while on ratio watch' : 'Your ratio watch ended'} with your ratio still short, so your downloads have been disabled. ${numbers} They come back automatically once your ratio meets its requirement, checked daily.${rules}`
       };
     case 'download_restored':
       return {
