@@ -92,3 +92,5 @@ A member on ratio watch, with lost download access, or in `poor` standing can no
 Delivery is two PRs. The first ships Decisions 1–4. The second ships Decision 5 and carries the migration and the refund-site changes, which are reviewed apart from the gate logic.
 
 Because `DOWNLOAD_DISABLED` never lifts on its own (#646), a member whose downloads were disabled by a failed watch stays unable to invite until staff act. Fixing #646 fixes this gate with it, because the gate reads the column.
+
+_(Extended 2026-09-15, by [#646](https://github.com/orphic-inc/stellar-api/issues/646) and [ADR-0044](0044-a-ratio-disable-records-its-cause.md). A disable now records its cause, and a ratio disable lifts once the ratio recovers, so `downloads_disabled` lifts with it. A staff disable does not. The gate itself is unchanged.)_

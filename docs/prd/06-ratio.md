@@ -41,6 +41,8 @@ Contributions are hosted links. `downloads.ts` credits a contributor's `contribu
 
 `ratioPolicy.ts`: `OK → WATCH → DOWNLOAD_DISABLED`. `WATCH` lasts 14 days; auto-disable on 10 GiB consumed during watch or watch expiry; the disabled state is reversed by staff only.
 
+_(Amended 2026-09-15, by [#646](https://github.com/orphic-inc/stellar-api/issues/646) and [ADR-0044](../adr/0044-a-ratio-disable-records-its-cause.md). "Reversed by staff only" described the code while a ratio-caused disable and a staff override were indistinguishable. A disable now records its cause: a staff disable is still reversed by staff only, and a ratio disable lifts to `OK` once the ratio meets its requirement, applied by a daily sweep. A staff watch now also reaches the 10 GiB rule.)_
+
 ### Ratio-exempt contributions: Freepass & Neutralpass
 
 Two Contribution-level flags change how a consumption touches ratio — the only points where the consumption-accounting path (`downloads.ts` today; korin.pink `ledger` per ADR-004) conditionally skips accrual:
