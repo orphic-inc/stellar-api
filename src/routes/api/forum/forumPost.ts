@@ -19,7 +19,6 @@ import {
   validateQuery,
   parsedParams
 } from '../../../middleware/validate';
-import { writeLimiter } from '../../../middleware/rateLimiter';
 import {
   createPostSchema,
   updatePostSchema,
@@ -172,7 +171,6 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  writeLimiter,
   validateParams(forumTopicParamsSchema),
   validate(createPostSchema),
   authHandler(async (req, res) => {

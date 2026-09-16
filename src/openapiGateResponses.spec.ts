@@ -293,18 +293,16 @@ describe('the committed openapi.json', () => {
     expect(reads).toEqual([]);
   });
 
-  it('documents a 429 on every mutation the limiter reaches', () => {
-    // One mutation is genuinely outside it, and naming it here is the point:
-    // `/api/install` is mounted BEFORE the site-wide limiter in app.ts, so the
-    // limiter never runs for it, and this route carries none of its own. The
-    // sibling `POST /install` does (`installLimiter`). Filed separately; the
-    // contract is right to stay silent while that is true.
+  it('documents a 429 on every mutation', () => {
+    // No exceptions. `POST /install/checklist/{id}/dismiss` was one until #560:
+    // `/api/install` was mounted above the site-wide limiter, which now sits
+    // above every router (see writeLimiterMount.spec.ts).
     const unlimited = operations
       .filter((op) => /^(POST|PUT|PATCH|DELETE) /.test(op.key))
       .filter((op) => !op.responses['429'])
       .map((op) => op.key);
 
-    expect(unlimited).toEqual(['POST /install/checklist/{id}/dismiss']);
+    expect(unlimited).toEqual([]);
   });
 
   it('does not mistake a rate limiter for a credential', () => {

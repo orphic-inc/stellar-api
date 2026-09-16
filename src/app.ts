@@ -155,6 +155,22 @@ export const createApp = () => {
     })
   );
 
+  // Mutations only, and the branch lives in rateLimiter.ts beside the limiter
+  // it guards — as an inline arrow here it was an anonymous wrapper that
+  // `readGate` could not see, so the contract had no way to derive the 429
+  // (#553).
+  //
+  // Mounted FIRST under /api, so that no router can escape it by mount order.
+  // It used to sit below /api/install, /api/version and /api/docs, and
+  // `POST /install/checklist/:id/dismiss` ran with no limiter at all (#560).
+  // `POST /install` now meets this AND its own `installLimiter`; they are
+  // separate instances with separate stores, and 5 per hour binds first.
+  //
+  // Because this already counts every mutation, a route must NOT mount
+  // `writeLimiter` again: one instance twice on a request counts it twice,
+  // which halved the forum topic and post limits to 15 a minute (#560).
+  app.use('/api', mutationRateLimit);
+
   app.use('/api/install', installRouter);
   app.use('/api/version', versionRouter);
   app.use('/api/docs/json', specRouter);
@@ -167,13 +183,6 @@ export const createApp = () => {
       msg: 'Application not installed. Please complete setup at /install.'
     });
   });
-
-  // Mutations only, and the branch lives in rateLimiter.ts beside the limiter
-  // it guards — as an inline arrow here it was an anonymous wrapper that
-  // `readGate` could not see, so the contract had no way to derive the 429
-  // (#553). Mounted after /api/install, /api/version and /api/docs, which
-  // therefore keep their own limiting or none.
-  app.use('/api', mutationRateLimit);
 
   app.use('/api/tools', toolsRouter);
   app.use('/api/home', homeRouter);
