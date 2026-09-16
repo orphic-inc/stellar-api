@@ -39,6 +39,31 @@ All notable changes to stellar-api are documented here.
   A 1:1 relation keyed on the primary key, so the added select is an indexed
   join. Additive response fields only; no existing field changes shape.
 
+### Fixed
+
+- **Every `/api` mutation is rate limited, and none is counted twice**
+  ([#560](https://github.com/orphic-inc/stellar-api/issues/560)) — the
+  site-wide write limiter is now mounted above every router in `app.ts`.
+
+  It used to sit below `/api/install`, `/api/version` and `/api/docs`, so
+  `POST /install/checklist/{id}/dismiss` ran with no limiter at all: the one
+  mutation in the contract nothing rate-limited. The route is staff-gated and
+  idempotent, so the exposure was a compromised or hostile staff session
+  hammering a write, not an anonymous flood. It now answers `429` like every
+  other mutation, and the contract says so. **stellar-ui owes an `api:sync`.**
+
+  `POST /install` now meets both limiters. They are separate instances with
+  separate stores, and its own 5 per hour binds long before 30 a minute, so
+  install behaviour is unchanged. The limiter also now runs ahead of the
+  permission gate on the dismiss route, so a refused attempt still counts.
+
+  Found while scoping it: `POST /forums/{forumId}/topics` and
+  `POST /forums/{forumId}/topics/{topicId}/posts` mounted `writeLimiter` a
+  second time beneath the site-wide one. One instance twice on a request shares
+  one store, so each topic or post cost two units of the per-IP write budget
+  and those routes refused at **15** a minute rather than 30. The route-level
+  mounts are removed; the site-wide limiter still covers both.
+
 ## [0.9.5] — 2026-09-15
 
 ### Added
