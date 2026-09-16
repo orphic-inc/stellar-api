@@ -229,7 +229,10 @@ describe('API auth/profile/user flows', () => {
         personalCollageLimit: 0,
         authorStylesheetLimit: 0
       },
-      secondaryRanks: []
+      secondaryRanks: [],
+      // A member with no RatioPolicyState row (#659). Null rather than absent:
+      // toAuthUser coerces, so the key is always on the wire.
+      ratioPolicy: null
     };
     prismaMock.user.findUnique.mockResolvedValue(
       makeUser({ password: 'hashed-password', disabled: false })
@@ -240,7 +243,9 @@ describe('API auth/profile/user flows', () => {
         ...authUser,
         contributed: BigInt(10),
         consumed: BigInt(5),
-        ratio: 0
+        ratio: 0,
+        // The row spells it as the relation; the wire spells it `ratioPolicy`.
+        ratioPolicyState: null
       })
     );
     prismaMock.userSession.create.mockResolvedValue({

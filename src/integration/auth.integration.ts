@@ -140,3 +140,104 @@ describe('loginUser', () => {
     );
   });
 });
+
+/**
+ * The session's ratio policy (#659) against a real database.
+ *
+ * `auth.spec.ts` casts its fixtures, so it proves the projection and nothing
+ * about the query. These prove `authUserSelect` actually resolves the relation
+ * — which is the half that breaks if the select or the schema moves.
+ */
+describe('the session carries ratio policy', () => {
+  it('is null for a member with no policy row', async () => {
+    const user = await registerFixtureUser(
+      'carol',
+      'carol@example.com',
+      'password3'
+    );
+    expect(user.ratioPolicy).toBeNull();
+
+    const result = await loginUser('carol@example.com', 'password3');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.ratioPolicy).toBeNull();
+  });
+
+  it('carries status, expiry and cause when a row exists', async () => {
+    const user = await registerFixtureUser(
+      'dave',
+      'dave@example.com',
+      'password4'
+    );
+    const expires = new Date('2026-12-01T00:00:00.000Z');
+    await testPrisma.ratioPolicyState.create({
+      data: {
+        userId: user.id,
+        status: 'WATCH',
+        watchStartedAt: new Date('2026-11-17T00:00:00.000Z'),
+        watchExpiresAt: expires
+      }
+    });
+
+    const result = await loginUser('dave@example.com', 'password4');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.ratioPolicy).toEqual({
+      status: 'WATCH',
+      watchExpiresAt: expires,
+      disabledCause: null
+    });
+  });
+
+  it('carries the cause for a staff disable', async () => {
+    const user = await registerFixtureUser(
+      'erin',
+      'erin@example.com',
+      'password5'
+    );
+    await testPrisma.ratioPolicyState.create({
+      data: {
+        userId: user.id,
+        status: 'DOWNLOAD_DISABLED',
+        downloadDisabledAt: new Date(),
+        disabledCause: 'STAFF'
+      }
+    });
+
+    const result = await loginUser('erin@example.com', 'password5');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.ratioPolicy).toMatchObject({
+      status: 'DOWNLOAD_DISABLED',
+      disabledCause: 'STAFF'
+    });
+  });
+
+  it('selects only the three fields the session needs', async () => {
+    // Not `requiredRatio`, and not the rest of RatioPolicyState: the session is
+    // read on every page, so widening this select has a site-wide cost.
+    const user = await registerFixtureUser(
+      'frank',
+      'frank@example.com',
+      'password6'
+    );
+    await testPrisma.ratioPolicyState.create({
+      data: {
+        userId: user.id,
+        status: 'WATCH',
+        watchStartedAt: new Date(),
+        watchExpiresAt: new Date(),
+        consumedAtWatchStart: BigInt(123)
+      }
+    });
+
+    const result = await loginUser('frank@example.com', 'password6');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.user.ratioPolicy!).sort()).toEqual([
+      'disabledCause',
+      'status',
+      'watchExpiresAt'
+    ]);
+  });
+});
