@@ -70,19 +70,40 @@ export const authUserSelect = {
         }
       }
     }
+  },
+  // Ratio policy state on the session (#659, ADR-0044), so a surface rendered
+  // on every page can read it without a request of its own. A SUBSET of
+  // RatioPolicyState: deliberately not `requiredRatio`, which needs
+  // getEligibleContributionBytes — an unbounded read over the member's
+  // contributions that has no business on the session's hot path.
+  // A 1:1 relation keyed on the primary key, so this is an indexed join.
+  ratioPolicyState: {
+    select: { status: true, watchExpiresAt: true, disabledCause: true }
   }
 } as const;
 
 type RawAuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
 
-export type AuthUser = Omit<RawAuthUser, 'contributed' | 'consumed'> & {
+/** The session's view of ratio policy: null when the member has no row. */
+export type SessionRatioPolicy = RawAuthUser['ratioPolicyState'];
+
+export type AuthUser = Omit<
+  RawAuthUser,
+  'contributed' | 'consumed' | 'ratioPolicyState'
+> & {
   contributed: string;
   consumed: string;
   // Derived from contributed/consumed at read time (computeRatio), not stored.
   ratio: number;
+  // Renamed off the relation: consumers read a policy, not a table row. Null
+  // when no row exists, which the policy itself reads as OK (getPolicyState).
+  ratioPolicy: SessionRatioPolicy;
 };
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => {
+  // Destructured out rather than spread: the wire name is `ratioPolicy`, and
+  // leaving the relation in would ship both spellings of the same thing.
+  const { ratioPolicyState, ...rest } = raw;
   const rankQuotaInputs = (
     field: 'personalCollageLimit' | 'authorStylesheetLimit'
   ): number[] => [
@@ -91,7 +112,7 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => {
   ];
 
   return {
-    ...raw,
+    ...rest,
     userRank: {
       ...raw.userRank,
       permissions: computeUserRankAccess({
@@ -125,7 +146,11 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => {
     },
     ratio: computeRatio(raw.contributed, raw.consumed),
     contributed: raw.contributed.toString(),
-    consumed: raw.consumed.toString()
+    consumed: raw.consumed.toString(),
+    // `?? null` so the key is always present on the wire. Prisma returns null
+    // for a missing relation, but an undefined here would drop the field from
+    // the JSON entirely and make "no row" indistinguishable from "old server".
+    ratioPolicy: ratioPolicyState ?? null
   };
 };
 

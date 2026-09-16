@@ -326,6 +326,20 @@ const AuthUser = registry.register(
     contributed: z.string().optional(),
     consumed: z.string().optional(),
     ratio: z.number().optional(),
+    // Ratio policy on the session (#659, ADR-0044), so a surface on every page
+    // reads it without its own request. Null when the member has no row, which
+    // the policy reads as OK. A SUBSET of RatioPolicyState — which cannot be
+    // referenced here anyway, being registered far below — and deliberately
+    // without `requiredRatio`: that needs an unbounded read over the member's
+    // contributions and does not belong on the session.
+    ratioPolicy: z
+      .object({
+        status: z.enum(['OK', 'WATCH', 'DOWNLOAD_DISABLED']),
+        watchExpiresAt: z.string().nullable(),
+        disabledCause: z.nativeEnum(RatioDisableCause).nullable()
+      })
+      .nullable()
+      .optional(),
     userRank: z.object({
       level: z.number(),
       name: z.string(),

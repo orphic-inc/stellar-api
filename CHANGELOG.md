@@ -6,6 +6,39 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **The session carries ratio policy state**
+  ([#659](https://github.com/orphic-inc/stellar-api/issues/659),
+  [ADR-0044](docs/adr/0044-ratio-policy.md)) — `AuthUser` gains
+  `ratioPolicy: { status, watchExpiresAt, disabledCause } | null`, so
+  `GET /auth` and the login response carry it alongside the `canDownload` flag
+  they already had.
+
+  This exists so a consumer can render a surface on **every** page without a
+  request of its own. The only route carrying `RatioPolicyState` is
+  `GET /profile/me/ratio`, and it is not cheap: `getRatioStats` calls
+  `getEligibleContributionBytes`, an unbounded read over every one of the
+  member's contributions, summed in application code rather than aggregated.
+  Fine for a profile view; not for something read on each page and polled.
+
+  It is a **subset**, deliberately. No `requiredRatio` — that is the expensive
+  computation above, and the surface this serves carries no numbers. No
+  `consumedAtWatchStart` — an honest "X of 10 GiB" needs the api to derive the
+  figure rather than have a client do the policy arithmetic, and it is the most
+  enforcement-internal value in the set, so it wants its own decision with a
+  real consumer behind it.
+
+  `null` means the member has no `RatioPolicyState` row, which the policy
+  already reads as `OK` (`getPolicyState`). The projection coerces with
+  `?? null` so the key is always on the wire: an `undefined` would drop the
+  field from the JSON and make "no row" indistinguishable from an api too old
+  to send it. The relation is destructured out rather than spread, so the row
+  does not also ship under its table name.
+
+  A 1:1 relation keyed on the primary key, so the added select is an indexed
+  join. Additive response fields only; no existing field changes shape.
+
 ## [0.9.5] — 2026-09-15
 
 ### Added

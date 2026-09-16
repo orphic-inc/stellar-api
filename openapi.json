@@ -239,6 +239,38 @@
           "ratio": {
             "type": "number"
           },
+          "ratioPolicy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "OK",
+                  "WATCH",
+                  "DOWNLOAD_DISABLED"
+                ]
+              },
+              "watchExpiresAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "disabledCause": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "RATIO",
+                  "STAFF",
+                  null
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "watchExpiresAt",
+              "disabledCause"
+            ]
+          },
           "userRank": {
             "type": "object",
             "properties": {
