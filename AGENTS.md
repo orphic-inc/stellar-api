@@ -56,6 +56,17 @@ this. Do not reason about anonymous UX from an api route in isolation — and do
 not treat "an anonymous caller sees less" as a regression without checking
 whether any UI can reach that surface anonymously at all.
 
+**The one exception is the Member Feed** (ADR-0014, #262), under `/api/feeds`.
+A feed reader cannot hold a session, so a derived **Feed Token** in the query
+string authenticates the feed's **owner**. Three consequences for that code:
+
+- There is no `req.user`. Resolve everything from the owner's id, never from
+  the request — `resolveViewer(req)` would silently render every feed gated.
+- Access is still the owner's: contribution feeds read through
+  `releaseVisibleTo(owner)`, exactly as the release pages do.
+- Every failure to authenticate is one identical 404, so an id is never
+  confirmed.
+
 ## Commands
 
 ```bash
@@ -381,7 +392,7 @@ src/
 
 ## API conventions
 
-- JSON responses only.
+- JSON responses only — except the Member Feed, which answers `application/rss+xml` (ADR-0014).
 - Success responses must remain backward compatible.
 - Validation handled through Zod schemas.
 - Authentication handled through middleware.

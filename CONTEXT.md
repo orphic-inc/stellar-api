@@ -83,8 +83,16 @@ The external service (`obrien-k/korin-pink`) that owns the IRC substrate — the
 _Avoid_: the IRC server, the bot (these are korin's, not in-repo), Ergo (one component korin owns)
 
 **Release-Announce Feed**:
-The out-of-band stream of new Contributions surfaced to members over IRC (and RSS) — the firehose of the Contribution Spine as it grows. stellar-api **pushes** each new Contribution to **korin.pink** (`POST /irc/announce`, `announce.ts` / `announceJob.ts`, authenticated by `KORIN_PULL_KEY`); korin renders the newest artifact to `#announce`. There is no in-repo feed and no per-user feed key. Delivery is **notify-and-link** (#136): the item links into the app, never a tokenized URL — consuming a release stays a session-authed accounted download.
+The out-of-band stream of new Contributions surfaced to members over IRC (and RSS) — the firehose of the Contribution Spine as it grows. stellar-api **pushes** each new Contribution to **korin.pink** (`POST /irc/announce`, `announce.ts` / `announceJob.ts`, authenticated by `KORIN_PULL_KEY`); korin renders the newest artifact to `#announce`. It is **pushed**, never pulled; the pull counterpart is the **Member Feed**, and there is no per-user feed key. Delivery is **notify-and-link** (#136): the item links into the app, never a tokenized URL — consuming a release stays a session-authed accounted download.
 _Avoid_: rss feed, announce stream, the firehose, AnnounceKey-gated feed
+
+**Member Feed**:
+A member's own RSS feeds, **pulled** by a feed reader (ADR-0014, #262): new contributions (filterable), their own contributions, their bookmarks, and site news. Read with a **Feed Token** in the query string, because a feed reader cannot hold a session — the one member surface outside the session. Every contribution feed shows its owner exactly what the release pages would (`releaseVisibleTo`), and every item is **notify-and-link**, the same item shape as the **Release-Announce Feed** delivered the other way.
+_Avoid_: rss feed (ambiguous with the announce push), personal feed, feed key, announce feed
+
+**Feed Token**:
+The credential on a **Member Feed** URL — **derived** on every request as an HMAC of the member's id and their `feedTokenEpoch` under `STELLAR_FEED_SECRET`, never stored (ADR-0014). Rotating bumps the epoch (the member, or staff holding `users_edit_reset_feeds`); rotating the secret revokes every feed at once. Bearer-grade: it authenticates which member is reading, never what they may read.
+_Avoid_: feed key, passkey, RSS auth, AnnounceKey
 
 **Service Key**:
 A shared secret gating the korin.pink seam — `KORIN_PULL_KEY` (stellar→korin: metrics pull + announce push) and `STELLAR_SERVICE_KEY` (korin→stellar Bearer: `by-irc-nick`, nick verify, reputation read). Each path **fails closed** until its key is set (`serviceAuth.ts`). These are service-to-service, not per-user; they replace the **retired** per-user `IRCKey` / `AnnounceKey` (ADR-0011), which were removed with the in-repo build and deliberately **not** revived (ADR-0015 §Scope).
@@ -161,7 +169,7 @@ _Avoid_: applying a theme, selecting a stylesheet, using a skin
 - **Sanitized Values** must be extracted at the Controller layer using **Contract Schemas** before execution by domain services.
 - The **Ratio Mechanism** reads **Eligible Contribution Bytes** (gated by **Effective Availability**) and never reads CRS; a derived **RatioScore** flows one-way into CRS as one **Dimension Scorer**. CRS never gates downloads.
 - A **Contribution Spine** carries type-agnostic fields only; a music Contribution attaches a **Release File** (per-file) and an **Edition** (per-pressing). Future CommunityTypes attach their own analogous satellites rather than forking the spine (ADR-0008).
-- IRC identity is the **Verified IRC Link** (`User.ircNick`, proven via **Nick Verification**), not a per-user secret — the retired `IRCKey` / `AnnounceKey` are not revived (ADR-0015). The **Release-Announce Feed** is pushed to **korin.pink** and delivered **notify-and-link** (#136). Neither the announce channel nor **IRCScore** touches the **Identity State** on the session-authed download path — they are out-of-band signals, never a download grant.
+- IRC identity is the **Verified IRC Link** (`User.ircNick`, proven via **Nick Verification**), not a per-user secret — the retired `IRCKey` / `AnnounceKey` are not revived (ADR-0015). The **Release-Announce Feed** is pushed to **korin.pink** and delivered **notify-and-link** (#136); the **Member Feed** is its pulled counterpart, read with a derived **Feed Token** rather than a revived key. Neither the announce channel nor **IRCScore** touches the **Identity State** on the session-authed download path — they are out-of-band signals, never a download grant.
 - **Standing** is computed on read from **Warnings** / ban state / tenure and _scales_ rule impact on the CRS via `ruleImpact`; it is not a **Dimension Scorer**, and it does not gate downloads, content or permissions (enforcement stays granular permissions). Invites are the exception: `poor` and `hammer` withhold the invite handout and refuse invite sends (ADR-0039 §4, ADR-0043). A member's own **confirmed** ban-evasion feeds the terminal `hammer` rung, whereas invite-tree **Contagion** feeds only a graded suspicion — suspect is not condemned.
 
 ## Flagged Ambiguities
