@@ -66,6 +66,42 @@ All notable changes to stellar-api are documented here.
   `api:sync`. Migration: `20260917000000_user_feed_token_epoch` (additive,
   defaulted).
 
+- **The Member Feed**
+  ([#262](https://github.com/orphic-inc/stellar-api/issues/262),
+  [ADR-0014](docs/adr/0014-per-user-contribution-feed.md)) — four RSS 2.0 feeds
+  a member reads from a feed reader, at the URLs `GET /profile/me/feeds` already
+  hands out:
+
+  - `GET /feeds/contributions.xml` — new contributions, optionally
+    `?community=&tag=&format=&bitrate=` (one value each, ANDed, tags
+    alias-resolved)
+  - `GET /feeds/mine.xml` — the owner's own contributions
+  - `GET /feeds/news.xml` — site news, each body rendered from BBCode for the
+    owner, linking `/#news-<id>`
+  - `GET /feeds/bookmarks.xml` — new contributions on bookmarked releases and
+    on releases crediting a bookmarked artist in any role
+
+  **No session.** Each authenticates its owner from `?user=&token=`, and every
+  failure — feeds disabled, bad token, unknown or disabled member — is the same
+  `404`. Filters are validated only after the token, so a stranger never sees a
+  `400`. Every contribution feed reads through `releaseVisibleTo(owner)`, the
+  same scope as the release pages. Items link to app pages and carry the
+  uploader as `dc:creator`; none carries a download URL.
+
+  **Two new limiters**, both new instances: `feedAuthLimiter` counts only feed
+  `404`s per IP (30 per 15 minutes), and `feedLimiter` counts reads per
+  authenticated member across all feeds (120 an hour), so members behind one
+  aggregator IP each keep their own budget. Responses are
+  `application/rss+xml`, `Cache-Control: private, max-age=300`; nothing is
+  cached in-process (#662).
+
+  **Sentry** now redacts a `token` query parameter from every event's request
+  URL and query string. The RSS renderer moved from `announce.ts` to
+  `lib/rss.ts`, shared with the feeds; the announce payload korin parses is
+  pinned byte-for-byte against output captured before the move.
+
+  Contract: four new operations. stellar-ui owes an `api:sync`.
+
 ### Fixed
 
 - **Every `/api` mutation is rate limited, and none is counted twice**

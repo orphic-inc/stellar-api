@@ -282,15 +282,23 @@ describe('the committed openapi.json', () => {
     }
   });
 
-  it('rate-limits no read', () => {
+  it('rate-limits only the reads that mount a limiter of their own', () => {
     // The site-wide limiter passes GET straight through. A method-blind
-    // derivation would put a 429 on all 156 of them and be wrong every time.
+    // derivation would put a 429 on every read and be wrong every time. The
+    // Member Feed's reads are the exception, and genuinely answer 429: each
+    // mounts `feedAuthLimiter` and `feedLimiter` itself (#262).
     const reads = operations
       .filter((op) => !/^(POST|PUT|PATCH|DELETE) /.test(op.key))
       .filter((op) => op.responses['429'])
-      .map((op) => op.key);
+      .map((op) => op.key)
+      .sort();
 
-    expect(reads).toEqual([]);
+    expect(reads).toEqual([
+      'GET /feeds/bookmarks.xml',
+      'GET /feeds/contributions.xml',
+      'GET /feeds/mine.xml',
+      'GET /feeds/news.xml'
+    ]);
   });
 
   it('documents a 429 on every mutation', () => {
