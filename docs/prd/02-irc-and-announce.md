@@ -46,7 +46,9 @@ The security boundary is the `(fromNick, code)` binding plus Ergo's `force-nick-
 
 ## Announce
 
-stellar-api **pushes** each new Contribution to korin; there is no in-repo RSS feed, no per-user feed key, and no bot worker.
+stellar-api **pushes** each new Contribution to korin; there is no per-user feed key and no bot worker.
+
+> **Amended 2026-09-17 ([#262](https://github.com/orphic-inc/stellar-api/issues/262), [ADR-0014](../adr/0014-per-user-contribution-feed.md)).** This read "no in-repo RSS feed". Announce stays push-only, but members now also **pull**: the **Member Feed** serves per-member RSS read with a derived token, never a stored key, and its items follow the same notify-and-link rule below.
 
 - **`announceJob.ts`** runs a cursor over new Contributions and, for each, builds a one-item RSS artifact and `POST`s it to `{KORIN_API_URL}/irc/announce` (`announce.ts`), authenticated by `KORIN_PULL_KEY`. korin renders the newest artifact to `#announce`. This **reverses the direction** of the superseded in-repo AnnounceKey-gated feed — stellar emits, korin delivers.
 - **Delivery shape (#136): notify-and-link.** The announce item carries a plain link into the app (the release page), never a tokenized one-shot URL. The download still resolves to a session-authed, ratio-accounted grant; the link only saves a click. This is why **key-authenticated access to content over IRC is deliberately not reintroduced** (Golden Rule 3).
