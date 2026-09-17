@@ -178,6 +178,9 @@ jest.mock('../modules/config', () => ({
   inviteExpiry: { intervalMs: 3600000 },
   ratioPolicy: { intervalMs: 86400000 },
   sentry: { dsn: '' },
+  // A real-length secret, so feed token derivation runs in route tests. The
+  // disabled path is exercised by mutating this object (feedToken.spec.ts).
+  feeds: { secret: 'f'.repeat(32) },
   email: {
     smtpHost: '',
     smtpPort: 587,

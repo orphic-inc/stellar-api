@@ -44,6 +44,7 @@ import {
   setRankSchema,
   rankLockSchema,
   canInviteSchema,
+  feedTokenRotateSchema,
   inviteCountSchema,
   cancelInviteSchema,
   staffBioSchema,
@@ -1710,6 +1711,29 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/feed-token/rotate',
+  tags: ['Users'],
+  summary: "Staff: revoke a member's Member Feed URLs",
+  description:
+    "Requires `users_edit_reset_feeds` (ADR-0014, #262). Bumps the member's " +
+    'feed token epoch, so every Member Feed URL they have handed out stops ' +
+    'working. The new URLs are never returned to staff. `reason` is recorded ' +
+    'in the audit log; `message`, when present, is sent to the member as a ' +
+    'System PM.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: feedTokenRotateSchema } }
+    }
+  },
+  responses: {
+    200: msgResponse('Feed token rotated'),
+    404: msgResponse('User not found')
+  }
+});
+
+registry.registerPath({
   method: 'put',
   path: '/users/{id}/invite-count',
   tags: ['Users'],
@@ -2166,6 +2190,61 @@ registry.registerPath({
           )
         }
       }
+    }
+  }
+});
+
+const memberFeedUrl = z
+  .string()
+  .describe('Complete feed URL, carrying `user` and `token` query parameters');
+
+const memberFeedsSchema = registry.register(
+  'MemberFeeds',
+  z.union([
+    z.object({ enabled: z.literal(false) }),
+    z.object({
+      enabled: z.literal(true),
+      feeds: z.object({
+        contributions: memberFeedUrl,
+        mine: memberFeedUrl,
+        news: memberFeedUrl,
+        bookmarks: memberFeedUrl
+      })
+    })
+  ])
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/profile/me/feeds',
+  tags: ['Profile'],
+  summary: 'Your Member Feed URLs',
+  description:
+    'Self only (ADR-0014, #262). `enabled: false` when this site has not set ' +
+    '`STELLAR_FEED_SECRET`, in which case every feed URL would 404, so none ' +
+    'is returned. Each URL is complete; there is no separate token field. ' +
+    'Sent `Cache-Control: no-store`: the body is a live credential.',
+  responses: {
+    200: {
+      description: 'Your feed URLs, or that feeds are not enabled',
+      content: { 'application/json': { schema: memberFeedsSchema } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/profile/me/feed-token/rotate',
+  tags: ['Profile'],
+  summary: 'Revoke your Member Feed URLs and get new ones',
+  description:
+    'Self only (ADR-0014, #262). Bumps your feed token epoch, so every feed ' +
+    'URL you have handed out stops working, and answers the new URLs in the ' +
+    'same shape as `GET /profile/me/feeds`. Sent `Cache-Control: no-store`.',
+  responses: {
+    200: {
+      description: 'Your new feed URLs, or that feeds are not enabled',
+      content: { 'application/json': { schema: memberFeedsSchema } }
     }
   }
 });

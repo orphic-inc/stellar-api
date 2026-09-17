@@ -111,6 +111,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     isDonor: false,
     canDownload: true,
     canInvite: true,
+    feedTokenEpoch: 0,
     rankLocked: false,
     adminComment: null,
     staffBio: null,

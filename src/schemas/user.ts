@@ -62,6 +62,13 @@ export const canInviteSchema = z.object({
   message: memberMessage
 });
 
+// Staff revoke a member's Member Feed URLs (ADR-0014, #262). No other field:
+// the new URLs are never returned to staff.
+export const feedTokenRotateSchema = z.object({
+  reason: staffReason,
+  message: memberMessage
+});
+
 const inviteCount = z.number().int().min(0).max(STAFF_INVITE_COUNT_MAX);
 
 export const inviteCountSchema = z.object({
@@ -133,6 +140,7 @@ export type SetRankInput = z.infer<typeof setRankSchema>;
 export type RankLockInput = z.infer<typeof rankLockSchema>;
 export type CanInviteInput = z.infer<typeof canInviteSchema>;
 export type InviteCountInput = z.infer<typeof inviteCountSchema>;
+export type FeedTokenRotateInput = z.infer<typeof feedTokenRotateSchema>;
 export type CancelInviteInput = z.infer<typeof cancelInviteSchema>;
 export type DonorRankInput = z.infer<typeof donorRankSchema>;
 export type GrantDonorInput = z.infer<typeof grantDonorSchema>;

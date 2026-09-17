@@ -247,6 +247,28 @@ export const korin = {
   channelWeights: parseChannelWeights(process.env.KORIN_CHANNEL_WEIGHTS)
 };
 
+// Member Feed (ADR-0014, #262). The HMAC secret every feed token is derived
+// from. Optional: unset, every feed route 404s and the settings read reports
+// feeds disabled, so operators opt in. Its own secret rather than one derived
+// from `auth.jwtSecret`, so rotating it (revoking every feed at once) does not
+// also log every member out. A value that is set but short is a misconfiguration
+// of a credential, so it fails boot like `requireEnv` does.
+const FEED_SECRET_MIN_LENGTH = 32;
+const parseFeedSecret = (raw?: string): string => {
+  if (!raw) return '';
+  if (raw.length < FEED_SECRET_MIN_LENGTH) {
+    console.error(
+      `FATAL: STELLAR_FEED_SECRET must be at least ${FEED_SECRET_MIN_LENGTH} characters`
+    );
+    process.exit(1);
+  }
+  return raw;
+};
+
+export const feeds = {
+  secret: parseFeedSecret(process.env.STELLAR_FEED_SECRET)
+};
+
 // Binary asset store (ADR-0026). The backend is a Postgres `Bytes` column, so
 // there is no connection to surface here — the only operational knob is the
 // store-time size ceiling, enforced by `validateAsset`.

@@ -195,6 +195,7 @@ export const DEFAULT_RANKS = [
       users_edit: true,
       users_warn: true,
       users_disable: true,
+      users_edit_reset_feeds: true,
       users_view_ips: true,
       users_view_email: true,
       messages_mass_pm: true,

@@ -24,6 +24,7 @@ import {
   type ReputationHistoryPeriodQuery
 } from '../../schemas/statsHistory';
 import { getPolicyState } from '../../modules/ratioPolicy';
+import { getMemberFeeds, rotateFeedToken } from '../../modules/feedToken';
 import { resolveViewer } from '../../modules/bbcodeRender';
 import { requireAuth } from '../../middleware/auth';
 import { loadPermissions } from '../../middleware/permissions';
@@ -145,6 +146,29 @@ router.get(
   authHandler(async (req, res) => {
     const { period } = parsedQuery<ReputationHistoryPeriodQuery>(res);
     res.json(await getCrsHistory(req.user.id, period as CrsHistoryPeriod));
+  })
+);
+
+// GET /api/profile/me/feeds — your Member Feed URLs (ADR-0014, #262), or that
+// feeds are not enabled here. Complete URLs, never a bare token. `no-store`:
+// the body is a live credential.
+router.get(
+  '/me/feeds',
+  requireAuth,
+  authHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(await getMemberFeeds(req.user.id));
+  })
+);
+
+// POST /api/profile/me/feed-token/rotate — revoke every feed URL you have
+// handed out, and answer the new ones.
+router.post(
+  '/me/feed-token/rotate',
+  requireAuth,
+  authHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(await rotateFeedToken(req.user.id, req.user.id));
   })
 );
 

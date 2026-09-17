@@ -50,6 +50,7 @@ import {
   rankLockSchema,
   canInviteSchema,
   inviteCountSchema,
+  feedTokenRotateSchema,
   cancelInviteSchema,
   donorRankSchema,
   grantDonorSchema,
@@ -60,6 +61,7 @@ import {
   type WarnUserInput,
   type ModerationNoteInput,
   type SetRankInput,
+  type FeedTokenRotateInput,
   type RankLockInput,
   type CanInviteInput,
   type InviteCountInput,
@@ -91,6 +93,7 @@ import {
   setInviteCount,
   cancelInvite
 } from '../../modules/inviteControls';
+import { rotateFeedToken } from '../../modules/feedToken';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -1004,6 +1007,24 @@ router.put(
         ? 'Invite privileges restored'
         : 'Invite privileges revoked'
     });
+  })
+);
+
+// POST /api/users/:id/feed-token/rotate — revoke one member's Member Feed URLs
+// (ADR-0014, #262). Staff never see the new URLs; see modules/feedToken.ts.
+router.post(
+  '/:id/feed-token/rotate',
+  ...requirePermission('users_edit_reset_feeds'),
+  validateParams(userIdParamsSchema),
+  validate(feedTokenRotateSchema),
+  authHandler(async (req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    await rotateFeedToken(
+      req.user.id,
+      id,
+      parsedBody<FeedTokenRotateInput>(res)
+    );
+    res.json({ msg: 'Feed token rotated' });
   })
 );
 
