@@ -12,6 +12,11 @@ import type { AnnounceVisibility } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { korin, email } from './config';
 import { getLogger } from './logging';
+import {
+  contributionItemTitle,
+  releaseUrl,
+  renderRssChannel
+} from '../lib/rss';
 
 const log = getLogger('announce');
 
@@ -76,9 +81,6 @@ export const announceTarget = (
   return { visibility: 'PRIVATE', community: item.communityId };
 };
 
-const releaseUrl = (releaseId: number): string =>
-  `${email.siteUrl}/releases/${releaseId}`;
-
 /** New contributions newer than `sinceId`, oldest first (announce in order). */
 export const getNewAnnounceItems = async (
   sinceId: number,
@@ -119,50 +121,26 @@ export const getNewAnnounceItems = async (
   }));
 };
 
-const escapeXml = (s: string): string =>
-  s.replace(
-    /[<>&'"]/g,
-    (ch) =>
-      ({
-        '<': '&lt;',
-        '>': '&gt;',
-        '&': '&amp;',
-        "'": '&apos;',
-        '"': '&quot;'
-      })[ch] as string
+/**
+ * Render items as an RSS 2.0 document (the payload korin parses). The channel
+ * and item rendering are shared with the Member Feed (#262); korin parses these
+ * bytes, so announce.spec.ts pins them against goldens captured before the move.
+ */
+export const renderAnnounceRss = (items: AnnounceItem[]): string =>
+  renderRssChannel(
+    {
+      title: 'Stellar — Release Announce',
+      link: email.siteUrl,
+      description: 'New contributions on Stellar'
+    },
+    items.map((item) => ({
+      title: contributionItemTitle(item.artists, item.title, item.type),
+      link: item.link,
+      guid: `stellar-contribution-${item.id}`,
+      pubDate: item.createdAt,
+      category: item.community
+    }))
   );
-
-const itemTitle = (item: AnnounceItem): string => {
-  const artists = item.artists.length ? `${item.artists.join(', ')} — ` : '';
-  return `${artists}${item.title} [${item.type}]`;
-};
-
-/** Render items as an RSS 2.0 document (the payload korin parses). */
-export const renderAnnounceRss = (items: AnnounceItem[]): string => {
-  const entries = items
-    .map((item) => {
-      const category = item.community
-        ? `\n      <category>${escapeXml(item.community)}</category>`
-        : '';
-      return `    <item>
-      <title>${escapeXml(itemTitle(item))}</title>
-      <link>${escapeXml(item.link)}</link>
-      <guid isPermaLink="false">stellar-contribution-${item.id}</guid>
-      <pubDate>${item.createdAt.toUTCString()}</pubDate>${category}
-    </item>`;
-    })
-    .join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <title>Stellar — Release Announce</title>
-    <link>${escapeXml(email.siteUrl)}</link>
-    <description>New contributions on Stellar</description>
-${entries}
-  </channel>
-</rss>`;
-};
 
 /**
  * Push a single item to korin's announce renderer. korin's `minimal` template

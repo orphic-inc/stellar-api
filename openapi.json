@@ -13496,6 +13496,333 @@
         ]
       }
     },
+    "/feeds/contributions.xml": {
+      "get": {
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Member Feed: new contributions",
+        "description": "New contributions the feed owner can see (`releaseVisibleTo`), optionally filtered; filters AND together, one value each. A `community` the owner cannot see yields an empty feed. Filters are validated only after the token, so a 400 is never answered to an unauthenticated caller. Authenticated by the `user` and `token` query parameters from `GET /profile/me/feeds`, never a session. Newest 50, notify-and-link: items link to app pages, never to a download. Sent `Cache-Control: private, max-age=300`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "community",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "tag",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mp3",
+                "flac",
+                "wav",
+                "ogg",
+                "aac",
+                "m4a",
+                "m4b",
+                "mp4",
+                "mkv",
+                "avi",
+                "mov",
+                "zip",
+                "exe",
+                "dmg",
+                "apk",
+                "pdf",
+                "epub",
+                "mobi",
+                "cbz",
+                "cbr",
+                "jpg",
+                "png",
+                "gif",
+                "txt"
+              ]
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Lossless",
+                "Lossless24",
+                "Kbps320",
+                "Kbps256",
+                "KbpsV0",
+                "Kbps192",
+                "KbpsV2",
+                "Kbps128",
+                "Other"
+              ]
+            },
+            "required": false,
+            "name": "bitrate",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RSS 2.0: new contributions",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feeds/mine.xml": {
+      "get": {
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Member Feed: the owner's own contributions",
+        "description": "The feed owner's own contributions, still access-filtered like every surface. Authenticated by the `user` and `token` query parameters from `GET /profile/me/feeds`, never a session. Newest 50, notify-and-link: items link to app pages, never to a download. Sent `Cache-Control: private, max-age=300`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RSS 2.0: the owner's contributions",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feeds/news.xml": {
+      "get": {
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Member Feed: site news",
+        "description": "Site news, each body rendered from BBCode for the owner as viewer, so `[mature]` follows their setting. Authenticated by the `user` and `token` query parameters from `GET /profile/me/feeds`, never a session. Newest 50, notify-and-link: items link to app pages, never to a download. Sent `Cache-Control: private, max-age=300`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RSS 2.0: site news",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feeds/bookmarks.xml": {
+      "get": {
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Member Feed: new contributions on the owner's bookmarks",
+        "description": "New contributions on bookmarked releases, and on visible releases crediting a bookmarked artist in any role, each once. Authenticated by the `user` and `token` query parameters from `GET /profile/me/feeds`, never a session. Newest 50, notify-and-link: items link to app pages, never to a download. Sent `Cache-Control: private, max-age=300`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": true,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RSS 2.0: new contributions on bookmarks",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/profile/me/invites": {
       "get": {
         "tags": [

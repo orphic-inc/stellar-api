@@ -223,6 +223,7 @@ src/
     communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
     crsHistory.ts           # Capture/query CRS as a time-series snapshot (#94, ADR-0007 trend layer); active-users-only, Monthly+Yearly cadence (no hourly), self-read only — captured by statsJob
     auth.ts                 # Password validation, auth user DB query helpers
+    feeds.ts                # Member Feed reads (#262): contributions, mine, news, bookmarks; each keyed on the feed owner rather than a session
     feedToken.ts            # Member Feed token (#262): derived per request, revoked by `feedTokenEpoch`; settings links + rotation
     artist.ts               # Artist creation/update with history tracking
     comment.ts              # Comment soft-delete with audit logging
@@ -297,7 +298,7 @@ src/
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user; exports requireAuth
     permissions.ts          # loadPermissions, requirePermission, requireOwnerOrPermission, requireAdminOnly, requireStrictAdmin (no role helpers — ADR-0001)
-    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter
+    rateLimiter.ts          # authLimiter, writeLimiter, installLimiter, downloadLimiter, feedAuthLimiter, feedLimiter
     serviceAuth.ts          # requireServiceKey — Bearer gate for korin.pink inbound calls (ADR-0013; fails closed)
     validate.ts             # validate(bodySchema), validateParams(paramsSchema)
   lib/
@@ -310,6 +311,7 @@ src/
     expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
     pagination.ts           # paginationBase (Zod) + parsedPage(res) → { page, limit, skip }
                             # paginatedResponse(res, data, total, pg)
+    rss.ts                  # Feed document rendering shared by the announce push and the Member Feed; pure, no database
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
     cssValidate.ts          # Store-time CSS boundary (ADR-0031): detects and REJECTS, stores bytes verbatim; reports every violation with rule + location
     assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, like cssValidate
@@ -364,6 +366,7 @@ src/
     siteHistory.ts          # Site history log
     releaseGroups.ts        # ReleaseGroup reads + curation (ADR-0023/#265): resolve, find-or-create, merge/split, cover art, group log
     stylesheet.ts           # User stylesheets
+    feeds.ts                # Member Feed (#262): contributions.xml, mine.xml, news.xml, bookmarks.xml; no session
     asset.ts                # GET /:hash — content-addressed binary delivery, immutable caching (ADR-0026)
     wiki.ts                 # Wiki pages, aliases, revisions
     docs.ts                 # API docs endpoint

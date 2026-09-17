@@ -62,6 +62,7 @@ import forumPollRouter from './routes/api/forum/forumPoll';
 import requestsRouter from './routes/api/requests';
 import downloadsRouter from './routes/api/downloads';
 import ratioPolicyRouter from './routes/api/ratioPolicy';
+import feedsRouter from './routes/api/feeds';
 import forumPollVoteRouter from './routes/api/forum/forumPollVote';
 import forumLastReadRouter from './routes/api/forum/forumLastReadTopic';
 import forumTopicNoteRouter from './routes/api/forum/forumTopicNote';
@@ -206,6 +207,8 @@ export const createApp = () => {
   app.use('/api/requests', requestsRouter);
   app.use('/api', downloadsRouter);
   app.use('/api/ratio-policy', ratioPolicyRouter);
+  // No session: the Member Feed authenticates its owner by feed token (ADR-0014).
+  app.use('/api/feeds', feedsRouter);
   app.use('/api/communities', communitiesRouter);
   app.use('/api/contributions', contributionsRouter);
   app.use('/api/log-check', logCheckRouter);

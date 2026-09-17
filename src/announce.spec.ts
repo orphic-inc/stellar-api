@@ -51,6 +51,51 @@ describe('renderAnnounceRss', () => {
   });
 });
 
+describe('renderAnnounceRss — byte-for-byte (#262)', () => {
+  // korin parses these bytes. #262 moved the channel and item rendering into
+  // modules/feeds.ts so the Member Feed shares it; these goldens were captured
+  // from the renderer BEFORE that move, and pin that the move changed nothing.
+  const base = {
+    releaseId: 9,
+    title: 'OK <Computer>',
+    communityId: 5,
+    announceVisibility: 'PUBLIC' as const,
+    link: 'https://stellar.test/releases/9?a=1&b=2'
+  };
+
+  it('renders an empty channel unchanged', () => {
+    expect(renderAnnounceRss([])).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>Stellar — Release Announce</title>\n    <link>https://stellar.test</link>\n    <description>New contributions on Stellar</description>\n\n  </channel>\n</rss>'
+    );
+  });
+
+  it('renders items, escaping and optional category, unchanged', () => {
+    const xml = renderAnnounceRss([
+      {
+        ...base,
+        id: 42,
+        artists: ['Radiohead', 'Nigel & "friends" \'x\''],
+        community: 'Music & Co',
+        type: 'flac',
+        createdAt: new Date('2026-06-15T00:00:00Z')
+      },
+      {
+        ...base,
+        id: 43,
+        artists: [],
+        community: null,
+        communityId: null,
+        announceVisibility: null,
+        type: 'mp3',
+        createdAt: new Date('2026-06-16T12:34:56Z')
+      }
+    ]);
+    expect(xml).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>Stellar — Release Announce</title>\n    <link>https://stellar.test</link>\n    <description>New contributions on Stellar</description>\n    <item>\n      <title>Radiohead, Nigel &amp; &quot;friends&quot; &apos;x&apos; — OK &lt;Computer&gt; [flac]</title>\n      <link>https://stellar.test/releases/9?a=1&amp;b=2</link>\n      <guid isPermaLink="false">stellar-contribution-42</guid>\n      <pubDate>Mon, 15 Jun 2026 00:00:00 GMT</pubDate>\n      <category>Music &amp; Co</category>\n    </item>\n    <item>\n      <title>OK &lt;Computer&gt; [mp3]</title>\n      <link>https://stellar.test/releases/9?a=1&amp;b=2</link>\n      <guid isPermaLink="false">stellar-contribution-43</guid>\n      <pubDate>Tue, 16 Jun 2026 12:34:56 GMT</pubDate>\n    </item>\n  </channel>\n</rss>'
+    );
+  });
+});
+
 describe('publishAnnounceItem', () => {
   const realFetch = global.fetch;
   afterEach(() => {

@@ -1,12 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { type Options } from 'express-rate-limit';
 import { getLogger } from '../modules/logging';
 import { markGate } from '../lib/routeGate';
 
 const secLog = getLogger('security');
 
-const createLimiter = (windowMs: number, max: number, msg: string) =>
+const createLimiter = (
+  windowMs: number,
+  max: number,
+  msg: string,
+  options: Partial<Options> = {}
+) =>
   rateLimit({
+    ...options,
     windowMs,
     max,
     standardHeaders: true,
@@ -48,6 +54,40 @@ export const downloadLimiter = createLimiter(
   'Too many download requests, please slow down'
 );
 
+/**
+ * Member Feed failures, per IP (ADR-0014 §5, #262). Counts ONLY the feed's
+ * 404 — a bad token, unknown id or disabled member — so brute force and junk
+ * floods are bounded while a reader polling successfully is never counted. A
+ * member's own 429 from `feedLimiter` is not a failure here either: an
+ * aggregator polling many members from one IP must not have one member's
+ * over-polling spend everyone's budget.
+ */
+export const feedAuthLimiter = createLimiter(
+  15 * 60 * 1000,
+  30,
+  'Too many failed feed requests, please try again later',
+  {
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (_req, res) => res.statusCode !== 404
+  }
+);
+
+/**
+ * Member Feed reads, per validated MEMBER across all their feeds (ADR-0014 §5).
+ * Mounted after the token check, which sets `res.locals.feedOwner`, so the key
+ * is an authenticated id: an attacker cannot spend someone else's budget, and
+ * members behind one aggregator IP each keep their own.
+ */
+export const feedLimiter = createLimiter(
+  60 * 60 * 1000,
+  120,
+  'Too many feed requests, please slow down',
+  {
+    keyGenerator: (_req, res) =>
+      `feed-member:${(res.locals.feedOwner as { id: number }).id}`
+  }
+);
+
 // Labelled so the contract can derive the 429 these answer, rather than have it
 // hand-written per route (#553). Same mechanism as the auth gates: `markGate`
 // stamps, `readGate` reads it back off the built app. Stamped in place rather
@@ -57,6 +97,8 @@ markGate(authLimiter, 'rateLimit');
 markGate(installLimiter, 'rateLimit');
 markGate(writeLimiter, 'rateLimit');
 markGate(downloadLimiter, 'rateLimit');
+markGate(feedAuthLimiter, 'rateLimit');
+markGate(feedLimiter, 'rateLimit');
 
 /**
  * The methods the site-wide write limiter guards.

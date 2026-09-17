@@ -28,7 +28,16 @@ const GATED: BBViewer = { showMature: false };
 export async function resolveViewer(req: Request): Promise<BBViewer> {
   const userId = req.user?.id;
   if (!userId) return GATED;
+  return resolveViewerForUser(userId);
+}
 
+/**
+ * The same preference, for a reader identified some other way than a session.
+ * The Member Feed (ADR-0014, #262) has no `req.user`: its reader is the feed's
+ * owner, authenticated by the feed token, and `resolveViewer(req)` would render
+ * every feed gated.
+ */
+export async function resolveViewerForUser(userId: number): Promise<BBViewer> {
   const row = await prisma.user.findUnique({
     where: { id: userId },
     select: { userSettings: { select: { showMatureContent: true } } }

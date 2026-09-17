@@ -54,6 +54,10 @@ import {
   massPmSchema
 } from '../schemas/user';
 import {
+  contributionFeedQuerySchema,
+  feedCredentialsSchema
+} from '../schemas/feeds';
+import {
   createContributionSchema,
   addContributionToReleaseSchema,
   contributionReportSchema,
@@ -2247,6 +2251,77 @@ registry.registerPath({
       content: { 'application/json': { schema: memberFeedsSchema } }
     }
   }
+});
+
+// ─── Member Feed (ADR-0014, #262) ─────────────────────────────────────────────
+// No session and no `security` block: a feed reader cannot hold a cookie, so the
+// owner is authenticated by `user` + `token` in the query string. Every failure
+// to authenticate is the same 404, so the contract cannot promise a 401.
+
+const memberFeedResponses = (what: string) => ({
+  200: {
+    description: `RSS 2.0: ${what}`,
+    content: { 'application/rss+xml': { schema: z.string() } }
+  },
+  404: msgResponse(
+    'Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.'
+  )
+});
+
+const memberFeedDescription = (what: string) =>
+  `${what} Authenticated by the \`user\` and \`token\` query parameters from ` +
+  '`GET /profile/me/feeds`, never a session. Newest 50, notify-and-link: ' +
+  'items link to app pages, never to a download. Sent ' +
+  '`Cache-Control: private, max-age=300`.';
+
+registry.registerPath({
+  method: 'get',
+  path: '/feeds/contributions.xml',
+  tags: ['Feeds'],
+  summary: 'Member Feed: new contributions',
+  description: memberFeedDescription(
+    'New contributions the feed owner can see (`releaseVisibleTo`), optionally filtered; filters AND together, one value each. A `community` the owner cannot see yields an empty feed. Filters are validated only after the token, so a 400 is never answered to an unauthenticated caller.'
+  ),
+  request: {
+    query: feedCredentialsSchema.merge(contributionFeedQuerySchema)
+  },
+  responses: memberFeedResponses('new contributions')
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/feeds/mine.xml',
+  tags: ['Feeds'],
+  summary: "Member Feed: the owner's own contributions",
+  description: memberFeedDescription(
+    "The feed owner's own contributions, still access-filtered like every surface."
+  ),
+  request: { query: feedCredentialsSchema },
+  responses: memberFeedResponses("the owner's contributions")
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/feeds/news.xml',
+  tags: ['Feeds'],
+  summary: 'Member Feed: site news',
+  description: memberFeedDescription(
+    'Site news, each body rendered from BBCode for the owner as viewer, so `[mature]` follows their setting.'
+  ),
+  request: { query: feedCredentialsSchema },
+  responses: memberFeedResponses('site news')
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/feeds/bookmarks.xml',
+  tags: ['Feeds'],
+  summary: "Member Feed: new contributions on the owner's bookmarks",
+  description: memberFeedDescription(
+    'New contributions on bookmarked releases, and on visible releases crediting a bookmarked artist in any role, each once.'
+  ),
+  request: { query: feedCredentialsSchema },
+  responses: memberFeedResponses('new contributions on bookmarks')
 });
 
 const OwnInviteItem = registry.register(
