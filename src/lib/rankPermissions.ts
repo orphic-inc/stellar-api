@@ -168,6 +168,12 @@ export const PERMISSION_GROUPS = [
         description: 'Enable or disable user accounts.'
       },
       {
+        key: 'users_edit_reset_feeds',
+        label: 'Reset feed tokens',
+        description:
+          "Revoke a member's Member Feed URLs by rotating their feed token."
+      },
+      {
         key: 'users_view_ips',
         label: 'View IP history',
         description: 'View per-user IP history.'

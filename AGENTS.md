@@ -196,6 +196,7 @@ Copy `.env.default` → `.env`.
 | `STELLAR_STAFFPM_PATH`              | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                                                                            |
 | `STELLAR_PUBLIC_KB_BASE`            | Public wiki root for `${*_article}` guidance links — korin.pink, readable pre-account (PRD-09, #126; default `https://korin.pink/wiki`)       |
 | `STELLAR_ASSET_MAX_BYTES`           | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                                                                   |
+| `STELLAR_FEED_SECRET`               | Member Feed token secret (#262; ≥ 32 chars). Unset: every feed 404s. Rotating it revokes every member's feed links                            |
 | `INACTIVITY_MODE`                   | Dormancy sweep: `off` (default) / `dryRun` / `on` (#279, ADR-0038). `dryRun` evaluates everything and writes nothing                          |
 | `INACTIVITY_MAX_DISABLES_PER_CYCLE` | Ceiling on disables per run (#279; default 50). Warns are uncapped — signing in undoes one                                                    |
 | `INACTIVITY_INTERVAL_MS`            | Dormancy sweep interval (#279; default 86400000 = 24h)                                                                                        |
@@ -222,6 +223,7 @@ src/
     communityHealthHistory.ts # Persist/query the community health pulse as a time-series snapshot (#75); captured by statsJob
     crsHistory.ts           # Capture/query CRS as a time-series snapshot (#94, ADR-0007 trend layer); active-users-only, Monthly+Yearly cadence (no hourly), self-read only — captured by statsJob
     auth.ts                 # Password validation, auth user DB query helpers
+    feedToken.ts            # Member Feed token (#262): derived per request, revoked by `feedTokenEpoch`; settings links + rotation
     artist.ts               # Artist creation/update with history tracking
     comment.ts              # Comment soft-delete with audit logging
     contribution.ts         # Contribution submission & processing (with link health)

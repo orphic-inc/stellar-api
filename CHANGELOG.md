@@ -39,6 +39,33 @@ All notable changes to stellar-api are documented here.
   A 1:1 relation keyed on the primary key, so the added select is an indexed
   join. Additive response fields only; no existing field changes shape.
 
+- **Member Feed tokens and settings**
+  ([#262](https://github.com/orphic-inc/stellar-api/issues/262),
+  [ADR-0014](docs/adr/0014-per-user-contribution-feed.md)) — the credential half
+  of the Member Feed. The feed routes themselves follow in a separate PR, so the
+  URLs these return 404 until then.
+
+  - `GET /profile/me/feeds` answers `{ enabled: false }`, or
+    `{ enabled: true, feeds: { contributions, mine, news, bookmarks } }` as
+    complete URLs. There is no bare token field. Sent `no-store`.
+  - `POST /profile/me/feed-token/rotate` revokes every feed URL the member has
+    handed out and answers the new ones in the same shape.
+  - `POST /users/{id}/feed-token/rotate` lets staff do the same, behind the new
+    **`users_edit_reset_feeds`**, with a required `reason` (audit) and an
+    optional `message` (System PM). Staff never see the URLs. The permission is
+    seeded on the staff rank; existing ranks lack it until granted.
+
+  The token is **derived** on every request, never stored:
+  `HMAC-SHA256(STELLAR_FEED_SECRET, "feed:<id>:<epoch>")`, compared in constant
+  time. Revocation is the new `User.feedTokenEpoch` counter, incremented rather
+  than set so concurrent rotations both count. **`STELLAR_FEED_SECRET` is a new,
+  optional env var**: unset, feeds are disabled; set but shorter than 32
+  characters, boot fails. A disabled member's token does not authenticate.
+
+  Contract: three new operations and a `MemberFeeds` schema. stellar-ui owes an
+  `api:sync`. Migration: `20260917000000_user_feed_token_epoch` (additive,
+  defaulted).
+
 ### Fixed
 
 - **Every `/api` mutation is rate limited, and none is counted twice**
