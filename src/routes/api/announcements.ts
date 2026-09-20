@@ -10,12 +10,15 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
+  validateQuery,
   parsedBody,
   parsedParams
 } from '../../middleware/validate';
+import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
   announcementSchema,
   globalNoticeSchema,
+  newsListQuerySchema,
   type AnnouncementInput,
   type GlobalNoticeInput
 } from '../../schemas/announcement';
@@ -81,6 +84,37 @@ router.post(
 );
 
 // GET /api/announcements/album-of-month — list all featured albums (staff)
+// GET /api/announcements/news — the paginated news list (#670).
+//
+// `GET /api/announcements` stays the homepage's combined first-paint payload
+// and is deliberately untouched; it answers two collections, so one `page`
+// parameter could not mean anything coherent for both. This is the list a
+// caller pages through — stellar-ui#348 walks it back to find the item a
+// `news.xml` link names, since the feed publishes FEED_SIZE items and that
+// payload carries five.
+//
+// Uncapped on purpose: FEED_SIZE is the feed's business, and a news archive
+// surface would want the whole list.
+router.get(
+  '/news',
+  requireAuth,
+  validateQuery(newsListQuerySchema),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const pg = parsedPage(res);
+    const [news, total] = await Promise.all([
+      prisma.news.findMany({
+        // `id` breaks the tie: `createdAt` is not unique, and two items sharing
+        // one would otherwise repeat or skip across a page boundary (#613/#652).
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: pg.skip,
+        take: pg.limit
+      }),
+      prisma.news.count()
+    ]);
+    paginatedResponse(res, news, total, pg);
+  })
+);
+
 router.get(
   '/album-of-month',
   ...requirePermission('news_manage'),

@@ -2866,6 +2866,42 @@ const GlobalNotice = registry.register(
 
 registry.registerPath({
   method: 'get',
+  path: '/announcements/news',
+  tags: ['Announcements'],
+  summary: 'The paginated news list',
+  description:
+    'Newest first, with `id` as the tiebreak so a shared `createdAt` cannot ' +
+    'repeat or skip a row across a page boundary. Distinct from ' +
+    "`GET /announcements`, which answers the homepage's combined " +
+    "first-paint payload and is not pageable. Uncapped: the Member Feed's " +
+    "own size is the feed's concern, not this list's.",
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated news items, newest first',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(Announcement),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    400: validationResponse(
+      '`page` or `limit` is not a positive integer, or `limit` exceeds the ' +
+        'maximum page size'
+    )
+  }
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/announcements/global-notices',
   tags: ['Announcements'],
   responses: {
