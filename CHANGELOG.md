@@ -102,6 +102,24 @@ All notable changes to stellar-api are documented here.
 
   Contract: four new operations. stellar-ui owes an `api:sync`.
 
+- **A paginated news list**
+  ([#670](https://github.com/orphic-inc/stellar-api/issues/670)) —
+  `GET /api/announcements/news`, newest first, behind `requireAuth` and the
+  standard `page`/`limit`. It exists because the Member Feed publishes 50 news
+  items and links each to the homepage anchor, while `GET /api/announcements`
+  carries five for first paint — so 45 of those links had nowhere to land.
+
+  That endpoint could not be paginated in place: it answers a combined
+  `{ announcements, blogPosts }` payload, where one `page` parameter cannot
+  mean anything coherent for both collections. It is unchanged.
+
+  The list is **uncapped**. The feed's size is the feed's concern, and an
+  unbounded list leaves room for a news archive surface later. Ordering breaks
+  a `createdAt` tie on `id`, so a page boundary cannot repeat or skip a row
+  (#613, #652).
+
+  Consumed by stellar-ui#348, which adds the anchors and a load-more control.
+
 ### Fixed
 
 - **An empty environment value no longer means an empty setting**

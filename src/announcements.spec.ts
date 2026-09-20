@@ -476,3 +476,90 @@ describe('announcements — missing rows answer the declared 404 (#564)', () => 
     expect(res.status).toBe(500);
   });
 });
+
+/**
+ * The paginated news list (#670).
+ *
+ * `news.xml` publishes FEED_SIZE items and links each to the homepage anchor
+ * (stellar-ui#348), while `GET /announcements` carries five for first paint.
+ * This is the list that lets the UI reach the rest.
+ */
+describe('GET /api/announcements/news', () => {
+  const page = (body: Record<string, unknown>) =>
+    body.meta as { total: number; page: number; limit: number };
+
+  it('answers a paginated envelope, not a bare array', async () => {
+    prismaMock.news.findMany.mockResolvedValue([makeNews()] as never);
+    prismaMock.news.count.mockResolvedValue(1 as never);
+
+    const res = await request(app).get('/api/announcements/news');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].title).toBe('Site update');
+    expect(page(res.body)).toMatchObject({ total: 1, page: 1 });
+  });
+
+  it('breaks a createdAt tie on id, so a page boundary cannot repeat a row', async () => {
+    prismaMock.news.findMany.mockResolvedValue([] as never);
+    prismaMock.news.count.mockResolvedValue(0 as never);
+
+    await request(app).get('/api/announcements/news');
+
+    expect(prismaMock.news.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      })
+    );
+  });
+
+  it('skips by page, so the UI can walk back to an older item', async () => {
+    prismaMock.news.findMany.mockResolvedValue([] as never);
+    prismaMock.news.count.mockResolvedValue(60 as never);
+
+    await request(app).get('/api/announcements/news?page=3&limit=10');
+
+    expect(prismaMock.news.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 20, take: 10 })
+    );
+  });
+
+  it('serves a whole feed page in one request, since FEED_SIZE is 50', async () => {
+    prismaMock.news.findMany.mockResolvedValue([] as never);
+    prismaMock.news.count.mockResolvedValue(50 as never);
+
+    const res = await request(app).get('/api/announcements/news?limit=50');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.news.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 50 })
+    );
+  });
+
+  it('refuses a non-positive page', async () => {
+    const res = await request(app).get('/api/announcements/news?page=0');
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toBeDefined();
+  });
+
+  it('refuses a limit beyond the maximum page size', async () => {
+    const res = await request(app).get('/api/announcements/news?limit=500');
+
+    expect(res.status).toBe(400);
+  });
+
+  it('leaves GET /api/announcements serving its five-item first paint', async () => {
+    prismaMock.news.findMany.mockResolvedValue([makeNews()] as never);
+    prismaMock.blog.findMany.mockResolvedValue([makeBlog()] as never);
+
+    const res = await request(app).get('/api/announcements');
+
+    expect(res.status).toBe(200);
+    expect(res.body.announcements).toHaveLength(1);
+    expect(res.body.blogPosts).toHaveLength(1);
+    expect(res.body.meta).toBeUndefined();
+    expect(prismaMock.news.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 5 })
+    );
+  });
+});
