@@ -8,7 +8,7 @@ Stellar is an invite-only platform built around **Communities** with granular pe
 
 ## Status: alpha
 
-Stellar is pre-1.0 software (currently 0.8.x). Running a public instance means running an alpha: interfaces and the database schema still change between releases, migrations may be destructive (pre-1.0 carries no backfill guarantees), and no data-durability promises are made yet. Trunk is kept deployable — every merge passes the full CI chain (format, lint, type-checks, unit and integration suites, and a boot-and-migrate container smoke test) — but treat any public deployment as disposable for now. A fresh install starts with registration `closed`; open it deliberately from site settings when you are ready to accept members.
+Stellar is pre-1.0 software (currently 0.9.x). Running a public instance means running an alpha: interfaces and the database schema still change between releases, migrations may be destructive (pre-1.0 carries no backfill guarantees), and no data-durability promises are made yet. Trunk is kept deployable — every merge passes the full CI chain (format, lint, type-checks, unit and integration suites, and a boot-and-migrate container smoke test) — but treat any public deployment as disposable for now. A fresh install starts with registration `closed`; open it deliberately from site settings when you are ready to accept members.
 
 ## What's here
 
