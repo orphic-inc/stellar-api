@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.6] — 2026-09-20
+
 ### Added
 
 - **The session carries ratio policy state**
@@ -120,7 +122,27 @@ All notable changes to stellar-api are documented here.
 
   Consumed by stellar-ui#348, which adds the anchors and a load-more control.
 
+- **A database-only compose file for local development** —
+  `docker-compose.dev.yml` starts Postgres alone (`postgres:16-alpine`, host
+  port overridable with `STELLAR_DEV_DB_PORT`), for a machine that already runs
+  a Postgres on 5432. Until now the only documented route to a local database
+  was stellar-compose, which starts the whole stack, and the credentials CI
+  uses were discoverable only by reading `.github/workflows/publish.yml`.
+
+  `README` gains the non-interactive migrate pair and states that
+  `prisma migrate deploy` does **not** run the seed, unlike `migrate dev` —
+  step 4 had assumed a TTY. `CONTRIBUTING` and `docs/README` now tell you to
+  `cp .env.test.example .env.test`, a file all three documents required and
+  none created.
+
 ### Fixed
+
+- **`.env.default` no longer ships a JWT secret that cannot boot** —
+  `STELLAR_AUTH_JWT_SECRET=changeme` is 8 characters against the 32-character
+  floor in `modules/config.ts`, so the shipped defaults refused to start and
+  `README` listed `changeme` in the "Example / default" column as though they
+  would. The value is now empty with a generation hint, so a missing secret
+  fails closed instead of impersonating a usable one.
 
 - **An empty environment value no longer means an empty setting**
   ([#667](https://github.com/orphic-inc/stellar-api/issues/667)) —
@@ -2907,7 +2929,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...HEAD
+[0.9.6]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/orphic-inc/stellar-api/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/orphic-inc/stellar-api/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/orphic-inc/stellar-api/compare/v0.9.2...v0.9.3
