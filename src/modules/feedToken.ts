@@ -96,7 +96,7 @@ export const authenticateFeedOwner = async (
 };
 
 const feedUrl = (name: MemberFeedName, userId: number, token: string) =>
-  `${email.siteUrl.replace(/\/+$/, '')}/api/feeds/${name}.xml?user=${userId}&token=${token}`;
+  `${email.siteUrl}/api/feeds/${name}.xml?user=${userId}&token=${token}`;
 
 const toMemberFeeds = (userId: number, epoch: number): MemberFeeds => {
   if (!feedsEnabled()) return { enabled: false };

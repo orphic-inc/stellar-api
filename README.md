@@ -92,7 +92,8 @@ cp .env.default .env
 | `STELLAR_PSQL_URI`         | **Prisma connection string** to your Postgres DB                                                        | `postgresql://stellar:changeme@localhost:5432/stellar` |
 | `STELLAR_AUTH_JWT_SECRET`  | Secret for signing JWTs — **32+ chars, or the API exits at boot**. Generate one: `openssl rand -hex 24` | _none — you must set this_                             |
 | `STELLAR_HTTP_PORT`        | API listening port                                                                                      | `8080`                                                 |
-| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (usually the UI url)                                                                | `https://stellargra.ph`                                |
+| `STELLAR_HTTP_CORS_ORIGIN` | Allowed CORS origin (the UI's url). Empty uses the dev default                                          | `http://localhost:9000`                                |
+| `STELLAR_SITE_URL`         | Public base url for emailed links and feed URLs. Empty uses the dev default                             | `http://localhost:9000`                                |
 | `STELLAR_LOG_LEVEL`        | Winston log level (`debug`/`info`/`error`)                                                              | `info`                                                 |
 
 > **The two variables `.env.default` cannot fill in for you** are `STELLAR_PSQL_URI` and `STELLAR_AUTH_JWT_SECRET`. Neither ships with a working value on purpose: the URI is an obviously-fake placeholder, and the JWT secret is empty. The API then fails fast (`FATAL: Missing required environment variable: STELLAR_AUTH_JWT_SECRET`, or `must be at least 32 characters` if you set one too short) rather than letting an instance run on a guessable secret. Set both before `npm run dev`.

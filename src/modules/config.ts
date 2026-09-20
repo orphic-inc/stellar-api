@@ -91,9 +91,40 @@ const parseTrustProxyHops = (raw?: string): number => {
   return parsed;
 };
 
+/**
+ * The origin this deployment is reached at, for development.
+ *
+ * Port 9000 is the stellar-ui dev server (`webpack.config.js`), which proxies
+ * `/api` here — so this is the origin a browser actually loads the site from
+ * while developing. It is only ever a fallback: `/api/install` reports it as a
+ * launch warning, because a live site reached at localhost serves nobody.
+ */
+export const DEV_ORIGIN = 'http://localhost:9000';
+
+/**
+ * Read an origin from the environment.
+ *
+ * Three things, each of which was a real defect (#667):
+ *
+ * - **Empty is unset.** `.env.default` ships these keys blank, and `??` does
+ *   NOT catch an empty string — so a copied default produced `siteUrl: ''` and
+ *   every absolute link the API builds came out origin-relative. Emailed links
+ *   (password recovery, invite registration) have no document to resolve
+ *   against, so they failed outright rather than degrading.
+ * - **A trailing slash is stripped.** Callers append `/recovery`, `/register`
+ *   and the like, so a trailing slash yields `//recovery`, which the UI router
+ *   treats as a different route. On `corsOrigin` it is worse: a browser's
+ *   `Origin` header never carries one, so the value matches nothing and
+ *   silently blocks every request the UI makes.
+ * - **Surrounding whitespace is trimmed**, since a stray space in a `.env` is
+ *   invisible in the file and fatal in a URL.
+ */
+const readOrigin = (raw: string | undefined, fallback: string): string =>
+  (raw?.trim() || fallback).replace(/\/+$/, '');
+
 export const http = {
   port: parseInt(process.env.STELLAR_HTTP_PORT || '8080', 10),
-  corsOrigin: process.env.STELLAR_HTTP_CORS_ORIGIN || 'http://localhost:3000',
+  corsOrigin: readOrigin(process.env.STELLAR_HTTP_CORS_ORIGIN, DEV_ORIGIN),
   trustProxyHops: parseTrustProxyHops(process.env.STELLAR_TRUST_PROXY_HOPS)
 };
 
@@ -276,11 +307,29 @@ export const assets = {
   maxBytes: parseInt(process.env.STELLAR_ASSET_MAX_BYTES ?? '2000000', 10) // 2 MB
 };
 
+// `||` rather than `??` throughout: `.env.default` ships every one of these
+// blank, and an empty string must mean "unset" (#667). Through `??` a copied
+// default gave `smtpPort: NaN` and `fromAddress: ''`. Both stay latent while
+// `smtpHost` is empty, since `sendInviteEmail` returns early — they bite the
+// moment someone sets a host and leaves the rest blank.
 export const email = {
   smtpHost: process.env.STELLAR_SMTP_HOST ?? '',
-  smtpPort: parseInt(process.env.STELLAR_SMTP_PORT ?? '587', 10),
+  smtpPort: parseInt(process.env.STELLAR_SMTP_PORT || '587', 10),
   smtpUser: process.env.STELLAR_SMTP_USER ?? '',
   smtpPass: process.env.STELLAR_SMTP_PASS ?? '',
-  fromAddress: process.env.STELLAR_SMTP_FROM ?? 'noreply@stellar.local',
-  siteUrl: process.env.STELLAR_SITE_URL ?? 'http://localhost:3000'
+  fromAddress: process.env.STELLAR_SMTP_FROM || 'noreply@stellar.local',
+  siteUrl: readOrigin(process.env.STELLAR_SITE_URL, DEV_ORIGIN)
 };
+
+/**
+ * Origins that mean "nobody has configured this yet" — the development
+ * fallback, and the RFC 2606 reserved names stellar-compose's
+ * `.env.api.example` ships. `/api/install` warns on all of them; the runbook
+ * already tells operators not to leave `example.org` in place, and this makes
+ * the software say so too.
+ */
+export const PLACEHOLDER_ORIGINS: readonly string[] = [
+  DEV_ORIGIN,
+  'https://example.org',
+  'https://example.com'
+];
