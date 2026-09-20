@@ -39,21 +39,23 @@ If the section for the tag is missing entirely, the `release` job fails rather t
 2. **Rename `[Unreleased]`** to `## [x.y.z] — YYYY-MM-DD` and open a fresh empty `[Unreleased]`. Add the compare-link footer entry.
 3. **Bump the manifest** — `npm version <x.y.z> --no-git-tag-version` (updates `package.json` and `package-lock.json`).
 4. **Regenerate `openapi.json`** — `npm run openapi:export`. Order matters; see the trap above.
-5. **Commit all of it together**, then open a PR into `upstream/main`.
+5. **Commit all of it together**, then open a PR into `origin/main`.
 6. **Verify CI is green**, including the freshness gates (`openapi.json`, `docs/erd.md`) and `version:check`.
-7. **Merge**, then tag the merge commit on upstream:
+7. **Merge**, then tag the merge commit:
 
    ```bash
-   git fetch upstream
+   git fetch origin
    git tag -a v<x.y.z> -m "v<x.y.z>" <merge-sha>
-   git push upstream v<x.y.z>
+   git push origin v<x.y.z>
    ```
 
 8. **Watch the tag run.** It should go `test` + `integration` → `smoke` → `publish` → `release`. Confirm the image is on GHCR and the Release exists with the right notes.
 
-## Do not push tags to the fork
+## One remote, and tags go to it
 
-Actions are enabled on `obrien-k/stellar-api`, so a `v*` tag pushed to `origin` triggers the same workflow there: a stray image under `ghcr.io/obrien-k/…` and, since the `release` job landed, a Release on the fork. Tag parity buys nothing — the fork is not a release surface. Tag `upstream` only.
+`origin` is `orphic-inc/stellar-api` — the release surface. There is no `upstream`, and no fork remote is configured.
+
+This section used to read "do not push tags to the fork", from when work happened on a personal fork with `upstream` pointing at the organisation. Actions were enabled on that fork, so a `v*` tag pushed to `origin` published a stray image under `ghcr.io/obrien-k/…` and, once the `release` job landed, a Release on the fork as well. The lesson survives the topology that produced it: **a `v*` tag publishes wherever it lands**, so push one only to the remote you mean to release from. If you ever re-add a fork remote, that hazard returns unchanged.
 
 ## If something goes wrong
 
