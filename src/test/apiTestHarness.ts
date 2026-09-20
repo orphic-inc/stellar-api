@@ -181,6 +181,15 @@ jest.mock('../modules/config', () => ({
   // A real-length secret, so feed token derivation runs in route tests. The
   // disabled path is exercised by mutating this object (feedToken.spec.ts).
   feeds: { secret: 'f'.repeat(32) },
+  // Exported by config and read by the install route's launch warnings (#667).
+  // A partial mock without it makes `PLACEHOLDER_ORIGINS.includes(...)` throw,
+  // which surfaces as every GET /api/install answering 500.
+  DEV_ORIGIN: 'http://localhost:9000',
+  PLACEHOLDER_ORIGINS: [
+    'http://localhost:9000',
+    'https://example.org',
+    'https://example.com'
+  ],
   email: {
     smtpHost: '',
     smtpPort: 587,

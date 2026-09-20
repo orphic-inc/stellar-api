@@ -104,6 +104,45 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **An empty environment value no longer means an empty setting**
+  ([#667](https://github.com/orphic-inc/stellar-api/issues/667)) —
+  `.env.default` ships `STELLAR_SITE_URL=` and `STELLAR_HTTP_CORS_ORIGIN=`
+  blank, and both were read with `??`, which does **not** catch an empty
+  string. Anyone who copied the defaults therefore ran with `siteUrl: ''`, and
+  every absolute link the API builds came out origin-relative.
+
+  Emailed links have no document to resolve against, so they failed outright
+  rather than degrading: **password recovery** (`/recovery?token=…`) and
+  **invite registration** (`/register?inviteKey=…`) were both unusable, as
+  were Member Feed URLs, feed item links and the announce payload's links.
+
+  The install check could not catch it either: it compared against the
+  development default, and an empty string is not equal to it — so the one
+  case its own text claims to cover ("is not set") produced no warning at all.
+
+  Empty, whitespace and absent now all mean unset. The same read fixes two
+  adjacent keys with the identical defect, which had produced
+  `smtpPort: NaN` and `fromAddress: ''` on a copied default.
+
+- **A trailing slash on either origin is now stripped**
+  ([#667](https://github.com/orphic-inc/stellar-api/issues/667)) — callers
+  append `/recovery`, `/register` and the like, so `https://site/` produced
+  `https://site//recovery`, which the UI router treats as a different route.
+  On `STELLAR_HTTP_CORS_ORIGIN` it was worse: a browser's `Origin` header
+  never carries a trailing slash, so the value matched nothing and silently
+  blocked every request the UI made. Only one of the nine consumers defended
+  itself; the rule now lives in one place instead.
+
+- **The launch warnings cover example hostnames, and name what breaks**
+  ([#667](https://github.com/orphic-inc/stellar-api/issues/667)) —
+  `GET /api/install` now warns when either origin is the development default
+  **or** one of the RFC 2606 placeholders stellar-compose's
+  `.env.api.example` ships. Its deploy runbook already told operators not to
+  leave `example.org` in place; the software says so too now. The
+  `STELLAR_SITE_URL` warning names password recovery and invites, so the cost
+  of ignoring it is visible. Response shape and both warning ids are
+  unchanged.
+
 - **Every `/api` mutation is rate limited, and none is counted twice**
   ([#560](https://github.com/orphic-inc/stellar-api/issues/560)) — the
   site-wide write limiter is now mounted above every router in `app.ts`.

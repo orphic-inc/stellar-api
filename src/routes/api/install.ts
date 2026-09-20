@@ -6,7 +6,8 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   auth as authConfig,
   http as httpConfig,
-  email as emailConfig
+  email as emailConfig,
+  PLACEHOLDER_ORIGINS
 } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { requirePermission } from '../../middleware/permissions';
@@ -47,18 +48,21 @@ const issueToken = (userId: number): Promise<string> =>
 
 function getConfigWarnings(): LaunchChecklistItem[] {
   const warnings: LaunchChecklistItem[] = [];
-  if (httpConfig.corsOrigin === 'http://localhost:3000') {
+  // An empty value now resolves to DEV_ORIGIN (#667), so the same comparison
+  // catches "unset", "left at the development default" and "still the example
+  // hostname from the deploy runbook".
+  if (PLACEHOLDER_ORIGINS.includes(httpConfig.corsOrigin)) {
     warnings.push({
       id: 'cors-origin-default',
       message:
-        'STELLAR_HTTP_CORS_ORIGIN is not set or uses the development default. Update this to your frontend URL before going live.'
+        'STELLAR_HTTP_CORS_ORIGIN is not set, or is still a development or example value. Update this to your frontend URL before going live.'
     });
   }
-  if (emailConfig.siteUrl === 'http://localhost:3000') {
+  if (PLACEHOLDER_ORIGINS.includes(emailConfig.siteUrl)) {
     warnings.push({
       id: 'site-url-default',
       message:
-        'STELLAR_SITE_URL is not set or uses the development default. Update this before going live.'
+        'STELLAR_SITE_URL is not set, or is still a development or example value. Emailed links (password recovery, invites) and feed URLs are built from it, so update this before going live.'
     });
   }
   if (!emailConfig.smtpHost) {
