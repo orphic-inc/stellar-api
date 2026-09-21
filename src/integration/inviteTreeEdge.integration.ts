@@ -36,6 +36,36 @@ afterAll(async () => {
 const rowOf = (userId: number) =>
   testPrisma.inviteTree.findUnique({ where: { userId } });
 
+let inviterSeq = 0;
+/** A member who can send invites. Registered openly, so their own edge is null. */
+const mkInviter = async (): Promise<number> => {
+  inviterSeq += 1;
+  const r = await registerUser({
+    username: `inviter${inviterSeq}`,
+    email: `inviter${inviterSeq}@example.com`,
+    password: 'password1',
+    registrationMode: 'open',
+    maxUsers: 7000
+  });
+  if (!r.ok) throw new Error('fixture registration failed');
+  return r.user.id;
+};
+
+const mkInvite = (
+  inviterId: number,
+  inviteKey: string,
+  email: string,
+  expiresInMs: number
+) =>
+  testPrisma.invite.create({
+    data: {
+      inviterId,
+      inviteKey,
+      email,
+      expires: new Date(Date.now() + expiresInMs)
+    }
+  });
+
 describe('account creation writes the row', () => {
   it('records the inviter when a member registers through an invite', async () => {
     const inviter = await registerUser({
@@ -67,6 +97,100 @@ describe('account creation writes the row', () => {
 
     expect((await rowOf(joiner.user.id))?.inviterId).toBe(inviter.user.id);
     expect((await rowOf(inviter.user.id))?.inviterId).toBeNull();
+  });
+
+  // #675. An open site used to ignore a presented key entirely: the invite
+  // was spent, the account got a null edge, and the invite lapsed. Two members
+  // believed an invitation had happened and the tree recorded none of it.
+  it('records the inviter on an OPEN site too, and consumes the invite', async () => {
+    const inviter = await mkInviter();
+    await mkInvite(inviter, 'k1', 'joiner@example.com', DAY);
+
+    const joiner = await registerUser({
+      username: 'joiner',
+      email: 'joiner@example.com',
+      password: 'password1',
+      registrationMode: 'open',
+      maxUsers: 7000,
+      inviteKey: 'k1'
+    });
+    if (!joiner.ok) throw new Error('open registration failed');
+
+    expect((await rowOf(joiner.user.id))?.inviterId).toBe(inviter);
+    expect(
+      (
+        await testPrisma.invite.findUniqueOrThrow({
+          where: { inviteKey: 'k1' }
+        })
+      ).status
+    ).toBe('accepted');
+  });
+
+  // The key is not the gate on an open site, so a bad one must never refuse a
+  // registration the site would have accepted with no key at all. Each of
+  // these succeeds, with no edge.
+  it.each([
+    ['an unknown key', 'nosuchkey', 'joiner@example.com'],
+    ['a key issued to somebody else', 'k1', 'stranger@example.com']
+  ])('registers despite %s, without an edge', async (_label, key, email) => {
+    const inviter = await mkInviter();
+    await mkInvite(inviter, 'k1', 'joiner@example.com', DAY);
+
+    const joiner = await registerUser({
+      username: 'joiner',
+      email,
+      password: 'password1',
+      registrationMode: 'open',
+      maxUsers: 7000,
+      inviteKey: key
+    });
+    if (!joiner.ok) throw new Error('open registration was refused');
+
+    expect((await rowOf(joiner.user.id))?.inviterId).toBeNull();
+  });
+
+  it('registers despite a lapsed key on an open site, without an edge', async () => {
+    const inviter = await mkInviter();
+    await mkInvite(inviter, 'k1', 'joiner@example.com', -1000);
+
+    const joiner = await registerUser({
+      username: 'joiner',
+      email: 'joiner@example.com',
+      password: 'password1',
+      registrationMode: 'open',
+      maxUsers: 7000,
+      inviteKey: 'k1'
+    });
+    if (!joiner.ok) throw new Error('open registration was refused');
+
+    expect((await rowOf(joiner.user.id))?.inviterId).toBeNull();
+    // Untouched, so the sweep still refunds it (ADR-0041).
+    expect(
+      (
+        await testPrisma.invite.findUniqueOrThrow({
+          where: { inviteKey: 'k1' }
+        })
+      ).status
+    ).toBe('pending');
+  });
+
+  // An invite mode registration still refuses a lapsed key outright: there the
+  // key IS the gate, and #675 changes nothing about that.
+  it('still refuses a lapsed key in invite mode', async () => {
+    const inviter = await mkInviter();
+    await mkInvite(inviter, 'k1', 'joiner@example.com', -1000);
+
+    const result = await registerUser({
+      username: 'joiner',
+      email: 'joiner@example.com',
+      password: 'password1',
+      registrationMode: 'invite',
+      maxUsers: 7000,
+      inviteKey: 'k1'
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invite_expired' });
+    expect(await testPrisma.inviteTree.count()).toBe(1);
   });
 
   it('writes no edge when an invite registration is refused', async () => {

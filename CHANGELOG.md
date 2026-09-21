@@ -77,6 +77,42 @@ All notable changes to stellar-api are documented here.
   schedule, and on an **open** site an invite is never claimed at all, so it
   records no inviter.
 
+- **An invite sent on an open site records the inviter**
+  ([#675](https://github.com/orphic-inc/stellar-api/issues/675),
+  [ADR-0042](docs/adr/0042-every-account-has-an-invite-tree-row.md)) —
+  `registerUser` read an invite key only in `invite` mode, so on an **open**
+  site a presented key was ignored outright. The invite was spent, the email
+  went out, the account was created with a null `InviteTree` edge, and the
+  invite lapsed three days later. Two members believed an invitation had
+  happened and the tree recorded none of it, so Golden Rule 2.1's
+  responsibility, contagion's suspicion and the invite dimension of the
+  community score never attached to that pair.
+
+  A presented key is now honoured in every mode. Whether one is _required_
+  stays the mode's business; whether one is _honoured_ is not.
+
+  **Outside `invite` mode the check is lenient.** A key that is unknown,
+  lapsed, or issued to a different address is not honoured and is not fatal:
+  an open site must not gain new ways to refuse a registration it would have
+  accepted with no key at all. The ignored case is logged. A guessed key buys
+  nothing either way, because the key is matched against the address it was
+  issued to.
+
+  **The claim now runs before the account is created**, and the inviter comes
+  from what the claim took rather than from the earlier read. That ordering
+  was previously safe only because every mode rolled the account back when the
+  claim lost its race with the expiry sweep. An open site no longer does — a
+  race must not cost somebody a registration they needed no key for — so an
+  edge can now only ever name an inviter whose invite was really consumed.
+
+  **No backfill.** Historical open-site invites never reached `accepted`, and
+  nothing distinguishes "followed the link" from "ignored it and registered
+  that week anyway". Any backfill would invent relationships and hand out real
+  credit and real suspicion for them.
+
+  `invite` mode is unchanged, capacity wording is unchanged, and an accepted
+  invite stays spent.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added

@@ -10,6 +10,9 @@ import { normalizePassword } from './badPasswords';
 import { isEmailBlacklisted } from './emailBlacklist';
 import { countSeats } from './settings';
 import { isInviteLapsed, livePendingInviteWhere } from './inviteExpiry';
+import { getLogger } from './logging';
+
+const log = getLogger('auth');
 
 /**
  * Is this password on the denylist?
@@ -267,13 +270,38 @@ export const registerUser = async ({
   }
 
   let inviteExpires: Date | undefined;
-  let inviterId: number | null = null;
+  // The invite this registration will try to claim. Whether one is REQUIRED is
+  // the mode's business; whether one is HONOURED is not (#675). An `open` site
+  // used to ignore a presented key outright, so the invite was spent, the
+  // account was created with no `InviteTree` edge, and the invite lapsed —
+  // leaving two members who believe an invitation happened and a tree that
+  // records none of it.
+  let presented: { inviteKey: string; inviterId: number } | null = null;
   if (registrationMode === 'invite') {
     if (!inviteKey) return { ok: false, reason: 'invite_required' };
     const invite = await checkInvite(inviteKey, email, new Date());
     if (!invite.ok) return invite;
     inviteExpires = invite.expires;
-    inviterId = invite.inviterId;
+    presented = { inviteKey, inviterId: invite.inviterId };
+  } else if (inviteKey) {
+    // Lenient, because here the key is not the gate. A stale, mistyped or
+    // someone else's key must not refuse a registration this site would have
+    // accepted with no key at all; it is simply not honoured. `checkInvite`
+    // matches the key against the address it was issued to, so a guessed one
+    // buys nothing either way.
+    //
+    // `inviteExpires` stays unset on purpose: it exists for the "your invite
+    // is valid until" wording on a full site (#627), which is invite-mode
+    // reasoning and has its own history. Out of scope here.
+    const invite = await checkInvite(inviteKey, email, new Date());
+    if (invite.ok) {
+      presented = { inviteKey, inviterId: invite.inviterId };
+    } else {
+      log.info('Invite key not honoured; registering without an inviter', {
+        reason: invite.reason,
+        registrationMode
+      });
+    }
   }
 
   // 2. Uniqueness / quality checks
@@ -304,8 +332,8 @@ export const registerUser = async ({
 
   const hashedPassword = await bcrypt.hash(password, await bcrypt.genSalt(10));
 
-  // 3. Atomic: create user + consume invite in one transaction so a crash
-  //    between the two can never leave the invite permanently open.
+  // 3. Atomic: consume the invite + create the user in one transaction so a
+  //    crash between the two can never leave the invite permanently open.
   const created = prisma.$transaction(async (tx): Promise<RegisterResult> => {
     // Capacity (#624, ADR-0040). Lock, THEN count: under READ COMMITTED each
     // statement sees rows committed before it began, so a caller that waited
@@ -319,6 +347,38 @@ export const registerUser = async ({
         reason: 'registration_full',
         ...(inviteExpires ? { inviteExpires } : {})
       };
+    }
+
+    // Claim the invite BEFORE the account, so the edge below is written from
+    // what the claim actually took rather than from the pre-check (#675). A
+    // claim, not a plain update: if the sweep expired and refunded this invite
+    // since the pre-check, accepting it too would count it twice.
+    let inviterId: number | null = null;
+    if (presented) {
+      const { count } = await tx.invite.updateMany({
+        where: {
+          inviteKey: presented.inviteKey,
+          ...livePendingInviteWhere(new Date())
+        },
+        data: { status: 'accepted' }
+      });
+      if (count > 0) {
+        inviterId = presented.inviterId;
+      } else if (registrationMode === 'invite') {
+        // The key was the gate, so losing it means no account. Throwing rolls
+        // back the claim and the account is never created.
+        throw new InviteLapsedDuringRegistration();
+      } else {
+        // It was not the gate. Keep the account and drop the edge: a race with
+        // the hourly sweep must not cost somebody a registration they needed
+        // no key for.
+        log.info(
+          'Invite lapsed mid-registration; registering without an inviter',
+          {
+            registrationMode
+          }
+        );
+      }
     }
 
     const defaultTheme = await getDefaultStylesheetName(tx);
@@ -337,24 +397,13 @@ export const registerUser = async ({
         userSettingsId: settings.id,
         profileId: profile.id,
         contributed: 5_368_709_120n,
-        // Every account has an InviteTree row (#633, ADR-0042). The inviter is
-        // the one the pre-check read; the claim below guarantees the same row,
-        // and a lost claim rolls this edge back with the user.
+        // Every account has an InviteTree row (#633, ADR-0042). `inviterId` is
+        // null unless the claim above took an invite, so an edge can only name
+        // an inviter whose invite this registration actually consumed.
         inviteTree: { create: { inviterId } }
       },
       select: authUserSelect
     });
-
-    if (registrationMode === 'invite' && inviteKey) {
-      // A claim, not a plain update: if the sweep expired and refunded this
-      // invite since the pre-check, accepting it too would count it twice.
-      // Throwing rolls back the user created above.
-      const { count } = await tx.invite.updateMany({
-        where: { inviteKey, ...livePendingInviteWhere(new Date()) },
-        data: { status: 'accepted' }
-      });
-      if (count === 0) throw new InviteLapsedDuringRegistration();
-    }
 
     return { ok: true, user: toAuthUser(newUser) };
   });
