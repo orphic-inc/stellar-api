@@ -91,6 +91,7 @@ import staffRouter from './routes/api/staff';
 import rulesRouter from './routes/api/rules';
 import friendsRouter from './routes/api/friends';
 import tagAliasesRouter from './routes/api/tagAliases';
+import tagsRouter from './routes/api/tags';
 import devToolsRouter from './routes/api/devTools';
 
 const log = getLogger('app');
@@ -234,6 +235,7 @@ export const createApp = () => {
   app.use('/api/rules', rulesRouter);
   app.use('/api/friends', friendsRouter);
   app.use('/api/tag-aliases', tagAliasesRouter);
+  app.use('/api/tags', tagsRouter);
 
   // Dev tools — only mounted outside production
   if (process.env.NODE_ENV !== 'production') {

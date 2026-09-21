@@ -2000,6 +2000,7 @@ model Tag {
   id          Int          @id @default(autoincrement())
   name        String       @unique
   occurrences Int          @default(0)
+  isOfficial  Boolean      @default(false)
   artistTags  ArtistTag[]
   releaseTags ReleaseTag[]
   aliases     TagAlias[]

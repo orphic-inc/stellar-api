@@ -6,6 +6,45 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **A curated tag vocabulary**
+  ([#298](https://github.com/orphic-inc/stellar-api/issues/298),
+  [ADR-0045](docs/adr/0045-official-tags-annotate-an-open-vocabulary.md)) —
+  `Tag.isOfficial` plus a new `/api/tags` router, so staff can say which tags
+  are the ones worth offering. `Tag.occurrences` already ranked tags by
+  popularity, but popularity ranks where curation selects: a tag can be popular
+  and useless, or rare and canonical.
+
+  Four operations. `GET /tags/official` is the member-facing read — the whole
+  curated set, name-sorted and unpaginated, which is what a tag picker fetches.
+  `GET /tags` pages the full table for the curation surface. `POST /tags/official`
+  promotes **by name**, creating the tag when it is absent, so a curator can
+  author a vocabulary on an install that has no tags yet. `DELETE /tags/{id}/official`
+  demotes; the row itself is never deleted.
+
+  **The vocabulary stays open.** Members keep minting tags freely — nothing on
+  the contribution or workbench write paths changes. `isOfficial` annotates.
+
+  Promotion folds case and resolves through the alias table, so promoting a
+  name that is aliased away promotes the good tag instead and the response says
+  which name it landed on. Both writes audit (`tag.promote`, `tag.demote`), and
+  the promote row records the name as typed alongside the resolved one.
+
+### Changed
+
+- **A tag alias can no longer bury an official tag**
+  ([#298](https://github.com/orphic-inc/stellar-api/issues/298),
+  [ADR-0045 §3](docs/adr/0045-official-tags-annotate-an-open-vocabulary.md)) —
+  `POST /tag-aliases` and `PUT /tag-aliases/{id}` now answer **409** when
+  `badTag` names an official tag, instead of accepting it.
+
+  `TagAlias.badTag` is a free `String` with no foreign key to `Tag`, so nothing
+  in the schema stopped a tag being marked canonical while the normalizer
+  rewrote it away at every write. Both routes already declared a 409, so no new
+  status code appears in the contract — but the refusal is new, and an existing
+  alias whose `badTag` is later promoted is not retroactively rejected.
+
 ### Docs
 
 - **Every environment variable the code reads is now in `.env.default` and the

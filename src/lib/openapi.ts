@@ -147,6 +147,7 @@ import {
   createTagAliasSchema,
   updateTagAliasSchema
 } from '../schemas/tagAliases';
+import { promoteTagSchema } from '../schemas/tags';
 import { featuredAlbumSchema } from '../schemas/featuredAlbum';
 import { createRankSchema, updateRankSchema } from '../schemas/tools';
 import {
@@ -8754,7 +8755,7 @@ registry.registerPath({
       content: { 'application/json': { schema: TagAliasItem } }
     },
     404: msgResponse('Canonical tag not found'),
-    409: msgResponse('That tag alias already exists')
+    409: msgResponse('Alias already exists, or names an official tag')
   }
 });
 
@@ -8774,7 +8775,7 @@ registry.registerPath({
       content: { 'application/json': { schema: TagAliasItem } }
     },
     404: msgResponse('Not found'),
-    409: msgResponse('That tag alias already exists')
+    409: msgResponse('Alias already exists, or names an official tag')
   }
 });
 
@@ -8786,6 +8787,83 @@ registry.registerPath({
   responses: {
     204: { description: 'Tag alias deleted' },
     404: msgResponse('Not found')
+  }
+});
+
+// ─── Tags (curated vocabulary) ────────────────────────────────────────────────
+
+const TagItem = registry.register(
+  'TagItem',
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    occurrences: z.number(),
+    isOfficial: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/tags/official',
+  tags: ['Tags'],
+  responses: {
+    200: {
+      description: 'The curated tag vocabulary, name-sorted and unpaginated',
+      content: { 'application/json': { schema: z.array(TagItem) } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/tags',
+  tags: ['Tags'],
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional(),
+      q: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated tag list, official tags first',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(TagItem), meta: PaginationMeta })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/tags/official',
+  tags: ['Tags'],
+  request: {
+    body: { content: { 'application/json': { schema: promoteTagSchema } } }
+  },
+  responses: {
+    201: {
+      description:
+        'Tag promoted. Created when absent, and the name may differ from the one sent: it is case-folded and redirected through the alias table.',
+      content: { 'application/json': { schema: TagItem } }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/tags/{id}/official',
+  tags: ['Tags'],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'Tag demoted',
+      content: { 'application/json': { schema: TagItem } }
+    },
+    404: msgResponse('Tag not found')
   }
 });
 
