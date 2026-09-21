@@ -147,3 +147,124 @@ describe('POST /api/auth/register — invite expiry (#627)', () => {
     expect(res.headers['set-cookie']).toBeUndefined();
   });
 });
+
+/**
+ * An open site honours a presented key too (#675). It used to ignore one
+ * outright, so the invite was spent, the account got a null `InviteTree` edge,
+ * and the invite lapsed — two members believing an invitation happened and a
+ * tree recording none of it.
+ *
+ * Lenient, because here the key is not the gate: a bad one is not honoured,
+ * but it never refuses a registration the site would have taken with no key.
+ */
+describe('POST /api/auth/register — an open site honours a key (#675)', () => {
+  beforeEach(() => {
+    resetApiTestState();
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      id: 1,
+      approvedDomains: [],
+      registrationStatus: 'open',
+      maxUsers: 7000,
+      dismissedLaunchChecklist: [],
+      installedAt: null,
+      badPasswordsSeededAt: null,
+      updatedAt: new Date()
+    });
+  });
+
+  /** Everything after the invite pre-check, so the transaction runs through. */
+  const registrationSucceeds = (claimCount: number) => {
+    prismaMock.user.findFirst.mockResolvedValueOnce(null);
+    prismaMock.badPassword.findUnique.mockResolvedValueOnce(null);
+    prismaMock.userRank.findFirst.mockResolvedValueOnce(makeUserRank());
+    prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.user.count.mockResolvedValueOnce(1);
+    prismaMock.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
+    prismaMock.profile.create.mockResolvedValueOnce({ id: 5 } as never);
+    prismaMock.invite.updateMany.mockResolvedValueOnce({ count: claimCount });
+    prismaMock.user.create.mockResolvedValueOnce(createdUser());
+  };
+
+  const edgeWritten = (inviterId: number | null) =>
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          inviteTree: { create: { inviterId } }
+        })
+      })
+    );
+
+  it('claims the invite and records the inviter', async () => {
+    prismaMock.invite.findUnique.mockResolvedValueOnce({
+      email: 'invitee@example.com',
+      status: 'pending',
+      expires: new Date(Date.now() + 86_400_000),
+      inviterId: 9,
+      inviter: { disabled: false, canInvite: true }
+    } as never);
+    registrationSucceeds(1);
+
+    const res = await request(app).post('/api/auth/register').send(body);
+
+    expect(res.status).toBe(201);
+    edgeWritten(9);
+    expect(prismaMock.invite.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'accepted' } })
+    );
+  });
+
+  it.each([
+    ['an unknown key', null],
+    [
+      'a key issued to another address',
+      {
+        email: 'someone-else@example.com',
+        status: 'pending',
+        expires: new Date(Date.now() + 86_400_000),
+        inviterId: 9,
+        inviter: { disabled: false, canInvite: true }
+      }
+    ],
+    [
+      'a lapsed key',
+      {
+        email: 'invitee@example.com',
+        status: 'pending',
+        expires: new Date(Date.now() - 1000),
+        inviterId: 9,
+        inviter: { disabled: false, canInvite: true }
+      }
+    ]
+  ])('registers anyway with %s, and claims nothing', async (_label, row) => {
+    prismaMock.invite.findUnique.mockResolvedValueOnce(row as never);
+    registrationSucceeds(0);
+
+    const res = await request(app).post('/api/auth/register').send(body);
+
+    expect(res.status).toBe(201);
+    edgeWritten(null);
+    expect(prismaMock.invite.updateMany).not.toHaveBeenCalled();
+  });
+
+  // The pre-check passed and the sweep took the invite before the claim. In
+  // invite mode that rolls the account back; here the key was not the gate, so
+  // the account stands and only the edge is lost.
+  it('keeps the account when the claim loses the race, dropping the edge', async () => {
+    prismaMock.invite.findUnique.mockResolvedValueOnce({
+      email: 'invitee@example.com',
+      status: 'pending',
+      expires: new Date(Date.now() + 86_400_000),
+      inviterId: 9,
+      inviter: { disabled: false, canInvite: true }
+    } as never);
+    registrationSucceeds(0);
+
+    const res = await request(app).post('/api/auth/register').send(body);
+
+    expect(res.status).toBe(201);
+    edgeWritten(null);
+    expect(prismaMock.invite.updateMany).toHaveBeenCalled();
+  });
+});

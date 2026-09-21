@@ -26,7 +26,7 @@ The legacy implementation wrote the relationship at registration too, as a plain
 
 ### 1. `InviteTree` is the source of truth, written at registration
 
-Invite registration nests `inviteTree: { create: { inviterId } }` into the `user.create` that runs inside the registration transaction. `inviterId` comes from the invite row the pre-check read. The accept claim that follows (ADR-0041 §3) guarantees it is the same row, because a reused row has a new key and the old key's claim fails. A lost claim rolls the edge back with the user.
+Invite registration nests `inviteTree: { create: { inviterId } }` into the `user.create` that runs inside the registration transaction. `inviterId` comes from the invite row the pre-check read. The accept claim that follows (ADR-0041 §3) guarantees it is the same row, because a reused row has a new key and the old key's claim fails. A lost claim rolls the edge back with the user. _(Order reversed by #675: the claim now runs first and `inviterId` comes from its result — see the amendment under Decision 2.)_
 
 Replacing the table with `Invite.inviteeId` was rejected. Every reader, both recursive walks, the generator, the seed and the staff list's response shape would have been rewritten, for a relationship `InviteTree` already stores and indexes. Deriving the tree at read time by email was rejected because every level of every walk would repeat the email-history reconstruction.
 
@@ -35,6 +35,16 @@ Replacing the table with `Invite.inviteeId` was rejected. Every reader, both rec
 A member nobody invited has a row with `inviterId: null`. That covers open registration, staff `createUser`, `/install`'s founding SysOp and the System user. So "no row" can only mean corrupt data, never "not invited".
 
 This departs from the legacy implementation, and it is the stronger invariant. The cost is that the staff list now has to filter (Decision 5), and every account-creation path has to remember the row (Decision 3).
+
+_(Amended 2026-09-21, by [#675](https://github.com/orphic-inc/stellar-api/issues/675). The sentence above lists open registration among the accounts with no inviter. That is right for a member nobody invited and wrong for one who was: until now an **`open`** site ignored a presented key outright, so the invite was spent, the email was sent, the account was created with a null edge, and the invite lapsed three days later. Two members believed an invitation had happened and the tree recorded none of it — which also meant Golden Rule 2.1's responsibility, ADR-0004 §3's contagion and the CRS invite dimension all quietly failed to attach to that pair. Nothing tested it; no call anywhere passed `registrationMode: 'open'` together with an `inviteKey`._
+
+_**A presented key is now honoured in every mode.** Whether one is *required* stays the mode's business — `invite` still refuses without one — but whether one is *honoured* is not. Outside `invite` mode the check is deliberately **lenient**: a key that is unknown, lapsed, or issued to another address is not honoured and is not fatal, because an open site must not gain new ways to refuse a registration it would have accepted with no key at all. `checkInvite` matches the key against the address it was issued to, so a guessed key buys nothing either way. The ignored case is logged._
+
+_**Decision 1's order is reversed**, and this is the load-bearing part. The claim now runs **before** the `user.create`, and `inviterId` comes from what the claim took rather than from the pre-check. Previously the edge was written from the pre-check and its correctness rested on the lost-claim throw rolling the account back — sound only while every mode throws. It no longer is: on an open site a claim lost to the hourly sweep keeps the account and drops the edge, because the key was not the gate and a race must not cost somebody a registration they needed no key for. Written from the pre-check, that path would have recorded an edge to an invite nobody consumed._
+
+_**No backfill.** ADR-0042 §4's migration recovers edges from `accepted` invites, and an open-site invite never reached `accepted` — it went `pending` → `expired`. Nothing distinguishes "followed the invite link" from "ignored it and registered independently that week", because the key was never claimed either way, so any backfill would invent relationships and hand out real CRS credit and real contagion suspicion for them. The limitation is accepted rather than guessed at._
+
+_Out of scope, deliberately: `inviteExpires` stays unset outside `invite` mode, so the "your invite is valid until" wording on a full site (#627) is unchanged; and the invite **stays spent** on acceptance, keeping ADR-0041's rule that acceptance is the one exit that does not refund.)_
 
 ### 3. The rule is enforced in TypeScript, by a structural spec
 
