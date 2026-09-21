@@ -35,7 +35,7 @@ import {
 import { computeStanding } from './standing';
 import { DAY_MS } from './inviteGrant';
 import { getRatioStats } from './ratio';
-import { isSiteFull } from './settings';
+import { getSettings, isSiteFull } from './settings';
 
 const log = getLogger('invite');
 
@@ -88,16 +88,24 @@ export type ExpiredInvite = LapsedInvite & { refunded: boolean };
 /**
  * Load one member's state and answer the send gates (#637, ADR-0043).
  *
- * Standing, ratio watch and capacity are read here and not in the spend: none
- * is a staff decision that must land atomically, and a member whose ratio or
- * warnings change mid-send gains nothing worth a lock (the ADR-0040 §3
- * argument). The ratio is computed only for a member whose row says `WATCH`.
+ * Standing, ratio watch, registration status and capacity are read here and
+ * not in the spend: none is a staff decision that must land atomically, and a
+ * member whose ratio or warnings change mid-send gains nothing worth a lock
+ * (the ADR-0040 §3 argument). A member who sends in the instant before an
+ * operator closes registration gains a three-day invite that lapses and
+ * refunds, so a closure is a courtesy here too (#673); `registerUser` is the
+ * exact gate. The ratio is computed only for a member whose row says `WATCH`.
+ *
+ * Settings are read ONCE and `maxUsers` handed to `isSiteFull`, which would
+ * otherwise load them again. `getSettings` is an upsert, so the careless
+ * version doubles a write on every eligibility poll.
  */
 export const getInviteRefusal = async (
   userId: number,
   unlimited: boolean,
   now: Date = new Date()
 ): Promise<InviteGateRefusal | null> => {
+  const settings = await getSettings();
   const [user, policy, siteFull] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -114,7 +122,7 @@ export const getInviteRefusal = async (
       where: { userId },
       select: { status: true }
     }),
-    isSiteFull()
+    isSiteFull(settings.maxUsers)
   ]);
   const status = policy?.status ?? null;
   const meetsRequirement =
@@ -132,6 +140,7 @@ export const getInviteRefusal = async (
       now
     }),
     onRatioWatch: isOnRatioWatch(status, meetsRequirement),
+    registrationClosed: settings.registrationStatus === 'closed',
     siteFull,
     balance: user.inviteCount,
     unlimited

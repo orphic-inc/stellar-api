@@ -18,22 +18,33 @@ Five facts from the code shaped the decisions:
 
 ## Decision
 
-### 1. Six gates, in one order
+### 1. Seven gates, in one order
 
 `firstInviteRefusal` in the pure `modules/inviteGates.ts` answers the first gate that refuses, in this order:
 
-| #   | Reason               | Refuses when                                                   |
-| --- | -------------------- | -------------------------------------------------------------- |
-| 1   | `invites_revoked`    | `canInvite = false`                                            |
-| 2   | `downloads_disabled` | `canDownload = false`, whichever cause set it                  |
-| 3   | `poor_standing`      | `isStandingDenied(computeStanding(...))`                       |
-| 4   | `ratio_watch`        | the row says `WATCH` **and** the ratio read now is still short |
-| 5   | `site_full`          | `isSiteFull()`                                                 |
-| 6   | `no_invites`         | `inviteCount` is `0`                                           |
+| #   | Reason                | Refuses when                                                   |
+| --- | --------------------- | -------------------------------------------------------------- |
+| 1   | `invites_revoked`     | `canInvite = false`                                            |
+| 2   | `downloads_disabled`  | `canDownload = false`, whichever cause set it                  |
+| 3   | `poor_standing`       | `isStandingDenied(computeStanding(...))`                       |
+| 4   | `ratio_watch`         | the row says `WATCH` **and** the ratio read now is still short |
+| 5   | `registration_closed` | `registrationStatus` is `closed`                               |
+| 6   | `site_full`           | `isSiteFull()`                                                 |
+| 7   | `no_invites`          | `inviteCount` is `0`                                           |
 
-An address already invited is refused after all six, as `already_invited`.
+An address already invited is refused after all seven, as `already_invited`.
 
 The order is what the member would have to fix first, with staff decisions above state the member caused. Before this, a revoked member on a full site was told to try later.
+
+_(Amended 2026-09-21, by [#673](https://github.com/orphic-inc/stellar-api/issues/673). `registration_closed` is new, and the table's numbering moves with it. Nothing here is reversed: [ADR-0040](0040-capacity-is-counted-in-enabled-seats.md) §3 already required the send to refuse rather than "emailing it to someone registration will turn away", and only capacity had made the journey into the gates. On a closed but not-full site the send succeeded, the invite was spent, and `registerUser` refused `registration_closed` before it read the key at all — buying, in §6's own words, "a three-day hold and one email". The closed **and** full case was masked, because `site_full` fired first and named the fact that stops being true when a seat frees._
+
+_Two things this decides that the ordering rule above does not. **Position.** The member can fix neither a closure nor a full site, so "what the member would have to fix first" is silent on the pair; `registerUser` decides it instead, checking its mode gate before it counts seats, so the two sides refuse in one sequence and an inviter is never told a different story about one site than their invitee. It also names the more durable fact. **Scope.** The gate reads `closed` alone. An `invite` site is the one that needs invites most, so `firstInviteRefusal` receives a `registrationClosed` boolean rather than the enum: a module that cannot see the three modes cannot later be tidied into `!== 'open'`._
+
+_A courtesy, not an atomic refusal, so it does not join `inviteSpendWhere` — §2's argument for capacity transfers unchanged, since a member who sends in the instant before an operator closes gains a three-day invite that lapses and refunds. `registerUser` stays the exact gate._
+
+_The wording follows the existing six, "Your invite was not used" included. [#656](https://github.com/orphic-inc/stellar-api/issues/656) has already filed that clause as wrong in the eligibility read, where nothing has been sent; it will restyle all seven together rather than leaving one in a second style._
+
+_Out of scope, and filed separately: the handout keeps accruing `inviteCount` while a site is closed ([ADR-0039](0039-invite-supply-is-class-based-accrual.md)), pending invites are left alone by this change and still lapse and refund on ADR-0041's schedule, and on an **`open`** site an invite is never claimed at all — `registerUser` reads the key only in `invite` mode, so the send spends, writes no `InviteTree` edge, and lapses.)_
 
 Standing uses the handout's own definition. A second reading of "bad standing" is the drift §4 of ADR-0039 warns against, and a later threshold change should move both. The member keeps their balance, and the refusal lifts when warnings expire.
 

@@ -10,7 +10,12 @@
  * a withdraw reaches only the caller's own invites, and that a cancelled address
  * stays taken until its original expiry.
  */
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  openRegistration
+} from '../test/dbHelpers';
 import { runInviteExpiryCycle } from '../modules/inviteExpiryJob';
 import { createInvite, listOwnPendingInvites } from '../modules/invite';
 import { registerUser } from '../modules/auth';
@@ -26,6 +31,8 @@ import { reusableInviteWhere } from '../modules/inviteExpiry';
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
+  // DEFAULTS is `closed`; createInvite reads it (#673).
+  await openRegistration();
 });
 
 afterAll(async () => {

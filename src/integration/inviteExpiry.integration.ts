@@ -6,7 +6,12 @@
  * `updateMany`, that a refund happens exactly once when two writers race for
  * the same transition, and that a reused row keeps `email @unique` intact.
  */
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  openRegistration
+} from '../test/dbHelpers';
 import { runInviteExpiryCycle } from '../modules/inviteExpiryJob';
 import { createInvite } from '../modules/invite';
 import { registerUser } from '../modules/auth';
@@ -15,6 +20,8 @@ import { DAY_MS } from '../modules/inviteGrant';
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
+  // DEFAULTS is `closed`; createInvite reads it (#673).
+  await openRegistration();
 });
 
 afterAll(async () => {

@@ -275,6 +275,10 @@ describe('POST /api/profile/referral/create-invite', () => {
   // writes; whether it refuses is inviteGates' and the integration suite's.
   it.each([
     [
+      'registration_closed',
+      'Registration is currently closed, so invites cannot be sent right now. Your invite was not used.'
+    ],
+    [
       'site_full',
       'The site is full, so invites cannot be sent right now. Your invite was not used.'
     ],

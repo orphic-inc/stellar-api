@@ -43,6 +43,40 @@ All notable changes to stellar-api are documented here.
   registration will refuse — tracked as
   [#673](https://github.com/orphic-inc/stellar-api/issues/673).
 
+- **A closed site refuses the invite send**
+  ([#673](https://github.com/orphic-inc/stellar-api/issues/673),
+  [ADR-0043](docs/adr/0043-sending-an-invite-is-gated-on-the-inviter.md)) —
+  the write-side half of the same confusion. No send gate read
+  `registrationStatus`, so on a closed but not-full site the send succeeded:
+  the invite was spent, the email went out, and `registerUser` refused
+  `registration_closed` before it looked at the key at all. The recipient got
+  a dead link and the member's invite sat pending for up to three days.
+
+  `POST /api/profile/referral/create-invite` and
+  `GET /api/profile/me/invites/eligibility` now answer a seventh refusal,
+  `registration_closed`, and **nothing is spent** by a refused send. Both
+  still come from one evaluator, so the page cannot disagree with the send.
+
+  **It sits above `site_full`.** The member can fix neither, so the ordering
+  rule is silent on the pair, and `registerUser` decides it instead: its mode
+  gate runs before it counts seats. The two sides now refuse in one sequence,
+  and an inviter is never told a different story about a site than the person
+  they invited. It also names the more durable fact — a seat frees on its own,
+  a closure waits on an operator. A closed **and** full site used to say only
+  "the site is full", which stops being true the moment somebody leaves.
+
+  **The gate reads `closed` alone.** An invite-only site is the one that needs
+  invites most, so the rule receives a boolean rather than the status: what it
+  cannot see, it cannot later be narrowed to.
+
+  Additive for stellar-ui, which renders the words the api sends and never
+  reads the reason. The `reason` enum gains a value, so an `api:sync` is owed.
+
+  Three adjacent findings are filed rather than folded in: the handout keeps
+  accruing while a site is closed, pending invites still lapse on their own
+  schedule, and on an **open** site an invite is never claimed at all, so it
+  records no inviter.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added

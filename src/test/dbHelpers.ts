@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { drainBackgroundTasks } from '../modules/backgroundTasks';
+import { DEFAULTS } from '../modules/settings';
 
 const testUrl = process.env.STELLAR_PSQL_URI_TEST!;
 
@@ -75,6 +76,27 @@ let nameSeq = 0;
 export const uniqueName = (prefix: string): string => {
   nameSeq += 1;
   return `${prefix}-${nameSeq}-${Date.now()}`;
+};
+
+/**
+ * Open site registration, for a suite whose subject reads it (#673).
+ *
+ * `seedDefaults` deliberately writes no `SiteSettings` row, and
+ * `badPassword.integration.ts` asserts that absence, so this cannot move
+ * there. The absence matters because `getSettings` upserts `DEFAULTS`, and
+ * `DEFAULTS.registrationStatus` is `closed` — a fresh site stays shut until an
+ * admin opens it (#332). Any suite exercising `createInvite` therefore runs
+ * against a closed site unless it says otherwise, and every send is refused.
+ *
+ * `registerUser` never needed this: it takes `registrationMode` as an
+ * argument and reads no settings, which is why nothing caught it sooner.
+ */
+export const openRegistration = async (): Promise<void> => {
+  await testPrisma.siteSettings.upsert({
+    where: { id: 1 },
+    create: { ...DEFAULTS, registrationStatus: 'open' },
+    update: { registrationStatus: 'open' }
+  });
 };
 
 /** Inserts the minimum seed data required by most business logic. */
