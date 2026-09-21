@@ -624,7 +624,7 @@ describe('API auth/profile/user flows', () => {
       });
 
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ msg: 'No invites remaining' });
+    expect(res.body).toEqual({ msg: 'You have no invites remaining.' });
   });
 
   it('returns the invite key on successful invite creation', async () => {

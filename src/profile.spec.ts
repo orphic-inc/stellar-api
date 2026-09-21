@@ -320,7 +320,7 @@ describe('POST /api/profile/referral/create-invite', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({
-      msg: 'Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: /inbox/staff'
+      msg: 'Your invite privileges have been revoked, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff'
     });
   });
 

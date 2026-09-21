@@ -9,14 +9,13 @@ import {
 } from '../../modules/profile';
 import { getRatioStats } from '../../modules/ratio';
 import { listOwnPendingInvites, getInviteRefusal } from '../../modules/invite';
-import type { InviteGateRefusal } from '../../modules/inviteGates';
+import { inviteRefusalMsg } from '../../modules/inviteGates';
 import { withdrawInvite } from '../../modules/inviteControls';
 import {
   parsedPage,
   paginatedResponse,
   paginationBase
 } from '../../lib/pagination';
-import { site } from '../../modules/config';
 import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
 import {
@@ -177,23 +176,6 @@ const inviteIdParamsSchema = z.object({
   inviteId: z.coerce.number().int().positive()
 });
 
-// The words for each send gate (#637, ADR-0043). The POST refusal and the
-// eligibility read both use this map, so the page that explains a refusal says
-// exactly what the send would.
-const INVITE_REFUSAL_MSG: Record<InviteGateRefusal, string> = {
-  invites_revoked: `Your invite privileges have been revoked, so this invite was not sent. Contact staff through Staff PM: ${site.staffPmPath}`,
-  downloads_disabled: `Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: ${site.staffPmPath}`,
-  poor_standing:
-    'You have active warnings, so invites cannot be sent until they expire. Your invite was not used.',
-  ratio_watch:
-    'You are on ratio watch, so invites cannot be sent until your ratio meets its requirement. Your invite was not used.',
-  registration_closed:
-    'Registration is currently closed, so invites cannot be sent right now. Your invite was not used.',
-  site_full:
-    'The site is full, so invites cannot be sent right now. Your invite was not used.',
-  no_invites: 'No invites remaining'
-};
-
 // `invites_unlimited` (ADR-0043 §5) is resolved here and passed down: the
 // invite module never reads permissions.
 const hasUnlimitedInvites = async (
@@ -212,7 +194,7 @@ router.get(
     res.json({
       canSend: reason === null,
       reason,
-      msg: reason === null ? null : INVITE_REFUSAL_MSG[reason],
+      msg: reason === null ? null : inviteRefusalMsg(reason, { sent: false }),
       unlimited
     });
   })
@@ -341,7 +323,9 @@ router.post(
         return res
           .status(409)
           .json({ msg: 'An invite has already been sent to that address' });
-      return res.status(403).json({ msg: INVITE_REFUSAL_MSG[result.reason] });
+      return res
+        .status(403)
+        .json({ msg: inviteRefusalMsg(result.reason, { sent: true }) });
     }
     await audit(
       prisma,
