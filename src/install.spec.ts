@@ -152,14 +152,48 @@ describe('GET /api/install', () => {
       expect(res.body.registrationFull).toBe(false);
     });
 
-    it('is false and counts nothing while registration is closed', async () => {
+    // Inverted by #657. This used to assert `false` and that nothing was
+    // counted, because the old `registrationStatus !== 'closed' &&` short-
+    // circuited the query. Being full and being closed are different facts,
+    // and a staff banner needs the first one whatever the second says.
+    it('is true while registration is closed, and does count', async () => {
       settingsWith('closed', 10);
       prismaMock.user.count.mockResolvedValue(10);
 
       const res = await request(app).get('/api/install');
 
+      expect(res.body.registrationFull).toBe(true);
+      expect(prismaMock.user.count).toHaveBeenCalledWith({
+        where: { disabled: false }
+      });
+    });
+
+    // The regression itself: staff closing registration on a full site used to
+    // flip this to false, so any consumer keyed on it went silent (#657).
+    it('holds steady across a change of registrationStatus while full', async () => {
+      prismaMock.user.count.mockResolvedValue(10);
+
+      settingsWith('open', 10);
+      const open = await request(app).get('/api/install');
+      settingsWith('invite', 10);
+      const invite = await request(app).get('/api/install');
+      settingsWith('closed', 10);
+      const closed = await request(app).get('/api/install');
+
+      expect([
+        open.body.registrationFull,
+        invite.body.registrationFull,
+        closed.body.registrationFull
+      ]).toEqual([true, true, true]);
+    });
+
+    it('is still false while a seat is free, whatever the status', async () => {
+      prismaMock.user.count.mockResolvedValue(9);
+
+      settingsWith('closed', 10);
+      const res = await request(app).get('/api/install');
+
       expect(res.body.registrationFull).toBe(false);
-      expect(prismaMock.user.count).not.toHaveBeenCalled();
     });
 
     it('exposes a boolean only, never the counts', async () => {

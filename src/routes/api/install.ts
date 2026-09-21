@@ -120,13 +120,16 @@ router.get(
     res.json({
       installed: settings.installedAt != null,
       registrationStatus: settings.registrationStatus,
-      // Lets the register page say "full" before a visitor fills in the form
-      // (#624). A boolean, never the counts: this endpoint is anonymous. Not
-      // counted while closed, which already refuses; best-effort, since only
+      // Enabled seats have reached `maxUsers` (#624). A boolean, never the
+      // counts: this endpoint is anonymous. Best-effort, since only
       // registerUser's locked check is authoritative.
-      registrationFull:
-        settings.registrationStatus !== 'closed' &&
-        (await isSiteFull(settings.maxUsers)),
+      //
+      // Deliberately NOT conditioned on `registrationStatus` (#657). It was,
+      // until the register page was read: it already branches on `closed`
+      // above this field (Register.tsx), so the condition bought nothing there
+      // and blinded every other consumer — a staff "site is full" banner went
+      // silent the moment registration closed. ADR-0040 §3 is amended.
+      registrationFull: await isSiteFull(settings.maxUsers),
       configWarnings: getConfigWarnings().map((item) => item.message),
       setupChecklist: getSetupChecklist(settings as SettingsWithDismissals)
     });

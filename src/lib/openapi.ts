@@ -613,9 +613,18 @@ registry.registerPath({
           schema: z.object({
             installed: z.boolean(),
             registrationStatus: z.enum(['open', 'invite', 'closed']),
-            // Enabled accounts have reached `maxUsers` (#624). Always false
-            // while closed; best-effort, since POST /auth/register re-checks.
-            registrationFull: z.boolean(),
+            // The meaning belongs in the contract, not here (#657): this was
+            // a TypeScript comment, so `openapi.json` carried a bare boolean
+            // and a generated client explained nothing. stellar-ui#327
+            // consumed it wrongly for exactly that reason.
+            registrationFull: z
+              .boolean()
+              .describe(
+                'Enabled seats have reached `maxUsers`. Independent of ' +
+                  '`registrationStatus`: a closed site that is full still ' +
+                  'reports `true`. Best-effort — `POST /auth/register` ' +
+                  're-checks under a lock and is the only authoritative answer.'
+              ),
             // Asymmetric on purpose (#333): the handler flattens configWarnings
             // to `.message`, but setupChecklist keeps its `id` because that is
             // what a dismissal writes to `dismissedLaunchChecklist`. Declaring
