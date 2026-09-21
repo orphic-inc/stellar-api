@@ -426,4 +426,27 @@ describe('listRatioWatch', () => {
       }
     });
   });
+
+  it('breaks the watch-start tie on userId, because the read is paged (#652)', async () => {
+    // `watchStartedAt` is nullable and a staff override NULLS it, so every
+    // overridden DOWNLOAD_DISABLED row ties. Under `skip`/`take` a tie is not
+    // cosmetic: Postgres may return tied rows in any order, and the order can
+    // change between two page requests, so staff see one member on both pages
+    // and never see another. The #613 guard exempts DateTime columns and
+    // cannot stand here.
+    jest.resetAllMocks();
+    mockPrismaPolicy.findMany.mockResolvedValue([]);
+    mockPrismaPolicy.count.mockResolvedValue(0);
+
+    await listRatioWatch({ page: 2, limit: 25, skip: 25 });
+
+    const args = mockPrismaPolicy.findMany.mock.calls[0][0];
+    expect(args.orderBy).toEqual([
+      { watchStartedAt: 'desc' },
+      { userId: 'asc' }
+    ]);
+    // The tiebreak is only a tiebreak if it is unique. `RatioPolicyState` has
+    // no `id` column; `userId` is the @id, which is what makes this total.
+    expect(args.skip).toBe(25);
+  });
 });

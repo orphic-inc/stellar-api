@@ -334,7 +334,17 @@ export const listRatioWatch = async (pg: PageParams) => {
         disabledCause: true,
         lastEvaluatedAt: true
       },
-      orderBy: { watchStartedAt: 'desc' },
+      // Tiebroken on the id, because `watchStartedAt` is NULLABLE and a staff
+      // override nulls it (see the schema comment on `disabledCause`). So every
+      // overridden DOWNLOAD_DISABLED row ties at null, and this read is
+      // paginated — a tie there does not reorder rows, it decides which page
+      // they land on, so staff can see one member twice and miss another
+      // entirely. The #613 guard cannot catch this: it exempts `DateTime`
+      // columns, and `watchStartedAt` is one on every model that has it.
+      //
+      // The id here is `userId`. `RatioPolicyState` has no `id` column — the
+      // user is the primary key.
+      orderBy: [{ watchStartedAt: 'desc' }, { userId: 'asc' }],
       skip: pg.skip,
       take: pg.limit
     }),
