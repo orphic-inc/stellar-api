@@ -91,6 +91,25 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Staff paging the ratio-watch list could see one member twice and miss
+  another** ([#652](https://github.com/orphic-inc/stellar-api/issues/652)) —
+  `GET /api/users/ratio-watch` ordered by `watchStartedAt` alone. That column
+  is **nullable**, and a staff override nulls it, so every overridden
+  `DOWNLOAD_DISABLED` row tied at `null`.
+
+  Under `skip`/`take` a tie is not cosmetic. Postgres may return tied rows in
+  any order and that order can change between two requests, so a member could
+  appear on two consecutive pages while another appeared on neither. The list
+  now tiebreaks on `userId`, which is the primary key of `RatioPolicyState` —
+  there is no `id` column on that model.
+
+  Only the order among tied rows changes; no response shape moves.
+
+  The [#613](https://github.com/orphic-inc/stellar-api/issues/613) tiebreak
+  guard cannot catch this by construction: it exempts `DateTime` columns,
+  because ties on a timestamp are usually incidental. A nullable one is not
+  incidental, and that gap is the remainder of #652.
+
 - **Invite eligibility no longer answers in the past tense**
   ([#656](https://github.com/orphic-inc/stellar-api/issues/656)) — `GET /profile/me/invites/eligibility` reused the send's
   words, which are written as the reply to an attempt. A member who had typed
