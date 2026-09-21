@@ -6,6 +6,43 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Capacity is reported independently of registration status**
+  ([#657](https://github.com/orphic-inc/stellar-api/issues/657),
+  [ADR-0040](docs/adr/0040-capacity-is-counted-in-enabled-seats.md)) —
+  `GET /api/install`'s `registrationFull` was conditioned on
+  `registrationStatus`, so closing registration on a full site flipped it to
+  `false` and every consumer keyed on it went silent. A staff "site is full"
+  banner vanished exactly when an operator was most likely to be looking at
+  capacity, while invite sends kept refusing with `site_full` — the two
+  surfaces disagreed about the same fact.
+
+  The condition is **removed**, not narrowed. It existed for the register page,
+  which turns out not to need it: that page branches on `closed` above the line
+  that reads this field, so the closed wording already won. `registrationFull`
+  now means enabled seats have reached `maxUsers`, whatever the registration
+  status. No field is added and the name is unchanged, so no consumer needs to
+  change.
+
+  **The meaning is now in the contract.** It had only ever been a TypeScript
+  comment, so `openapi.json` carried a bare boolean that explained nothing to a
+  generated client. It is a `.describe()` now, which adds a documentation line
+  to the spec — **stellar-ui owes an `api:sync`**, though no generated type
+  changes shape.
+
+  Two accepted consequences. An anonymous caller now learns "at capacity" while
+  registration is closed, where it previously read `false`: one bit, and
+  `/stats` is behind `requireAuth`, so `maxUsers` stays underivable — the old
+  answer was simply wrong. And a closed site now runs the seat count on every
+  `/install`, because the `&&` no longer short-circuits it; an open or invite
+  site already paid that on every request.
+
+  This fixes the read side only. Nothing in the invite send path reads
+  `registrationStatus`, so a closed **not-full** site still spends invites that
+  registration will refuse — tracked as
+  [#673](https://github.com/orphic-inc/stellar-api/issues/673).
+
 ## [0.9.6] — 2026-09-20
 
 ### Added
