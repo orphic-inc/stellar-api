@@ -132,6 +132,37 @@ describe('runInviteGrantCycle — gates', () => {
   });
 });
 
+/**
+ * The faucet is member-scoped (ADR-0039 §9, #676): site state governs an invite
+ * at the moment it is ACTED ON, never at the moment it ACCRUES. A closed or
+ * full site therefore changes nothing here, and the only way to keep that true
+ * is to pin that the sweep reads no site state at all — a comment saying so
+ * would not survive anyone wiring it in.
+ *
+ * This stands against a second edit in passing. `getSettings()` is an `upsert`,
+ * so a settings read per batch would turn a read-only nightly pass over
+ * thousands of members into one write per batch.
+ */
+describe('runInviteGrantCycle — scope', () => {
+  it('reads no site state, so a closed or full site cannot pause accrual', async () => {
+    mockPages([row({ id: 1, inviteCount: 0 }), row({ id: 2, inviteCount: 6 })]);
+
+    const tally = await runInviteGrantCycle(NOW);
+
+    // Both decision paths ran, so what follows covers a whole cycle rather
+    // than an early return that never reached the evaluator.
+    expect(tally.granted).toBe(1);
+    expect(tally.atCap).toBe(1);
+
+    expect(prismaMock.siteSettings.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.siteSettings.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.siteSettings.findFirst).not.toHaveBeenCalled();
+    // `countSeats`. An `isSiteFull()` wired in with `maxUsers` passed down from
+    // the caller would surface here rather than above.
+    expect(prismaMock.user.count).not.toHaveBeenCalled();
+  });
+});
+
 describe('runInviteGrantCycle — writes', () => {
   it('grants with a conditional increment, never an absolute value', async () => {
     mockPages([row({ id: 1, inviteCount: 0 })]);

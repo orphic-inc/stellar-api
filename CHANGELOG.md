@@ -6,6 +6,33 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Docs
+
+- **The invite handout is member-scoped, and that is now a written rule**
+  ([#676](https://github.com/orphic-inc/stellar-api/issues/676),
+  [ADR-0039 §9](docs/adr/0039-invite-supply-is-class-based-accrual.md)) — the
+  faucet reads no site settings, so it keeps accruing `inviteCount` while
+  registration is closed. #676 filed that as an oversight. It is recorded as
+  intended instead, so **no behaviour changes**.
+
+  The line: site state governs an invite at the moment it is **acted on**,
+  never at the moment it **accrues**. A closed site is the send gate's business
+  ([#673](https://github.com/orphic-inc/stellar-api/issues/673)), not the faucet's. It binds the handout alone — a pending
+  invite is a live offer rather than an allowance, so
+  [#677](https://github.com/orphic-inc/stellar-api/issues/677) is not pre-judged.
+
+  **One test is added**: a full handout cycle performs no site-settings read.
+  It fails the moment the faucet is taught about closure, and it cannot be
+  satisfied by rewording a comment. `getSettings()` is an `upsert`, so it also
+  stands against a settings read per batch turning a read-only nightly sweep
+  into one write per batch.
+
+  The amendment supersedes one Context paragraph in ADR-0039, which said
+  `maxUsers` was not a backstop and that nothing in the ADR may rely on it.
+  [#624](https://github.com/orphic-inc/stellar-api/issues/624) and
+  [ADR-0040](docs/adr/0040-capacity-is-counted-in-enabled-seats.md) landed seat
+  enforcement afterwards, and §9 relies on it: a balance cannot mint a seat.
+
 ### Fixed
 
 - **Capacity is reported independently of registration status**
