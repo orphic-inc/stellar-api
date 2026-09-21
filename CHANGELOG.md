@@ -52,6 +52,28 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Invite eligibility no longer answers in the past tense**
+  ([#656](https://github.com/orphic-inc/stellar-api/issues/656)) — `GET /profile/me/invites/eligibility` reused the send's
+  words, which are written as the reply to an attempt. A member who had typed
+  nothing was told that an invite they never created was not sent, and that an
+  invite they do not have was not used.
+
+  Each refusal now keeps **one** set of words, present tense, and the send adds
+  the single clause specific to it. That is a stronger guarantee than two
+  phrasings would give: the two surfaces cannot drift, because neither holds
+  words of its own.
+
+  Only one clause was ever send-specific. `invites_revoked` was the outlier —
+  its consequence clause was past tense, fusing the two — and `no_invites` was
+  already correct in both, so it takes no spend clause at all and is now a full
+  sentence like its siblings.
+
+  The Staff PM pointer moved to its own field so it stays **last**: stellar-ui
+  linkifies a path anchored to the end of the message, and a clause appended
+  after it would have turned that link into plain text with nothing failing on
+  either side. `inviteGates.spec.ts` now asserts the shape across the whole
+  table, so an eighth refusal cannot be added the old way.
+
 - **The invite expiry message no longer promises a send the gates may refuse**
   ([#685](https://github.com/orphic-inc/stellar-api/issues/685)) — it ended "You can invite that address again", which is a
   claim about what the member may do next. Seven gates own that

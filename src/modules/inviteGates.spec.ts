@@ -10,7 +10,10 @@ import { RatioPolicyStatus } from '@prisma/client';
 import {
   firstInviteRefusal,
   isOnRatioWatch,
+  inviteRefusalMsg,
   INVITE_GATE_ORDER,
+  INVITE_REFUSAL,
+  SPEND,
   type InviteGateInput,
   type InviteGateRefusal
 } from './inviteGates';
@@ -113,5 +116,71 @@ describe('isOnRatioWatch', () => {
     [null, false, false]
   ] as const)('status %s, meets requirement %s → %s', (status, meets, on) => {
     expect(isOnRatioWatch(status, meets)).toBe(on);
+  });
+});
+
+/**
+ * The words, as structure rather than as strings (#656).
+ *
+ * The per-message copy is pinned at the route level, on both surfaces, in
+ * profile.spec.ts and profileInvites.spec.ts. What is pinned HERE is the shape
+ * every entry must have, which is what an eighth refusal added later would
+ * otherwise get wrong — `invites_revoked` is how the seventh came to be the odd
+ * one out, carrying a past-tense clause its six siblings did not.
+ */
+describe('invite refusal copy', () => {
+  const ENTRIES = INVITE_GATE_ORDER.map(
+    (reason) => [reason, INVITE_REFUSAL[reason]] as const
+  );
+
+  // The one send-specific clause. Baked into a `base`, it would reappear on the
+  // eligibility page, telling a member who has typed nothing that an invite
+  // they never created was not used — the whole of #656.
+  it.each(ENTRIES)('%s: the base carries no send-only clause', (_, copy) => {
+    expect(copy.base).not.toContain(SPEND);
+    expect(copy.base).not.toMatch(/was not (used|sent)/i);
+  });
+
+  // stellar-ui linkifies a path anchored to the END of the message
+  // (`TRAILING_PATH` in InviteForm.tsx). A path inside `base` would sit before
+  // the spend clause on a send, and the Staff PM link would quietly become
+  // plain text. Nothing on the ui side can catch that.
+  it.each(ENTRIES)('%s: the base does not end with a path', (_, copy) => {
+    expect(copy.base).not.toMatch(/(\/[a-z0-9/-]+)\s*$/i);
+  });
+
+  it.each(ENTRIES)('%s: the base is a full sentence', (_, copy) => {
+    expect(copy.base).toMatch(/\.$/);
+  });
+
+  it.each(ENTRIES)('%s: says nothing about a send when none was made', (r) => {
+    expect(inviteRefusalMsg(r, { sent: false })).not.toContain(SPEND);
+  });
+
+  it.each(ENTRIES.filter(([, c]) => c.pointer))(
+    '%s: the pointer stays last, on both surfaces',
+    (reason, copy) => {
+      for (const sent of [true, false]) {
+        expect(inviteRefusalMsg(reason, { sent })).toMatch(
+          new RegExp(`${copy.pointer?.replace(/[/]/g, '\\/')}$`)
+        );
+      }
+    }
+  );
+
+  // "You have no invites remaining. Your invite was not used." contradicts
+  // itself: there was none to use.
+  it('no_invites reads the same before and after a send', () => {
+    expect(inviteRefusalMsg('no_invites', { sent: true })).toBe(
+      inviteRefusalMsg('no_invites', { sent: false })
+    );
+  });
+
+  it('every other refusal reassures the sender, and only the sender', () => {
+    for (const [reason, copy] of ENTRIES) {
+      if (!copy.spends) continue;
+      expect(inviteRefusalMsg(reason, { sent: true })).toContain(SPEND);
+      expect(inviteRefusalMsg(reason, { sent: false })).not.toContain(SPEND);
+    }
   });
 });

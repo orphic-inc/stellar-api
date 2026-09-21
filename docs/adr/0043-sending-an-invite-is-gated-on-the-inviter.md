@@ -2,6 +2,8 @@
 
 **Status: Accepted (2026-09-15).** Accepted as the gate on [#637](https://github.com/orphic-inc/stellar-api/issues/637), the posture [ADR-0040](0040-capacity-is-counted-in-enabled-seats.md) and [ADR-0041](0041-an-invite-lapses-and-is-returned.md) took. It records the decisions from the grill on that issue, [recorded on the issue](https://github.com/orphic-inc/stellar-api/issues/637#issuecomment-5683530680). It extends [ADR-0039](0039-invite-supply-is-class-based-accrual.md) §4, ADR-0040 §3 and ADR-0041.
 
+> **Amended 2026-09-21.** §8 is added, recording the answer to [#656](https://github.com/orphic-inc/stellar-api/issues/656): each refusal has **one** set of words, present tense, and the send adds the single clause that is specific to it. §3 and §4 carry corrections below — §3 said every refusal "says the invite was not used", which is no longer true of the eligibility read or of `no_invites`, and §4 described one map where there is now one entry composed per surface.
+
 ## Context
 
 **Anyone with a positive `inviteCount` could send an invite**, unless staff had revoked their privileges (#636) or the site was full (#624). The legacy implementation refused a member the site considered a liability: one on ratio watch, or one whose download privileges were gone. It also had two staff permissions, one for unlimited invites and one for inviting past the user limit.
@@ -64,9 +66,13 @@ One exemption: an empty balance does not refuse a member re-inviting their own l
 
 The body gains no fields. The words say which of very different things to fix, and each says the invite was not used. `downloads_disabled` names Staff PM, because nothing lifts it on its own today.
 
+_(Corrected 2026-09-21, by [#656](https://github.com/orphic-inc/stellar-api/issues/656). "Each says the invite was not used" held while the send was the only reader. It is now true of the send alone, and of every refusal but `no_invites`, where the member has none to spend. See §8.)_
+
 ### 4. Eligibility is answered before the send
 
 `GET /profile/me/invites/eligibility` returns `{ canSend, reason, msg }` from the same evaluator, and the route takes both refusals' words from one map. The ui can hide the form and explain before anyone submits, as the legacy page did, and it cannot disagree with the POST.
+
+_(Corrected 2026-09-21, by [#656](https://github.com/orphic-inc/stellar-api/issues/656). One **entry** per refusal, composed per surface — not one finished string used by both. The guarantee is unchanged and stronger: the two cannot disagree, because neither holds words of its own. See §8.)_
 
 The machine-readable `reason` lives here and not on the error body, where it would be a convention for one route.
 
@@ -93,6 +99,33 @@ Growth past the cap stays a staff decision through `POST /users`.
 ### 7. The rules text is the Golden Rules
 
 The invite page quotes Golden Rules 1.1, 2.1 and 2.2 from `GET /rules/tree`. The api serves no invite-page copy of its own.
+
+### 8. One set of words per refusal, composed per surface
+
+[#656](https://github.com/orphic-inc/stellar-api/issues/656) found the eligibility read answering in the past tense. It reused the send's words, which are written as the reply to an attempt — _"so this invite was not sent"_, _"Your invite was not used"_ — so a member who had typed nothing was told that an invite they never created was not sent.
+
+The fix is **not** two phrasings per refusal. Reading the seven, only one clause was ever send-specific:
+
+- **State and consequence** — "You are on ratio watch, so invites cannot be sent until your ratio meets its requirement" — are present tense and describe a condition. They were already true before a send.
+- **The spend clause** — "Your invite was not used" — is the only part that presumes an attempt, and it was the _identical sentence_ in five of the seven.
+- `invites_revoked` was the outlier: its consequence clause was past tense, fusing the two, which is why it read worst.
+- `no_invites` was already correct in both, needing no spend clause at all.
+
+So each refusal keeps **one** entry, and the surface composes it:
+
+```
+base + (a send, and the reason spends ? SPEND : '') + (pointer ?? '')
+```
+
+This is a stronger guarantee than §4's original. The two surfaces cannot drift, because neither holds words of its own — there is nothing to keep in step.
+
+Three constraints on the table, each of which cost something to discover:
+
+- **The pointer is a separate field and stays last.** stellar-ui linkifies a path anchored to the **end** of the message (`TRAILING_PATH` in `InviteForm.tsx`). A clause appended after it turns the Staff PM link into plain text, and nothing on either side would fail. That ordering is now a property the api owes the ui.
+- **`no_invites` takes no spend clause.** "You have no invites remaining. Your invite was not used." contradicts itself. It also says nothing about when more arrive: [ADR-0039](0039-invite-supply-is-class-based-accrual.md)'s Consequences rejected a `nextGrantAt` for promising invites to a member whose rank rate is `0` or whose standing is `poor`, and the same objection binds these words.
+- **An `invites_unlimited` member still gets the spend clause.** §5 keeps their stored balance accruing as the fallback if the permission is removed, so it is a balance they hold and really did not spend.
+
+`inviteGates.spec.ts` asserts the shape over the whole table rather than the wording: no `base` contains the spend clause, none ends with a path, each is a full sentence, and the eligibility composition never mentions a send. An eighth refusal added the old way fails there — which is how the seventh came to be the odd one out.
 
 ## Consequences
 

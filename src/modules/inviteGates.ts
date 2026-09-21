@@ -1,6 +1,8 @@
 /**
- * Whether a member may send an invite right now (#637, ADR-0043). Pure: the
- * caller loads the member's state, so the order is testable without a database.
+ * Whether a member may send an invite right now (#637, ADR-0043), and the words
+ * each refusal answers in (#656). Pure: the caller loads the member's state, so
+ * the order is testable without a database. The copy below reads `site` for one
+ * configured path and touches nothing else.
  *
  * The send and the eligibility read both answer from `firstInviteRefusal`, so
  * the page that explains a refusal can never disagree with the POST.
@@ -19,6 +21,7 @@
  */
 import { RatioPolicyStatus } from '@prisma/client';
 import { isStandingDenied } from './inviteGrant';
+import { site } from './config';
 import type { Standing } from './standing';
 
 /** Every refusal, first to last. A tuple so the OpenAPI enum reads it. */
@@ -75,6 +78,90 @@ export const firstInviteRefusal = (
   input: InviteGateInput
 ): InviteGateRefusal | null =>
   INVITE_GATE_ORDER.find((reason) => REFUSES[reason](input)) ?? null;
+
+/**
+ * The words for each send gate (#637, ADR-0043), composed per surface (#656).
+ *
+ * The POST refusal and the eligibility read answer from the same entry, so the
+ * page explaining a refusal can never disagree with the send. They differ in
+ * exactly one clause, so each reason has ONE set of words here rather than two
+ * that would have to be kept in step.
+ *
+ *   base + (a send, and the reason spends ? SPEND : '') + (pointer ?? '')
+ *
+ * Every `base` is present tense and states a condition, so it is true before a
+ * send as well as after one. `SPEND` is the only send-specific clause: it
+ * reassures a member who just tried that their balance is intact, and it is
+ * nonsense on the eligibility page, where nothing was attempted.
+ *
+ * Three things here are deliberate:
+ *
+ *  - The POINTER is a separate field rather than part of `base`, because it
+ *    must stay LAST. stellar-ui linkifies a path anchored to the end of the
+ *    message (`TRAILING_PATH` in `InviteForm.tsx`), so a clause appended after
+ *    it would silently turn the Staff PM link back into plain text. Keeping it
+ *    last is a property this module owes the ui, not a style choice.
+ *  - `no_invites` takes no SPEND clause. "You have no invites remaining. Your
+ *    invite was not used." contradicts itself — there was none to use.
+ *  - An `invites_unlimited` member still gets SPEND. Their stored balance keeps
+ *    accruing as the fallback if the permission is removed (ADR-0043 §5), so it
+ *    is a balance they really hold and really did not spend.
+ */
+interface InviteRefusalCopy {
+  /** Present tense, true whether or not a send was attempted. */
+  base: string;
+  /** Whether the send's reply reassures that no invite was spent. */
+  spends: boolean;
+  /** Appended last, after any spend clause. */
+  pointer?: string;
+}
+
+export const SPEND = 'Your invite was not used.';
+const STAFF_PM = `Contact staff through Staff PM: ${site.staffPmPath}`;
+
+export const INVITE_REFUSAL: Record<InviteGateRefusal, InviteRefusalCopy> = {
+  invites_revoked: {
+    base: 'Your invite privileges have been revoked, so invites cannot be sent.',
+    spends: true,
+    pointer: STAFF_PM
+  },
+  downloads_disabled: {
+    base: 'Your download access is disabled, so invites cannot be sent.',
+    spends: true,
+    pointer: STAFF_PM
+  },
+  poor_standing: {
+    base: 'You have active warnings, so invites cannot be sent until they expire.',
+    spends: true
+  },
+  ratio_watch: {
+    base: 'You are on ratio watch, so invites cannot be sent until your ratio meets its requirement.',
+    spends: true
+  },
+  registration_closed: {
+    base: 'Registration is currently closed, so invites cannot be sent right now.',
+    spends: true
+  },
+  site_full: {
+    base: 'The site is full, so invites cannot be sent right now.',
+    spends: true
+  },
+  no_invites: { base: 'You have no invites remaining.', spends: false }
+};
+
+/**
+ * The refusal in the words for this surface. `sent` is whether the caller just
+ * attempted a send, which is the only thing the two surfaces disagree about.
+ */
+export const inviteRefusalMsg = (
+  reason: InviteGateRefusal,
+  { sent }: { sent: boolean }
+): string => {
+  const { base, spends, pointer } = INVITE_REFUSAL[reason];
+  return [base, sent && spends ? SPEND : '', pointer ?? '']
+    .filter(Boolean)
+    .join(' ');
+};
 
 /**
  * On watch, for inviting: the stored status AND the ratio read now.

@@ -76,7 +76,7 @@ describe('GET /api/profile/me/invites/eligibility', () => {
     expect(res.body).toEqual({
       canSend: false,
       reason: 'downloads_disabled',
-      msg: 'Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff',
+      msg: 'Your download access is disabled, so invites cannot be sent. Contact staff through Staff PM: /inbox/staff',
       unlimited: false
     });
   });
@@ -97,7 +97,7 @@ describe('GET /api/profile/me/invites/eligibility', () => {
     expect(res.body).toEqual({
       canSend: false,
       reason: 'registration_closed',
-      msg: 'Registration is currently closed, so invites cannot be sent right now. Your invite was not used.',
+      msg: 'Registration is currently closed, so invites cannot be sent right now.',
       unlimited: false
     });
   });
