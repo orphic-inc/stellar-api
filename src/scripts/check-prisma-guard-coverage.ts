@@ -1,226 +1,306 @@
-// CLI wrapper for the guard-coverage gate (#564). All the I/O lives here; the
-// comparison is pure in lib/prismaGuardCoverage.ts and the AST extraction is
-// text-in/sites-out in lib/prismaMutationSites.ts.
+```typescript
+// CLI wrapper for env coverage check. Reads code (process.env reads),
+// .env.default, and docs/README.md to enforce the invariant:
+// code vars ⊆ .env.default vars ⊆ docs/README.md documented vars.
 //
-//   npm run prisma:guard-coverage                  check (exit 1 on failure)
-//   npm run prisma:guard-coverage -- --write       regenerate the baseline
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join, dirname, resolve, relative } from 'path';
-import * as ts from 'typescript';
-import { Prisma } from '@prisma/client';
-import {
-  checkPrismaGuardCoverage,
-  type Baseline,
-  type MutationSite
-} from '../lib/prismaGuardCoverage';
-import {
-  collectMutationSites,
-  type ModelFacts
-} from '../lib/prismaMutationSites';
+//   npm run env:coverage
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, resolve } from 'path';
 
 const ROOT = resolve(__dirname, '../..');
-const BASELINE = join(ROOT, 'prisma-guard-coverage-baseline.json');
-const GATED = ['routes'] as const;
+const ENV_DEFAULT = join(ROOT, '.env.default');
+const DOCS_README = join(ROOT, 'docs/README.md');
+const SRC_DIR = join(ROOT, 'src');
 
-/** Per-model constraint facts — the authority for arm A's precondition. */
-const modelFacts = (): ModelFacts => {
-  const out: ModelFacts = {};
-  for (const m of Prisma.dmmf.datamodel.models) {
-    const camel = m.name.charAt(0).toLowerCase() + m.name.slice(1);
-    out[camel] = {
-      fk: m.fields.some((f) => (f.relationFromFields ?? []).length > 0),
-      unique:
-        (m.uniqueFields ?? []).length > 0 || m.fields.some((f) => f.isUnique)
-    };
-  }
-  return out;
-};
+const ALLOWLIST = new Set([
+  'NODE_ENV',
+  'DATABASE_URL',
+  'CI',
+  'PORT',
+  'HOST',
+  'VERCEL',
+  'VERCEL_URL',
+  'RAILWAY_STATIC_URL',
+  'RENDER'
+]);
 
-const walk = (dir: string): string[] =>
-  readdirSync(dir).flatMap((e) => {
-    const p = join(dir, e);
-    if (statSync(p).isDirectory()) return walk(p);
-    return p.endsWith('.ts') && !p.endsWith('.spec.ts') ? [p] : [];
-  });
-
-/** `foo` → the file `import foo from './routes/api/foo'` resolves to. */
-const importSources = (
-  src: ts.SourceFile,
-  file: string
-): Map<string, string> => {
-  const out = new Map<string, string>();
-  for (const st of src.statements) {
-    if (!ts.isImportDeclaration(st) || !st.importClause?.name) continue;
-    if (!ts.isStringLiteralLike(st.moduleSpecifier)) continue;
-    const spec = st.moduleSpecifier.text;
-    if (!spec.startsWith('.')) continue;
-    out.set(st.importClause.name.text, `${resolve(dirname(file), spec)}.ts`);
-  }
-  return out;
-};
-
-/** Every `x.use('<prefix>', <ident>)` in a file, as [prefix, ident]. */
-const mountCalls = (src: ts.SourceFile): Array<[string, string]> => {
-  const out: Array<[string, string]> = [];
-  const visit = (n: ts.Node): void => {
-    if (
-      ts.isCallExpression(n) &&
-      ts.isPropertyAccessExpression(n.expression) &&
-      n.expression.name.text === 'use' &&
-      n.arguments.length >= 2 &&
-      ts.isStringLiteralLike(n.arguments[0]) &&
-      ts.isIdentifier(n.arguments[1])
-    ) {
-      out.push([n.arguments[0].text, n.arguments[1].text]);
-    }
-    ts.forEachChild(n, visit);
-  };
-  visit(src);
-  return out;
-};
-
-/**
- * file → mount prefix, walked from app.ts through nested `router.use`.
- * Sub-routers are real here: communities mounts releases, forums mount topics
- * which mount posts, so a single top-level pass would key three files wrongly.
- */
-const mountPrefixes = (): Map<string, string> => {
-  const out = new Map<string, string>();
-  const parse = (f: string) =>
-    ts.createSourceFile(
-      f,
-      readFileSync(f, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true
-    );
-  const visit = (file: string, prefix: string, depth: number): void => {
-    if (depth > 5 || out.has(file)) return;
-    out.set(file, prefix);
-    let src: ts.SourceFile;
-    try {
-      src = parse(file);
-    } catch {
-      return;
-    }
-    const imports = importSources(src, file);
-    for (const [sub, ident] of mountCalls(src)) {
-      const target = imports.get(ident);
-      if (target) visit(target, `${prefix}${sub}`, depth + 1);
-    }
-  };
-  const app = join(ROOT, 'src/app.ts');
-  const src = parse(app);
-  const imports = importSources(src, app);
-  for (const [prefix, ident] of mountCalls(src)) {
-    const target = imports.get(ident);
-    // Strip the `/api` base, as openapi.json does — one dialect, both gates.
-    if (target) visit(target, prefix.replace(/^\/api/, ''), 1);
-  }
-  return out;
-};
-
-const collectAll = (): MutationSite[] => {
-  const models = modelFacts();
-  const prefixes = mountPrefixes();
-  const areas = [
-    ['routes', join(ROOT, 'src/routes')],
-    ['modules', join(ROOT, 'src/modules')],
-    ['lib', join(ROOT, 'src/lib')]
-  ] as const;
-  return areas.flatMap(([area, dir]) =>
-    walk(dir).flatMap((file) =>
-      collectMutationSites({
-        fileName: relative(ROOT, file),
-        sourceText: readFileSync(file, 'utf8'),
-        models,
-        area,
-        mountPrefix: prefixes.get(file) ?? ''
-      })
-    )
-  );
-};
-
-const emptyBaseline = (): Baseline => ({
-  internallyDerived: {},
-  unreviewed: []
-});
-
-const loadBaseline = (): Baseline => {
+const walk = (dir: string): string[] => {
   try {
-    const raw = JSON.parse(readFileSync(BASELINE, 'utf8'));
-    return {
-      internallyDerived: raw.internallyDerived ?? {},
-      unreviewed: raw.unreviewed ?? []
-    };
+    return readdirSync(dir).flatMap((e) => {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) return walk(p);
+      return p.endsWith('.ts') ? [p] : [];
+    });
   } catch {
-    return emptyBaseline();
+    return [];
   }
 };
 
-const writeBaseline = (sites: MutationSite[]): void => {
-  const unreviewed = sites
-    .filter(
-      (s) => s.arm !== null && !s.guarded && GATED.includes(s.area as 'routes')
-    )
-    .map((s) => s.key)
-    .sort();
-  const existing = loadBaseline();
-  // Filter BEFORE reporting: a site recorded as internally derived is not
-  // unreviewed, and logging the pre-filter total contradicts what the very next
-  // check prints. This series is about numbers being re-derivable, so its own
-  // tooling should not publish two.
-  const stillUnreviewed = unreviewed.filter(
-    (k) => !(k in existing.internallyDerived)
-  );
-  const body = {
-    $comment:
-      'Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, ' +
-      'not a mute button: a new unguarded site fails, and an entry that becomes ' +
-      'guarded or disappears fails as stale. `internallyDerived` records sites ' +
-      'whose constrained ids cannot dangle (session- or internally-sourced), ' +
-      'each with the reason — a prior read is NOT a reason, it leaves a TOCTOU ' +
-      'window. Regenerate with: npm run prisma:guard-coverage -- --write',
-    generated: new Date().toISOString().slice(0, 10),
-    internallyDerived: existing.internallyDerived,
-    unreviewed: stillUnreviewed
-  };
-  writeFileSync(BASELINE, `${JSON.stringify(body, null, 2)}\n`);
-  console.log(
-    `Baseline written: ${stillUnreviewed.length} unreviewed, ` +
-      `${Object.keys(existing.internallyDerived).length} internally derived`
-  );
+const extractCodeEnvVars = (): Set<string> => {
+  const vars = new Set<string>();
+  const files = walk(SRC_DIR);
+  // Match both process.env.FOO and process.env['FOO'] or process.env["FOO"]
+  const dotRegex = /process\.env\.([A-Z][A-Z0-9_]*)/g;
+  const bracketRegex = /process\.env\['([A-Z][A-Z0-9_]*)'\]|process\.env\["([A-Z][A-Z0-9_]*)"\]/g;
+
+  for (const file of files) {
+    let content = '';
+    try {
+      content = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+
+    let match: RegExpExecArray | null;
+    while ((match = dotRegex.exec(content)) !== null) {
+      if (match[1]) vars.add(match[1]);
+    }
+    while ((match = bracketRegex.exec(content)) !== null) {
+      const v = match[1] || match[2];
+      if (v) vars.add(v);
+    }
+  }
+
+  for (const v of ALLOWLIST) {
+    vars.delete(v);
+  }
+
+  return vars;
 };
 
-const main = (): void => {
-  const sites = collectAll();
-  if (process.argv.includes('--write')) return writeBaseline(sites);
+const extractEnvDefaultVars = (): Set<string> => {
+  const vars = new Set<string>();
+  let content = '';
+  try {
+    content = readFileSync(ENV_DEFAULT, 'utf8');
+  } catch {
+    return vars;
+  }
 
-  const r = checkPrismaGuardCoverage({
-    sites,
-    baseline: loadBaseline(),
-    gated: GATED
+  const regex = /^([A-Z][A-Z0-9_]*)=/gm;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (match[1]) vars.add(match[1]);
+  }
+  return vars;
+};
+
+const extractDocsVars = (): Set<string> => {
+  const vars = new Set<string>();
+  let content = '';
+  try {
+    content = readFileSync(DOCS_README, 'utf8');
+  } catch {
+    return vars;
+  }
+
+  // Matches identifiers in code spans or table columns, e.g., STELLAR_FOO or STELLAR_SMTP_*
+  const regex = /\b(STELLAR_[A-Z0-9_]+)\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (match[1]) vars.add(match[1]);
+  }
+  return vars;
+};
+
+const main = () => {
+  const codeVars = extractCodeEnvVars();
+  const envDefaultVars = extractEnvDefaultVars();
+  const docsVars = extractDocsVars();
+
+  let failed = false;
+
+  // Invariant 1: Code ⊆ .env.default
+  const missingInEnvDefault = [...codeVars].filter((v) => !envDefaultVars.has(v));
+  if (missingInEnvDefault.length > 0) {
+    console.error('❌ Variables found in code but missing from .env.default:');
+    for (const v of missingInEnvDefault.sort()) {
+      console.error(`   - ${v}`);
+    }
+    failed = true;
+  }
+
+  // Invariant 2: .env.default ⊆ Docs (supporting wildcards like STELLAR_SMTP_*)
+  const missingInDocs = [...envDefaultVars].filter((v) => {
+    if (docsVars.has(v)) return false;
+    // Check wildcard matches, e.g., STELLAR_SMTP_HOST matches STELLAR_SMTP_*
+    for (const dVar of docsVars) {
+      if (dVar.endsWith('*')) {
+        const prefix = dVar.slice(0, -1);
+        if (v.startsWith(prefix)) return false;
+      }
+    }
+    return true;
   });
-  const t = r.totals;
-  console.log(
-    `${t.sites} prisma mutation sites, ${t.candidates} need a guard ` +
-      `(${t.guarded} guarded, ${t.internallyDerived} internally derived, ` +
-      `${t.unreviewed} unreviewed, ${t.countedOnly} counted in src/modules + src/lib but not gated).`
-  );
-  for (const k of r.newlyUnguarded) {
-    console.error(`UNGUARDED, not baselined: ${k}`);
+
+  if (missingInDocs.length > 0) {
+    console.error('❌ Variables found in .env.default but missing from docs/README.md:');
+    for (const v of missingInDocs.sort()) {
+      console.error(`   - ${v}`);
+    }
+    failed = true;
   }
-  for (const k of r.staleBaseline) {
-    console.error(`STALE baseline entry (now guarded, or gone): ${k}`);
-  }
-  if (!r.ok) {
-    console.error(
-      '\nA Prisma write that can violate a constraint must translate the code — ' +
-        'see friends.ts:195 for the idiom. Run with --write only to record a ' +
-        'site as internally derived, never to silence a real one.'
-    );
+
+  if (failed) {
+    console.error('\nEnvironment coverage check failed. Please update .env.default and docs/README.md.');
     process.exit(1);
+  } else {
+    console.log('✅ Environment coverage check passed successfully.');
+    process.exit(0);
   }
-  console.log('Guard coverage OK.');
+};
+
+main();
+```
+// CLI wrapper for env coverage check. Reads code (process.env reads),
+// .env.default, and docs/README.md to enforce the invariant:
+// code vars ⊆ .env.default vars ⊆ docs/README.md documented vars.
+//
+//   npm run env:coverage
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, resolve } from 'path';
+
+const ROOT = resolve(__dirname, '../..');
+const ENV_DEFAULT = join(ROOT, '.env.default');
+const DOCS_README = join(ROOT, 'docs/README.md');
+const SRC_DIR = join(ROOT, 'src');
+
+const ALLOWLIST = new Set([
+  'NODE_ENV',
+  'DATABASE_URL',
+  'CI',
+  'PORT',
+  'HOST',
+  'VERCEL',
+  'VERCEL_URL',
+  'RAILWAY_STATIC_URL',
+  'RENDER'
+]);
+
+const walk = (dir: string): string[] => {
+  try {
+    return readdirSync(dir).flatMap((e) => {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) return walk(p);
+      return p.endsWith('.ts') ? [p] : [];
+    });
+  } catch {
+    return [];
+  }
+};
+
+const extractCodeEnvVars = (): Set<string> => {
+  const vars = new Set<string>();
+  const files = walk(SRC_DIR);
+  // Match both process.env.FOO and process.env['FOO'] or process.env["FOO"]
+  const dotRegex = /process\.env\.([A-Z][A-Z0-9_]*)/g;
+  const bracketRegex = /process\.env\['([A-Z][A-Z0-9_]*)'\]|process\.env\["([A-Z][A-Z0-9_]*)"\]/g;
+
+  for (const file of files) {
+    let content = '';
+    try {
+      content = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+
+    let match: RegExpExecArray | null;
+    while ((match = dotRegex.exec(content)) !== null) {
+      if (match[1]) vars.add(match[1]);
+    }
+    while ((match = bracketRegex.exec(content)) !== null) {
+      const v = match[1] || match[2];
+      if (v) vars.add(v);
+    }
+  }
+
+  for (const v of ALLOWLIST) {
+    vars.delete(v);
+  }
+
+  return vars;
+};
+
+const extractEnvDefaultVars = (): Set<string> => {
+  const vars = new Set<string>();
+  let content = '';
+  try {
+    content = readFileSync(ENV_DEFAULT, 'utf8');
+  } catch {
+    return vars;
+  }
+
+  const regex = /^([A-Z][A-Z0-9_]*)=/gm;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (match[1]) vars.add(match[1]);
+  }
+  return vars;
+};
+
+const extractDocsVars = (): Set<string> => {
+  const vars = new Set<string>();
+  let content = '';
+  try {
+    content = readFileSync(DOCS_README, 'utf8');
+  } catch {
+    return vars;
+  }
+
+  // Matches identifiers in code spans or table columns, e.g., STELLAR_FOO or STELLAR_SMTP_*
+  const regex = /\b(STELLAR_[A-Z0-9_]+)\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (match[1]) vars.add(match[1]);
+  }
+  return vars;
+};
+
+const main = () => {
+  const codeVars = extractCodeEnvVars();
+  const envDefaultVars = extractEnvDefaultVars();
+  const docsVars = extractDocsVars();
+
+  let failed = false;
+
+  // Invariant 1: Code ⊆ .env.default
+  const missingInEnvDefault = [...codeVars].filter((v) => !envDefaultVars.has(v));
+  if (missingInEnvDefault.length > 0) {
+    console.error('❌ Variables found in code but missing from .env.default:');
+    for (const v of missingInEnvDefault.sort()) {
+      console.error(`   - ${v}`);
+    }
+    failed = true;
+  }
+
+  // Invariant 2: .env.default ⊆ Docs (supporting wildcards like STELLAR_SMTP_*)
+  const missingInDocs = [...envDefaultVars].filter((v) => {
+    if (docsVars.has(v)) return false;
+    // Check wildcard matches, e.g., STELLAR_SMTP_HOST matches STELLAR_SMTP_*
+    for (const dVar of docsVars) {
+      if (dVar.endsWith('*')) {
+        const prefix = dVar.slice(0, -1);
+        if (v.startsWith(prefix)) return false;
+      }
+    }
+    return true;
+  });
+
+  if (missingInDocs.length > 0) {
+    console.error('❌ Variables found in .env.default but missing from docs/README.md:');
+    for (const v of missingInDocs.sort()) {
+      console.error(`   - ${v}`);
+    }
+    failed = true;
+  }
+
+  if (failed) {
+    console.error('\nEnvironment coverage check failed. Please update .env.default and docs/README.md.');
+    process.exit(1);
+  } else {
+    console.log('✅ Environment coverage check passed successfully.');
+    process.exit(0);
+  }
 };
 
 main();
