@@ -8,6 +8,23 @@ All notable changes to stellar-api are documented here.
 
 ### Docs
 
+- **Every environment variable the code reads is now in `.env.default` and the
+  reference table** ([#653](https://github.com/orphic-inc/stellar-api/issues/653)) — `docs/README.md` called `.env.default`
+  "the authoritative list" while the table omitted ten variables, including both
+  background-job mode switches. An operator reading it would never have found
+  `INACTIVITY_MODE` or `INVITE_GRANT_MODE`.
+
+  Two of the ten were missing from `.env.default` itself, so the file did not
+  match its own description: **`STELLAR_FEED_SECRET`** (#262 — unset, every
+  Member Feed route answers its 404, which is the safe default for what is a
+  bearer credential) and `STELLAR_MINIMUM_BOUNTY`. Both are now present with
+  their defaults, verified against every `process.env` read in `src/`.
+
+  The table keeps a full copy rather than deferring to `.env.default` for the
+  job dials, which was the other option on the issue: the pointer target was
+  itself incomplete, so pointing at it would have moved the drift instead of
+  ending it.
+
 - **The invite handout is member-scoped, and that is now a written rule**
   ([#676](https://github.com/orphic-inc/stellar-api/issues/676),
   [ADR-0039 §9](docs/adr/0039-invite-supply-is-class-based-accrual.md)) — the
