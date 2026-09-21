@@ -23,6 +23,7 @@ import {
   type UpdateTagAliasInput
 } from '../../schemas/tagAliases';
 import { AppError } from '../../lib/errors';
+import { isOfficialTagName } from '../../modules/tag';
 
 const router = express.Router();
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
@@ -59,6 +60,16 @@ router.post(
   authHandler(async (req, res) => {
     const { badTag, goodTag: goodTagName } =
       parsedBody<CreateTagAliasInput>(res);
+    // An official tag may not be aliased away (#298, ADR-0045). Nothing in the
+    // schema prevents it — `badTag` is a free String with no FK to `Tag` — so
+    // without this, one staff action silently undoes another: the tag stays
+    // marked canonical while the normalizer rewrites it at every write.
+    if (await isOfficialTagName(badTag)) {
+      throw new AppError(
+        409,
+        `"${badTag}" is an official tag — demote it before aliasing it away`
+      );
+    }
     const goodTag = await prisma.tag.findUnique({
       where: { name: goodTagName }
     });
@@ -95,6 +106,16 @@ router.put(
       parsedBody<UpdateTagAliasInput>(res);
     const existing = await prisma.tagAlias.findUnique({ where: { id } });
     if (!existing) throw new AppError(404, 'Tag alias not found');
+    // An official tag may not be aliased away (#298, ADR-0045). Nothing in the
+    // schema prevents it — `badTag` is a free String with no FK to `Tag` — so
+    // without this, one staff action silently undoes another: the tag stays
+    // marked canonical while the normalizer rewrites it at every write.
+    if (await isOfficialTagName(badTag)) {
+      throw new AppError(
+        409,
+        `"${badTag}" is an official tag — demote it before aliasing it away`
+      );
+    }
     const goodTag = await prisma.tag.findUnique({
       where: { name: goodTagName }
     });
