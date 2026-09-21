@@ -35,6 +35,24 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **`version:check` now covers `openapi.json`, the surface it claimed to check**
+  ([#538](https://github.com/orphic-inc/stellar-api/issues/538)) — `versionConsistency.ts` opened by saying every version
+  surface on the project is compared against the manifest. `openapi.json`
+  carries one, at `info.version`, and was never read. `VersionSurfaces` declared
+  no such axis and the command-line wrapper never opened the file.
+
+  Nobody was bitten, because a **different** gate caught it: the _OpenAPI
+  freshness_ step in `publish.yml` regenerates the spec and diffs it. But that step's name says
+  nothing about versions, so every release had to explain the connection in
+  prose. The failure now lands at pre-commit instead, where the message names
+  the version — and names `npm run openapi:export`, since hand-editing a
+  generated file would only fail the freshness diff next.
+
+  `openapi.json` is the **only** derived surface that really drifts. `runtime`
+  is `appVersion`, which reads the same `package.json` as `manifest`, so it
+  cannot disagree; the spec is a committed artifact and goes stale the moment
+  the manifest moves without a re-export.
+
 - **Capacity is reported independently of registration status**
   ([#657](https://github.com/orphic-inc/stellar-api/issues/657),
   [ADR-0040](docs/adr/0040-capacity-is-counted-in-enabled-seats.md)) —

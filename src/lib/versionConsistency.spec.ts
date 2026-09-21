@@ -6,7 +6,8 @@ describe('checkVersionConsistency', () => {
       manifest: '0.5.6',
       lockfile: '0.5.6',
       changelogTop: '0.5.6',
-      runtime: '0.5.6'
+      runtime: '0.5.6',
+      openapi: '0.5.6'
     });
     expect(result).toEqual([]);
   });
@@ -43,6 +44,28 @@ describe('checkVersionConsistency', () => {
     ]);
   });
 
+  // The drift this catches is a manifest bump with no `openapi:export`, which
+  // CI would otherwise report under a step named "OpenAPI freshness" (#538).
+  // Unlike `runtime`, this surface is a committed artifact and really can lag.
+  it('flags a committed openapi.json that lags the manifest', () => {
+    const result = checkVersionConsistency({
+      manifest: '0.5.6',
+      lockfile: '0.5.6',
+      openapi: '0.5.5'
+    });
+    expect(result).toEqual([
+      { surface: 'openapi', expected: '0.5.6', actual: '0.5.5' }
+    ]);
+  });
+
+  it('skips the openapi axis when the surface is absent', () => {
+    const result = checkVersionConsistency({
+      manifest: '0.5.6',
+      lockfile: '0.5.6'
+    });
+    expect(result).toEqual([]);
+  });
+
   it('ignores the tag axis by default (a release bump runs ahead of the tag)', () => {
     const result = checkVersionConsistency({
       manifest: '0.5.6',
@@ -76,6 +99,7 @@ describe('checkVersionConsistency', () => {
         manifest: '0.5.6',
         lockfile: '0.5.5',
         changelogTop: '0.5.4',
+        openapi: '0.5.3',
         latestTag: '0.5.5'
       },
       { checkTag: true }
@@ -83,6 +107,7 @@ describe('checkVersionConsistency', () => {
     expect(result.map((m) => m.surface)).toEqual([
       'lockfile',
       'changelog',
+      'openapi',
       'tag'
     ]);
   });
