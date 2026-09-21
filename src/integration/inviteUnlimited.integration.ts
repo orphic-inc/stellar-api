@@ -9,7 +9,12 @@
  * new one. The last is what stops grant → send → revoke → withdraw from minting
  * an invite.
  */
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  openRegistration
+} from '../test/dbHelpers';
 import { createInvite, inviteSpendWhere } from '../modules/invite';
 import { runInviteExpiryCycle } from '../modules/inviteExpiryJob';
 import { cancelInvite, withdrawInvite } from '../modules/inviteControls';
@@ -17,6 +22,8 @@ import { cancelInvite, withdrawInvite } from '../modules/inviteControls';
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
+  // DEFAULTS is `closed`; createInvite reads it (#673).
+  await openRegistration();
 });
 
 afterAll(async () => {

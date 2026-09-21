@@ -2159,12 +2159,12 @@ registry.registerPath({
     },
     403: msgResponse(
       'A send gate refused (#637): invite privileges revoked (#636), download ' +
-        'access disabled, active warnings (poor standing), ratio watch, the ' +
-        'site is full (#624), or no invites remaining. The first that applies ' +
-        'is reported, in that order, and no invite is spent. A caller with ' +
-        '`invites_unlimited` is never refused for the balance, and spends ' +
-        'nothing. `GET /profile/me/invites/eligibility` answers the same gates ' +
-        'first'
+        'access disabled, active warnings (poor standing), ratio watch, ' +
+        'registration is closed (#673), the site is full (#624), or no ' +
+        'invites remaining. The first that applies is reported, in that ' +
+        'order, and no invite is spent. A caller with `invites_unlimited` is ' +
+        'never refused for the balance, and spends nothing. ' +
+        '`GET /profile/me/invites/eligibility` answers the same gates first'
     ),
     409: msgResponse(
       'A live invite already exists for that address, or a cancelled one has ' +

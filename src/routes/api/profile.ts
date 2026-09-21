@@ -187,6 +187,8 @@ const INVITE_REFUSAL_MSG: Record<InviteGateRefusal, string> = {
     'You have active warnings, so invites cannot be sent until they expire. Your invite was not used.',
   ratio_watch:
     'You are on ratio watch, so invites cannot be sent until your ratio meets its requirement. Your invite was not used.',
+  registration_closed:
+    'Registration is currently closed, so invites cannot be sent right now. Your invite was not used.',
   site_full:
     'The site is full, so invites cannot be sent right now. Your invite was not used.',
   no_invites: 'No invites remaining'

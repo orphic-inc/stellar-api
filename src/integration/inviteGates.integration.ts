@@ -8,7 +8,12 @@
  * spend's claim holds `canDownload` on its own, apart from the pre-check that
  * would otherwise hide it.
  */
-import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import {
+  truncateAll,
+  seedDefaults,
+  testPrisma,
+  openRegistration
+} from '../test/dbHelpers';
 import { createInvite, inviteSpendWhere } from '../modules/invite';
 import { DAY_MS } from '../modules/inviteGrant';
 import { DEFAULTS } from '../modules/settings';
@@ -16,6 +21,8 @@ import { DEFAULTS } from '../modules/settings';
 beforeEach(async () => {
   await truncateAll();
   await seedDefaults();
+  // DEFAULTS is `closed`; createInvite reads it (#673).
+  await openRegistration();
 });
 
 afterAll(async () => {
@@ -84,6 +91,17 @@ const fillSite = async () => {
     where: { id: 1 },
     create: { ...DEFAULTS, maxUsers },
     update: { maxUsers }
+  });
+};
+
+/** Put the site into one registration mode. */
+const setRegistration = async (
+  registrationStatus: 'open' | 'invite' | 'closed'
+) => {
+  await testPrisma.siteSettings.upsert({
+    where: { id: 1 },
+    create: { ...DEFAULTS, registrationStatus },
+    update: { registrationStatus }
   });
 };
 
@@ -158,6 +176,50 @@ describe('createInvite send gates', () => {
       reason: 'invites_revoked'
     });
   });
+
+  // #673. A closed site refuses registration before it looks at the key at
+  // all, so an invite sent now cannot be redeemed by anyone.
+  it('refuses a closed site, spending nothing and writing no invite', async () => {
+    const member = await mkUser();
+    await setRegistration('closed');
+
+    expect(await createInvite(member.id, 'a@example.com', '')).toEqual({
+      ok: false,
+      reason: 'registration_closed'
+    });
+    expect(await balance(member.id)).toBe(1);
+    expect(await testPrisma.invite.count()).toBe(0);
+  });
+
+  // Different facts, different remedies: a seat frees on its own, a closure
+  // waits on an operator. Naming the full one sends the member away to wait
+  // for something that will not help.
+  it('names the closure over the capacity when a closed site is also full', async () => {
+    const member = await mkUser();
+    await fillSite();
+    await setRegistration('closed');
+
+    expect(await createInvite(member.id, 'a@example.com', '')).toEqual({
+      ok: false,
+      reason: 'registration_closed'
+    });
+  });
+
+  // The gate is `closed` alone. An invite-only site is the one that needs
+  // invites most, so a later `!== 'open'` would break exactly the sites the
+  // feature exists for.
+  it.each(['open', 'invite'] as const)(
+    'lets a member of a %s site send',
+    async (mode) => {
+      const member = await mkUser();
+      await setRegistration(mode);
+
+      expect(
+        await createInvite(member.id, `${mode}@example.com`, '')
+      ).toMatchObject({ ok: true });
+      expect(await balance(member.id)).toBe(0);
+    }
+  );
 
   it('refuses a full site before a balance, and spends nothing', async () => {
     const member = await mkUser({ inviteCount: 0 });

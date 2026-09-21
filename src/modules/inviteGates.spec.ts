@@ -20,6 +20,7 @@ const OPEN: InviteGateInput = {
   canDownload: true,
   standing: 'clean',
   onRatioWatch: false,
+  registrationClosed: false,
   siteFull: false,
   balance: 1,
   unlimited: false
@@ -31,6 +32,7 @@ const CLOSE: Record<InviteGateRefusal, Partial<InviteGateInput>> = {
   downloads_disabled: { canDownload: false },
   poor_standing: { standing: 'poor' },
   ratio_watch: { onRatioWatch: true },
+  registration_closed: { registrationClosed: true },
   site_full: { siteFull: true },
   no_invites: { balance: 0 }
 };
@@ -54,12 +56,17 @@ describe('firstInviteRefusal', () => {
     ).toBe(earlier);
   });
 
+  // The generated pairs above cannot catch a transposition: they are derived
+  // from INVITE_GATE_ORDER, so they move with it. This is the guard that pins
+  // the decision — including registration_closed above site_full (#673), which
+  // ADR-0043 §1's "what the member fixes first" rule does not decide.
   it('orders staff decisions, then member state, then capacity and balance', () => {
     expect(INVITE_GATE_ORDER).toEqual([
       'invites_revoked',
       'downloads_disabled',
       'poor_standing',
       'ratio_watch',
+      'registration_closed',
       'site_full',
       'no_invites'
     ]);

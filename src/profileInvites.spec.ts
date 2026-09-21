@@ -37,7 +37,10 @@ describe('GET /api/profile/me/invites/eligibility', () => {
       ...overrides
     } as never);
     prismaMock.ratioPolicyState.findUnique.mockResolvedValue(null);
-    prismaMock.siteSettings.upsert.mockResolvedValue({ maxUsers: 50 } as never);
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      maxUsers: 50,
+      registrationStatus: 'open'
+    } as never);
     prismaMock.user.count.mockResolvedValue(10);
   };
 
@@ -76,6 +79,71 @@ describe('GET /api/profile/me/invites/eligibility', () => {
       msg: 'Your download access is disabled, so invites cannot be sent. Your invite was not used. Contact staff through Staff PM: /inbox/staff',
       unlimited: false
     });
+  });
+
+  // #673. The wiring, not the order: the pure module is pinned in
+  // inviteGates.spec.ts, and what can only break here is the read that feeds
+  // it — that the status comes from settings at all.
+  it('refuses a closed site, in the words the send would use', async () => {
+    member();
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      maxUsers: 50,
+      registrationStatus: 'closed'
+    } as never);
+
+    const res = await request(app).get('/api/profile/me/invites/eligibility');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      canSend: false,
+      reason: 'registration_closed',
+      msg: 'Registration is currently closed, so invites cannot be sent right now. Your invite was not used.',
+      unlimited: false
+    });
+  });
+
+  // A closed site and a full one are different facts with different remedies:
+  // a seat frees on its own, a closure waits on an operator. Naming the full
+  // one here would tell the member to wait for something that will not help.
+  it('names the closure over the capacity when a closed site is also full', async () => {
+    member();
+    prismaMock.siteSettings.upsert.mockResolvedValue({
+      maxUsers: 50,
+      registrationStatus: 'closed'
+    } as never);
+    prismaMock.user.count.mockResolvedValue(50);
+
+    const res = await request(app).get('/api/profile/me/invites/eligibility');
+
+    expect(res.body.reason).toBe('registration_closed');
+  });
+
+  // The gate is 'closed' alone. An invite-only site is the one that needs
+  // invites most, so a later `!== 'open'` would break precisely the sites the
+  // feature exists for — and nothing else in the suite would notice.
+  it.each(['open', 'invite'] as const)(
+    'lets a member of a %s site send',
+    async (registrationStatus) => {
+      member();
+      prismaMock.siteSettings.upsert.mockResolvedValue({
+        maxUsers: 50,
+        registrationStatus
+      } as never);
+
+      const res = await request(app).get('/api/profile/me/invites/eligibility');
+
+      expect(res.body).toMatchObject({ canSend: true, reason: null });
+    }
+  );
+
+  // getSettings is an upsert. isSiteFull loads settings itself when given no
+  // cap, so the careless wiring doubles a write on every poll of this route.
+  it('reads settings once, handing the cap to the capacity check', async () => {
+    member();
+
+    await request(app).get('/api/profile/me/invites/eligibility');
+
+    expect(prismaMock.siteSettings.upsert).toHaveBeenCalledTimes(1);
   });
 });
 
