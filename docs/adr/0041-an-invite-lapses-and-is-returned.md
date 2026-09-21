@@ -2,6 +2,8 @@
 
 **Status: Accepted (2026-09-14).** Accepted as the gate on [#627](https://github.com/orphic-inc/stellar-api/issues/627), whose implementation follows this contract, the posture [ADR-0040](0040-capacity-is-counted-in-enabled-seats.md) took on #624. It records the decisions from the grill on that issue, [recorded on the issue](https://github.com/orphic-inc/stellar-api/issues/627#issuecomment-5671754407). Builds on [ADR-0039](0039-invite-supply-is-class-based-accrual.md), whose Decision 1 this amends.
 
+> **Amended 2026-09-21.** §9 is added, recording the answer to [#677](https://github.com/orphic-inc/stellar-api/issues/677) (closed as not planned) and to [#685](https://github.com/orphic-inc/stellar-api/issues/685). A closure does **not** lapse pending invites — the clock is the clock, in both directions — and the expiry PM stops asserting what the member may do next. §7's extension note is corrected below, because it quoted a sentence [#685](https://github.com/orphic-inc/stellar-api/issues/685) removed from the code.
+
 ## Context
 
 **`Invite.expires` was written and never read.** `createInvite` set it 30 days out, and `registerUser` checked only `status === 'pending'` and the email, so an invite key stayed usable forever. No commit had ever compared against the column.
@@ -77,7 +79,9 @@ A full site does not pause the clock. Pausing needs a record of when the site wa
 
 Every lapse writes an `invite.expired` audit row. The original inviter gets a System PM, sent after the transaction commits so a failed PM cannot undo a refund. `sendSystemMessage` refuses disabled recipients, which is the intended outcome. A member re-inviting their own address gets no PM, since they are the one who did it.
 
-_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). An inviter whose invite privileges are revoked gets no PM either, from the sweep or from a re-invite. Their invites lapsed because of the revoke, not because time ran out, and "you can invite that address again" would be false. The refund and the audit row are unchanged. Staff can PM the member about the revoke itself.)_
+_(Extended 2026-09-15, by [#636](https://github.com/orphic-inc/stellar-api/issues/636). An inviter whose invite privileges are revoked gets no PM either, from the sweep or from a re-invite. Their invites lapsed because of the revoke, not because time ran out, so "Your invite expired" would blame the clock for a moderation act. The refund and the audit row are unchanged. Staff can PM the member about the revoke itself.)_
+
+_(Corrected 2026-09-21, by [#685](https://github.com/orphic-inc/stellar-api/issues/685). That note originally gave a second ground — "'you can invite that address again' would be false" — quoting a sentence the PM no longer contains. §9 removed it. The suppression is unchanged and rests on the ground above, which always stood on its own.)_
 
 ### 8. `rejected` is dropped
 
@@ -95,6 +99,35 @@ _Unlike an expiry, the inviter is PMed only when staff write a message.)_
 _(Extended 2026-09-15, by [#640](https://github.com/orphic-inc/stellar-api/issues/640). A member can withdraw their own pending invite. The withdraw is the same `pending → cancelled` claim, scoped to the caller's invites, so another member's invite answers 404. It refunds, audits with `by: 'inviter'` and sends no PM. It needs no invite privileges._
 
 _**§5 changes:** a `cancelled` row holds its address until its original `expires`. Its key is refused at once, but the address is not free for a re-invite until then. Without this, a withdraw's refund would let a member send, withdraw and send again, mailing one address without limit. "Is this key usable" (`isInviteLapsed`) and "is this address free" (`isAddressFree`) are now separate rules in `inviteExpiry.ts`. The rule applies to staff cancels too.)_
+
+### 9. Site state does not move the invite clock, in either direction
+
+[#677](https://github.com/orphic-inc/stellar-api/issues/677) proposed that a closed site lapse its pending invites, so an operator closing registration would not leave undeliverable keys in flight for up to three days. **Declined**, and the reasoning is recorded here because the issue is otherwise closed and someone will think of it again.
+
+§6 already settled the mirror image: _"A full site does not pause the clock. Pausing needs a record of when the site was full, which nothing keeps."_ #677 asked for the same move on the other side — a site state that **accelerates** the clock rather than pausing it — and it fails for the same reason, plus a worse one of its own.
+
+**A pending invite already survives a closure.** `livePendingInviteWhere` gates on `status`, `expires`, `inviter.disabled` and `inviter.canInvite`; a closure touches none of them, and `registerUser`'s mode gate returns on `closed` **before any database work**, so the row is never read. Reopen inside the three days and the key works again.
+
+So lapsing on closure is a loss, not a fix:
+
+- **A closure shorter than the invite's remaining life** — today the invite survives and the invitee registers on reopening. Under the proposal it is destroyed at the sweep's next tick and has to be sent again.
+- **A closure longer than it** — the invite expires anyway, at most three days later, with the same refund.
+
+The whole benefit is a refund arriving up to three days sooner, and [#673](https://github.com/orphic-inc/stellar-api/issues/673) forbids spending that balance while the site is closed. It buys the member nothing until the site reopens, by which point the ordinary sweep has paid it. The invitee gains nothing either: their key is temporarily dead in both worlds, and the proposal makes it permanently dead instead.
+
+**And the cadence is not the safety net it looks like.** #677 argued that a closure reopening before the next hourly tick destroys nothing. The tick is process-relative — `STARTUP_DELAY_MS`, then `setInterval` — so a ten-minute closure has roughly a one-in-six chance of a tick landing inside it. Making it genuinely safe would need a deliberate grace period, which needs a `registrationClosedAt` stamp that does not exist. `SiteSettings.updatedAt` cannot stand in: **every** settings write bumps it, `maxUsers` and `approvedDomains` included. That is §6's "which nothing keeps", a second time.
+
+#### What the expiry PM may claim
+
+#677 was right about one thing, and [#685](https://github.com/orphic-inc/stellar-api/issues/685) fixes it. `expiredBody` ended with _"You can invite that address again"_ — a claim about **what the member may do next**, which seven gates own ([ADR-0043](0043-sending-an-invite-is-gated-on-the-inviter.md)) and none of which is visible from the sweep. On a closed or full site, or from ratio watch, poor standing or disabled downloads, the sentence was false.
+
+**Naming the cause instead is not soundly implementable**, for the same reason the grace period is not: the sweep sees the site as it is **now**, not across the invite's three days. A closure that opened and shut inside that window is invisible to it, and a site closed an hour ago would be blamed for an invite that had three open days to be used.
+
+What the sweep knows for certain is the row. After the claim, `isAddressFree` is unconditionally true, so the body states that the address is no longer held. The rule generalises:
+
+> A system PM states what the writer knows. It does not assert what the member may do next, because the gates own that and the writer cannot see them.
+
+`inviteExpiryJob.spec.ts` stands against the edit: it asserts the body carries no second-person capability claim, matching the looser phrasings too, so the sentence cannot return under a rewrite.
 
 ## Consequences
 

@@ -88,10 +88,24 @@ const expiredSubject = (refunded: boolean) =>
   refunded
     ? 'Your invite expired and has been returned'
     : 'Your invite expired';
+/**
+ * The closing sentence names the ADDRESS, not the member (#685).
+ *
+ * It used to read "You can invite that address again", which is a claim about
+ * what the member may do next — and seven gates own that answer (ADR-0043),
+ * none of them visible from here. On a closed or full site, or from ratio
+ * watch, poor standing or disabled downloads, the sentence was simply false.
+ *
+ * What the sweep knows for certain is the row: after the claim `isAddressFree`
+ * is unconditionally true, so the address really is free. Naming a CAUSE
+ * instead was rejected on #677 — the sweep sees the site as it is now, not as
+ * it was across the invite's three days, so any attribution would often be
+ * wrong.
+ */
 const expiredBody = (email: string, refunded: boolean) =>
   refunded
-    ? `Your invite to ${email} expired before it was used, so it has been returned to you. You can invite that address again.`
-    : `Your invite to ${email} expired before it was used. You can invite that address again.`;
+    ? `Your invite to ${email} expired before it was used, so it has been returned to you. That address is no longer held, so it can be invited again.`
+    : `Your invite to ${email} expired before it was used. That address is no longer held, so it can be invited again.`;
 
 /**
  * Tell the inviter. Call only AFTER the transaction commits, so a failed PM can
@@ -99,9 +113,13 @@ const expiredBody = (email: string, refunded: boolean) =>
  * `sendSystemMessage` itself, which is the intended outcome.
  *
  * An inviter whose invite privileges are revoked (#636) gets no PM either. Their
- * pending invites lapse because of the revoke, not because time ran out, and
- * "you can invite that address again" would be false. Staff tell them about the
- * revoke itself. Read at send time, so a restore before the PM is honoured.
+ * pending invites lapse because of the revoke, not because time ran out, so
+ * "Your invite expired" would misattribute a moderation act to the clock. Staff
+ * tell them about the revoke itself. Read at send time, so a restore before the
+ * PM is honoured.
+ *
+ * That reason used to be second to "'you can invite that address again' would
+ * be false", which #685 removed from the body. It stands on its own.
  */
 export const notifyInviteExpired = async (
   invite: LapsedInvite & { refunded: boolean }

@@ -52,6 +52,22 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **The invite expiry message no longer promises a send the gates may refuse**
+  ([#685](https://github.com/orphic-inc/stellar-api/issues/685)) — it ended "You can invite that address again", which is a
+  claim about what the member may do next. Seven gates own that
+  ([ADR-0043](docs/adr/0043-sending-an-invite-is-gated-on-the-inviter.md)) and
+  none is visible from the sweep, so the sentence was false on a closed or full
+  site, and from ratio watch, poor standing or disabled downloads.
+
+  It now states what the sweep actually knows: the address is no longer held.
+  Naming a cause was rejected — the sweep sees the site as it is now, not across
+  the invite's three days, so it would often blame the wrong thing.
+
+  The message had **no test of any kind**, so the copy could drift either way
+  unnoticed. `inviteExpiryJob.spec.ts` is new and pins the rule rather than the
+  wording: the body carries no second-person capability claim, matching looser
+  phrasings too, so it cannot return under a rewrite.
+
 - **`version:check` now covers `openapi.json`, the surface it claimed to check**
   ([#538](https://github.com/orphic-inc/stellar-api/issues/538)) — `versionConsistency.ts` opened by saying every version
   surface on the project is compared against the manifest. `openapi.json`
