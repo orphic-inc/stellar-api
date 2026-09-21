@@ -126,7 +126,7 @@ describe('revoking invite privileges', () => {
 
     expect(await statusOf('pending@example.com')).toBe('expired');
     expect(await balance(member.id)).toBe(1);
-    // "You can invite that address again" would be false while revoked.
+    // "Your invite expired" would blame the clock for a moderation act (#685).
     expect(await pmsTo(member.id)).toBe(0);
   });
 
