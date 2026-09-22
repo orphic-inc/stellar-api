@@ -1,7 +1,18 @@
+import type { Prisma } from '@prisma/client';
 import {
+  emitNotifications,
   extractMentionedUsernames,
   extractNewMentionedUsernames
 } from './notifications';
+import { recipientsWhoCanSee } from '../modules/notificationAccess';
+
+jest.mock('../modules/notificationAccess', () => ({
+  recipientsWhoCanSee: jest.fn()
+}));
+
+const canSee = recipientsWhoCanSee as jest.MockedFunction<
+  typeof recipientsWhoCanSee
+>;
 
 describe('extractMentionedUsernames', () => {
   it('extracts a single username', () => {
@@ -69,5 +80,59 @@ describe('extractNewMentionedUsernames', () => {
   it('returns empty array when no new quotes are introduced', () => {
     const result = extractNewMentionedUsernames('plain', 'also plain');
     expect(result).toEqual([]);
+  });
+});
+
+describe('emitNotifications (#695)', () => {
+  const createMany = jest.fn();
+  const tx = {
+    notification: { createMany }
+  } as unknown as Prisma.TransactionClient;
+
+  it('dedupes and drops the actor before asking who can see the target', async () => {
+    canSee.mockResolvedValue([2, 3]);
+    await emitNotifications(tx, {
+      userIds: [2, 3, 2, 9],
+      type: 'artist_release',
+      actorId: 9,
+      page: 'release',
+      pageId: 40
+    });
+    expect(canSee).toHaveBeenCalledWith(tx, 'release', 40, [2, 3]);
+  });
+
+  it('writes only the recipients who can see the target', async () => {
+    canSee.mockResolvedValue([3]);
+    await emitNotifications(tx, {
+      userIds: [2, 3],
+      type: 'forum_quote',
+      page: 'forums',
+      pageId: 5,
+      postId: 11
+    });
+    expect(createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          userId: 3,
+          type: 'forum_quote',
+          actorId: null,
+          page: 'forums',
+          pageId: 5,
+          postId: 11
+        }
+      ],
+      skipDuplicates: true
+    });
+  });
+
+  it('writes nothing when no recipient can see it', async () => {
+    canSee.mockResolvedValue([]);
+    await emitNotifications(tx, {
+      userIds: [2],
+      type: 'artist_release',
+      page: 'release',
+      pageId: 40
+    });
+    expect(createMany).not.toHaveBeenCalled();
   });
 });

@@ -204,22 +204,16 @@ export const createPost = async (
       where: { topicId: forumTopicId },
       select: { userId: true }
     });
-    const notifyUserIds = subs
-      .map((s) => s.userId)
-      .filter((uid) => uid !== authorId);
-    if (notifyUserIds.length > 0) {
-      await tx.notification.createMany({
-        data: notifyUserIds.map((uid) => ({
-          userId: uid,
-          type: 'forum_sub' as const,
-          actorId: authorId,
-          page: 'forums' as const,
-          pageId: forumTopicId,
-          postId: post.id
-        })),
-        skipDuplicates: true
-      });
-    }
+    // Through `emitNotifications`, not a direct write, so a subscriber who
+    // cannot read this forum is not notified (#695). It drops the author.
+    await emitNotifications(tx, {
+      userIds: subs.map((s) => s.userId),
+      type: 'forum_sub',
+      actorId: authorId,
+      page: 'forums',
+      pageId: forumTopicId,
+      postId: post.id
+    });
 
     const quotedUsernames = extractMentionedUsernames(body);
     if (quotedUsernames.length > 0) {

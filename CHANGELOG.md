@@ -351,6 +351,30 @@ All notable changes to stellar-api are documented here.
   no usable characters, such as `&&&`. An alias that normalizes onto its own
   target is refused with `400` too.
 
+- **Notifications no longer reach members who cannot see their target**
+  ([#695](https://github.com/orphic-inc/stellar-api/issues/695)) — an
+  `artist_release` went to every subscriber of a credited artist, including
+  members outside the release's private community. The notification list then
+  showed them its title.
+
+  The same gap affected quotes and subscriptions. A member quoted in a forum
+  above their class was sent the topic title, and so was a subscriber to a topic
+  they could not read. Comment quotes and subscriptions on private pages worked
+  the same way.
+
+  Every notification is now written only for recipients who can see its target
+  when it is sent: releases and contributions through the release access rule,
+  requests and community pages through community access, and forum topics
+  through the recipient's forum class. Artist, collage, news and notice pages
+  are site-wide.
+
+  The check runs once, at send time. Notifications sent before this change are
+  left as they are, and a member who loses access later keeps what they were
+  sent while they had it.
+
+  A member subscribed to two credited artists now gets one notification rather
+  than two.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added
