@@ -571,9 +571,6 @@
           "styledTooltips": {
             "type": "boolean"
           },
-          "paranoia": {
-            "type": "number"
-          },
           "notificationMethod": {
             "type": "string",
             "enum": [
@@ -611,7 +608,6 @@
           "id",
           "siteAppearance",
           "styledTooltips",
-          "paranoia",
           "notificationMethod",
           "showEmail",
           "showLastSeen",
@@ -12209,12 +12205,6 @@
                   "styledTooltips": {
                     "type": "boolean"
                   },
-                  "paranoia": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 3
-                  },
                   "avatar": {
                     "anyOf": [
                       {
@@ -12914,12 +12904,6 @@
                   },
                   "styledTooltips": {
                     "type": "boolean"
-                  },
-                  "paranoia": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 3
                   },
                   "notificationMethod": {
                     "type": "string",

@@ -664,7 +664,6 @@ describe('API auth/profile/user flows', () => {
         externalStylesheet: null,
         activeAuthorStylesheetId: null,
         styledTooltips: true,
-        paranoia: 0,
         notificationMethod: 'Popup' as const,
         showEmail: false,
         showLastSeen: false,
@@ -744,6 +743,31 @@ describe('API auth/profile/user flows', () => {
     expect(res.body.profile.profileTitle).toBe('New Title');
   });
 
+  // #586 / ADR-0046 — the defect this change exists to remove.
+  //
+  // `updateProfile` used to spread `paranoiaToVisibility(paranoia)` LAST, so any
+  // explicitly-sent show* value was overwritten on every request carrying a
+  // level at all. stellar-ui's settings form posted one unconditionally, which
+  // is why the five checkboxes could not ship: they would have arrived inert.
+  //
+  // A ticked box now reaches the writer, and the level is stripped by `validate()`.
+  it('honours an explicit show* flag and strips a paranoia level (#586)', async () => {
+    updateProfileMock.mockResolvedValue({ profile: {} } as never);
+
+    const res = await request(app).put('/api/profile/me').send({
+      paranoia: 3,
+      showRatioStats: true,
+      showEmail: true
+    });
+
+    expect(res.status).toBe(200);
+    expect(updateProfileMock).toHaveBeenCalledWith(
+      7,
+      { showRatioStats: true, showEmail: true },
+      { showMature: false }
+    );
+  });
+
   it('returns the current profile aggregate from /api/profile/me', async () => {
     getProfileByIdMock.mockResolvedValue({
       id: 7,
@@ -785,7 +809,6 @@ describe('API auth/profile/user flows', () => {
         externalStylesheet: null,
         activeAuthorStylesheetId: null,
         styledTooltips: true,
-        paranoia: 0,
         notificationMethod: 'Popup',
         showEmail: true,
         showLastSeen: true,
@@ -935,7 +958,6 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'dark',
       externalStylesheet: null,
       styledTooltips: true,
-      paranoia: 1,
       notificationMethod: 'Popup' as const,
       showEmail: false,
       showLastSeen: false,
@@ -961,7 +983,6 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'light',
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
-      paranoia: 2,
       avatar: 'https://example.com/avatar.png',
       notificationMethod: 'Popup' as const,
       showEmail: true,
@@ -977,6 +998,9 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'light',
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
+      // Still sent, deliberately: #586 removed `paranoia` from the schema, so
+      // `validate()` must STRIP it rather than forward it. The expectation
+      // below is exact, so a surviving key fails there.
       paranoia: 2,
       avatar: 'https://example.com/avatar.png',
       showEmail: true,
@@ -992,7 +1016,6 @@ describe('API auth/profile/user flows', () => {
       siteAppearance: 'light',
       externalStylesheet: 'https://example.com/style.css',
       styledTooltips: false,
-      paranoia: 2,
       avatar: 'https://example.com/avatar.png',
       showEmail: true,
       showLastSeen: true,

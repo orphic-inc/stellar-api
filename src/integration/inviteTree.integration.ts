@@ -89,7 +89,7 @@ describe('getInviteSubtreeRows', () => {
 });
 
 describe('getMemberInviteTreeView', () => {
-  it('nests the subtree and summarizes it, paranoia included in totals', async () => {
+  it('nests the subtree and summarizes it, hidden members included in totals', async () => {
     const { root, a, c } = await seedTree();
     const { tree, summary } = await getMemberInviteTreeView(root.id, false);
 

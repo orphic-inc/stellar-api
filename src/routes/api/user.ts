@@ -508,7 +508,7 @@ router.get(
 
 // GET /api/users/:id/invite-tree — a member's invite subtree + summary.
 // Own tree, or any tree with the invites-manage permission (which also lifts
-// the per-member paranoia gate for moderation).
+// the per-member privacy gate for moderation).
 router.get(
   '/:id/invite-tree',
   requireAuth,

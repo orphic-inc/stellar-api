@@ -80,7 +80,7 @@ describe('getPercentileSummary', () => {
     expect(summary.artistsAdded.raw).toBe(9);
   });
 
-  it('omits the raw value of a paranoia-gated dimension, keeping its percentile', async () => {
+  it('omits the raw value of a privacy-gated dimension, keeping its percentile', async () => {
     mockCounts(TOP_OF_EVERY_DIMENSION);
 
     const summary = await getPercentileSummary(user, activitySummary, {

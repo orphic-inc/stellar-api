@@ -33,6 +33,34 @@ All notable changes to stellar-api are documented here.
 
 ### Changed
 
+- **Breaking — privacy is the five `show*` flags; the `paranoia` level is gone**
+  ([#586](https://github.com/orphic-inc/stellar-api/issues/586),
+  [ADR-0046](docs/adr/0046-privacy-is-five-flags-not-a-level.md)) —
+  `UserSettings.paranoia` is **removed** from the response schema, from both
+  write doors and from the database.
+
+  **No gate ever read it.** Every visibility decision — profile reads, the stat
+  time-series, ranked-list eligibility, the invite-tree rollup — reads
+  `showEmail`, `showLastSeen`, `showContributedStats`, `showConsumedStats` and
+  `showRatioStats`. The level was inert, and the two doors that wrote it
+  disagreed: `PUT /profile/me` cascaded it over the five, overwriting any
+  explicitly-sent flag, while `PUT /users/settings` stored it bare.
+
+  That cascade is why the five could not ship as controls — they would have
+  arrived inert, since the settings form posts a level on every save. An
+  explicitly-sent flag now reaches the writer, which unblocks them.
+
+  **No member-facing behaviour changed for anyone using the settings form**: it
+  already wrote the five through the cascade, and those values are untouched.
+
+  **No backfill, deliberately.** A stored level disagreeing with a row's flags
+  was never in effect, so applying it now would retroactively change what other
+  members can see of someone.
+
+  Presets move to stellar-ui as buttons over the checkboxes, leaving no
+  server-side trace. `showMatureContent` is unaffected — it governs what _you_
+  see rather than what others see of you, and was always excluded ([#400](https://github.com/orphic-inc/stellar-api/issues/400)).
+
 - **A tag alias can no longer bury an official tag**
   ([#298](https://github.com/orphic-inc/stellar-api/issues/298),
   [ADR-0045 §3](docs/adr/0045-official-tags-annotate-an-open-vocabulary.md)) —

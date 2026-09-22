@@ -14,7 +14,6 @@ export const userSettingsSchema = z.object({
   siteAppearance: z.string().optional(),
   externalStylesheet: externalStylesheetUrl,
   styledTooltips: z.boolean().optional(),
-  paranoia: z.coerce.number().int().min(0).max(3).optional(),
   // The second avatar write path, and until #396 the laxer one: this schema had
   // no URL validation at all, so `PUT /api/users/settings` accepted anything a
   // string could hold while `PUT /api/profile/me` at least required a URL. #361

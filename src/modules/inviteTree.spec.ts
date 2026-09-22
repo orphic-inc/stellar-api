@@ -69,7 +69,7 @@ describe('buildInviteSubtree', () => {
     expect(buildInviteSubtree(rows(), 6)).toEqual([]);
   });
 
-  it('carries per-node fields through, including the paranoia flag', () => {
+  it('carries per-node fields through, including the stats-visible flag', () => {
     const node5 = flatten(buildInviteSubtree(rows(), 1)).find(
       (n) => n.userId === 5
     )!;
@@ -100,7 +100,7 @@ describe('summarizeInviteTree', () => {
     expect(s.depth).toBe(3); // member 6
   });
 
-  it('counts disabled, donor, and paranoia-hidden members', () => {
+  it('counts disabled, donor, and privacy-hidden members', () => {
     const s = summary();
     expect(s.disabledCount).toBe(1); // member 4
     expect(s.donorCount).toBe(1); // member 3
@@ -114,7 +114,7 @@ describe('summarizeInviteTree', () => {
     ]);
   });
 
-  it('totals the whole subtree INCLUDING paranoia-hidden members', () => {
+  it('totals the whole subtree INCLUDING privacy-hidden members', () => {
     // 100+200+10+30+5 = 345 contributed; 50+100+10+0+5 = 165 consumed
     expect(summary().total).toEqual({
       contributed: '345',

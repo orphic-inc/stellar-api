@@ -53,7 +53,6 @@ export const profileUpdateSchema = z.object({
   // server-side in updateProfile, not here — it spans two fields' runtime values.
   activeAuthorStylesheetId: z.number().int().positive().nullable().optional(),
   styledTooltips: z.boolean().optional(),
-  paranoia: z.coerce.number().int().min(0).max(3).optional(),
   notificationMethod: z
     .enum(['Disabled', 'Popup', 'Traditional', 'Push', 'Combined'])
     .optional(),
@@ -67,8 +66,9 @@ export const profileUpdateSchema = z.object({
   // `validate()` stripped the key and the write was unreachable — a 200 with the
   // old value. `settingsParity.spec.ts` pins the invariant that let that happen.
   //
-  // Unlike the five above it is NOT touched by `paranoiaToVisibility`: paranoia
-  // governs what others see of you, this governs what you see.
+  // Unlike the five above it governs what YOU see rather than what OTHERS see
+  // of you (#400). That distinction is why it survived #586, which removed the
+  // `paranoia` level: the five above are a privacy control, this one is not.
   showMatureContent: z.boolean().optional()
 });
 
