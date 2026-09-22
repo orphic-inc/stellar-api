@@ -50,4 +50,30 @@ describe('settings schema parity — the two doors onto UserSettings', () => {
     expect(profileKeys).toContain('showMatureContent');
     expect(settingsKeys).toContain('showMatureContent');
   });
+
+  // #586 / ADR-0046. `paranoia` was a level that NOTHING read — every visibility
+  // gate reads the five booleans below — and the two doors wrote it differently:
+  // `/profile/me` cascaded it over the five, `/users/settings` stored it bare.
+  // The five are the privacy control now, and presets are a stellar-ui
+  // affordance that leaves no server-side trace.
+  //
+  // Reintroducing it as an input is what would make the five checkboxes inert
+  // again, so this stands against that rather than against the name.
+  it('neither door accepts a paranoia level', () => {
+    expect(profileKeys).not.toContain('paranoia');
+    expect(settingsKeys).not.toContain('paranoia');
+  });
+
+  it('the five privacy flags are writable through both doors', () => {
+    for (const flag of [
+      'showEmail',
+      'showLastSeen',
+      'showContributedStats',
+      'showConsumedStats',
+      'showRatioStats'
+    ]) {
+      expect(profileKeys).toContain(flag);
+      expect(settingsKeys).toContain(flag);
+    }
+  });
 });

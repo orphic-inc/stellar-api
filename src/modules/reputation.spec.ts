@@ -844,7 +844,7 @@ describe('getReputation', () => {
   });
 });
 
-// ─── filterReputationView (paranoia-gated projection) ─────────────────────────
+// ─── filterReputationView (privacy-gated projection) ──────────────────────────
 
 describe('filterReputationView', () => {
   const crs = {

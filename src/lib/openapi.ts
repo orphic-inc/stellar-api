@@ -747,7 +747,6 @@ const UserSettings = registry.register(
     // exclusive with externalStylesheet.
     activeAuthorStylesheetId: z.number().nullable().optional(),
     styledTooltips: z.boolean(),
-    paranoia: z.number(),
     notificationMethod: z.enum([
       'Disabled',
       'Popup',
@@ -945,8 +944,8 @@ const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
 const InviteNode = registry.register('InviteNode', InviteNodeSchema);
 
 // PRD-01 Profile Integration: community-stats block. Null when the target's
-// paranoia hides all stats from this viewer; the reputation `ratio` dimension is
-// omitted (and the score recomputed) when consumed stats are hidden.
+// privacy flags hide their ratio stats from this viewer; the reputation `ratio`
+// dimension is omitted (and the score recomputed) when consumed stats are hidden.
 const CommunityStats = registry.register(
   'CommunityStats',
   z.object({

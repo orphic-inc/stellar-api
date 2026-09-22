@@ -696,7 +696,7 @@ export const getReputation = async (userId: number): Promise<CrsResult> => {
 };
 
 // Dimensions derived from a member's snatches (downloads/consumed). When a
-// viewer's paranoia hides consumed stats, these are dropped from the reputation
+// member's privacy flags hide consumed stats, these are dropped from the reputation
 // VIEW too, so the score they see can't leak the hidden activity. RatioScore is
 // the only consumed-derived dimension (ratio = contributed / consumed).
 export const SNATCH_DERIVED_DIMENSIONS = ['ratio'];
@@ -711,7 +711,7 @@ export const MODERATION_DIMENSIONS = ['inviteContagion'];
  * Project a computed CRS into a viewer-safe view by dropping dimensions the
  * viewer isn't entitled to and recomputing the displayed score from what
  * remains — so a gated viewer neither sees a hidden dimension nor can back it
- * out of the total. Two independent gates: `includeSnatchDerived` (paranoia —
+ * out of the total. Two independent gates: `includeSnatchDerived` (privacy —
  * hides consumed-derived `ratio`) and `includeModeration` (staff-only — hides
  * the invite-tree Contagion drag + clears the `suspect` flag). Pure.
  */

@@ -3,7 +3,7 @@
  *
  * Pure assembly + summary over adjacency rows: each member carries an
  * `inviterId` pointing at whoever invited them. The DB read (a recursive walk)
- * and the paranoia decision live in the read/route layer; these functions are
+ * and the privacy decision live in the read/route layer; these functions are
  * pure so the tree shape and aggregate stats are deterministically testable —
  * the same style as `computeStanding` / `ruleImpact`.
  *
@@ -24,7 +24,7 @@ export interface InviteTreeRow {
   isDonor: boolean;
   contributed: bigint;
   consumed: bigint;
-  /** False when the member's paranoia hides their byte stats from the viewer. */
+  /** False when the member's privacy flags hide their byte stats from the viewer. */
   statsVisible: boolean;
 }
 
@@ -57,10 +57,10 @@ export interface InviteTreeSummary {
   depth: number;
   disabledCount: number;
   donorCount: number;
-  /** Descendants whose stats are paranoia-hidden from the viewer. */
+  /** Descendants whose stats their privacy flags hide from the viewer. */
   hiddenCount: number;
   byRank: { rankName: string; count: number }[];
-  /** Whole-subtree contributed/consumed + ratio — includes paranoia-hidden members. */
+  /** Whole-subtree contributed/consumed + ratio — includes privacy-hidden members. */
   total: RatioStats;
   /** Direct-invitee (top level) contributed/consumed + ratio. */
   topLevel: RatioStats;
@@ -116,7 +116,7 @@ export const buildInviteSubtree = (
 
 /**
  * Aggregate an assembled subtree. Byte totals include every descendant —
- * paranoia hides a member's stats from *display*, never from the aggregate
+ * a privacy flag hides a member's stats from *display*, never from the aggregate
  * (an inviter is answerable for their whole tree's footprint).
  */
 export const summarizeInviteTree = (

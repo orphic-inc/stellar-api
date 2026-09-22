@@ -1,6 +1,6 @@
 /**
  * Unit tests for the PRD-01 Profile Integration community-stats block —
- * the pure shaping + paranoia gating in `buildCommunityStats`.
+ * the pure shaping + privacy gating in `buildCommunityStats`.
  */
 
 // Avoid pulling isomorphic-dompurify (jsdom ESM) through profile.ts → sanitize
@@ -42,7 +42,7 @@ const reputationWithContagion = {
 };
 
 describe('buildCommunityStats', () => {
-  it('returns null when any input is null (top paranoia tier hides all stats)', () => {
+  it('returns null when any input is null (showRatioStats off hides all stats)', () => {
     expect(
       buildCommunityStats(null, inviteView, reputation, true, true)
     ).toBeNull();

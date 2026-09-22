@@ -40,7 +40,6 @@ type UserSettingsView = {
   externalStylesheet: string | null;
   activeAuthorStylesheetId: number | null;
   styledTooltips: boolean;
-  paranoia: number;
   notificationMethod: NotificationMethod;
   showEmail: boolean;
   showLastSeen: boolean;
@@ -117,8 +116,8 @@ type ProfilePercentile = {
   rank: number;
   total: number;
   /**
-   * The contributing value behind the percentile. `null` when the viewer's
-   * paranoia gate hides that stat outright (contributed/consumed bytes) — the
+   * The contributing value behind the percentile. `null` when the member's
+   * privacy flags hide that stat outright (contributed/consumed bytes) — the
    * percentile itself stays visible, as it always has.
    */
   raw: number | null;
@@ -232,7 +231,6 @@ const PROFILE_BASE_SELECT = {
       // arms of one radio, so the pointer travels the contract next to the URL.
       activeAuthorStylesheetId: true,
       styledTooltips: true,
-      paranoia: true,
       notificationMethod: true,
       showEmail: true,
       showLastSeen: true,
@@ -866,12 +864,12 @@ interface InviteSummaryView {
 
 /**
  * Shape the PRD-01 Profile Integration community-stats block from already-fetched
- * inputs. Pure so the paranoia gating is testable without a DB:
- *  - any input `null` (the caller didn't fetch it because the top paranoia tier
- *    hides every stat) → the whole block is `null`.
- *  - `includeSnatchDerived` false (consumed stats hidden, paranoia ≥ 2) → the
- *    snatch-derived (`ratio`) dimension drops out of the reputation view and its
- *    score is recomputed (see `filterReputationView`).
+ * inputs. Pure so the privacy gating is testable without a DB:
+ *  - any input `null` (the caller didn't fetch it because `showRatioStats` is
+ *    off) → the whole block is `null`.
+ *  - `includeSnatchDerived` false (`showConsumedStats` off) → the snatch-derived
+ *    (`ratio`) dimension drops out of the reputation view and its score is
+ *    recomputed (see `filterReputationView`).
  */
 export const buildCommunityStats = (
   friendCount: number | null,
@@ -933,8 +931,8 @@ const buildProfileView = async (
   const canSeeSnatches = viewer.isOwner || viewer.isStaff;
 
   // PRD-01 Profile Integration: the community-stats block (friends count, invite
-  // summary, reputation) is visible unless the highest paranoia tier hides every
-  // stat — same gate as ratio/buffer (`canSeeRatio`). Compute it only when
+  // summary, reputation) is visible unless `showRatioStats` is off — the same
+  // gate as ratio/buffer (`canSeeRatio`). Compute it only when
   // visible so non-visible profile loads don't pay for the extra queries.
   const [
     activitySummary,
@@ -1043,7 +1041,6 @@ const buildProfileView = async (
           externalStylesheet: settings.externalStylesheet,
           activeAuthorStylesheetId: settings.activeAuthorStylesheetId,
           styledTooltips: settings.styledTooltips,
-          paranoia: settings.paranoia,
           notificationMethod: settings.notificationMethod,
           showEmail: settings.showEmail,
           showLastSeen: settings.showLastSeen,
@@ -1128,20 +1125,6 @@ export const getProfileByLookup = async (
   );
 };
 
-// Paranoia is the single privacy control. Each level hides progressively more:
-//   0 = fully visible; 1 = hide email + last-seen; 2 = also hide contributed/
-//   consumed stats; 3 = also hide ratio/buffer.
-// NOTE: showMatureContent is deliberately NOT here (#400). Paranoia governs what
-// OTHERS can see of you; the mature gate governs what YOU see. Raising paranoia
-// must not silently change a member's own content preferences.
-const paranoiaToVisibility = (level: number) => ({
-  showEmail: level < 1,
-  showLastSeen: level < 1,
-  showContributedStats: level < 2,
-  showConsumedStats: level < 2,
-  showRatioStats: level < 3
-});
-
 export const updateProfile = async (
   userId: number,
   data: {
@@ -1153,7 +1136,6 @@ export const updateProfile = async (
     externalStylesheet?: string;
     activeAuthorStylesheetId?: number | null;
     styledTooltips?: boolean;
-    paranoia?: number;
     notificationMethod?: NotificationMethod;
     showEmail?: boolean;
     showLastSeen?: boolean;
@@ -1258,10 +1240,6 @@ export const updateProfile = async (
         }),
         ...(data.showMatureContent !== undefined && {
           showMatureContent: data.showMatureContent
-        }),
-        ...(data.paranoia !== undefined && {
-          paranoia: data.paranoia,
-          ...paranoiaToVisibility(data.paranoia)
         })
       }
     })

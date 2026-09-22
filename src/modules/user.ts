@@ -33,8 +33,8 @@ export const getUserSettings = async (userId: number) => {
   if (!settings) return null;
   // ircNick holds only a *verified* nick (ADR-0015), so non-null ⇒ verified. We
   // surface it self-only here (this route reads the caller's own settings) so the
-  // UI can render "currently linked: X" — the public profile deliberately omits it
-  // (paranoia) since it's not in PROFILE_BASE_SELECT (#201).
+  // UI can render "currently linked: X" — the public profile deliberately omits
+  // it for privacy, since it's not in PROFILE_BASE_SELECT (#201).
   return { ...settings, ircNick: user.ircNick };
 };
 
@@ -44,7 +44,6 @@ export const updateUserSettings = async (
     siteAppearance?: string;
     externalStylesheet?: string;
     styledTooltips?: boolean;
-    paranoia?: number;
     avatar?: string;
     notificationMethod?:
       'Disabled' | 'Popup' | 'Traditional' | 'Push' | 'Combined';
@@ -75,7 +74,6 @@ export const updateUserSettings = async (
         ...(data.styledTooltips !== undefined && {
           styledTooltips: data.styledTooltips
         }),
-        ...(data.paranoia !== undefined && { paranoia: data.paranoia }),
         ...(data.notificationMethod !== undefined && {
           notificationMethod: data.notificationMethod
         }),
@@ -239,7 +237,6 @@ export interface InviteSubtreeRow {
   disabled: boolean;
   isDonor: boolean;
   rankName: string;
-  paranoia: number;
   showContributedStats: boolean;
   showConsumedStats: boolean;
   dateRegistered: Date;
@@ -292,7 +289,6 @@ export const getInviteSubtreeRows = async (
       userRank: { select: { name: true } },
       userSettings: {
         select: {
-          paranoia: true,
           showContributedStats: true,
           showConsumedStats: true
         }
@@ -311,7 +307,6 @@ export const getInviteSubtreeRows = async (
       disabled: u.disabled,
       isDonor: u.isDonor,
       rankName: u.userRank?.name ?? '',
-      paranoia: u.userSettings?.paranoia ?? 0,
       showContributedStats: u.userSettings?.showContributedStats ?? true,
       showConsumedStats: u.userSettings?.showConsumedStats ?? true,
       dateRegistered: u.dateRegistered,
@@ -369,7 +364,7 @@ export interface InviteTreeViewNode {
   isDonor: boolean;
   disabled: boolean;
   depth: number;
-  /** Null when the member's stats are paranoia-hidden from this viewer. */
+  /** Null when the member's privacy flags hide their stats from this viewer. */
   stats: { contributed: string; consumed: string; ratio: string } | null;
   children: InviteTreeViewNode[];
 }

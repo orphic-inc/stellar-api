@@ -417,7 +417,6 @@ model UserSettings {
   siteAppearance           String             @default("sublime")
   externalStylesheet       String?
   styledTooltips           Boolean            @default(true)
-  paranoia                 Int                @default(0)
   notificationMethod       NotificationMethod @default(Traditional)
   showEmail                Boolean            @default(false)
   showLastSeen             Boolean            @default(false)
