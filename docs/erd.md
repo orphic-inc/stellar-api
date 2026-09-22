@@ -371,6 +371,16 @@ erDiagram
     }
   
 
+  "notification_filters" {
+
+    }
+  
+
+  "notification_filter_hits" {
+
+    }
+  
+
   "tags" {
 
     }
@@ -768,6 +778,10 @@ erDiagram
     "comment_subscriptions" }o--|| users : "user"
     "notifications" }o--|| users : "user"
     "notifications" }o--|o users : "actor"
+    "notification_filters" }o--|| users : "user"
+    "notification_filter_hits" }o--|| notification_filters : "filter"
+    "notification_filter_hits" }o--|| users : "user"
+    "notification_filter_hits" }o--|| contributions : "contribution"
     "tag_aliases" }o--|| tags : "goodTag"
     "tag_aliases" }o--|| users : "createdBy"
     "release_histories" }o--|| releases : "release"

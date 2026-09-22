@@ -55,6 +55,7 @@ import assetRouter from './routes/api/asset';
 import commentsRouter from './routes/api/comments';
 import subscriptionsRouter from './routes/api/subscriptions';
 import notificationsRouter from './routes/api/notifications';
+import notificationFiltersRouter from './routes/api/notificationFilters';
 import postsRouter from './routes/api/posts';
 import forumRouter from './routes/api/forum/forumRoute';
 import forumCategoryRouter from './routes/api/forum/forumCategory';
@@ -198,6 +199,7 @@ export const createApp = () => {
   app.use('/api/comments', commentsRouter);
   app.use('/api/subscriptions', subscriptionsRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/notification-filters', notificationFiltersRouter);
   app.use('/api/posts', postsRouter);
   app.use('/api/forums/categories', forumCategoryRouter);
   app.use('/api/forums/polls', forumPollRouter);

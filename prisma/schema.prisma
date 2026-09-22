@@ -339,17 +339,17 @@ model StaffGroup {
 }
 
 model UserRank {
-  id                    Int                 @id @default(autoincrement())
-  level                 Int
-  name                  String
-  permissions           Json
-  secondary             Boolean             @default(false)
-  permittedForumIds     Int[]               @default([])
-  color                 String              @default("")
-  badge                 String              @default("")
-  uploadRequired        Int                 @default(0)
-  personalCollageLimit  Int                 @default(0)
-  authorStylesheetLimit Int                 @default(0)
+  id                      Int                 @id @default(autoincrement())
+  level                   Int
+  name                    String
+  permissions             Json
+  secondary               Boolean             @default(false)
+  permittedForumIds       Int[]               @default([])
+  color                   String              @default("")
+  badge                   String              @default("")
+  uploadRequired          Int                 @default(0)
+  personalCollageLimit    Int                 @default(0)
+  authorStylesheetLimit   Int                 @default(0)
   /// How many stylesheet assets a member of this rank may upload (#342). NOTE:
   /// the semantic is the OPPOSITE of authorStylesheetLimit above — here `0`
   /// means none, `null` means unlimited, and a positive N is the cap. The
@@ -357,25 +357,31 @@ model UserRank {
   /// allowance scales up the ladder like personalCollageLimit; staff are null
   /// (uncapped). Default 0, so a rank created without an explicit value can
   /// upload nothing rather than everything.
-  assetLimit            Int?                @default(0)
+  assetLimit              Int?                @default(0)
   /// Invites added to a member of this rank each handout period (#282,
   /// ADR-0039). `0` means this class earns none, and is the default precisely
   /// so a rank that predates the feature hands out nothing until staff opts it
   /// in. Never null — unlike `assetLimit` directly above, there is no
   /// "unlimited" state here: an uncapped invite faucet is not a thing we want
   /// expressible.
-  inviteGrantPerPeriod  Int                 @default(0)
+  inviteGrantPerPeriod    Int                 @default(0)
   /// Ceiling the accrual clamps to. `0` means a member of this rank holds no
   /// invites, so a nonzero grant with a zero cap is inert rather than
   /// contradictory. Same `0`-means-none reading as the field above.
-  inviteCap             Int                 @default(0)
-  displayStaff          Boolean             @default(false)
-  staffGroupId          Int?
-  staffGroup            StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
-  users                 User[]
-  secondaryUsers        UserSecondaryRank[]
-  promotionRulesFrom    RankPromotionRule[] @relation("RankPromotionFrom")
-  promotionRulesTo      RankPromotionRule[] @relation("RankPromotionTo")
+  inviteCap               Int                 @default(0)
+  /// How many contribution notification filters a member of this rank may keep
+  /// (#263, ADR-0049). The `assetLimit` semantic: `0` means the rank cannot use
+  /// filters at all, `null` means unlimited, a positive N is the cap. It is the
+  /// only gate — there is no permission key beside it, so the two cannot
+  /// disagree. Default 0, so no rank has filters until staff opts it in.
+  notificationFilterLimit Int?                @default(0)
+  displayStaff            Boolean             @default(false)
+  staffGroupId            Int?
+  staffGroup              StaffGroup?         @relation(fields: [staffGroupId], references: [id], onDelete: SetNull)
+  users                   User[]
+  secondaryUsers          UserSecondaryRank[]
+  promotionRulesFrom      RankPromotionRule[] @relation("RankPromotionFrom")
+  promotionRulesTo        RankPromotionRule[] @relation("RankPromotionTo")
 
   @@unique([level])
   @@unique([name])
@@ -554,6 +560,8 @@ model User {
   artistSubscriptions      ArtistSubscription[]
   notifications            Notification[]                   @relation("NotificationUser")
   actedNotifications       Notification[]                   @relation("NotificationActor")
+  notificationFilters      NotificationFilter[]
+  notificationFilterHits   NotificationFilterHit[]
   globalNotices            GlobalNotice[]
   blogs                    Blog[]
   posts                    Post[]
@@ -1360,21 +1368,21 @@ model Release {
 }
 
 model Contribution {
-  id                      Int                   @id @default(autoincrement())
+  id                      Int                     @id @default(autoincrement())
   userId                  Int
-  user                    User                  @relation(fields: [userId], references: [id])
+  user                    User                    @relation(fields: [userId], references: [id])
   releaseId               Int
-  release                 Release               @relation(fields: [releaseId], references: [id])
+  release                 Release                 @relation(fields: [releaseId], references: [id])
   contributorId           Int
-  contributor             Contributor           @relation(fields: [contributorId], references: [id])
-  releaseDescription      String?               @db.VarChar(1000)
-  consumers               Consumer[]            @relation("ContributionConsumers")
-  collaborators           Artist[]              @relation("ContributionCollaborators")
+  contributor             Contributor             @relation(fields: [contributorId], references: [id])
+  releaseDescription      String?                 @db.VarChar(1000)
+  consumers               Consumer[]              @relation("ContributionConsumers")
+  collaborators           Artist[]                @relation("ContributionCollaborators")
   comments                Comment[]
   downloadUrl             String
   sizeInBytes             BigInt?
   approvedAccountingBytes BigInt?
-  linkStatus              LinkHealthStatus      @default(UNKNOWN)
+  linkStatus              LinkHealthStatus        @default(UNKNOWN)
   linkCheckedAt           DateTime?
   linkStatusChangedAt     DateTime?
   // Cumulative confirmed-PASS uptime, the substrate for the lifetime link-health
@@ -1383,20 +1391,21 @@ model Contribution {
   // PASS segment began (null when not currently PASS). Live uptime =
   // healthyMs + (healthySince ? now - healthySince : 0). The time analog of
   // User.contributed — a substrate accumulator, not a score (ADR-0007).
-  healthyMs               BigInt                @default(0)
+  healthyMs               BigInt                  @default(0)
   healthySince            DateTime?
   // Ratio-exempt flag (PRD-06 #4). Read at consumption time in downloads.ts to
   // suppress accrual; staff-settable and audited. See RatioExempt.
-  ratioExempt             RatioExempt           @default(NONE)
+  ratioExempt             RatioExempt             @default(NONE)
   type                    FileType
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
   Request                 Request[]
   fills                   RequestFill[]
   downloadAccessGrants    DownloadAccessGrant[]
   reports                 ContributionReport[]
+  notificationFilterHits  NotificationFilterHit[]
   editionId               Int
-  edition                 Edition               @relation(fields: [editionId], references: [id])
+  edition                 Edition                 @relation(fields: [editionId], references: [id])
   releaseFile             ReleaseFile?
 
   @@index([userId])
@@ -1991,6 +2000,67 @@ model Notification {
 
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+/// A member's saved watch over new contributions (#263, ADR-0049).
+///
+/// Every list is an AND of "empty, or the contribution has one of these", so an
+/// empty list places no constraint. A contribution missing a value (no bitrate,
+/// no media) matches only a filter that leaves that list empty. `tags` and
+/// `notTags` hold canonical names (#689); `artistIds` hold artist ids, matched
+/// against release credits.
+model NotificationFilter {
+  id                  Int                     @id @default(autoincrement())
+  userId              Int
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label               String                  @db.VarChar(100)
+  artistIds           Int[]                   @default([])
+  tags                String[]                @default([])
+  notTags             String[]                @default([])
+  communityIds        Int[]                   @default([])
+  releaseTypes        ReleaseType[]           @default([])
+  releaseCategories   ReleaseCategory[]       @default([])
+  fileTypes           FileType[]              @default([])
+  bitrates            Bitrate[]               @default([])
+  media               ReleaseMedia[]          @default([])
+  /// Inclusive bounds on the release year or the edition year; either may be
+  /// set alone.
+  fromYear            Int?
+  toYear              Int?
+  /// Only the first contribution on a release to satisfy THIS filter's
+  /// `fileTypes` and `bitrates` — not only the first contribution on the release.
+  newReleasesOnly     Boolean                 @default(false)
+  /// Skip a release with more than two main-class credits.
+  excludeCompilations Boolean                 @default(false)
+  /// Match `artistIds` through main-class credits only.
+  mainCreditsOnly     Boolean                 @default(false)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  hits                NotificationFilterHit[]
+
+  @@index([userId])
+  @@map("notification_filters")
+}
+
+/// One filter matching one contribution (#263, ADR-0049). A contribution three
+/// filters caught is three rows, so each filter's own view is complete; the
+/// member-facing count and list work per contribution instead.
+model NotificationFilterHit {
+  id             Int                @id @default(autoincrement())
+  filterId       Int
+  filter         NotificationFilter @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  /// Denormalized from the filter, for the unread count and the combined list.
+  userId         Int
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributionId Int
+  contribution   Contribution       @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  readAt         DateTime?
+  createdAt      DateTime           @default(now())
+
+  @@unique([filterId, contributionId])
+  @@index([userId, readAt])
+  @@index([contributionId])
+  @@map("notification_filter_hits")
 }
 
 // ─── Content ──────────────────────────────────────────────────────────────────

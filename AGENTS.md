@@ -237,6 +237,8 @@ src/
     ratioPolicy.ts          # Ratio policy evaluation
     ratioPolicyRules.ts     # Ratio state machine (#646, ADR-0044) — pure: row, ratio and clock → one transition; no DB
     ratioPolicyJob.ts       # Daily sweep, no mode switch (#646): applies ratioPolicyRules to watched and ratio-disabled members, one caught evaluation each
+    notificationFilters.ts  # Contribution notification filters (#263, ADR-0049): rank allowance, filter create/update/delete, the post-commit matcher, per-contribution hit reads
+    notificationFilterMatch.ts # The filter predicate (#263) — pure: contribution facts and one filter → whether it matches; no database
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
     settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)
@@ -346,6 +348,7 @@ src/
     settings.ts             # GET|PUT /settings — site-wide settings (admin)
     profile.ts              # /me, /user/:id, PUT /me, DELETE /, POST /referral/create-invite
     notifications.ts        # GET /, DELETE /:id
+    notificationFilters.ts  # Filter create/list/update/delete + hits (read, catch up, clear read) — gated on the rank's notificationFilterLimit (#263)
     subscriptions.ts        # POST /subscribe, GET /, POST /subscribe-comments
     comments.ts             # GET /, GET /:id, POST /, PUT /:id, DELETE /:id
     posts.ts                # Blog posts + comments
