@@ -22723,11 +22723,11 @@
             }
           },
           "400": {
-            "description": "Invalid path parameters or request body",
+            "description": "A tag name has no usable characters once normalized (#689), or the request is invalid",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -35074,11 +35074,11 @@
             }
           },
           "400": {
-            "description": "Invalid request body",
+            "description": "`badTag` has no usable characters once normalized, or normalizes to the name of its own target (#689); or the request is invalid",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -35193,11 +35193,11 @@
             }
           },
           "400": {
-            "description": "Invalid path parameters or request body",
+            "description": "`badTag` has no usable characters once normalized, or normalizes to the name of its own target (#689); or the request is invalid",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }
@@ -35396,7 +35396,7 @@
         },
         "responses": {
           "201": {
-            "description": "Tag promoted. Created when absent, and the name may differ from the one sent: it is case-folded and redirected through the alias table.",
+            "description": "Tag promoted. Created when absent, and the name may differ from the one sent: it is normalized (#689) and redirected through the alias table.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35406,11 +35406,11 @@
             }
           },
           "400": {
-            "description": "Invalid request body",
+            "description": "A tag name has no usable characters once normalized (#689), or the request is invalid",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/MsgResponse"
                 }
               }
             }

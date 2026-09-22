@@ -56,6 +56,8 @@ A release page has no use for it — the legacy one cannot distinguish a canonic
 
 ### 5. Names are folded on the promote path only
 
+> **Superseded by [ADR-0047](0047-a-tag-name-has-one-canonical-form.md)** (#689): every tag name now takes one canonical form, on every path. This section is kept as it was written.
+
 `foldTagName` lowercases and trims, and only `promoteTag` calls it. Tag names are unnormalized site-wide: `Tag.name` is case-sensitive in Postgres, `normalizeTags` (`contribution.ts:55`) only splits and trims, and `useReleaseWorkbench.ts:110` in stellar-ui lowercases in the **browser** for one of the two member write paths.
 
 So `rock` and `Rock` are two rows today, and this ADR does not fix that. What it does fix is the curated set holding both, which is the one place the inconsistency is least excusable. Folding the member write paths as well needs a migration merging existing case-variant rows along with their `ReleaseTag` and `ArtistTag` children, and is its own issue.
@@ -68,3 +70,4 @@ So `rock` and `Rock` are two rows today, and this ADR does not fix that. What it
 - Promotion and demotion both write an audit row — `tag.promote` and `tag.demote`. The promote row carries the name as typed alongside the name it resolved to, which is the only record that a fold or an alias redirect happened.
 - A fresh install has an empty curated set. Nothing seeds one, because promotion mints and a seeded genre list would presume what the site is about.
 - Tag rows are never deleted in production — the only `deleteMany` is devTools cleanup, guarded to `seed.*` names — so an official tag persists until it is demoted.
+  - _Superseded in part by [ADR-0047](0047-a-tag-name-has-one-canonical-form.md):_ its migration deletes the merged-away variants, carrying `isOfficial` to the survivor.

@@ -1,5 +1,6 @@
 import { Prisma, Top10SnapshotType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { resolveTagNames } from './tag';
 import { computeRatio } from './ratio';
 import { primaryArtist } from './releaseCredits';
 import type {
@@ -111,12 +112,11 @@ function windowStart(type: string): Date | null {
   }
 }
 
+// Names go through the tag name rule and aliases (#689, ADR-0047), so an
+// exclusion finds the same tag a write would have stored.
 async function resolveExcludeTagIds(excludeTags?: string): Promise<number[]> {
   if (!excludeTags) return [];
-  const names = excludeTags
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+  const names = await resolveTagNames(excludeTags.split(','));
   if (names.length === 0) return [];
   const tags = await prisma.tag.findMany({
     where: { name: { in: names } },

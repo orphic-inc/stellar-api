@@ -11,6 +11,7 @@ import {
 } from '../../modules/releaseGroup';
 import { forumReadableWhere } from '../../modules/forumAccess';
 import { computeRatio } from '../../modules/ratio';
+import { resolveTagNames } from '../../modules/tag';
 import { validateQuery, parsedQuery } from '../../middleware/validate';
 import { parsedPage, paginatedResponse } from '../../lib/pagination';
 import {
@@ -37,16 +38,31 @@ const router = Router();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildTagWhere(
-  tags: string | undefined,
-  tagMode: 'any' | 'all'
-): object | undefined {
-  const names = tags
+/**
+ * The tag names a `tags` filter asks for, through the tag name rule and aliases
+ * (#689, ADR-0047) exactly as a write would take them — or `undefined` when it
+ * asks for none. A filter whose every name normalizes away comes back EMPTY
+ * rather than `undefined`, so it matches nothing instead of being ignored.
+ */
+async function resolveTagFilter(
+  tags: string | undefined
+): Promise<string[] | undefined> {
+  const asked = tags
     ?.split(',')
     .map((t) => t.trim())
     .filter(Boolean);
-  if (!names?.length) return undefined;
-  return tagMode === 'all'
+  if (!asked?.length) return undefined;
+  return resolveTagNames(asked);
+}
+
+// An empty `AND` matches everything, so `all` falls back to the `in` form when
+// no name survived: `in: []` matches nothing, which is what was asked for.
+function buildTagWhere(
+  names: string[] | undefined,
+  tagMode: 'any' | 'all'
+): object | undefined {
+  if (!names) return undefined;
+  return tagMode === 'all' && names.length > 0
     ? {
         AND: names.map((name) => ({
           releaseTags: { some: { tag: { name } } }
@@ -56,15 +72,11 @@ function buildTagWhere(
 }
 
 function buildArtistTagWhere(
-  tags: string | undefined,
+  names: string[] | undefined,
   tagMode: 'any' | 'all'
 ): object | undefined {
-  const names = tags
-    ?.split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
-  if (!names?.length) return undefined;
-  return tagMode === 'all'
+  if (!names) return undefined;
+  return tagMode === 'all' && names.length > 0
     ? { AND: names.map((name) => ({ tags: { some: { tag: { name } } } })) }
     : { tags: { some: { tag: { name: { in: names } } } } };
 }
@@ -178,10 +190,10 @@ function buildReleaseScalarWhere(
  * is independently small, and grouping them by the spine they target is how
  * the original block was already commented.
  */
-function buildReleaseWhere(
+async function buildReleaseWhere(
   q: ReleaseFilterQuery,
   communityIds: number[] | undefined
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const where: Record<string, unknown> = {
     ...buildReleaseTextWhere(q),
     ...buildReleaseScalarWhere(q)
@@ -200,7 +212,7 @@ function buildReleaseWhere(
 
   // Assigned last, so `tagMode=all`'s `AND` array lands on the finished object
   // exactly as it did when this was inline.
-  const tagPredicate = buildTagWhere(q.tags, q.tagMode);
+  const tagPredicate = buildTagWhere(await resolveTagFilter(q.tags), q.tagMode);
   if (tagPredicate) Object.assign(where, tagPredicate);
 
   return where;
@@ -300,7 +312,7 @@ router.get(
         : [q.communityId]
       : undefined;
 
-    const where = buildReleaseWhere(q, communityIds);
+    const where = await buildReleaseWhere(q, communityIds);
 
     // Every query below reads `scoped`, never `where` — a release in a PRIVATE
     // community the caller does not belong to must not appear in a search, the
@@ -369,7 +381,7 @@ router.get(
       viewerId: req.user.id,
       // The same filters the release search builds — they decide which groups
       // match, not which members are shown.
-      releaseWhere: buildReleaseWhere(q, communityIds),
+      releaseWhere: await buildReleaseWhere(q, communityIds),
       skip: pg.skip,
       take: pg.limit,
       orderBy: q.orderBy,
@@ -398,7 +410,10 @@ router.get(
     const q = parsedQuery<SearchArtistsQuery>(res);
     const pg = parsedPage(res);
 
-    const tagPredicate = buildArtistTagWhere(q.tags, q.tagMode);
+    const tagPredicate = buildArtistTagWhere(
+      await resolveTagFilter(q.tags),
+      q.tagMode
+    );
 
     // A withdrawn artist is not a search result (#509 F3 soft delete).
     const where: Record<string, unknown> = { deletedAt: null };

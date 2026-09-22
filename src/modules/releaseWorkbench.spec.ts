@@ -294,6 +294,19 @@ describe('releaseWorkbench session', () => {
     });
   });
 
+  it('refuses a tag name with no usable characters (#689)', async () => {
+    const session = await releaseWorkbench.open({
+      actorId: 7,
+      communityId: 1,
+      releaseId: 3
+    });
+    await expect(session.addTag({ name: '&&&' })).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Tag name has no usable characters'
+    });
+    expect(prismaMock.tag.upsert).not.toHaveBeenCalled();
+  });
+
   it('reverts history through the session seam', async () => {
     prismaMock.contribution.findFirst.mockResolvedValue(null as never);
     prismaMock.releaseHistory.findFirst.mockResolvedValue({

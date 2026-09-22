@@ -9,9 +9,15 @@ import {
   makeBBCodeForumPost,
   makeReleaseDescription,
   makeCommunityName,
-  makeWikiSlug
+  makeWikiSlug,
+  GENRE_TAGS,
+  ERA_TAGS,
+  DESCRIPTOR_TAGS
 } from './contentFactory';
 import { SeedContext } from './seedRandom';
+import { normalizeTagName } from '../tag';
+
+jest.mock('../../lib/prisma', () => ({ prisma: {} }));
 
 describe('makeUsername', () => {
   it('returns a non-empty string', () => {
@@ -91,6 +97,14 @@ describe('makeTagSet', () => {
       const tags = makeTagSet(ctx, true);
       expect(tags.length).toBeGreaterThanOrEqual(1);
       expect(tags.length).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('draws only names already in canonical form (#689)', () => {
+    // The generator normalizes before minting anyway; this keeps the pools
+    // honest, so a seeded name never differs from the one a member would type.
+    for (const t of [...GENRE_TAGS, ...ERA_TAGS, ...DESCRIPTOR_TAGS]) {
+      expect(normalizeTagName(t)).toBe(t);
     }
   });
 

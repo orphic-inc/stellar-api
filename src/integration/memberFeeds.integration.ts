@@ -34,6 +34,9 @@ afterAll(async () => {
 
 let seq = 0;
 const tag = (prefix: string) => `${prefix}-${Date.now()}-${seq++}`;
+// Dot-separated, so the name is already canonical (#689): the feed filter
+// normalizes what it is given before matching.
+const tagName = (prefix: string) => `${prefix}.${Date.now()}.${seq++}`;
 
 const createUser = async (name: string) => {
   const rank = await testPrisma.userRank.findFirstOrThrow();
@@ -223,12 +226,12 @@ describe('Member Feed reads against a real database', () => {
       title: 'Untagged'
     });
     const good = await testPrisma.tag.create({
-      data: { name: tag('electronic') }
+      data: { name: tagName('electronic') }
     });
     await testPrisma.releaseTag.create({
       data: { releaseId: tagged.id, tagId: good.id }
     });
-    const badName = tag('electronica');
+    const badName = tagName('electronica');
     await testPrisma.tagAlias.create({
       data: { badTag: badName, goodTagId: good.id, createdById: uploader.id }
     });

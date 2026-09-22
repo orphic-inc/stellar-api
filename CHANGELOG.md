@@ -299,6 +299,30 @@ All notable changes to stellar-api are documented here.
   `invite` mode is unchanged, capacity wording is unchanged, and an accepted
   invite stays spent.
 
+- **A tag name has one canonical form**
+  ([#689](https://github.com/orphic-inc/stellar-api/issues/689),
+  [ADR-0047](docs/adr/0047-a-tag-name-has-one-canonical-form.md)) —
+  `rock`, `Rock` and `ROCK` were three tags, and so were `hip hop`, `hip-hop`
+  and `hip.hop`. The write paths disagreed: the contribution path did not fold
+  case at all, while the workbench and promotion did.
+
+  Every tag name is now lowercased, separators become `.`, and anything else
+  outside `[a-z0-9.]` is dropped. `Hip Hop` is stored as `hip.hop`, and
+  `Drum & Bass` as `drum.bass`.
+
+  The rule runs inside the alias resolver, so contribution, workbench add,
+  promotion and both alias writes all take it. Release search, artist search,
+  the top-10 exclusion and the feed filter resolve names the same way.
+
+  A migration merges existing variants into one tag. It keeps the row already
+  spelled canonically, or else the official one, and keeps curation. A release
+  carrying two variants keeps one of them. Each alias dropped along the way is
+  reported in the migration output.
+
+  Workbench add, promotion and both alias writes answer `400` for a name with
+  no usable characters, such as `&&&`. An alias that normalizes onto its own
+  target is refused with `400` too.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added

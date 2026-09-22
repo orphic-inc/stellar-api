@@ -52,14 +52,9 @@ const contributionSelect = {
 
 const log = getLogger('contribution');
 
-const normalizeTags = (tags?: string): string[] => [
-  ...new Set(
-    (tags ?? '')
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-  )
-];
+// Splits only. `resolveTagNames` owns the tag name rule (#689, ADR-0047), so
+// normalizing, dropping empties and deduping the variants all happen there.
+const splitTagList = (tags?: string): string[] => (tags ?? '').split(',');
 
 // UI role labels ("Main artist", "Remixer", legacy "main") → ArtistRole. Kept
 // tolerant of casing and a trailing "artist"/"artists"; anything unrecognised
@@ -126,8 +121,7 @@ export const createContributionSubmission = async ({
   });
   if (!community) return null;
 
-  const normalizedTags = normalizeTags(tags);
-  const canonicalTags = await resolveTagNames(normalizedTags);
+  const canonicalTags = await resolveTagNames(splitTagList(tags));
 
   const contribution = await prisma.$transaction(async (tx) => {
     const contributor = await tx.contributor.upsert({

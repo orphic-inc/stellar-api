@@ -39,9 +39,9 @@ describe('resolveTagName', () => {
       data: { name: 'hip.hop', occurrences: 0 }
     });
     await testPrisma.tagAlias.create({
-      data: { badTag: 'hip-hop', goodTagId: canonical.id, createdById: user.id }
+      data: { badTag: 'hiphop', goodTagId: canonical.id, createdById: user.id }
     });
-    const result = await resolveTagName('hip-hop');
+    const result = await resolveTagName('HipHop');
     expect(result).toBe('hip.hop');
   });
 });
@@ -59,12 +59,12 @@ describe('resolveTagNames', () => {
     });
     await testPrisma.tagAlias.create({
       data: {
-        badTag: 'electronic-music',
+        badTag: 'electronic.music',
         goodTagId: canonical.id,
         createdById: user.id
       }
     });
-    const result = await resolveTagNames(['electronic-music', 'electronic']);
+    const result = await resolveTagNames(['Electronic Music', 'electronic']);
     expect(result).toHaveLength(1);
     expect(result[0]).toBe('electronic');
   });
@@ -80,13 +80,13 @@ describe('resolveTagNames', () => {
       data: { name: 'hip.hop', occurrences: 0 }
     });
     await testPrisma.tagAlias.create({
-      data: { badTag: 'hip-hop', goodTagId: canonical.id, createdById: user.id }
+      data: { badTag: 'hiphop', goodTagId: canonical.id, createdById: user.id }
     });
-    const result = await resolveTagNames(['hip-hop', 'rock', 'jazz']);
+    const result = await resolveTagNames(['hiphop', 'rock', 'jazz']);
     expect(result).toContain('hip.hop');
     expect(result).toContain('rock');
     expect(result).toContain('jazz');
-    expect(result).not.toContain('hip-hop');
+    expect(result).not.toContain('hiphop');
     expect(result).toHaveLength(3);
   });
 });
