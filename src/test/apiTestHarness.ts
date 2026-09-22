@@ -279,6 +279,19 @@ jest.mock('jsonwebtoken', () => ({
   )
 }));
 
+// Emit-time access (#695) is proven against real rows in
+// integration/notificationAccess.integration.ts. Here it passes every recipient
+// through, so these specs test their own emitter, not the access rules. A plain
+// function, not a jest.fn: `resetMocks` would strip a mock's implementation.
+jest.mock('../modules/notificationAccess', () => ({
+  recipientsWhoCanSee: async (
+    _tx: unknown,
+    _page: unknown,
+    _pageId: unknown,
+    userIds: number[]
+  ) => userIds
+}));
+
 jest.mock('../lib/prisma', () => ({
   prisma: jest.requireActual('jest-mock-extended').mockDeep()
 }));

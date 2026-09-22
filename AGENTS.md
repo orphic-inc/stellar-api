@@ -239,6 +239,7 @@ src/
     ratioPolicyJob.ts       # Daily sweep, no mode switch (#646): applies ratioPolicyRules to watched and ratio-disabled members, one caught evaluation each
     notificationFilters.ts  # Contribution notification filters (#263, ADR-0049): rank allowance, filter create/update/delete, the post-commit matcher, per-contribution hit reads
     notificationFilterMatch.ts # The filter predicate (#263) — pure: contribution facts and one filter → whether it matches; no database
+    notificationAccess.ts   # Emit-time notification access (#695): recipientsWhoCanSee — who may see a page target when it is sent; emitNotifications applies it to every emitter. No read-time re-check, by decision
     reports.ts              # Report claim/resolve logic
     requests.ts             # Release request + bounty logic
     settings.ts             # Site settings helpers + countSeats/isSiteFull — the enabled-seat count `maxUsers` is enforced against (#624, ADR-0040)
