@@ -255,7 +255,7 @@ src/
     bootstrap.ts              # Idempotent seed helpers shared by prisma/seed.ts and /install (ranks, promotion rules, forums, System user); each a no-op when rows exist
     seedAll.ts                # The idempotent baseline seed composed from bootstrap.ts — everything /install needs before the first SysOp; creates no real users
     staff.ts                  # getStaffList() — staff roster grouped by StaffGroup (member-facing; see the two-staff-surfaces model)
-    tag.ts                    # resolveTagName/resolveTagNames — TagAlias bad→good redirection
+    tag.ts                    # normalizeTagName — the one tag name rule (#689, ADR-0047); resolveTagName/resolveTagNames normalize then follow TagAlias bad→good
     donor.ts                  # Donor perks map + donor settings/rewards/forum-title updates
     donorExpiryJob.ts         # Background job: hourly sweep deleting expired donor rows (condition-based, so a staff re-grant survives)
     standing.ts               # PRD-05/ADR-0004 — pure: active UserWarning rows + ban state → Standing tier; the producer feeding ruleImpact()

@@ -90,7 +90,7 @@ describe('POST /api/tags/official', () => {
   });
 
   it('records BOTH the typed name and the one it landed on', async () => {
-    // The audit row is the only record that a fold or an alias redirect
+    // The audit row is the only record that normalization or an alias redirect
     // happened: the response alone cannot say what was asked for.
     await request(app).post('/api/tags/official').send({ name: 'ShoeGaze' });
 
@@ -113,6 +113,16 @@ describe('POST /api/tags/official', () => {
       .send({ name: 'shoegaze' });
 
     expect(res.status).toBe(403);
+    expect(prismaMock.tag.upsert).not.toHaveBeenCalled();
+  });
+
+  it('refuses a name with no usable characters (#689)', async () => {
+    const res = await request(app)
+      .post('/api/tags/official')
+      .send({ name: '&&&' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ msg: 'Tag name has no usable characters' });
     expect(prismaMock.tag.upsert).not.toHaveBeenCalled();
   });
 
@@ -239,5 +249,83 @@ describe('official tags cannot be aliased away', () => {
 
     expect(res.status).toBe(201);
     expect(prismaMock.tagAlias.create).toHaveBeenCalled();
+  });
+});
+
+// ─── Alias names follow the tag name rule (#689, ADR-0047) ────────────────────
+//
+// The resolver looks `badTag` up NORMALIZED, so an alias stored any other way
+// would never match. Both writes share one helper; POST covers the rule and PUT
+// proves it is wired in.
+
+describe('alias writes normalize both names', () => {
+  beforeEach(() => {
+    setCurrentUserPermissions({ tags_manage: true });
+  });
+
+  it('stores badTag normalized and finds goodTag by its normalized name', async () => {
+    prismaMock.tag.findUnique
+      .mockResolvedValueOnce(null as never)
+      .mockResolvedValueOnce({ id: 9, name: 'dream.pop' } as never);
+    prismaMock.tagAlias.create.mockResolvedValue({ id: 2 } as never);
+
+    const res = await request(app)
+      .post('/api/tag-aliases')
+      .send({ badTag: 'Dreampop!', goodTag: 'Dream Pop' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.tag.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { name: 'dream.pop' } })
+    );
+    expect(prismaMock.tagAlias.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ badTag: 'dreampop', goodTagId: 9 })
+      })
+    );
+  });
+
+  it('refuses a badTag with no usable characters', async () => {
+    const res = await request(app)
+      .post('/api/tag-aliases')
+      .send({ badTag: '&&&', goodTag: 'dream.pop' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ msg: 'Tag name has no usable characters' });
+    expect(prismaMock.tagAlias.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses an alias that normalizes onto its own target', async () => {
+    // Normalization already does this alias's job, and the migration deletes
+    // such rows, so the route must not be able to recreate one.
+    prismaMock.tag.findUnique
+      .mockResolvedValueOnce({ isOfficial: false } as never)
+      .mockResolvedValueOnce({ id: 9, name: 'dream.pop' } as never);
+
+    const res = await request(app)
+      .post('/api/tag-aliases')
+      .send({ badTag: 'Dream-Pop', goodTag: 'dream.pop' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toContain('already');
+    expect(prismaMock.tagAlias.create).not.toHaveBeenCalled();
+  });
+
+  it('normalizes on PUT as well', async () => {
+    prismaMock.tagAlias.findUnique.mockResolvedValue({ id: 1 } as never);
+    prismaMock.tag.findUnique
+      .mockResolvedValueOnce(null as never)
+      .mockResolvedValueOnce({ id: 9, name: 'dream.pop' } as never);
+    prismaMock.tagAlias.update.mockResolvedValue({ id: 1 } as never);
+
+    const res = await request(app)
+      .put('/api/tag-aliases/1')
+      .send({ badTag: 'Dreampop!', goodTag: 'Dream Pop' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.tagAlias.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { badTag: 'dreampop', goodTagId: 9 }
+      })
+    );
   });
 });

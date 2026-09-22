@@ -191,6 +191,23 @@ describe('createContributionSubmission', () => {
     expect(jazz!.occurrences).toBeGreaterThanOrEqual(1);
   });
 
+  it('stores variants under one normalized name (#689)', async () => {
+    const user = await createUser('norm');
+    const community = await createCommunity();
+
+    await createContributionSubmission({
+      userId: user.id,
+      input: { ...baseInput(community.id), tags: 'Free Jazz, free-jazz, &&&' }
+    });
+
+    const tags = await testPrisma.tag.findMany({
+      where: { name: { contains: 'jazz', mode: 'insensitive' } }
+    });
+    expect(tags.map((t) => [t.name, t.occurrences])).toEqual([
+      ['free.jazz', 1]
+    ]);
+  });
+
   it('sets the release category from input rather than defaulting to Album', async () => {
     const user = await createUser('cat');
     const community = await createCommunity();

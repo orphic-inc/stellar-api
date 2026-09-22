@@ -41,7 +41,10 @@ const READABLE_COMMUNITIES = {
 // ─── GET /api/search/releases ─────────────────────────────────────────────────
 
 describe('GET /api/search/releases', () => {
-  beforeEach(() => resetApiTestState());
+  beforeEach(() => {
+    resetApiTestState();
+    prismaMock.tagAlias.findMany.mockResolvedValue([]);
+  });
 
   it('returns 200 with empty results and no params', async () => {
     prismaMock.release.findMany.mockResolvedValue([]);
@@ -111,6 +114,50 @@ describe('GET /api/search/releases', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           releaseTags: { some: { tag: { name: { in: ['jazz'] } } } }
+        })
+      })
+    );
+  });
+
+  it('normalizes tag names before filtering (#689)', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?tags=Hip%20Hop,JAZZ');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          releaseTags: { some: { tag: { name: { in: ['hip.hop', 'jazz'] } } } }
+        })
+      })
+    );
+  });
+
+  it('follows a tag alias, as a write would (#689)', async () => {
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    prismaMock.tagAlias.findMany.mockResolvedValue([
+      { badTag: 'hiphop', goodTag: { name: 'hip.hop' } }
+    ] as never);
+    await request(app).get('/api/search/releases?tags=HipHop');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          releaseTags: { some: { tag: { name: { in: ['hip.hop'] } } } }
+        })
+      })
+    );
+  });
+
+  it('matches nothing when every tag normalizes away, in either mode (#689)', async () => {
+    // An empty `AND` would match EVERYTHING, so an all-junk filter under
+    // tagMode=all must not become one — it widens rather than narrows.
+    prismaMock.release.findMany.mockResolvedValue([]);
+    prismaMock.release.count.mockResolvedValue(0);
+    await request(app).get('/api/search/releases?tags=%26%26,---&tagMode=all');
+    expect(prismaMock.release.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          releaseTags: { some: { tag: { name: { in: [] } } } }
         })
       })
     );
@@ -349,7 +396,10 @@ describe('GET /api/search/releases', () => {
 // ─── GET /api/search/artists ──────────────────────────────────────────────────
 
 describe('GET /api/search/release-groups (ADR-0037 §4)', () => {
-  beforeEach(() => resetApiTestState());
+  beforeEach(() => {
+    resetApiTestState();
+    prismaMock.tagAlias.findMany.mockResolvedValue([]);
+  });
 
   it('counts GROUPS, so the total describes what is paged', async () => {
     prismaMock.releaseGroup.findMany.mockResolvedValue([]);
@@ -400,7 +450,10 @@ describe('GET /api/search/release-groups (ADR-0037 §4)', () => {
 });
 
 describe('GET /api/search/artists', () => {
-  beforeEach(() => resetApiTestState());
+  beforeEach(() => {
+    resetApiTestState();
+    prismaMock.tagAlias.findMany.mockResolvedValue([]);
+  });
 
   it('excludes withdrawn artists (#509 F3)', async () => {
     prismaMock.artist.findMany.mockResolvedValue([]);
@@ -439,6 +492,19 @@ describe('GET /api/search/artists', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tags: { some: { tag: { name: { in: ['jazz'] } } } }
+        })
+      })
+    );
+  });
+
+  it('normalizes artist tag names before filtering (#689)', async () => {
+    prismaMock.artist.findMany.mockResolvedValue([]);
+    prismaMock.artist.count.mockResolvedValue(0);
+    await request(app).get('/api/search/artists?tags=Free%20Jazz');
+    expect(prismaMock.artist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tags: { some: { tag: { name: { in: ['free.jazz'] } } } }
         })
       })
     );

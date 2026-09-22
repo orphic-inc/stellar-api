@@ -99,12 +99,10 @@ export const releaseVoteSchema = z.object({
   positive: z.boolean()
 });
 
+// No normalization here: `resolveTagName` owns the tag name rule (#689,
+// ADR-0047), so every path that takes a name gets the same one.
 export const releaseTagSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(50)
-    .transform((s) => s.trim().toLowerCase())
+  name: z.string().min(1).max(50)
 });
 
 export const releaseTagVoteSchema = z.object({

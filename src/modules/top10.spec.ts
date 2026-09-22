@@ -27,6 +27,7 @@ const prismaMock = {
     findFirst: jest.fn(),
     create: jest.fn()
   },
+  tagAlias: { findMany: jest.fn() },
   $queryRaw: jest.fn()
 };
 
@@ -45,7 +46,10 @@ import {
 } from './top10';
 
 describe('getTopReleases', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prismaMock.tagAlias.findMany.mockResolvedValue([]);
+  });
 
   it('maps contributed release rows and attaches tags', async () => {
     prismaMock.tag.findMany.mockResolvedValue([{ id: 5 }]);
@@ -93,6 +97,28 @@ describe('getTopReleases', () => {
     ]);
     expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
       where: { name: { in: ['ambient'] } },
+      select: { id: true }
+    });
+  });
+
+  it('excludes tags by their normalized, alias-resolved names (#689)', async () => {
+    prismaMock.tagAlias.findMany.mockResolvedValue([
+      { badTag: 'darkambient', goodTag: { name: 'dark.ambient' } }
+    ]);
+    prismaMock.tag.findMany.mockResolvedValue([]);
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    prismaMock.releaseTag.findMany.mockResolvedValue([]);
+    prismaMock.releaseArtist.findMany.mockResolvedValue([]);
+
+    await getTopReleases({
+      type: 'contributed',
+      limit: 10,
+      excludeTags: 'DarkAmbient, Free Jazz, &&',
+      format: undefined
+    });
+
+    expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
+      where: { name: { in: ['dark.ambient', 'free.jazz'] } },
       select: { id: true }
     });
   });

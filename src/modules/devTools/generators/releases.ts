@@ -44,6 +44,7 @@ import {
   makeBBCodeForumPost
 } from '../contentFactory';
 import { trackCreate } from '../tracking';
+import { normalizeTagName } from '../../tag';
 
 const RELEASE_CATEGORIES: ReleaseCategory[] = [
   'Album',
@@ -100,8 +101,11 @@ function pickCategory(rng: SeedContext): ReleaseCategory {
  */
 async function getOrCreateTag(
   prisma: PrismaClient,
-  name: string
+  rawName: string
 ): Promise<number> {
+  // This mints directly rather than through `resolveTagName`, so it applies the
+  // tag name rule itself (#689, ADR-0047). Generated names already satisfy it.
+  const name = normalizeTagName(rawName);
   const existing = await prisma.tag.findUnique({ where: { name } });
   if (existing) {
     await prisma.tag.update({

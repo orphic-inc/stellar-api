@@ -701,6 +701,52 @@ describe('POST /api/communities/:communityId/releases/:releaseId/tags', () => {
     expect(res.status).toBe(409);
   });
 
+  it('stores a variant under its normalized name (#689)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    prismaMock.release.findFirst.mockResolvedValue({
+      id: 3,
+      releaseTags: []
+    } as never);
+    prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
+      (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+    );
+    prismaMock.tag.upsert.mockResolvedValue({
+      id: 9,
+      name: 'free.jazz'
+    } as never);
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue({
+      id: 3,
+      title: 'Kind of Blue',
+      description: 'Classic',
+      image: null,
+      year: 1959,
+      isEdition: false,
+      edition: null,
+      releaseTags: []
+    } as never);
+    prismaMock.releaseTag.create.mockResolvedValue({ id: 19 } as never);
+
+    await request(app)
+      .post('/api/communities/1/releases/3/tags')
+      .send({ name: 'Free Jazz' });
+
+    expect(prismaMock.tag.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { name: 'free.jazz' } })
+    );
+  });
+
+  it('answers 400 for a tag name with no usable characters (#689)', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/releases/3/tags')
+      .send({ name: '&&&' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ msg: 'Tag name has no usable characters' });
+    expect(prismaMock.tag.upsert).not.toHaveBeenCalled();
+  });
+
   it('creates and attaches a tag transactionally', async () => {
     prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
     prismaMock.release.findFirst.mockResolvedValue({

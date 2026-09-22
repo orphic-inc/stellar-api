@@ -1,7 +1,7 @@
 import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
-import { resolveTagName } from '../tag';
+import { assertUsableTagName, resolveTagName } from '../tag';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { getReleaseWorkbenchView } from './load';
 import { snapshotRelease, type ReleaseSnapshot } from './snapshot';
@@ -18,6 +18,7 @@ export const addReleaseWorkbenchTag = async (
 ): Promise<ReleaseWorkbenchView> => {
   await loadReleaseWorkbenchAuthority(ref);
   const name = await resolveTagName(input.name);
+  assertUsableTagName(name);
 
   const release = await prisma.release.findFirst({
     where: { id: ref.releaseId, communityId: ref.communityId },

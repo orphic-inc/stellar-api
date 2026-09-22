@@ -5444,6 +5444,10 @@ registry.registerPath({
       description: 'Tag added',
       content: { 'application/json': { schema: ReleaseTag } }
     },
+    400: msgResponse(
+      'A tag name has no usable characters once normalized (#689), or the ' +
+        'request is invalid'
+    ),
     409: msgResponse('Release already has this tag')
   }
 });
@@ -8753,6 +8757,10 @@ registry.registerPath({
       description: 'Tag alias created',
       content: { 'application/json': { schema: TagAliasItem } }
     },
+    400: msgResponse(
+      '`badTag` has no usable characters once normalized, or normalizes to ' +
+        'the name of its own target (#689); or the request is invalid'
+    ),
     404: msgResponse('Canonical tag not found'),
     409: msgResponse('Alias already exists, or names an official tag')
   }
@@ -8773,6 +8781,10 @@ registry.registerPath({
       description: 'Tag alias updated',
       content: { 'application/json': { schema: TagAliasItem } }
     },
+    400: msgResponse(
+      '`badTag` has no usable characters once normalized, or normalizes to ' +
+        'the name of its own target (#689); or the request is invalid'
+    ),
     404: msgResponse('Not found'),
     409: msgResponse('Alias already exists, or names an official tag')
   }
@@ -8846,9 +8858,13 @@ registry.registerPath({
   responses: {
     201: {
       description:
-        'Tag promoted. Created when absent, and the name may differ from the one sent: it is case-folded and redirected through the alias table.',
+        'Tag promoted. Created when absent, and the name may differ from the one sent: it is normalized (#689) and redirected through the alias table.',
       content: { 'application/json': { schema: TagItem } }
-    }
+    },
+    400: msgResponse(
+      'A tag name has no usable characters once normalized (#689), or the ' +
+        'request is invalid'
+    )
   }
 });
 
