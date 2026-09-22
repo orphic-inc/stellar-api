@@ -28,6 +28,8 @@ export const createRankSchema = z.object({
   // "unlimited" tier for an invite faucet, unlike assetLimit directly above.
   inviteGrantPerPeriod: z.number().int().min(0).optional(),
   inviteCap: z.number().int().min(0).optional(),
+  // #263: the assetLimit semantic — 0 = no filters, N = the cap, null = unlimited.
+  notificationFilterLimit: z.number().int().min(0).nullable().optional(),
   displayStaff: z.boolean().optional(),
   staffGroupId: z.number().int().positive().nullable().optional()
 });
@@ -46,6 +48,7 @@ export const updateRankSchema = z
     assetLimit: z.number().int().min(0).nullable().optional(),
     inviteGrantPerPeriod: z.number().int().min(0).optional(),
     inviteCap: z.number().int().min(0).optional(),
+    notificationFilterLimit: z.number().int().min(0).nullable().optional(),
     displayStaff: z.boolean().optional(),
     staffGroupId: z.number().int().positive().nullable().optional()
   })

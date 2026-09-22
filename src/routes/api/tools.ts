@@ -92,6 +92,7 @@ const formatRank = (
   assetLimit: r.assetLimit,
   inviteGrantPerPeriod: r.inviteGrantPerPeriod,
   inviteCap: r.inviteCap,
+  notificationFilterLimit: r.notificationFilterLimit,
   displayStaff: r.displayStaff,
   staffGroupId: r.staffGroupId,
   primaryUserCount: r._count.users,
@@ -158,6 +159,7 @@ router.post(
       assetLimit,
       inviteGrantPerPeriod,
       inviteCap,
+      notificationFilterLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<CreateRankInput>(res);
@@ -205,6 +207,10 @@ router.post(
           // not a meaningful state.
           inviteGrantPerPeriod: inviteGrantPerPeriod ?? 0,
           inviteCap: inviteCap ?? 0,
+          // #263: the assetLimit tri-state, so an explicit null (unlimited)
+          // survives and an absent field fails closed at 0.
+          notificationFilterLimit:
+            notificationFilterLimit === undefined ? 0 : notificationFilterLimit,
           displayStaff: displayStaff ?? false,
           staffGroupId: effectiveStaffGroupId
         },
@@ -261,6 +267,7 @@ router.put(
       assetLimit,
       inviteGrantPerPeriod,
       inviteCap,
+      notificationFilterLimit,
       displayStaff,
       staffGroupId
     } = parsedBody<UpdateRankInput>(res);
@@ -308,6 +315,9 @@ router.put(
           ...(assetLimit !== undefined && { assetLimit }),
           ...(inviteGrantPerPeriod !== undefined && { inviteGrantPerPeriod }),
           ...(inviteCap !== undefined && { inviteCap }),
+          ...(notificationFilterLimit !== undefined && {
+            notificationFilterLimit
+          }),
           ...(displayStaff !== undefined && { displayStaff }),
           ...(effectiveStaffGroupId !== undefined && {
             staffGroupId: effectiveStaffGroupId

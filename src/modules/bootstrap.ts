@@ -29,6 +29,9 @@ export const DEFAULT_RANKS = [
     // zero (#342): a brand-new User has no reason to upload a stylesheet asset,
     // so they upload nothing. 0 = none, null = unlimited (staff).
     assetLimit: 0,
+    // Contribution notification filters (#263, ADR-0049) start closed on every
+    // member rank: staff opt a class in from the rank editor. Staff hold null.
+    notificationFilterLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -46,6 +49,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 1,
     assetLimit: 1,
+    notificationFilterLimit: 0,
     // One step past User: unlocks advanced discovery. Identity stays understated
     // (no color/badge) — the first earned rung, not yet a "notable" tier.
     permissions: {
@@ -66,6 +70,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 2,
     assetLimit: 2,
+    notificationFilterLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -85,6 +90,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 3,
     assetLimit: 3,
+    notificationFilterLimit: 0,
     // Top of the "earns new powers" range: adds elevated user search and collage
     // management. The auto ladder above Elite is prestige — identity, not new perms.
     permissions: {
@@ -110,6 +116,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 4,
     assetLimit: 4,
+    notificationFilterLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -130,6 +137,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 5,
     assetLimit: 5,
+    notificationFilterLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -150,6 +158,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 6,
     assetLimit: 6,
+    notificationFilterLimit: 0,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -173,6 +182,7 @@ export const DEFAULT_RANKS = [
     // reason to hit an upload ceiling. Diverges from personalCollageLimit, which
     // gives staff a concrete number — assets are the resource we want unlimited.
     assetLimit: null,
+    notificationFilterLimit: null,
     permissions: {
       forums_read: true,
       forums_post: true,
@@ -211,6 +221,7 @@ export const DEFAULT_RANKS = [
     badge: '',
     personalCollageLimit: 4,
     assetLimit: null,
+    notificationFilterLimit: null,
     permissions: ALL_PERMISSIONS
   }
 ] as const;
@@ -432,6 +443,7 @@ export async function seedRanks(client: PrismaClient): Promise<void> {
         badge: rank.badge,
         personalCollageLimit: rank.personalCollageLimit,
         assetLimit: rank.assetLimit,
+        notificationFilterLimit: rank.notificationFilterLimit,
         permissions: rank.permissions
       }
     });

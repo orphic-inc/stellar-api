@@ -39,6 +39,7 @@ export function makeUserRank(
     level: 1000,
     inviteGrantPerPeriod: 0,
     inviteCap: 0,
+    notificationFilterLimit: 0,
     color: '',
     badge: '',
     permissions: {

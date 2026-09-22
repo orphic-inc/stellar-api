@@ -31,6 +31,34 @@ All notable changes to stellar-api are documented here.
   which name it landed on. Both writes audit (`tag.promote`, `tag.demote`), and
   the promote row records the name as typed alongside the resolved one.
 
+- **Contribution notification filters**
+  ([#263](https://github.com/orphic-inc/stellar-api/issues/263),
+  [ADR-0049](docs/adr/0049-contribution-notification-filters.md)) — a member
+  saves named filters over new contributions, and each match becomes a hit to
+  read, catch up on and clear. It is the discovery feature the legacy
+  implementation's power users relied on.
+
+  A filter can name artists, tags and excluded tags, communities, release
+  types, categories, file types, bitrates, media and a year range. It has three
+  flags. `newReleasesOnly` means the first contribution on a release to match
+  this filter's formats. `excludeCompilations` skips releases with more than two
+  main artists, and `mainCreditsOnly` ignores guest credits.
+
+  Matching runs after an upload commits, on both contribution paths, so a
+  matching failure cannot fail the upload. It skips the uploader, disabled accounts and members who
+  cannot see the release. Hits re-check access when read.
+
+  Three filters catching one upload count as one unread and list as one item.
+  Each filter still keeps its own rows, which the per-filter feed (#663) will
+  read. Clearing removes read hits only.
+
+  The new `UserRank.notificationFilterLimit` is the only gate: `0` means no
+  filters (`403` on every route), `null` means unlimited, N is the cap. It
+  defaults to `0`, so nothing changes until staff opt a rank in.
+
+  New routes live under `/api/notification-filters`. Staff with `users_edit`
+  can read a member's filters at `GET /api/users/:id/notification-filters`.
+
 ### Changed
 
 - **Breaking — privacy is the five `show*` flags; the `paranoia` level is gone**

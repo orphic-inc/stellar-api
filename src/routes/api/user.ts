@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { translatePrismaError } from '../../lib/prismaErrors';
+import { listNotificationFilters } from '../../modules/notificationFilters';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import {
   getUserSettings,
@@ -793,6 +794,19 @@ router.delete(
     const { id, warnId } = parsedParams<{ id: number; warnId: number }>(res);
     await deleteWarning(id, warnId);
     res.status(204).send();
+  })
+);
+
+// GET /api/users/:id/notification-filters — staff read of a member's filters
+// (#263). Read-only, and not gated on the member's own rank allowance: staff
+// look at what a member set up, whatever the member can currently do with it.
+router.get(
+  '/:id/notification-filters',
+  ...requirePermission('users_edit'),
+  validateParams(userIdParamsSchema),
+  authHandler(async (_req, res) => {
+    const { id } = parsedParams<{ id: number }>(res);
+    res.json(await listNotificationFilters(id));
   })
 );
 

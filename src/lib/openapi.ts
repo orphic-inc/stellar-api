@@ -6,6 +6,7 @@ import {
 import { z } from 'zod';
 import {
   AssetKind,
+  Bitrate,
   CommunityType,
   EconomyTransactionReason,
   DownloadGrantStatus,
@@ -15,6 +16,7 @@ import {
   RatioDisableCause,
   RatioPolicyStatus,
   ReleaseCategory,
+  ReleaseMedia,
   ReleaseType,
   RegistrationStatus,
   ReportStatus,
@@ -3356,6 +3358,299 @@ registry.registerPath({
   }
 });
 
+// ─── Contribution notification filters (#263, ADR-0049) ──────────────────────
+
+import {
+  markNotificationFilterHitReadSchema,
+  notificationFilterCatchupSchema,
+  notificationFilterSchema
+} from '../schemas/notificationFilters';
+
+const NotificationFilter = registry.register(
+  'NotificationFilter',
+  z.object({
+    id: z.number().int(),
+    label: z.string(),
+    artistIds: z.array(z.number().int()),
+    tags: z.array(z.string()),
+    notTags: z.array(z.string()),
+    communityIds: z.array(z.number().int()),
+    releaseTypes: z.array(z.nativeEnum(ReleaseType)),
+    releaseCategories: z.array(z.nativeEnum(ReleaseCategory)),
+    fileTypes: z.array(z.nativeEnum(FileType)),
+    bitrates: z.array(z.nativeEnum(Bitrate)),
+    media: z.array(z.nativeEnum(ReleaseMedia)),
+    fromYear: z.number().int().nullable(),
+    toYear: z.number().int().nullable(),
+    newReleasesOnly: z.boolean(),
+    excludeCompilations: z.boolean(),
+    mainCreditsOnly: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+const NotificationFilterHitItem = registry.register(
+  'NotificationFilterHitItem',
+  z.object({
+    contributionId: z.number().int(),
+    read: z.boolean(),
+    matchedAt: z.string(),
+    filters: z.array(z.object({ id: z.number().int(), label: z.string() })),
+    contribution: z.object({
+      id: z.number().int(),
+      type: z.nativeEnum(FileType),
+      bitrate: z.nativeEnum(Bitrate).nullable(),
+      createdAt: z.string(),
+      uploader: z.object({ id: z.number().int(), username: z.string() }),
+      release: z.object({
+        id: z.number().int(),
+        title: z.string(),
+        year: z.number().int(),
+        communityId: z.number().int().nullable()
+      })
+    })
+  })
+);
+
+const noFilterAllowance = msgResponse(
+  "The caller's rank has a `notificationFilterLimit` of 0"
+);
+const filterIdQuery = z.object({ filterId: z.string().optional() });
+
+registry.registerPath({
+  method: 'get',
+  path: '/notification-filters',
+  tags: ['NotificationFilters'],
+  summary: "The caller's filters and their rank allowance",
+  description:
+    '`limit` is the rank `notificationFilterLimit`: `null` is unlimited, a ' +
+    'number is the cap.',
+  responses: {
+    200: {
+      description: 'Filters, oldest first',
+      content: {
+        'application/json': {
+          schema: z.object({
+            filters: z.array(NotificationFilter),
+            limit: z.number().int().nullable()
+          })
+        }
+      }
+    },
+    403: noFilterAllowance
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/notification-filters',
+  tags: ['NotificationFilters'],
+  summary: 'Create a filter',
+  description:
+    'Tags are normalized and alias-resolved (#689). Artists are ids and must ' +
+    'exist. A filter needs a label and at least one set field; a flag alone ' +
+    'counts.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: notificationFilterSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Filter created',
+      content: { 'application/json': { schema: NotificationFilter } }
+    },
+    400: msgResponse(
+      'The rank limit is reached, an artist does not exist, the filter sets ' +
+        'nothing, or the request is invalid'
+    ),
+    403: noFilterAllowance
+  }
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/notification-filters/{id}',
+  tags: ['NotificationFilters'],
+  summary: 'Replace a filter',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: notificationFilterSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Filter replaced',
+      content: { 'application/json': { schema: NotificationFilter } }
+    },
+    400: msgResponse(
+      'An artist does not exist, the filter sets nothing, or the request is ' +
+        'invalid'
+    ),
+    403: noFilterAllowance,
+    404: msgResponse('No such filter of the caller’s')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/notification-filters/{id}',
+  tags: ['NotificationFilters'],
+  summary: 'Delete a filter and its hits',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Filter deleted' },
+    403: noFilterAllowance,
+    404: msgResponse('No such filter of the caller’s')
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/notification-filters/hits',
+  tags: ['NotificationFilters'],
+  summary: 'Contributions the caller’s filters caught',
+  description:
+    'One item per contribution, naming every filter that caught it, newest ' +
+    'first. `read` is true only when every hit in scope is read. `filterId` ' +
+    'narrows to one filter; `unread=true` to contributions with an unread hit. ' +
+    'Contributions the caller can no longer see are left out.',
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional(),
+      filterId: z.string().optional(),
+      unread: z.enum(['true', 'false']).optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Caught contributions',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(NotificationFilterHitItem),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    403: noFilterAllowance,
+    404: msgResponse('`filterId` names no filter of the caller’s')
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/notification-filters/hits/unread-count',
+  tags: ['NotificationFilters'],
+  summary: 'How many caught contributions are unread',
+  description:
+    'Counts contributions, not hits: three filters catching one is 1.',
+  responses: {
+    200: {
+      description: 'Unread count',
+      content: {
+        'application/json': { schema: z.object({ count: z.number().int() }) }
+      }
+    },
+    403: noFilterAllowance
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/notification-filters/hits/read',
+  tags: ['NotificationFilters'],
+  summary: 'Mark a caught contribution read',
+  description:
+    'Every filter’s hit on it, or only `filterId`’s. Re-reading is a no-op.',
+  request: {
+    body: {
+      content: {
+        'application/json': { schema: markNotificationFilterHitReadSchema }
+      }
+    }
+  },
+  responses: {
+    204: { description: 'Marked read' },
+    403: noFilterAllowance,
+    404: msgResponse('The caller has no hit on that contribution')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/notification-filters/hits/catchup',
+  tags: ['NotificationFilters'],
+  summary: 'Mark every hit read, or one filter’s',
+  request: {
+    body: {
+      content: {
+        'application/json': { schema: notificationFilterCatchupSchema }
+      }
+    }
+  },
+  responses: {
+    204: { description: 'Caught up' },
+    403: noFilterAllowance,
+    404: msgResponse('`filterId` names no filter of the caller’s')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/notification-filters/hits',
+  tags: ['NotificationFilters'],
+  summary: 'Clear read hits',
+  description:
+    'Removes READ hits only, every filter’s or `filterId`’s, so unread ' +
+    'matches survive.',
+  request: { query: filterIdQuery },
+  responses: {
+    204: { description: 'Read hits cleared' },
+    403: noFilterAllowance,
+    404: msgResponse('`filterId` names no filter of the caller’s')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/notification-filters/hits/{contributionId}',
+  tags: ['NotificationFilters'],
+  summary: 'Remove a caught contribution, read or not',
+  request: {
+    params: z.object({ contributionId: z.string() }),
+    query: filterIdQuery
+  },
+  responses: {
+    204: { description: 'Removed' },
+    403: noFilterAllowance,
+    404: msgResponse('The caller has no hit on that contribution')
+  }
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/notification-filters',
+  tags: ['Users'],
+  summary: 'Staff read of a member’s notification filters',
+  description:
+    'Requires `users_edit`. Read-only, and not subject to the member’s own ' +
+    'rank allowance.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'The member’s filters',
+      content: {
+        'application/json': { schema: z.array(NotificationFilter) }
+      }
+    }
+  }
+});
+
 registry.registerPath({
   method: 'get',
   path: '/subscriptions',
@@ -4529,6 +4824,8 @@ const UserRank = registry.register(
     // class neither earns nor holds invites.
     inviteGrantPerPeriod: z.number().int(),
     inviteCap: z.number().int(),
+    // #263: 0 = no notification filters, N = the cap, null = unlimited.
+    notificationFilterLimit: z.number().int().nullable(),
     displayStaff: z.boolean(),
     staffGroupId: z.number().int().nullable(),
     primaryUserCount: z.number().int(),

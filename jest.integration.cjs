@@ -7,6 +7,7 @@ module.exports = {
   globalSetup: '<rootDir>/globalSetup.js',
   globalTeardown: '<rootDir>/globalTeardown.js',
   setupFiles: ['<rootDir>/src/test/integrationSetup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/test/integrationAfterEnv.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist'],
   moduleNameMapper: {
     '^isomorphic-dompurify$': '<rootDir>/src/test/mocks/dompurify.ts'

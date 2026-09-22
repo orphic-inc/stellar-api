@@ -11,6 +11,7 @@ import { AppError } from '../lib/errors';
 import { audit } from '../lib/audit';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
+import { scheduleFilterMatching } from './notificationFilters';
 import { checkContributionLink } from './linkHealth';
 import { runInBackground } from './backgroundTasks';
 import { assertWithinSizeCap } from './contributionLimits';
@@ -266,6 +267,8 @@ export const createContributionSubmission = async ({
       })
     )
   );
+  // After commit, so a matching failure cannot roll back the upload (#263).
+  scheduleFilterMatching(contribution.id);
 
   return {
     ...contribution,
@@ -350,6 +353,7 @@ export const addContributionToRelease = async ({
           })
         )
       );
+      scheduleFilterMatching(contribution.id);
       return {
         ...contribution,
         sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
