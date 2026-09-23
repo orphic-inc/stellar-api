@@ -411,6 +411,17 @@ All notable changes to stellar-api are documented here.
   The route now shows it, and its `403` response is removed from the contract.
   Changing a personal collage is still for its owner or staff only.
 
+- **Comment threads on deleted pages are closed**
+  ([#701](https://github.com/orphic-inc/stellar-api/issues/701)) — the thread
+  of a deleted artist, request or public collage stayed readable and writable
+  through `/api/comments`. It now answers as a missing page does: 404 on a read
+  or an edit, and 400 on a new comment.
+
+  This holds for staff too, although staff can still view a deleted collage.
+  Restoring a collage reopens its thread, since the comments are kept. An
+  author or a `reports_manage` moderator can still delete a comment there.
+  No status code is new.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added
