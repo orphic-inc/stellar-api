@@ -288,6 +288,93 @@ describe('canSeeCommentThread (#697)', () => {
   });
 });
 
+// #701: a thread on a soft-deleted page is the same `false` as a missing page's,
+// for everyone. Nobody can see or restore a deleted artist or request, and a
+// deleted collage's staff view does not extend to its thread.
+describe('canSeeCommentThread on a soft-deleted page (#701)', () => {
+  it('shuts the thread of a deleted artist', async () => {
+    const viewer = await createAuthor();
+    const artist = await testPrisma.artist.create({
+      data: { name: uniqueName('Artist') }
+    });
+    await expect(
+      canSeeCommentThread(CommentPage.artist, artist.id, viewer.id)
+    ).resolves.toBe(true);
+
+    await testPrisma.artist.update({
+      where: { id: artist.id },
+      data: { deletedAt: new Date() }
+    });
+
+    await expect(
+      canSeeCommentThread(CommentPage.artist, artist.id, viewer.id)
+    ).resolves.toBe(false);
+  });
+
+  it('shuts the thread of a deleted request', async () => {
+    const viewer = await createAuthor();
+    const open = await testPrisma.community.create({
+      data: {
+        name: uniqueName('Deleted-Request-Community'),
+        image: '',
+        registrationStatus: RegistrationStatus.open,
+        type: CommunityType.Music
+      }
+    });
+    const request = await testPrisma.request.create({
+      data: {
+        communityId: open.id,
+        userId: viewer.id,
+        title: 'wanted',
+        description: 'd',
+        type: ReleaseType.Music
+      }
+    });
+    await expect(
+      canSeeCommentThread(CommentPage.requests, request.id, viewer.id)
+    ).resolves.toBe(true);
+
+    await testPrisma.request.update({
+      where: { id: request.id },
+      data: { deletedAt: new Date() }
+    });
+
+    await expect(
+      canSeeCommentThread(CommentPage.requests, request.id, viewer.id)
+    ).resolves.toBe(false);
+  });
+
+  it('shuts the thread of a deleted public collage, and restoring it reopens the thread', async () => {
+    // Staff can still view and restore the collage itself; the thread follows
+    // the page's lifecycle, not that staff exception, so the gate stays free
+    // of permission checks. The owner here is the collage's creator.
+    const owner = await createAuthor();
+    const collage = await testPrisma.collage.create({
+      data: {
+        name: uniqueName('Collage'),
+        description: 'd',
+        userId: owner.id,
+        categoryId: 1
+      }
+    });
+    const setDeleted = (isDeleted: boolean) =>
+      testPrisma.collage.update({
+        where: { id: collage.id },
+        data: { isDeleted, deletedAt: isDeleted ? new Date() : null }
+      });
+
+    await setDeleted(true);
+    await expect(
+      canSeeCommentThread(CommentPage.collages, collage.id, owner.id)
+    ).resolves.toBe(false);
+
+    await setDeleted(false);
+    await expect(
+      canSeeCommentThread(CommentPage.collages, collage.id, owner.id)
+    ).resolves.toBe(true);
+  });
+});
+
 describe('canSeeThreadOf (#697)', () => {
   it('reads the thread off a stored comment', async () => {
     const member = await createAuthor();

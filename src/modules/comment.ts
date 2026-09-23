@@ -41,7 +41,9 @@ type ThreadCheck = (pageId: number, viewerId: number) => Promise<boolean>;
  * two enums share names, not meaning, and each maps onto the same fragments.
  *
  * `artist` and `collages` are site-wide, so their check is only that the page
- * exists. Every check answers false for a page that does not exist.
+ * exists. Every check answers false for a page that does not exist, and a
+ * soft-deleted page counts as one that does not (#701): staff may still view a
+ * deleted collage, but its thread takes no permission check here.
  */
 const THREAD_CHECKS: Record<CommentPage, ThreadCheck> = {
   release: async (id, viewerId) =>
@@ -54,14 +56,16 @@ const THREAD_CHECKS: Record<CommentPage, ThreadCheck> = {
     })) > 0,
   requests: async (id, viewerId) =>
     (await prisma.request.count({
-      where: { AND: [{ id }, requestVisibleTo(viewerId)] }
+      where: { AND: [{ id, deletedAt: null }, requestVisibleTo(viewerId)] }
     })) > 0,
   communities: async (id, viewerId) =>
     (await prisma.community.count({
       where: { AND: [{ id }, communityReadableWhere(viewerId)] }
     })) > 0,
-  artist: async (id) => (await prisma.artist.count({ where: { id } })) > 0,
-  collages: async (id) => (await prisma.collage.count({ where: { id } })) > 0
+  artist: async (id) =>
+    (await prisma.artist.count({ where: { id, deletedAt: null } })) > 0,
+  collages: async (id) =>
+    (await prisma.collage.count({ where: { id, isDeleted: false } })) > 0
 };
 
 /**
