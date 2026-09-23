@@ -6,7 +6,7 @@ import type {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
-import { releaseVisibleTo } from './communityAccess';
+import { contributionVisibleTo, releaseVisibleTo } from './communityAccess';
 import { sanitizePlain } from '../lib/sanitize';
 // Profile info is stored as raw BBCode and transcribed at read time via the
 // shared render-at-read seam — the API is the single source of transcription
@@ -364,7 +364,7 @@ const getRecentContributions = async (
   viewerId: number | null
 ): Promise<RecentContribution[]> => {
   const rows = await prisma.contribution.findMany({
-    where: { userId, release: releaseVisibleTo(viewerId) },
+    where: { userId, ...contributionVisibleTo(viewerId) },
     orderBy: { createdAt: 'desc' },
     take: 5,
     select: {

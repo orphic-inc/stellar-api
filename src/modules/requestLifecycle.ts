@@ -1,6 +1,6 @@
 import { ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { communityReadableWhere } from './communityAccess';
+import { requestVisibleTo } from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { floorSub } from './ratio';
@@ -116,7 +116,7 @@ export async function getRequestDetail(
     where: {
       id: requestId,
       deletedAt: null,
-      community: communityReadableWhere(viewerId)
+      ...requestVisibleTo(viewerId)
     },
     include: {
       user: { select: { id: true, username: true } },
@@ -748,7 +748,7 @@ export async function listRequests({
   // This FILTERS rather than 403s, deliberately and for #509's reason: refusing
   // when the caller names a community would make `?communityId=N` an existence
   // oracle for private communities.
-  const scope = { community: communityReadableWhere(viewerId) };
+  const scope = requestVisibleTo(viewerId);
 
   const where: Record<string, unknown> = {
     AND: [scope],

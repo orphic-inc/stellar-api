@@ -8,7 +8,7 @@
  *
  * Three rules hold across the catalog, and each is a reason not to "simplify":
  *
- *  - Every contribution feed reads through `releaseVisibleTo(owner)`. A feed
+ *  - Every contribution feed reads through `contributionVisibleTo(owner)`. A feed
  *    shows its owner exactly what the release pages would, private communities
  *    included, and nothing more (ADR-0036 §2).
  *  - Items notify and link (#136). The link is the release page; no item ever
@@ -20,7 +20,7 @@
 import type { Bitrate, FileType, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { email, site } from './config';
-import { releaseVisibleTo } from './communityAccess';
+import { contributionVisibleTo } from './communityAccess';
 import { resolveTagName } from './tag';
 import { renderSiteBBCode, resolveViewerForUser } from './bbcodeRender';
 import {
@@ -81,7 +81,7 @@ const readContributions = async (
   const rows = await prisma.contribution.findMany({
     where: {
       ...where,
-      release: { AND: [releaseVisibleTo(ownerId), ...release] }
+      AND: [contributionVisibleTo(ownerId), { release: { AND: release } }]
     },
     orderBy: { id: 'desc' },
     take: FEED_SIZE,
