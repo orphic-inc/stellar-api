@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { getLogger } from './logging';
 import { runInBackground } from './backgroundTasks';
-import { releaseVisibleTo } from './communityAccess';
+import { contributionVisibleTo, releaseVisibleTo } from './communityAccess';
 import { resolveTagNames } from './tag';
 import {
   filterMatches,
@@ -346,7 +346,7 @@ export const listNotificationFilterHits = async (
   if (opts.filterId !== undefined) await assertOwnFilter(userId, opts.filterId);
   const scope = hitScope(userId, opts.filterId);
   const where: Prisma.ContributionWhereInput = {
-    release: releaseVisibleTo(userId),
+    ...contributionVisibleTo(userId),
     notificationFilterHits: {
       some: { ...scope, ...(opts.unread && { readAt: null }) }
     }
@@ -406,7 +406,7 @@ export const listNotificationFilterHits = async (
 export const countUnreadNotificationFilterHits = (userId: number) =>
   prisma.contribution.count({
     where: {
-      release: releaseVisibleTo(userId),
+      ...contributionVisibleTo(userId),
       notificationFilterHits: { some: { userId, readAt: null } }
     }
   });

@@ -20,7 +20,7 @@ import {
 } from './test/apiTestHarness';
 import { feeds } from './modules/config';
 import { deriveFeedToken } from './modules/feedToken';
-import { releaseVisibleTo } from './modules/communityAccess';
+import { contributionVisibleTo } from './modules/communityAccess';
 
 const OWNER = 9;
 const SECRET = feeds.secret;
@@ -28,7 +28,7 @@ const token = () => deriveFeedToken(OWNER, 0);
 const creds = () => `user=${OWNER}&token=${token()}`;
 
 type FindManyArgs = {
-  where: Record<string, unknown> & { release: { AND: unknown[] } };
+  where: Record<string, unknown> & { AND: unknown[] };
   select: Record<string, unknown>;
   take: number;
 };
@@ -134,7 +134,10 @@ describe('GET /api/feeds/contributions.xml', () => {
 
     const query = contributionQuery();
     // The owner's scope — not the session's (7), and not the public scope.
-    expect(query.where.release.AND).toEqual([releaseVisibleTo(OWNER)]);
+    expect(query.where.AND).toEqual([
+      contributionVisibleTo(OWNER),
+      { release: { AND: [] } }
+    ]);
     expect(query.take).toBe(50);
     // Notify-and-link: nothing on the item could carry a download.
     expect(query.select).not.toHaveProperty('downloadUrl');
@@ -151,10 +154,16 @@ describe('GET /api/feeds/contributions.xml', () => {
 
     expect(res.status).toBe(200);
     const { where } = contributionQuery();
-    expect(where.release.AND).toEqual([
-      releaseVisibleTo(OWNER),
-      { communityId: 4 },
-      { releaseTags: { some: { tag: { name: 'electronic' } } } }
+    expect(where.AND).toEqual([
+      contributionVisibleTo(OWNER),
+      {
+        release: {
+          AND: [
+            { communityId: 4 },
+            { releaseTags: { some: { tag: { name: 'electronic' } } } }
+          ]
+        }
+      }
     ]);
     expect(where.type).toBe('flac');
     expect(where.releaseFile).toEqual({ bitrate: 'Lossless24' });
@@ -206,7 +215,10 @@ describe('GET /api/feeds/mine.xml', () => {
     expect(res.status).toBe(200);
     const { where } = contributionQuery();
     expect(where.userId).toBe(OWNER);
-    expect(where.release.AND).toEqual([releaseVisibleTo(OWNER)]);
+    expect(where.AND).toEqual([
+      contributionVisibleTo(OWNER),
+      { release: { AND: [] } }
+    ]);
   });
 });
 
@@ -215,17 +227,23 @@ describe('GET /api/feeds/bookmarks.xml', () => {
     const res = await request(app).get(`/api/feeds/bookmarks.xml?${creds()}`);
 
     expect(res.status).toBe(200);
-    expect(contributionQuery().where.release.AND).toEqual([
-      releaseVisibleTo(OWNER),
+    expect(contributionQuery().where.AND).toEqual([
+      contributionVisibleTo(OWNER),
       {
-        OR: [
-          { bookmarks: { some: { userId: OWNER } } },
-          {
-            credits: {
-              some: { artist: { bookmarks: { some: { userId: OWNER } } } }
+        release: {
+          AND: [
+            {
+              OR: [
+                { bookmarks: { some: { userId: OWNER } } },
+                {
+                  credits: {
+                    some: { artist: { bookmarks: { some: { userId: OWNER } } } }
+                  }
+                }
+              ]
             }
-          }
-        ]
+          ]
+        }
       }
     ]);
   });
