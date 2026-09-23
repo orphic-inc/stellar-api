@@ -1189,7 +1189,7 @@ model Community {
   // tick and does not unsend past lines.
   announceVisibility    AnnounceVisibility        @default(PUBLIC)
   consumers             Consumer[]                @relation("CommunityConsumers")
-  contributors          Contributor[]
+  contributors          Contributor[]             @relation("CommunityContributors")
   releases              Release[]
   comments              Comment[]
   // Per-community role relation (Axis-1). Named Curator, not staff: "staff" is
@@ -1227,12 +1227,15 @@ model Consumer {
   @@map("consumers")
 }
 
+/// One row per user, belonging to every community they contribute to (#709,
+/// ADR-0050) — the same shape as `Consumer`. It held a single `communityId`
+/// until #709, so uploading to a second community moved or never granted the
+/// role, and the membership union lost communities a member still belonged to.
 model Contributor {
   id            Int            @id @default(autoincrement())
   userId        Int            @unique
   user          User           @relation(fields: [userId], references: [id])
-  communityId   Int
-  community     Community      @relation(fields: [communityId], references: [id])
+  communities   Community[]    @relation("CommunityContributors")
   contributions Contribution[]
   releases      Release[]      @relation("ReleaseContributors")
   createdAt     DateTime       @default(now())

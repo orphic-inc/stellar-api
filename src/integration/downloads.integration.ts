@@ -80,8 +80,8 @@ const createContribution = async (
   });
   const contributor = await testPrisma.contributor.upsert({
     where: { userId },
-    update: {},
-    create: { userId, communityId: community.id }
+    update: { communities: { connect: { id: community.id } } },
+    create: { userId, communities: { connect: { id: community.id } } }
   });
   return testPrisma.contribution.create({
     data: {

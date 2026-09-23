@@ -82,7 +82,9 @@ const createRelease = (communityId: number) =>
   });
 
 const join = (userId: number, communityId: number) =>
-  testPrisma.contributor.create({ data: { userId, communityId } });
+  testPrisma.contributor.create({
+    data: { userId, communities: { connect: { id: communityId } } }
+  });
 
 const emit = (page: SubscriptionPage, pageId: number, userIds: number[]) =>
   testPrisma.$transaction((tx) =>

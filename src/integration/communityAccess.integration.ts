@@ -329,7 +329,7 @@ describe('contribution and request visibility follow their community (#697)', ()
     const uploader = await createUser(`uploader-${releaseId}`);
     const home = await createCommunity(RegistrationStatus.open);
     const contributor = await testPrisma.contributor.create({
-      data: { userId: uploader.id, communityId: home.id }
+      data: { userId: uploader.id, communities: { connect: { id: home.id } } }
     });
     const edition = await testPrisma.edition.create({ data: { releaseId } });
     return testPrisma.contribution.create({

@@ -126,11 +126,15 @@ export async function seedE2eRelease(
     );
   }
 
-  // Contributor.userId is @unique: one row per user, carrying the community.
+  // Contributor.userId is @unique: one row per user, connected to every
+  // community they contribute to (#709, ADR-0050).
   const contributor = await client.contributor.upsert({
     where: { userId: contributorUserId },
-    create: { userId: contributorUserId, communityId: community.id },
-    update: { communityId: community.id },
+    create: {
+      userId: contributorUserId,
+      communities: { connect: { id: community.id } }
+    },
+    update: { communities: { connect: { id: community.id } } },
     select: { id: true }
   });
 

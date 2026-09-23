@@ -188,7 +188,7 @@ describe('canSeeCommentThread (#697)', () => {
     const release = await createRelease(closed.id);
     const home = await createCommunity(RegistrationStatus.open);
     const contributor = await testPrisma.contributor.create({
-      data: { userId: outsider.id, communityId: home.id }
+      data: { userId: outsider.id, communities: { connect: { id: home.id } } }
     });
     const edition = await testPrisma.edition.create({
       data: { releaseId: release.id }

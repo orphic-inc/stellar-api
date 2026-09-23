@@ -62,6 +62,42 @@ const RELEASE_DESCRIPTIONS = [
   'Archive rip of OOP release. Single available source.'
 ];
 
+/**
+ * The generated uploader's Contributor, connected to this community too: one
+ * row per user, belonging to every community they contribute to (#709,
+ * ADR-0050) — never only the first. Only a row this run creates is tracked.
+ */
+async function ensureContributor(
+  prisma: PrismaClient,
+  runId: string,
+  userId: number,
+  communityId: number,
+  createdAt: Date
+) {
+  const existing = await prisma.contributor.findUnique({ where: { userId } });
+  if (existing) {
+    return prisma.contributor.update({
+      where: { id: existing.id },
+      data: { communities: { connect: { id: communityId } } }
+    });
+  }
+  const created = await prisma.contributor.create({
+    data: {
+      userId,
+      communities: { connect: { id: communityId } },
+      createdAt,
+      updatedAt: createdAt
+    }
+  });
+  await trackCreate(
+    prisma as Parameters<typeof trackCreate>[0],
+    runId,
+    'Contributor',
+    { id: created.id }
+  );
+  return created;
+}
+
 export async function generateContributions(
   prisma: PrismaClient,
   ctx: RunContext
@@ -104,33 +140,21 @@ export async function generateContributions(
       const contributorUserId = pick(users, rng);
       const createdAt = daysAgo(0, 2 * 365, rng);
 
-      // Get or create Contributor record
-      let contributor = await prisma.contributor.findUnique({
-        where: { userId: contributorUserId }
+      const releaseRow = await prisma.release.findUnique({
+        where: { id: releaseId },
+        select: { communityId: true }
       });
-      if (!contributor) {
-        const releaseRow = await prisma.release.findUnique({
-          where: { id: releaseId },
-          select: { communityId: true }
-        });
-        const releaseCommunityId =
-          releaseRow?.communityId ?? ctx.generatedCommunityIds[0];
-        if (!releaseCommunityId) continue; // skip if no community available
-        contributor = await prisma.contributor.create({
-          data: {
-            userId: contributorUserId,
-            communityId: releaseCommunityId,
-            createdAt,
-            updatedAt: createdAt
-          }
-        });
-        await trackCreate(
-          prisma as Parameters<typeof trackCreate>[0],
-          runId,
-          'Contributor',
-          { id: contributor.id }
-        );
-      }
+      const releaseCommunityId =
+        releaseRow?.communityId ?? ctx.generatedCommunityIds[0];
+      if (!releaseCommunityId) continue; // skip if no community available
+
+      const contributor = await ensureContributor(
+        prisma,
+        runId,
+        contributorUserId,
+        releaseCommunityId,
+        createdAt
+      );
 
       const fileType = pick(CONTRIBUTION_FILE_TYPES, rng);
       const bitrate = pick(BITRATES, rng);

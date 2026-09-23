@@ -54,7 +54,9 @@ jest.mock('../lib/userRankAccess', () => ({
 }));
 
 jest.mock('./contribution', () => ({
-  addContributionToRelease: jest.fn()
+  addContributionToRelease: jest.fn(),
+  // The upload gate (#709); a plain function so resetMocks keeps it.
+  mayUploadTo: async (community: unknown) => !!community
 }));
 
 jest.mock('./settings', () => ({
@@ -358,9 +360,12 @@ describe('releaseWorkbench session', () => {
       id: 1,
       registrationStatus: RegistrationStatus.open
     } as never);
-    prismaMock.community.findUnique.mockResolvedValueOnce({
-      id: 1,
-      allowDuplicateFormats: true
+    prismaMock.release.findFirst.mockResolvedValueOnce({
+      community: {
+        id: 1,
+        registrationStatus: RegistrationStatus.open,
+        allowDuplicateFormats: true
+      }
     } as never);
     addContributionToReleaseMock.mockResolvedValue({
       id: 15,

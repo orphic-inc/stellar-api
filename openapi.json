@@ -22111,8 +22111,8 @@
         "tags": [
           "Communities"
         ],
-        "summary": "Add a member (consumer) to a community",
-        "description": "Community admin or curator only.",
+        "summary": "Admit a member to a community as a consumer or a contributor",
+        "description": "Community admin or curator only. `role` defaults to `consumer`. Admit as `contributor` a member who is to upload: an upload requires membership and cannot itself be the way in (#709, ADR-0050).",
         "parameters": [
           {
             "schema": {
@@ -22133,6 +22133,14 @@
                     "type": "integer",
                     "minimum": 0,
                     "exclusiveMinimum": true
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "consumer",
+                      "contributor"
+                    ],
+                    "default": "consumer"
                   }
                 },
                 "required": [
@@ -22217,7 +22225,7 @@
           "Communities"
         ],
         "summary": "Remove a member from a community",
-        "description": "Answers 409 when the target is the community LEADER or a CURATOR: that role has to be removed first. The leader is checked before the curator because a leader is always also a curator, so the message names the role that actually has to be reassigned.",
+        "description": "Removes the member from both the consumer and the contributor role (#709); 404 when they hold neither. Answers 409 when the target is the community LEADER or a CURATOR: that role has to be removed first. The leader is checked before the curator because a leader is always also a curator, so the message names the role that actually has to be reassigned.",
         "parameters": [
           {
             "schema": {
@@ -24658,6 +24666,7 @@
         "tags": [
           "Communities"
         ],
+        "description": "Requires membership of the community (#709, ADR-0050). A release in a community the caller cannot see answers the same 404 as a missing one (ADR-0036 §5).",
         "parameters": [
           {
             "schema": {
@@ -24806,7 +24815,7 @@
             }
           },
           "404": {
-            "description": "Release not found",
+            "description": "Release not found, or in a community you cannot see",
             "content": {
               "application/json": {
                 "schema": {
@@ -24895,6 +24904,7 @@
         "tags": [
           "Contributions"
         ],
+        "description": "Requires membership of the community (#709, ADR-0050). A community the caller cannot see answers the same 404 as a missing one.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -25138,7 +25148,7 @@
             }
           },
           "404": {
-            "description": "Community not found",
+            "description": "Community not found, or one you cannot see",
             "content": {
               "application/json": {
                 "schema": {

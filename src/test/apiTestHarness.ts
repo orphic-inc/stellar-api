@@ -16,7 +16,10 @@ jest.mock('../modules/profile', () => ({
 
 jest.mock('../modules/contribution', () => ({
   createContributionSubmission: jest.fn(),
-  addContributionToRelease: jest.fn()
+  addContributionToRelease: jest.fn(),
+  // The upload gate (#709): any existing community counts as the caller's. A
+  // plain function, not jest.fn(impl) — resetMocks would strip the impl.
+  mayUploadTo: async (community: unknown) => !!community
 }));
 
 jest.mock('../modules/downloads', () => ({

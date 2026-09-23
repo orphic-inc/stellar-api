@@ -498,9 +498,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
   });
 
   it('rejects duplicate formats when the community disallows them', async () => {
-    prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ allowDuplicateFormats: false }) as never
-    );
+    prismaMock.release.findFirst.mockResolvedValue({
+      community: makeCommunity({ allowDuplicateFormats: false })
+    } as never);
     prismaMock.contribution.findFirst.mockResolvedValue({
       id: 11,
       releaseId: 3,
@@ -514,8 +514,8 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
     expect(res.status).toBe(409);
   });
 
-  it('returns 404 when the community is missing', async () => {
-    prismaMock.community.findUnique.mockResolvedValue(null);
+  it('returns 404 when the release is missing or not in that community', async () => {
+    prismaMock.release.findFirst.mockResolvedValue(null);
 
     const res = await request(app)
       .post('/api/communities/1/releases/3/contributions')
@@ -525,9 +525,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
   });
 
   it('returns 404 when addContributionToRelease cannot find the release', async () => {
-    prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ allowDuplicateFormats: true }) as never
-    );
+    prismaMock.release.findFirst.mockResolvedValue({
+      community: makeCommunity({ allowDuplicateFormats: true })
+    } as never);
     addContributionToReleaseMock.mockResolvedValue(null);
 
     const res = await request(app)
@@ -538,9 +538,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
   });
 
   it('creates a contribution for valid input', async () => {
-    prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ allowDuplicateFormats: true }) as never
-    );
+    prismaMock.release.findFirst.mockResolvedValue({
+      community: makeCommunity({ allowDuplicateFormats: true })
+    } as never);
     addContributionToReleaseMock.mockResolvedValue({
       id: 15,
       releaseId: 3,
@@ -574,9 +574,9 @@ describe('POST /api/communities/:communityId/releases/:releaseId/contributions',
   });
 
   it('emits artist_release notifications to subscribers when contribution is added', async () => {
-    prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ allowDuplicateFormats: true }) as never
-    );
+    prismaMock.release.findFirst.mockResolvedValue({
+      community: makeCommunity({ allowDuplicateFormats: true })
+    } as never);
     addContributionToReleaseMock.mockResolvedValue({
       id: 15,
       releaseId: 3,
