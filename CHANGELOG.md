@@ -391,6 +391,16 @@ All notable changes to stellar-api are documented here.
   confirms nothing. An author can still delete their own comment after losing
   access, and a moderator with `reports_manage` can delete any comment.
 
+- **A deleted comment could still be edited and deleted again**
+  ([#703](https://github.com/orphic-inc/stellar-api/issues/703)) — `PUT` and
+  `DELETE` on `/api/comments/{id}` found soft-deleted comments. An edit brought
+  the text back and sent quote notifications for a comment no route serves. A
+  second delete overwrote the deletion time and wrote a second audit row.
+
+  Both now answer the 404 that `GET /api/comments/{id}` already sends. The
+  writes are conditional too, so a delete racing an edit or another delete also
+  gets the 404. No status code is new.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added
