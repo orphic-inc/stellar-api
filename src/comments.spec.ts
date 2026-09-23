@@ -12,29 +12,60 @@ import {
 } from './test/factories';
 
 jest.mock('./modules/comment', () => ({
-  deleteComment: jest.fn()
+  deleteComment: jest.fn(),
+  canSeeCommentThread: jest.fn(),
+  canSeeThreadOf: jest.fn()
 }));
 
 import * as commentModule from './modules/comment';
-const deleteCommentMock = (commentModule as jest.Mocked<typeof commentModule>)
-  .deleteComment;
+const mockedComment = commentModule as jest.Mocked<typeof commentModule>;
+const deleteCommentMock = mockedComment.deleteComment;
+const canSeeCommentThreadMock = mockedComment.canSeeCommentThread;
+const canSeeThreadOfMock = mockedComment.canSeeThreadOf;
 
-beforeEach(() => resetApiTestState());
+beforeEach(() => {
+  resetApiTestState();
+  // Visible by default; the #697 cases below shut the thread explicitly.
+  canSeeCommentThreadMock.mockResolvedValue(true);
+  canSeeThreadOfMock.mockResolvedValue(true);
+});
 
 // ─── GET /api/comments ────────────────────────────────────────────────────────
 
 describe('GET /api/comments', () => {
-  it('returns a paginated list of comments with no filters', async () => {
+  it('returns a paginated list of one thread', async () => {
     prismaMock.comment.findMany.mockResolvedValue([
       makeCommentWithAuthor({ id: 12 })
     ] as never);
     prismaMock.comment.count.mockResolvedValue(1);
 
-    const res = await request(app).get('/api/comments');
+    const res = await request(app).get('/api/comments?context=artist&pageId=3');
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.meta.total).toBe(1);
+  });
+
+  // #697: the thread-less form listed every comment on the site, private
+  // threads included, and had no caller.
+  it('returns 400 when no thread is named', async () => {
+    const res = await request(app).get('/api/comments');
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a thread the caller cannot see', async () => {
+    canSeeCommentThreadMock.mockResolvedValue(false);
+
+    const res = await request(app).get(
+      '/api/comments?context=release&pageId=7'
+    );
+
+    expect(res.status).toBe(404);
+    expect(canSeeCommentThreadMock).toHaveBeenCalledWith('release', 7, 7);
+    expect(prismaMock.comment.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.comment.count).not.toHaveBeenCalled();
   });
 
   // #231 — comment authors must carry the donor sign + warning sign so the
@@ -55,7 +86,7 @@ describe('GET /api/comments', () => {
     ] as never);
     prismaMock.comment.count.mockResolvedValue(1);
 
-    const res = await request(app).get('/api/comments');
+    const res = await request(app).get('/api/comments?context=artist&pageId=3');
 
     expect(res.status).toBe(200);
     expect(res.body.data[0].author).toEqual({
@@ -131,15 +162,11 @@ describe('GET /api/comments', () => {
     expect(call?.where).toMatchObject({ page: 'release', releaseId: 7 });
   });
 
-  it('filters only by page when pageId is omitted', async () => {
-    prismaMock.comment.findMany.mockResolvedValue([]);
-    prismaMock.comment.count.mockResolvedValue(0);
+  it('returns 400 when pageId is omitted', async () => {
+    const res = await request(app).get('/api/comments?context=artist');
 
-    await request(app).get('/api/comments?context=artist');
-
-    const call = prismaMock.comment.findMany.mock.calls[0][0];
-    expect(call?.where).toMatchObject({ page: 'artist', deletedAt: null });
-    expect(call?.where).not.toHaveProperty('artistId');
+    expect(res.status).toBe(400);
+    expect(prismaMock.comment.findMany).not.toHaveBeenCalled();
   });
 
   it('returns 400 for an invalid page filter', async () => {
@@ -195,6 +222,18 @@ describe('GET /api/comments/:id', () => {
   // `requireAuth` would drop both from `openapi.json`, and the export step
   // fails on any diff — it does not show up as a green test.
 
+  it('returns 404 for a comment in a thread the caller cannot see', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeCommentWithAuthor({ id: 12 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+
+    const res = await request(app).get('/api/comments/12');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Comment not found');
+  });
+
   it('never serves a soft-deleted comment', async () => {
     // `deleteComment` only stamps `deletedAt` and keeps the body verbatim, so
     // without this filter a withdrawn comment's text was readable by id. The
@@ -234,6 +273,23 @@ describe('POST /api/comments', () => {
         })
       })
     );
+  });
+
+  // #697: the same 400 as a page that does not exist, so a write cannot be
+  // used to probe for private ids.
+  it('returns 400 for a page the caller cannot see', async () => {
+    canSeeCommentThreadMock.mockResolvedValue(false);
+
+    const res = await request(app).post('/api/comments').send({
+      page: 'release',
+      body: 'hello',
+      releaseId: 9
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('The commented item was not found');
+    expect(canSeeCommentThreadMock).toHaveBeenCalledWith('release', 9, 7);
+    expect(prismaMock.comment.create).not.toHaveBeenCalled();
   });
 
   it('persists release comments with the matching foreign key', async () => {
@@ -505,6 +561,36 @@ describe('PUT /api/comments/:id', () => {
     expect(res.body.msg).toBe('Not authorized');
   });
 
+  // #697: visibility before ownership. A 403 here would confirm that a
+  // comment exists in a thread the caller cannot see.
+  it('returns 404, not 403, for a comment in a thread the caller cannot see', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 99 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+
+    const res = await request(app)
+      .put('/api/comments/12')
+      .send({ body: 'Tamper' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Comment not found');
+  });
+
+  it('refuses the author once they cannot see the thread', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 7 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+
+    const res = await request(app)
+      .put('/api/comments/12')
+      .send({ body: 'Still mine' });
+
+    expect(res.status).toBe(404);
+    expect(prismaMock.comment.update).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for a non-numeric comment id', async () => {
     const res = await request(app).put('/api/comments/nope').send({
       body: 'Updated body'
@@ -555,6 +641,52 @@ describe('DELETE /api/comments/:id', () => {
 
     expect(res.status).toBe(403);
     expect(res.body.msg).toBe('Not authorized');
+  });
+
+  // #697: the author may always remove their own words, and a moderator acts
+  // on a reported comment without being a member (a moderation verb,
+  // ADR-0036). Anyone else is refused as if the comment were not there.
+  it('lets the author delete after losing sight of the thread', async () => {
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 7 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+    deleteCommentMock.mockResolvedValue([] as never);
+
+    const res = await request(app).delete('/api/comments/12');
+
+    expect(res.status).toBe(204);
+    expect(deleteCommentMock).toHaveBeenCalledWith(12, 7, false);
+  });
+
+  it('lets a moderator delete in a thread they cannot see', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ reports_manage: true })
+    );
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 99 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+    deleteCommentMock.mockResolvedValue([] as never);
+
+    const res = await request(app).delete('/api/comments/12');
+
+    expect(res.status).toBe(204);
+    expect(deleteCommentMock).toHaveBeenCalledWith(12, 7, true);
+  });
+
+  it('returns 404, not 403, to anyone else who cannot see the thread', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeUserRank());
+    prismaMock.comment.findUnique.mockResolvedValue(
+      makeComment({ id: 12, authorId: 99 }) as never
+    );
+    canSeeThreadOfMock.mockResolvedValue(false);
+
+    const res = await request(app).delete('/api/comments/12');
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toBe('Comment not found');
+    expect(deleteCommentMock).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the comment does not exist', async () => {

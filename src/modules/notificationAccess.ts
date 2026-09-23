@@ -2,8 +2,10 @@ import { Prisma, SubscriptionPage } from '@prisma/client';
 import { getUserRankAccess } from '../lib/userRankAccess';
 import {
   communityReadableWhere,
+  contributionVisibleTo,
   releaseInPublicCommunity,
-  releaseVisibleTo
+  releaseVisibleTo,
+  requestVisibleTo
 } from './communityAccess';
 import { forumReadableWhere } from './forumAccess';
 
@@ -84,24 +86,28 @@ const seeContribution = async (
   contributionId: number,
   userIds: number[]
 ): Promise<number[]> => {
-  const c = await tx.contribution.findUnique({
-    where: { id: contributionId },
-    select: { releaseId: true }
-  });
-  return c ? seeRelease(tx, c.releaseId, userIds) : [];
+  const sees = async (viewerId: number | null) =>
+    (await tx.contribution.count({
+      where: { AND: [{ id: contributionId }, contributionVisibleTo(viewerId)] }
+    })) > 0;
+  // The same one-query shortcut as a release: the viewer-less scope is the
+  // public one.
+  if (await sees(null)) return userIds;
+  return keep(userIds, sees);
 };
 
-const seeRequest = async (
+const seeRequest = (
   tx: TxClient,
   requestId: number,
   userIds: number[]
-): Promise<number[]> => {
-  const r = await tx.request.findUnique({
-    where: { id: requestId },
-    select: { communityId: true }
-  });
-  return r ? seeCommunity(tx, r.communityId, userIds) : [];
-};
+): Promise<number[]> =>
+  keep(
+    userIds,
+    async (userId) =>
+      (await tx.request.count({
+        where: { AND: [{ id: requestId }, requestVisibleTo(userId)] }
+      })) > 0
+  );
 
 type Check = (
   tx: TxClient,
@@ -139,10 +145,11 @@ const CHECKS: Record<SubscriptionPage, Check> = {
  * case the rule deliberately excludes.
  *
  * Every rule here is the canonical one, reused rather than restated:
- * `releaseVisibleTo` (ADR-0036) for releases and contributions,
- * `communityReadableWhere` for requests and community pages, and
- * `forumReadableWhere` for forum topics, over the recipient's own rank access —
- * the same `effectiveLevel` the auth middleware puts on `req.user`.
+ * `releaseVisibleTo` (ADR-0036) for releases, `contributionVisibleTo` and
+ * `requestVisibleTo` for their pages (#697), `communityReadableWhere` for
+ * community pages, and `forumReadableWhere` for forum topics, over the
+ * recipient's own rank access — the same `effectiveLevel` the auth middleware
+ * puts on `req.user`.
  *
  * Queries run on the caller's TRANSACTION client. A new topic's first post can
  * quote someone in the same transaction that creates the topic; the global

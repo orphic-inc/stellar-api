@@ -241,6 +241,26 @@ export const releaseVisibleTo = (
     : releaseVisibleToViewer(viewerId);
 
 /**
+ * The viewer's contribution scope: a contribution is visible exactly when its
+ * release is (#697). No owner arm — an uploader who loses access to the
+ * community loses the contribution with it, as for the release (ADR-0036).
+ */
+export const contributionVisibleTo = (
+  viewerId: number | null
+): Prisma.ContributionWhereInput => ({ release: releaseVisibleTo(viewerId) });
+
+/**
+ * The viewer's request scope: a request is visible exactly when its community
+ * is readable (#697). `Request.communityId` is required, so there is no null
+ * arm to carry.
+ */
+export const requestVisibleTo = (
+  viewerId: number
+): Prisma.RequestWhereInput => ({
+  community: communityReadableWhere(viewerId)
+});
+
+/**
  * Load a community the user is allowed to reach, or throw the 404/403 the
  * route would have sent. The load-then-gate shape every module-side caller
  * needs, so the gate can't be forgotten between the two.

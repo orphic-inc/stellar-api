@@ -10,8 +10,10 @@ const pageIdSchema = z.number().int().positive();
 
 export const commentQuerySchema = z.object({
   ...paginationBase,
-  context: commentPageEnum.optional(),
-  pageId: z.coerce.number().int().positive().optional()
+  // Both required (#697): a list reads exactly one thread, so it can be gated
+  // on that thread's page.
+  context: commentPageEnum,
+  pageId: z.coerce.number().int().positive()
 });
 
 export const createCommentSchema = z

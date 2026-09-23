@@ -29,7 +29,11 @@ import {
   type CreateCommentInput,
   type UpdateCommentInput
 } from '../../schemas/comment';
-import { deleteComment } from '../../modules/comment';
+import {
+  canSeeCommentThread,
+  canSeeThreadOf,
+  deleteComment
+} from '../../modules/comment';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
@@ -132,18 +136,19 @@ router.get(
   validateQuery(commentQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { context, pageId } = parsedQuery<CommentQueryInput>(res);
+    // A thread follows its page (#697): one the caller cannot see is the same
+    // 404 as one that does not exist.
+    if (!(await canSeeCommentThread(context, pageId, req.user!.id)))
+      return res.status(404).json({ msg: 'Comment thread not found' });
     const pg = parsedPage(res);
-    const where: Record<string, unknown> = {};
-    if (context) where.page = context as CommentPage;
-    if (context && pageId) {
-      if (context === CommentPage.communities) where.communityId = pageId;
-      else if (context === CommentPage.artist) where.artistId = pageId;
-      else if (context === CommentPage.collages) where.collageId = pageId;
-      else if (context === CommentPage.contributions)
-        where.contributionId = pageId;
-      else if (context === CommentPage.requests) where.requestId = pageId;
-      else if (context === CommentPage.release) where.releaseId = pageId;
-    }
+    const where: Record<string, unknown> = { page: context };
+    if (context === CommentPage.communities) where.communityId = pageId;
+    else if (context === CommentPage.artist) where.artistId = pageId;
+    else if (context === CommentPage.collages) where.collageId = pageId;
+    else if (context === CommentPage.contributions)
+      where.contributionId = pageId;
+    else if (context === CommentPage.requests) where.requestId = pageId;
+    else if (context === CommentPage.release) where.releaseId = pageId;
     const [comments, total] = await Promise.all([
       prisma.comment.findMany({
         where: { ...where, deletedAt: null },
@@ -194,7 +199,8 @@ router.get(
         author: { select: authorRefSelect }
       }
     });
-    if (!comment) return res.status(404).json({ msg: 'Comment not found' });
+    if (!comment || !(await canSeeThreadOf(comment, req.user!.id)))
+      return res.status(404).json({ msg: 'Comment not found' });
     res.json({
       ...comment,
       author: toAuthorRefOrNull(comment.author),
@@ -235,6 +241,12 @@ router.post(
       contributions: { subPage: 'contributions', pageId: contributionId }
     };
     const subTarget = subPageMap[page];
+
+    // The schema guarantees the id `page` names, so the map above holds it. A
+    // page the caller cannot see is the same 400 as a dangling id (#697), so a
+    // write cannot probe for private ones.
+    if (!(await canSeeCommentThread(page, subTarget!.pageId!, req.user.id)))
+      return res.status(400).json({ msg: 'The commented item was not found' });
 
     let comment;
     try {
@@ -292,7 +304,11 @@ router.put(
     const { body } = parsedBody<UpdateCommentInput>(res);
     const { id } = parsedParams<{ id: number }>(res);
     const comment = await prisma.comment.findUnique({ where: { id } });
-    if (!comment) return res.status(404).json({ msg: 'Comment not found' });
+    // Visibility before ownership (#697): a 403 would confirm the comment
+    // exists in a thread the caller cannot see. It also shuts the author out
+    // once they lose access — an edit writes to the page.
+    if (!comment || !(await canSeeThreadOf(comment, req.user.id)))
+      return res.status(404).json({ msg: 'Comment not found' });
     if (comment.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
@@ -358,11 +374,17 @@ router.delete(
     const comment = await prisma.comment.findUnique({ where: { id } });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
 
+    // #697: the author may always withdraw their own words, and a moderator
+    // acts on a reported comment without being a member — a moderation verb,
+    // not a read (ADR-0036). Anyone else who cannot see the thread is refused
+    // as if the comment were not there, before the 403 could confirm it is.
     const isOwner = comment.authorId === req.user.id;
     if (
       !isOwner &&
       !hasPermission(await loadPermissions(req, res), 'reports_manage')
     ) {
+      if (!(await canSeeThreadOf(comment, req.user.id)))
+        return res.status(404).json({ msg: 'Comment not found' });
       return res.status(403).json({ msg: 'Not authorized' });
     }
 

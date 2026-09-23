@@ -375,6 +375,22 @@ All notable changes to stellar-api are documented here.
   A member subscribed to two credited artists now gets one notification rather
   than two.
 
+- **Comment threads on private-community pages follow the page's access**
+  ([#697](https://github.com/orphic-inc/stellar-api/issues/697)) — any member
+  could read and write the thread of a release, contribution, request or
+  community in a private community they did not belong to. With no query,
+  `GET /api/comments` also listed every comment on the site.
+
+  **Breaking:** `GET /api/comments` now requires both `context` and `pageId`,
+  and reads one thread. A page the caller cannot see answers the same 404 as a
+  missing page. `POST /api/comments` answers the 400 it already sent for a
+  missing page.
+
+  `GET`, `PUT` and `DELETE` on `/api/comments/{id}` answer 404 for a comment in a
+  thread the caller cannot see. The check runs before the author check, so a 403
+  confirms nothing. An author can still delete their own comment after losing
+  access, and a moderator with `reports_manage` can delete any comment.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added

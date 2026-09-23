@@ -6370,6 +6370,11 @@ registry.registerPath({
   method: 'get',
   path: '/comments',
   tags: ['Comments'],
+  summary: 'One comment thread, paginated',
+  description:
+    'Reads exactly one thread: `context` and `pageId` are both required ' +
+    '(#697). A thread follows its page, so a page the caller cannot see ' +
+    'answers the same 404 as one that does not exist.',
   request: {
     query: commentQuerySchema
   },
@@ -6377,7 +6382,8 @@ registry.registerPath({
     200: {
       description: 'Comments',
       content: { 'application/json': { schema: PaginatedComments } }
-    }
+    },
+    404: msgResponse('No such page, or one the caller cannot see')
   }
 });
 
@@ -6385,6 +6391,11 @@ registry.registerPath({
   method: 'post',
   path: '/comments',
   tags: ['Comments'],
+  description:
+    'A page that does not exist and a page the caller cannot see both ' +
+    'answer 400 `The commented item was not found` (#697), so a write ' +
+    'cannot probe for private ids. That 400 shares its status with body ' +
+    'validation, so it is not declared as a separate response.',
   request: {
     body: {
       content: {
@@ -6417,7 +6428,9 @@ registry.registerPath({
       description: 'Comment',
       content: { 'application/json': { schema: Comment } }
     },
-    404: msgResponse('Comment not found, or soft-deleted')
+    404: msgResponse(
+      'Comment not found, soft-deleted, or in a thread the caller cannot see'
+    )
   }
 });
 
@@ -6439,7 +6452,9 @@ registry.registerPath({
       content: { 'application/json': { schema: CommentUpdated } }
     },
     403: msgResponse('Not the comment author'),
-    404: msgResponse('Not found')
+    404: msgResponse(
+      'Not found, or in a thread the caller cannot see — checked before authorship'
+    )
   }
 });
 
@@ -6453,7 +6468,9 @@ registry.registerPath({
       description: 'Comment deleted'
     },
     403: msgResponse('Not the comment author and missing reports_manage'),
-    404: msgResponse('Not found')
+    404: msgResponse(
+      'Not found, or in a thread a caller who is neither author nor moderator cannot see'
+    )
   }
 });
 
