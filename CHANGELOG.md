@@ -401,6 +401,16 @@ All notable changes to stellar-api are documented here.
   writes are conditional too, so a delete racing an edit or another delete also
   gets the 404. No status code is new.
 
+- **A personal collage is readable by any member**
+  ([#706](https://github.com/orphic-inc/stellar-api/issues/706)) —
+  `GET /api/collages/{id}` answered 403 to anyone but the owner or staff for a
+  personal collage. Every other surface already treated one as public: the
+  collage list, the comment thread, notifications, and the profile's featured
+  shelves, which linked other viewers straight to that 403.
+
+  The route now shows it, and its `403` response is removed from the contract.
+  Changing a personal collage is still for its owner or staff only.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added
