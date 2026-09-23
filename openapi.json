@@ -38514,7 +38514,7 @@
           "Collages"
         ],
         "summary": "One collage with its entries and your subscription context",
-        "description": "Entries are ordered by `sort`. `isSubscribed`/`isBookmarked` describe the CALLER, so this response is per-viewer and not cacheable across members. Visiting while subscribed updates your `lastVisit`. Two access rules are worth noting: a DELETED collage answers 404 to non-staff rather than 403, and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner or staff.",
+        "description": "Entries are ordered by `sort`. `isSubscribed`/`isBookmarked` describe the CALLER, so this response is per-viewer and not cacheable across members. Visiting while subscribed updates your `lastVisit`. Two access rules are worth noting: a DELETED collage answers 404 to non-staff rather than 403, and a PERSONAL collage (categoryId 0) is readable by any member; only its owner or staff may change it (#706).",
         "parameters": [
           {
             "schema": {
@@ -38548,16 +38548,6 @@
           },
           "401": {
             "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MsgResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Personal collage belonging to someone else",
             "content": {
               "application/json": {
                 "schema": {

@@ -308,6 +308,34 @@ const collageInclude = {
   _count: { select: { entries: true, subscriptions: true, bookmarks: true } }
 };
 
+/** The detail read: `collageInclude` plus the entries this viewer may see. */
+const collageDetailInclude = (viewerId: number) => ({
+  ...collageInclude,
+  entries: {
+    // ADR-0036 §1: a release's identity is private to its community, so an
+    // entry the viewer cannot reach is omitted rather than rendered. The rows
+    // stay in the database — they were never malformed, and one reappears
+    // correctly if this viewer later joins that community (ADR-0036 §7).
+    where: { release: releaseVisibleToViewer(viewerId) },
+    orderBy: [{ sort: 'asc' as const }, { id: 'asc' as const }],
+    include: {
+      release: {
+        select: {
+          id: true,
+          title: true,
+          image: true,
+          year: true,
+          communityId: true,
+          releaseType: true,
+          credits: releaseCreditsSelect,
+          releaseGroup: { select: groupProjectionSelect }
+        }
+      },
+      user: { select: { id: true, username: true } }
+    }
+  }
+});
+
 // Personal collages: categoryId === 0
 const isPersonal = (categoryId: number) => categoryId === 0;
 
@@ -410,33 +438,7 @@ router.get(
 
     const collage = await prisma.collage.findUnique({
       where: { id },
-      include: {
-        ...collageInclude,
-        entries: {
-          // ADR-0036 §1: a release's identity is private to its community, so
-          // an entry the viewer cannot reach is omitted rather than rendered.
-          // The rows stay in the database — they were never malformed, and one
-          // reappears correctly if this viewer later joins that community
-          // (ADR-0036 §7).
-          where: { release: releaseVisibleToViewer(authReq.user.id) },
-          orderBy: [{ sort: 'asc' }, { id: 'asc' }],
-          include: {
-            release: {
-              select: {
-                id: true,
-                title: true,
-                image: true,
-                year: true,
-                communityId: true,
-                releaseType: true,
-                credits: releaseCreditsSelect,
-                releaseGroup: { select: groupProjectionSelect }
-              }
-            },
-            user: { select: { id: true, username: true } }
-          }
-        }
-      }
+      include: collageDetailInclude(authReq.user.id)
     });
 
     if (!collage) return res.status(404).json({ msg: 'Collage not found' });
@@ -446,13 +448,6 @@ router.get(
 
     if (collage.isDeleted && !staff) {
       return res.status(404).json({ msg: 'Collage not found' });
-    }
-
-    // For personal collages, only owner or staff can view
-    if (isPersonal(collage.categoryId)) {
-      if (collage.userId !== authReq.user.id && !staff) {
-        return res.status(403).json({ msg: 'Permission denied' });
-      }
     }
 
     // Subscription context for the requesting user

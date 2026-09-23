@@ -9754,15 +9754,14 @@ registry.registerPath({
     'CALLER, so this response is per-viewer and not cacheable across members. ' +
     'Visiting while subscribed updates your `lastVisit`. Two access rules are ' +
     'worth noting: a DELETED collage answers 404 to non-staff rather than 403, ' +
-    'and a PERSONAL collage (categoryId 0) answers 403 to anyone but its owner ' +
-    'or staff.',
+    'and a PERSONAL collage (categoryId 0) is readable by any member; only its ' +
+    'owner or staff may change it (#706).',
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
       description: 'Collage detail',
       content: { 'application/json': { schema: CollageDetail } }
     },
-    403: msgResponse('Personal collage belonging to someone else'),
     404: msgResponse('Not found, or deleted and the caller is not staff')
   }
 });

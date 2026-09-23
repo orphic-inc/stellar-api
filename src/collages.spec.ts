@@ -332,19 +332,6 @@ describe('GET /api/collages/:id', () => {
     expect(res.status).toBe(200);
   });
 
-  it('returns 403 for personal collage owned by another user', async () => {
-    prismaMock.collage.findUnique.mockResolvedValue(
-      makeCollageDetail({
-        categoryId: 0,
-        userId: 99,
-        entries: []
-      }) as unknown as ReturnType<typeof makeCollage>
-    );
-
-    const res = await request(app).get('/api/collages/1');
-    expect(res.status).toBe(403);
-  });
-
   it('updates subscriber lastVisit when the viewer is subscribed', async () => {
     prismaMock.collage.findUnique.mockResolvedValue(
       makeCollageDetail({
