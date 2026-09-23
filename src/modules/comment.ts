@@ -13,7 +13,12 @@ export const deleteComment = async (
   isModAction: boolean
 ) =>
   prisma.$transaction([
-    prisma.comment.update({ where: { id }, data: { deletedAt: new Date() } }),
+    // Only a live comment (#703): a second delete throws P2025 and the batch
+    // drops its audit row, rather than re-stamping and logging it twice.
+    prisma.comment.update({
+      where: { id, deletedAt: null },
+      data: { deletedAt: new Date() }
+    }),
     prisma.auditLog.create({
       data: {
         actorId,

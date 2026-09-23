@@ -303,7 +303,11 @@ router.put(
   authHandler(async (req, res) => {
     const { body } = parsedBody<UpdateCommentInput>(res);
     const { id } = parsedParams<{ id: number }>(res);
-    const comment = await prisma.comment.findUnique({ where: { id } });
+    // A soft-deleted comment is missing here, as on `GET /:id` (#703): the
+    // body survives deletion, so an edit would resurrect it and quote-notify.
+    const comment = await prisma.comment.findUnique({
+      where: { id, deletedAt: null }
+    });
     // Visibility before ownership (#697): a 403 would confirm the comment
     // exists in a thread the caller cannot see. It also shuts the author out
     // once they lose access — an edit writes to the page.
@@ -315,8 +319,9 @@ router.put(
     let updated;
     try {
       updated = await prisma.$transaction(async (tx) => {
+        // Conditional too, so a delete racing this edit lands as the 404.
         const result = await tx.comment.update({
-          where: { id },
+          where: { id, deletedAt: null },
           data: {
             body: sanitizeHtml(body),
             editedUserId: req.user.id,
@@ -371,7 +376,10 @@ router.delete(
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
 
-    const comment = await prisma.comment.findUnique({ where: { id } });
+    // #703: deleting twice re-stamped `deletedAt` and wrote a second audit row.
+    const comment = await prisma.comment.findUnique({
+      where: { id, deletedAt: null }
+    });
     if (!comment) return res.status(404).json({ msg: 'Comment not found' });
 
     // #697: the author may always withdraw their own words, and a moderator
@@ -388,7 +396,12 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    await deleteComment(id, req.user.id, !isOwner);
+    try {
+      await deleteComment(id, req.user.id, !isOwner);
+    } catch (err) {
+      // Lost a race with another delete; the read above cannot close it.
+      translatePrismaError(err, { P2025: [404, 'Comment not found'] });
+    }
     res.status(204).send();
   })
 );

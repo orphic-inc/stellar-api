@@ -577,7 +577,7 @@ describe('API content and shared flows', () => {
 
     expect(res.status).toBe(200);
     expect(prismaMock.comment.update).toHaveBeenCalledWith({
-      where: { id: 12 },
+      where: { id: 12, deletedAt: null },
       data: expect.objectContaining({
         body: 'new body',
         editedUserId: 7

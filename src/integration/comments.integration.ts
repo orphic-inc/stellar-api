@@ -85,6 +85,31 @@ describe('deleteComment', () => {
     expect(log!.action).toBe('comment.mod_delete');
   });
 
+  // #703: the second of two deletes must not re-stamp `deletedAt` or write a
+  // second audit row. It throws P2025, and the batch takes the audit row back.
+  it('refuses to delete a comment twice', async () => {
+    const author = await createAuthor();
+    const comment = await createComment(author.id);
+    await deleteComment(comment.id, author.id, false);
+    const { deletedAt } = await testPrisma.comment.findUniqueOrThrow({
+      where: { id: comment.id }
+    });
+
+    await expect(deleteComment(comment.id, author.id, true)).rejects.toThrow(
+      expect.objectContaining({ code: 'P2025' })
+    );
+
+    const dbComment = await testPrisma.comment.findUniqueOrThrow({
+      where: { id: comment.id }
+    });
+    expect(dbComment.deletedAt).toEqual(deletedAt);
+    expect(
+      await testPrisma.auditLog.count({
+        where: { targetType: 'Comment', targetId: comment.id }
+      })
+    ).toBe(1);
+  });
+
   it('executes the soft-delete and audit log in a single transaction', async () => {
     const author = await createAuthor();
     const comment = await createComment(author.id);
