@@ -123,7 +123,7 @@ const createContributor = async (name: string) => {
   const user = await createUser(name);
   const home = await createCommunity(RegistrationStatus.open);
   const contributor = await testPrisma.contributor.create({
-    data: { userId: user.id, communityId: home.id }
+    data: { userId: user.id, communities: { connect: { id: home.id } } }
   });
   return { userId: user.id, contributorId: contributor.id };
 };

@@ -59,6 +59,12 @@ All notable changes to stellar-api are documented here.
   New routes live under `/api/notification-filters`. Staff with `users_edit`
   can read a member's filters at `GET /api/users/:id/notification-filters`.
 
+- **A curator can admit a member as a contributor**
+  ([#709](https://github.com/orphic-inc/stellar-api/issues/709)) —
+  `POST /api/communities/{id}/members` takes `role: consumer | contributor`,
+  defaulting to `consumer`, so a caller that sends none is unchanged.
+  `DELETE /api/communities/{id}/members/{userId}` removes both roles.
+
 ### Changed
 
 - **Breaking — privacy is the five `show*` flags; the `paranoia` level is gone**
@@ -421,6 +427,24 @@ All notable changes to stellar-api are documented here.
   Restoring a collage reopens its thread, since the comments are kept. An
   author or a `reports_manage` moderator can still delete a comment there.
   No status code is new.
+
+- **Uploading into a private community no longer makes you a member**
+  ([#709](https://github.com/orphic-inc/stellar-api/issues/709),
+  [ADR-0050](docs/adr/0050-a-contributor-belongs-to-many-communities.md)) —
+  neither upload route checked access, and the contributor role an upload
+  writes is part of membership. Attaching a file to one release id in a
+  private community granted its whole catalogue. Both routes now require
+  membership first, and answer the 404 they already sent for a missing
+  community or release. The add-to-release route also checked for a duplicate
+  format before any access check, so its 409 confirmed that a private release
+  existed; that check now runs after the gate.
+
+  **Uploading elsewhere no longer costs a member their other communities.** A
+  contributor held one community: the create path kept the first, and the
+  add-to-release path moved it to the latest. `Contributor` now belongs to
+  many communities, like `Consumer`. The migration rebuilds each member's
+  communities from their contributions, so a lost membership comes back;
+  past uploads by non-members are kept for curators to review.
 
 ## [0.9.6] — 2026-09-20
 

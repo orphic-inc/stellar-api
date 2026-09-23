@@ -87,6 +87,7 @@ import {
   releaseVoteSchema,
   releaseTagSchema,
   releaseTagVoteSchema,
+  addCuratorSchema,
   addMemberSchema
 } from '../schemas/community';
 import {
@@ -5089,8 +5090,11 @@ registry.registerPath({
   method: 'post',
   path: '/communities/{id}/members',
   tags: ['Communities'],
-  summary: 'Add a member (consumer) to a community',
-  description: 'Community admin or curator only.',
+  summary: 'Admit a member to a community as a consumer or a contributor',
+  description:
+    'Community admin or curator only. `role` defaults to `consumer`. Admit ' +
+    'as `contributor` a member who is to upload: an upload requires ' +
+    'membership and cannot itself be the way in (#709, ADR-0050).',
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5117,7 +5121,8 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Remove a member from a community',
   description:
-    'Answers 409 when the target is the community LEADER or a CURATOR: that ' +
+    'Removes the member from both the consumer and the contributor role ' +
+    '(#709); 404 when they hold neither. Answers 409 when the target is the community LEADER or a CURATOR: that ' +
     'role has to be removed first. The leader is checked before the curator ' +
     'because a leader is always also a curator, so the message names the ' +
     'role that actually has to be reassigned.',
@@ -5150,7 +5155,7 @@ registry.registerPath({
     body: {
       content: {
         'application/json': {
-          schema: addMemberSchema
+          schema: addCuratorSchema
         }
       }
     }
@@ -5835,12 +5840,16 @@ registry.registerPath({
       }
     }
   },
+  description:
+    'Requires membership of the community (#709, ADR-0050). A release in a ' +
+    'community the caller cannot see answers the same 404 as a missing one ' +
+    '(ADR-0036 §5).',
   responses: {
     201: {
       description: 'Contribution created',
       content: { 'application/json': { schema: Contribution } }
     },
-    404: msgResponse('Release not found')
+    404: msgResponse('Release not found, or in a community you cannot see')
   }
 });
 
@@ -5876,6 +5885,9 @@ registry.registerPath({
       }
     }
   },
+  description:
+    'Requires membership of the community (#709, ADR-0050). A community the ' +
+    'caller cannot see answers the same 404 as a missing one.',
   responses: {
     201: {
       description: 'Contribution submitted and release created',
@@ -5885,7 +5897,7 @@ registry.registerPath({
         }
       }
     },
-    404: msgResponse('Community not found')
+    404: msgResponse('Community not found, or one you cannot see')
   }
 });
 

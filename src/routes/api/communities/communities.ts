@@ -30,7 +30,9 @@ import {
 import {
   createCommunitySchema,
   updateCommunitySchema,
+  addCuratorSchema,
   addMemberSchema,
+  type AddMemberInput,
   type CreateCommunityInput,
   type UpdateCommunityInput
 } from '../../../schemas/community';
@@ -196,7 +198,8 @@ router.get(
   })
 );
 
-// POST /api/communities/:id/members — add a consuming member (communities_manage or curator)
+// POST /api/communities/:id/members — admit a member as a consumer (default) or
+// a contributor (#709, ADR-0050) (communities_manage or curator)
 router.post(
   '/:id/members',
   requireAuth,
@@ -204,20 +207,26 @@ router.post(
   validate(addMemberSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const { userId } = parsedBody<{ userId: number }>(res);
+    const { userId, role } = parsedBody<AddMemberInput>(res);
 
     await assertCommunityAdminOrCurator(id, req, res);
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
 
-    let consumer;
+    // Both roles are one row per user connected to many communities, so one
+    // set of arguments admits either (ADR-0050).
+    const admit = {
+      where: { userId },
+      create: { userId, communities: { connect: { id } } },
+      update: { communities: { connect: { id } } }
+    };
+    let member;
     try {
-      consumer = await prisma.consumer.upsert({
-        where: { userId },
-        create: { userId, communities: { connect: { id } } },
-        update: { communities: { connect: { id } } }
-      });
+      member =
+        role === 'contributor'
+          ? await prisma.contributor.upsert(admit)
+          : await prisma.consumer.upsert(admit);
     } catch (err) {
       // The `connect` raises P2025 when the community is gone, the FK raises
       // P2003 when the user is, and neither says which — so the message names
@@ -228,11 +237,12 @@ router.post(
         P2003: [404, 'Community or user not found']
       });
     }
-    res.status(201).json(consumer);
+    res.status(201).json(member);
   })
 );
 
-// DELETE /api/communities/:id/members/:userId — remove a consuming member (communities_manage or curator)
+// DELETE /api/communities/:id/members/:userId — remove a member from both the
+// consumer and the contributor role (#709) (communities_manage or curator)
 router.delete(
   '/:id/members/:userId',
   requireAuth,
@@ -242,7 +252,7 @@ router.delete(
 
     const community = await assertCommunityAdminOrCurator(id, req, res);
 
-    // This route operates on the Consumer link only. When the target also holds
+    // This route removes the consumer and contributor links. When the target also holds
     // a curator or leader role, refuse rather than partially removing them: no
     // route strips a role as a side effect of removing a membership
     // (ADR-0033 §Decision 5). Curators go through DELETE /:id/curators/:userId,
@@ -259,14 +269,24 @@ router.delete(
       });
     }
 
-    const consumer = await prisma.consumer.findUnique({ where: { userId } });
-    if (!consumer) return res.status(404).json({ msg: 'User not found' });
+    const [consumer, contributor] = await Promise.all([
+      prisma.consumer.findUnique({ where: { userId } }),
+      prisma.contributor.findUnique({ where: { userId } })
+    ]);
+    if (!consumer && !contributor)
+      return res.status(404).json({ msg: 'User not found' });
 
+    // "Remove a member" means from both roles (#709, ADR-0050), atomically, so
+    // a failure cannot leave the member half-removed.
+    const leave = {
+      where: { userId },
+      data: { communities: { disconnect: { id } } }
+    };
     try {
-      await prisma.consumer.update({
-        where: { userId },
-        data: { communities: { disconnect: { id } } }
-      });
+      await prisma.$transaction([
+        ...(consumer ? [prisma.consumer.update(leave)] : []),
+        ...(contributor ? [prisma.contributor.update(leave)] : [])
+      ]);
     } catch (err) {
       translatePrismaError(err, {
         P2025: [404, 'Community or user not found']
@@ -281,7 +301,7 @@ router.post(
   '/:id/curators',
   requireAuth,
   validateParams(communityIdParamsSchema),
-  validate(addMemberSchema),
+  validate(addCuratorSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { userId } = parsedBody<{ userId: number }>(res);

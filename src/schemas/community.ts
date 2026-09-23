@@ -109,10 +109,17 @@ export const releaseTagVoteSchema = z.object({
   direction: z.enum(['up', 'down'])
 });
 
-// Shared by POST /communities/:id/members and POST /communities/:id/curators —
-// both routes validate with this same schema.
-export const addMemberSchema = z.object({
+// POST /communities/:id/curators. A curator is its own role with its own add
+// and remove routes, so this body carries no `role`.
+export const addCuratorSchema = z.object({
   userId: z.number().int().positive()
+});
+
+// POST /communities/:id/members: the curator body plus the role to admit the
+// member under (#709, ADR-0050). `consumer` by default, so the route's contract
+// is unchanged for a caller that sends no role.
+export const addMemberSchema = addCuratorSchema.extend({
+  role: z.enum(['consumer', 'contributor']).default('consumer')
 });
 
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
@@ -122,4 +129,5 @@ export type UpdateReleaseInput = z.infer<typeof updateReleaseSchema>;
 export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
 export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;
 export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;
+export type AddCuratorInput = z.infer<typeof addCuratorSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;

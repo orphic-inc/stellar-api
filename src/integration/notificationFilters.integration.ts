@@ -231,9 +231,12 @@ describe('matching on upload', () => {
     const member = await createUser('member');
     const stranger = await createUser('stranger');
     const closed = await createCommunity(RegistrationStatus.closed);
-    await testPrisma.contributor.create({
-      data: { userId: member.id, communityId: closed.id }
-    });
+    // An upload requires membership (#709), so the uploader is admitted too.
+    for (const userId of [uploader.id, member.id]) {
+      await testPrisma.contributor.create({
+        data: { userId, communities: { connect: { id: closed.id } } }
+      });
+    }
     await watch(member.id);
     await watch(stranger.id);
 

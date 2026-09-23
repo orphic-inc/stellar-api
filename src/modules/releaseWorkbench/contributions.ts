@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { sizeBytesToNumber } from '../../lib/serialize';
 import { AppError } from '../../lib/errors';
 import { emitNotifications } from '../../lib/notifications';
-import { addContributionToRelease } from '../contribution';
+import { addContributionToRelease, mayUploadTo } from '../contribution';
 import { getSettings } from '../settings';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { snapshotRelease } from './snapshot';
@@ -78,6 +78,46 @@ export const listReleaseContributions = async (
   }));
 };
 
+/**
+ * Whether this caller may attach a file of this type to this release, checked
+ * in an order that cannot leak (#709, ADR-0050). The membership gate runs
+ * first: the duplicate-format 409 would otherwise confirm to a non-member that
+ * a private release exists, and which file types it holds (ADR-0036 §5). A
+ * release they cannot see is the same 404 as a missing one.
+ */
+const assertMayAttach = async (
+  ref: ReleaseWorkbenchRef,
+  fileType: FileType
+): Promise<void> => {
+  const release = await prisma.release.findFirst({
+    where: { id: ref.releaseId, communityId: ref.communityId },
+    select: {
+      community: {
+        select: {
+          id: true,
+          registrationStatus: true,
+          allowDuplicateFormats: true
+        }
+      }
+    }
+  });
+  const community = release?.community ?? null;
+  if (!community || !(await mayUploadTo(community, ref.actorId))) {
+    throw new AppError(404, 'Release not found');
+  }
+  if (community.allowDuplicateFormats) return;
+
+  const existing = await prisma.contribution.findFirst({
+    where: { releaseId: ref.releaseId, type: fileType }
+  });
+  if (existing) {
+    throw new AppError(
+      409,
+      `A ${fileType} contribution already exists for this release`
+    );
+  }
+};
+
 export const attachReleaseWorkbenchContribution = async (
   ref: ReleaseWorkbenchRef,
   input: AddContributionToReleaseInput
@@ -105,25 +145,7 @@ export const attachReleaseWorkbenchContribution = async (
     }
   }
 
-  const community = await prisma.community.findUnique({
-    where: { id: ref.communityId },
-    select: { allowDuplicateFormats: true }
-  });
-  if (!community) {
-    throw new AppError(404, 'Community not found');
-  }
-
-  if (!community.allowDuplicateFormats) {
-    const existing = await prisma.contribution.findFirst({
-      where: { releaseId: ref.releaseId, type: input.fileType as FileType }
-    });
-    if (existing) {
-      throw new AppError(
-        409,
-        `A ${input.fileType} contribution already exists for this release`
-      );
-    }
-  }
+  await assertMayAttach(ref, input.fileType as FileType);
 
   const contribution = await addContributionToRelease({
     userId: ref.actorId,

@@ -3,6 +3,7 @@ import {
   FileType,
   Prisma,
   RatioExempt,
+  RegistrationStatus,
   ReleaseCategory,
   ReleaseType
 } from '@prisma/client';
@@ -16,6 +17,7 @@ import { checkContributionLink } from './linkHealth';
 import { runInBackground } from './backgroundTasks';
 import { assertWithinSizeCap } from './contributionLimits';
 import { resolveTagNames } from './tag';
+import { hasCommunityAccess } from './communityAccess';
 import type {
   AddContributionToReleaseInput,
   CreateContributionInput
@@ -80,6 +82,35 @@ const roleFromImportance = (importance: string): ArtistRole => {
   return ROLE_BY_LABEL[normalized] ?? ArtistRole.Main;
 };
 
+/**
+ * An upload requires membership (#709, ADR-0050): it records the contributor
+ * role, so it cannot also be the way in. A community the uploader cannot see
+ * answers `false` exactly as a missing one does, so each path returns the same
+ * `null` — and the same 404 — for both (ADR-0036 §5).
+ */
+export const mayUploadTo = async (
+  community: { id: number; registrationStatus: RegistrationStatus } | null,
+  userId: number
+): Promise<boolean> =>
+  !!community &&
+  hasCommunityAccess(community.id, userId, community.registrationStatus);
+
+/**
+ * Record that `userId` contributes to `communityId` (#709, ADR-0050). One
+ * `Contributor` row per user, connected to every community they contribute to:
+ * a connect never moves or drops the role from another community.
+ */
+const recordContributorRole = (
+  tx: Prisma.TransactionClient,
+  userId: number,
+  communityId: number
+) =>
+  tx.contributor.upsert({
+    where: { userId },
+    update: { communities: { connect: { id: communityId } } },
+    create: { userId, communities: { connect: { id: communityId } } }
+  });
+
 export const createContributionSubmission = async ({
   userId,
   input
@@ -120,16 +151,12 @@ export const createContributionSubmission = async ({
   const community = await prisma.community.findUnique({
     where: { id: communityId }
   });
-  if (!community) return null;
+  if (!(await mayUploadTo(community, userId))) return null;
 
   const canonicalTags = await resolveTagNames(splitTagList(tags));
 
   const contribution = await prisma.$transaction(async (tx) => {
-    const contributor = await tx.contributor.upsert({
-      where: { userId },
-      update: {},
-      create: { userId, communityId }
-    });
+    const contributor = await recordContributorRole(tx, userId, communityId);
 
     const names = collaborators.map((c) => c.artist);
     const existing = await tx.artist.findMany({
@@ -288,9 +315,10 @@ export const addContributionToRelease = async ({
   input: AddContributionToReleaseInput;
 }) => {
   const release = await prisma.release.findFirst({
-    where: { id: releaseId, communityId }
+    where: { id: releaseId, communityId },
+    include: { community: { select: { id: true, registrationStatus: true } } }
   });
-  if (!release) return null;
+  if (!release || !(await mayUploadTo(release.community, userId))) return null;
 
   // Reject oversized contributions (#93). On this path the category comes from
   // the release the file is being attached to, not the request body.
@@ -298,11 +326,7 @@ export const addContributionToRelease = async ({
 
   return prisma
     .$transaction(async (tx: Prisma.TransactionClient) => {
-      const contributor = await tx.contributor.upsert({
-        where: { userId },
-        update: { communityId },
-        create: { userId, communityId }
-      });
+      const contributor = await recordContributorRole(tx, userId, communityId);
 
       // Every contribution belongs to an edition; attach to the release's
       // default edition, creating one if the release has none yet.
