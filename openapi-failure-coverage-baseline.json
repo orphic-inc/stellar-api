@@ -25,7 +25,6 @@
     "GET /bookmarks/requests",
     "GET /collages",
     "GET /collages/deleted",
-    "GET /comments",
     "GET /communities",
     "GET /contributions",
     "GET /donations",

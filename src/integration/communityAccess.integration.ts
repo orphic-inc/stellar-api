@@ -1,6 +1,7 @@
 import {
   AnnounceVisibility,
   CommunityType,
+  FileType,
   RegistrationStatus,
   ReleaseCategory,
   ReleaseType
@@ -8,8 +9,10 @@ import {
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import {
   communityRoleUnion,
+  contributionVisibleTo,
   hasCommunityAccess,
-  listCommunityMembers
+  listCommunityMembers,
+  requestVisibleTo
 } from '../modules/communityAccess';
 import { seedDefaultCommunity } from '../modules/bootstrap';
 import { listCommunityReleases } from '../modules/releaseBrowse';
@@ -316,5 +319,117 @@ describe('seedDefaultCommunity survives the curator rename (#422)', () => {
     await expect(
       testPrisma.consumer.findUnique({ where: { userId: sysop.id } })
     ).resolves.toBeNull();
+  });
+});
+
+describe('contribution and request visibility follow their community (#697)', () => {
+  // The contributor row is the contribution's uploader identity. It is created
+  // in a separate open community, so it grants no role in the one under test.
+  const createContribution = async (releaseId: number) => {
+    const uploader = await createUser(`uploader-${releaseId}`);
+    const home = await createCommunity(RegistrationStatus.open);
+    const contributor = await testPrisma.contributor.create({
+      data: { userId: uploader.id, communityId: home.id }
+    });
+    const edition = await testPrisma.edition.create({ data: { releaseId } });
+    return testPrisma.contribution.create({
+      data: {
+        userId: uploader.id,
+        releaseId,
+        editionId: edition.id,
+        contributorId: contributor.id,
+        type: FileType.flac,
+        downloadUrl: 'https://example.com/x.torrent'
+      }
+    });
+  };
+
+  const createRequest = async (communityId: number) => {
+    const requester = await createUser(`requester-${communityId}`);
+    return testPrisma.request.create({
+      data: {
+        communityId,
+        userId: requester.id,
+        title: 'wanted',
+        description: 'd',
+        type: ReleaseType.Music
+      }
+    });
+  };
+
+  const joinAsConsumer = (userId: number, communityId: number) =>
+    testPrisma.consumer.create({
+      data: { userId, communities: { connect: { id: communityId } } }
+    });
+
+  const seesContribution = async (id: number, viewerId: number | null) =>
+    (await testPrisma.contribution.count({
+      where: { AND: [{ id }, contributionVisibleTo(viewerId)] }
+    })) === 1;
+
+  const seesRequest = async (id: number, viewerId: number) =>
+    (await testPrisma.request.count({
+      where: { AND: [{ id }, requestVisibleTo(viewerId)] }
+    })) === 1;
+
+  it('shows a contribution in a closed community to a member only', async () => {
+    const member = await createUser('c-member');
+    const outsider = await createUser('c-outsider');
+    const closed = await createCommunity(RegistrationStatus.closed);
+    await joinAsConsumer(member.id, closed.id);
+    const contribution = await createContribution(
+      (await createRelease(closed.id)).id
+    );
+
+    expect(await seesContribution(contribution.id, member.id)).toBe(true);
+    expect(await seesContribution(contribution.id, outsider.id)).toBe(false);
+  });
+
+  it('shows a contribution in an open community to anyone, session or not', async () => {
+    const outsider = await createUser('c-open');
+    const open = await createCommunity(RegistrationStatus.open);
+    const contribution = await createContribution(
+      (await createRelease(open.id)).id
+    );
+
+    expect(await seesContribution(contribution.id, outsider.id)).toBe(true);
+    expect(await seesContribution(contribution.id, null)).toBe(true);
+  });
+
+  it('shows a contribution whose release has no community to anyone', async () => {
+    // The load-bearing `communityId: null` arm of releaseVisibleTo (ADR-0036):
+    // a bare relation filter would drop this row for every viewer.
+    const outsider = await createUser('c-null');
+    const release = await testPrisma.release.create({
+      data: {
+        title: 'No community',
+        description: 'd',
+        type: ReleaseType.Music,
+        releaseType: ReleaseCategory.Album,
+        year: 2001
+      }
+    });
+    const contribution = await createContribution(release.id);
+
+    expect(await seesContribution(contribution.id, outsider.id)).toBe(true);
+  });
+
+  it('shows a request in a closed community to a member only', async () => {
+    const member = await createUser('r-member');
+    const outsider = await createUser('r-outsider');
+    const closed = await createCommunity(RegistrationStatus.closed);
+    await joinAsConsumer(member.id, closed.id);
+    const request = await createRequest(closed.id);
+
+    expect(await seesRequest(request.id, member.id)).toBe(true);
+    expect(await seesRequest(request.id, outsider.id)).toBe(false);
+  });
+
+  it('shows a request in an open community to anyone', async () => {
+    const outsider = await createUser('r-open');
+    const open = await createCommunity(RegistrationStatus.open);
+    const request = await createRequest(open.id);
+
+    expect(await seesRequest(request.id, outsider.id)).toBe(true);
   });
 });

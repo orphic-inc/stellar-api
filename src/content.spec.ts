@@ -529,6 +529,8 @@ describe('API content and shared flows', () => {
   });
 
   it('creates a comment for a valid comment target', async () => {
+    // The thread's community is readable to the caller (#697).
+    prismaMock.community.count.mockResolvedValue(1);
     prismaMock.comment.create.mockResolvedValue(
       makeCommentWithAuthor({
         id: 12,
@@ -562,8 +564,9 @@ describe('API content and shared flows', () => {
 
   it('updates a comment for the owner', async () => {
     prismaMock.comment.findUnique.mockResolvedValue(
-      makeComment({ id: 12, authorId: 7, body: 'old body' })
+      makeComment({ id: 12, authorId: 7, body: 'old body', communityId: 3 })
     );
+    prismaMock.community.count.mockResolvedValue(1);
     prismaMock.comment.update.mockResolvedValue(
       makeComment({ id: 12, authorId: 7, body: 'new body', editedUserId: 7 })
     );
@@ -584,9 +587,12 @@ describe('API content and shared flows', () => {
   });
 
   it('rejects comment deletion for non-owners without moderator permissions', async () => {
+    // A thread the caller can see, so the refusal is the 403 rather than the
+    // 404 a hidden thread gets (#697).
     prismaMock.comment.findUnique.mockResolvedValue(
-      makeComment({ id: 12, authorId: 99 })
+      makeComment({ id: 12, authorId: 99, communityId: 3 })
     );
+    prismaMock.community.count.mockResolvedValue(1);
 
     const res = await request(app).delete('/api/comments/12');
 
