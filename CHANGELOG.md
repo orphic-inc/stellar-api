@@ -446,6 +446,17 @@ All notable changes to stellar-api are documented here.
   communities from their contributions, so a lost membership comes back;
   past uploads by non-members are kept for curators to review.
 
+- **A contribution you cannot see is not found, uploader included**
+  ([#700](https://github.com/orphic-inc/stellar-api/issues/700)) —
+  `GET /api/contributions/{id}` answered 403 to a non-member, which confirmed
+  that the id existed in a private community. It also let an uploader removed
+  from that community read the release and other members' comments, a thread
+  `/api/comments` already refuses them.
+
+  It now reads through the same rule as every contribution read, and a hidden
+  contribution is the same 404 as a missing one. The `403` is removed from the
+  contract. Your own uploads stay listed on `GET /api/contributions`.
+
 ## [0.9.6] — 2026-09-20
 
 ### Added

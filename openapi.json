@@ -25181,7 +25181,7 @@
           "Contributions"
         ],
         "summary": "One contribution, with its release, collaborators and comments",
-        "description": "Comments carry `bodyHtml`, rendered at read time from BBCode. `sizeInBytes` is serialised as a number rather than the global BigInt-to-string default.",
+        "description": "Only a contribution the caller can see, read through the same rule as every contribution read; there is no exception for its uploader (#700). Your own uploads stay listed on GET /contributions. Comments carry `bodyHtml`, rendered at read time from BBCode. `sizeInBytes` is serialised as a number rather than the global BigInt-to-string default.",
         "parameters": [
           {
             "schema": {
@@ -25223,18 +25223,8 @@
               }
             }
           },
-          "403": {
-            "description": "Not a member of the release’s community",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MsgResponse"
-                }
-              }
-            }
-          },
           "404": {
-            "description": "Contribution not found, or its community does not exist",
+            "description": "Contribution not found, or in a community the caller cannot see",
             "content": {
               "application/json": {
                 "schema": {
