@@ -6,6 +6,20 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.7] — 2026-09-23
+
+**Upgrade note: take a database backup before deploying. Rolling back past
+this release means restoring that backup, not reverting the pin.** Three
+migrations in 0.9.7 cannot be undone by running 0.9.6 again:
+
+- `user_settings.paranoia` is dropped (#586).
+- `contributors.communityId` is dropped (#709).
+- Tag names are normalized, which merges and deletes duplicate tags (#689).
+
+Each column is dropped in the same release as the code that stopped reading
+it. 0.9.6 still selects both columns, so it cannot boot against a 0.9.7
+schema.
+
 ### Added
 
 - **A curated tag vocabulary**
@@ -3380,7 +3394,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...HEAD
+[0.9.7]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/orphic-inc/stellar-api/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/orphic-inc/stellar-api/compare/v0.9.3...v0.9.4
