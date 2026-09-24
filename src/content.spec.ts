@@ -9,6 +9,7 @@ import {
   resetApiTestState
 } from './test/apiTestHarness';
 import { authorRefSelect } from './modules/authorRef';
+import { contributionVisibleTo } from './modules/communityAccess';
 import {
   makeAuthorRefRow,
   makePost,
@@ -143,47 +144,7 @@ describe('API content and shared flows', () => {
     expect(res.body.data).toHaveLength(1);
   });
 
-  it('returns 404 for a missing contribution detail', async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue(null);
-
-    const res = await request(app).get('/api/contributions/999');
-
-    expect(res.status).toBe(404);
-  });
-
-  it('returns contribution detail when present', async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue({
-      id: 5,
-      userId: 7,
-      releaseId: 3,
-      contributorId: null,
-      releaseDescription: 'Seeded',
-      sizeInBytes: 1234,
-      approvedAccountingBytes: 1234,
-      linkStatus: 'PASS',
-      linkCheckedAt: null,
-      type: 'flac',
-      releaseFile: {
-        bitrate: null,
-        hasLog: false,
-        hasCue: false,
-        isScene: false
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      user: { id: 7, username: 'kai' },
-      release: { id: 3, title: 'Kind of Blue' },
-      collaborators: [],
-      comments: []
-    } as never);
-
-    const res = await request(app).get('/api/contributions/5');
-
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe(5);
-  });
-
-  // ── #509 F6: the detail read is scoped to the release's community ──
+  // ── #700: the detail read is the viewer's contribution scope, nothing more ──
 
   const contributionRow = (over: Record<string, unknown> = {}) =>
     ({
@@ -212,78 +173,48 @@ describe('API content and shared flows', () => {
       ...over
     }) as never;
 
+  it('answers 404 when the contribution is missing or hidden (#700)', async () => {
+    // One query decides both: a contribution the viewer cannot see is not
+    // found, so the answer cannot tell a prober the id exists (ADR-0036 §5).
+    prismaMock.contribution.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/contributions/999');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Contribution not found' });
+  });
+
+  it('reads through contributionVisibleTo, with no owner arm (#700)', async () => {
+    // The owner arm served a member removed from a private community the
+    // release row and other members' comments; the thread itself 404s for
+    // them through /api/comments (#697). `contribute/list` stays self-scoped.
+    prismaMock.contribution.findFirst.mockResolvedValue(contributionRow());
+
+    const res = await request(app).get('/api/contributions/5');
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(5);
+    expect(prismaMock.contribution.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: [{ id: 5 }, contributionVisibleTo(7)] }
+      })
+    );
+    expect(prismaMock.community.findUnique).not.toHaveBeenCalled();
+  });
+
   it('excludes soft-deleted comments from the contribution read (#598)', async () => {
     // `deleteComment` stamps `deletedAt` and keeps the body verbatim, so an
     // unfiltered relation read served deleted content — not a tombstone.
     // routes/api/comments.ts filters at its list, count and detail; this
     // relation was missed by that sweep.
-    prismaMock.contribution.findUnique.mockResolvedValue(contributionRow());
+    prismaMock.contribution.findFirst.mockResolvedValue(contributionRow());
 
     await request(app).get('/api/contributions/5');
 
-    // The relation sits under `select`, not `include`, and the route reads the
-    // contribution more than once — so find the call that carries it.
-    const withComments = prismaMock.contribution.findUnique.mock.calls
-      .map((c) => c[0] as { select?: { comments?: { where?: unknown } } })
-      .find((a) => a.select?.comments);
-    expect(withComments?.select?.comments?.where).toEqual({ deletedAt: null });
-  });
-
-  it('lets the owner read their own contribution without a community check', async () => {
-    // Ownership is tested first and independently: a member who contributed
-    // and later lost access to that community still sees the row in their own
-    // /contributions list, so the detail must not 403 on them.
-    prismaMock.contribution.findUnique.mockResolvedValue(contributionRow());
-
-    const res = await request(app).get('/api/contributions/5');
-
-    expect(res.status).toBe(200);
-    expect(prismaMock.community.findUnique).not.toHaveBeenCalled();
-  });
-
-  it("lets a member of the release's community read someone else's", async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue(
-      contributionRow({ userId: 99, user: { id: 99, username: 'other' } })
-    );
-    prismaMock.community.findUnique.mockResolvedValue({
-      registrationStatus: 'open'
-    } as never);
-
-    const res = await request(app).get('/api/contributions/5');
-
-    expect(res.status).toBe(200);
-  });
-
-  it("refuses a non-member someone else's contribution", async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue(
-      contributionRow({ userId: 99, user: { id: 99, username: 'other' } })
-    );
-    prismaMock.community.findUnique.mockResolvedValue({
-      registrationStatus: 'closed'
-    } as never);
-    prismaMock.community.findFirst.mockResolvedValue(null);
-
-    const res = await request(app).get('/api/contributions/5');
-
-    expect(res.status).toBe(403);
-  });
-
-  it('does not gate a contribution whose release has no community', async () => {
-    // Release.communityId is nullable; a release with no community has no
-    // membership to test, and gating it would hide rows that were never
-    // community-scoped (the same arm the search scope carries).
-    prismaMock.contribution.findUnique.mockResolvedValue(
-      contributionRow({
-        userId: 99,
-        user: { id: 99, username: 'other' },
-        release: { id: 3, title: 'Kind of Blue', communityId: null }
-      })
-    );
-
-    const res = await request(app).get('/api/contributions/5');
-
-    expect(res.status).toBe(200);
-    expect(prismaMock.community.findUnique).not.toHaveBeenCalled();
+    const [args] = prismaMock.contribution.findFirst.mock.calls[0] as [
+      { select?: { comments?: { where?: unknown } } }
+    ];
+    expect(args.select?.comments?.where).toEqual({ deletedAt: null });
   });
 
   it('rejects contribution creation for invalid download URLs when domains are enforced', async () => {

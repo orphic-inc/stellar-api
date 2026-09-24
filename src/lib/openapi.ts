@@ -5907,17 +5907,20 @@ registry.registerPath({
   tags: ['Contributions'],
   summary: 'One contribution, with its release, collaborators and comments',
   description:
-    'Comments carry `bodyHtml`, rendered at read time from BBCode. ' +
-    '`sizeInBytes` is serialised as a number rather than the global ' +
-    'BigInt-to-string default.',
+    'Only a contribution the caller can see, read through the same rule as ' +
+    'every contribution read; there is no exception for its uploader (#700). ' +
+    'Your own uploads stay listed on GET /contributions. Comments carry ' +
+    '`bodyHtml`, rendered at read time from BBCode. `sizeInBytes` is ' +
+    'serialised as a number rather than the global BigInt-to-string default.',
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
       description: 'Contribution',
       content: { 'application/json': { schema: Contribution } }
     },
-    403: msgResponse('Not a member of the release\u2019s community'),
-    404: msgResponse('Contribution not found, or its community does not exist')
+    404: msgResponse(
+      'Contribution not found, or in a community the caller cannot see'
+    )
   }
 });
 
