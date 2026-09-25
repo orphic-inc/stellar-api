@@ -408,6 +408,10 @@ src/
 - Authentication handled through middleware.
 - Authorization handled through permission checks.
 - Never perform authorization directly from route parameters.
+- Choose a success status by what the call does (#711):
+  - **`201` + the entity** — a POST that creates an entity.
+  - **`200` + the resulting state** — an action whose outcome the caller cannot predict from the request, such as a toggle or a count.
+  - **`204`, no body** — an idempotent action or relationship edit whose outcome the request already determines: admitting a member or curator, claiming, subscribing. An upsert belongs here, since it may create nothing.
 
 ## req.user shape
 

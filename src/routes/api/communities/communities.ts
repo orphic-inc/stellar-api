@@ -199,7 +199,8 @@ router.get(
 );
 
 // POST /api/communities/:id/members — admit a member as a consumer (default) or
-// a contributor (#709, ADR-0050) (communities_manage or curator)
+// a contributor (#709, ADR-0050) (communities_manage or curator). Answers 204:
+// the admit is an upsert, so there may be nothing created to return (#711)
 router.post(
   '/:id/members',
   requireAuth,
@@ -221,12 +222,9 @@ router.post(
       create: { userId, communities: { connect: { id } } },
       update: { communities: { connect: { id } } }
     };
-    let member;
     try {
-      member =
-        role === 'contributor'
-          ? await prisma.contributor.upsert(admit)
-          : await prisma.consumer.upsert(admit);
+      if (role === 'contributor') await prisma.contributor.upsert(admit);
+      else await prisma.consumer.upsert(admit);
     } catch (err) {
       // The `connect` raises P2025 when the community is gone, the FK raises
       // P2003 when the user is, and neither says which — so the message names
@@ -237,7 +235,7 @@ router.post(
         P2003: [404, 'Community or user not found']
       });
     }
-    res.status(201).json(member);
+    res.status(204).send();
   })
 );
 

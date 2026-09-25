@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **`POST /communities/{id}/members` answers `204` with no body**, not `201` (#711). The admit is an upsert, so re-admitting an existing member created nothing, yet answered `201 Created` with the raw role row. That row was not the `CommunityMember` the contract declared, and its `id` was the role row's, not the user's. Read the member's resulting roles from `members` on `GET /communities/{id}`. stellar-ui discards the body, so it needs only the re-vendor. AGENTS.md now records the rule: `201` for a create, `200` for an unpredictable outcome, `204` for an idempotent edit.
+
 ## [0.9.7] — 2026-09-23
 
 **Upgrade note: take a database backup before deploying. Rolling back past
