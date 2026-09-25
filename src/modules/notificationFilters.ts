@@ -50,6 +50,8 @@ const filterSelect = {
   updatedAt: true
 } as const satisfies Prisma.NotificationFilterSelect;
 
+const dedupe = <T>(values: T[]): T[] => [...new Set(values)];
+
 // ─── The allowance ────────────────────────────────────────────────────────────
 
 /**
@@ -76,14 +78,41 @@ export const getFilterAllowance = async (
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
-export const listNotificationFilters = (userId: number) =>
-  prisma.notificationFilter.findMany({
-    where: { userId },
-    orderBy: [{ id: 'asc' }],
-    select: filterSelect
-  });
+/**
+ * Add `artists: { id, name }[]` beside `artistIds` (#715), so a list of filters
+ * costs one artist read rather than one per chip. Display only: `artistIds`
+ * stays the value a client writes back. A withdrawn artist keeps its id there
+ * but gets no entry here, which is how a client tells it has gone.
+ */
+const withArtistNames = async <F extends { artistIds: number[] }>(
+  filters: F[]
+): Promise<(F & { artists: { id: number; name: string }[] })[]> => {
+  const ids = dedupe(filters.flatMap((f) => f.artistIds));
+  const names = new Map<number, string>();
+  if (ids.length > 0) {
+    const artists = await prisma.artist.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true, name: true }
+    });
+    for (const { id, name } of artists) names.set(id, name);
+  }
+  return filters.map((f) => ({
+    ...f,
+    artists: f.artistIds.flatMap((id) => {
+      const name = names.get(id);
+      return name === undefined ? [] : [{ id, name }];
+    })
+  }));
+};
 
-const dedupe = <T>(values: T[]): T[] => [...new Set(values)];
+export const listNotificationFilters = async (userId: number) =>
+  withArtistNames(
+    await prisma.notificationFilter.findMany({
+      where: { userId },
+      orderBy: [{ id: 'asc' }],
+      select: filterSelect
+    })
+  );
 
 /**
  * Validated input → the row's criteria. Tags go through the tag name rule and
@@ -136,10 +165,12 @@ export const createNotificationFilter = async (
     }
   }
   const data = await prepareCriteria(input);
-  return prisma.notificationFilter.create({
+  const created = await prisma.notificationFilter.create({
     data: { ...data, userId },
     select: filterSelect
   });
+  const [named] = await withArtistNames([created]);
+  return named;
 };
 
 /** Load a filter the member owns, or the one 404 a stranger's id also gets. */
@@ -164,10 +195,12 @@ export const updateNotificationFilter = async (
     data
   });
   if (count === 0) throw new AppError(404, 'Notification filter not found');
-  return prisma.notificationFilter.findUniqueOrThrow({
+  const updated = await prisma.notificationFilter.findUniqueOrThrow({
     where: { id },
     select: filterSelect
   });
+  const [named] = await withArtistNames([updated]);
+  return named;
 };
 
 export const deleteNotificationFilter = async (userId: number, id: number) => {

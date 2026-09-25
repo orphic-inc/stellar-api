@@ -301,12 +301,17 @@
               "assetLimit": {
                 "type": "integer",
                 "nullable": true
+              },
+              "notificationFilterLimit": {
+                "type": "integer",
+                "nullable": true
               }
             },
             "required": [
               "level",
               "name",
-              "color"
+              "color",
+              "notificationFilterLimit"
             ]
           }
         },
@@ -2994,6 +2999,24 @@
               "type": "integer"
             }
           },
+          "artists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
           "tags": {
             "type": "array",
             "items": {
@@ -3144,6 +3167,7 @@
           "id",
           "label",
           "artistIds",
+          "artists",
           "tags",
           "notTags",
           "communityIds",

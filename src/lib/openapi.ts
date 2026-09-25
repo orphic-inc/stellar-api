@@ -357,7 +357,10 @@ const AuthUser = registry.register(
       permissions: z.record(z.string(), z.boolean()).optional(),
       personalCollageLimit: z.number().int().optional(),
       authorStylesheetLimit: z.number().int().optional(),
-      assetLimit: z.number().int().nullable().optional()
+      assetLimit: z.number().int().nullable().optional(),
+      // #715: the primary rank's allowance, as enforced. Null is unlimited and
+      // 0 is none, so a client hides the filters entry point on 0 only.
+      notificationFilterLimit: z.number().int().nullable()
     })
   })
 );
@@ -3373,6 +3376,9 @@ const NotificationFilter = registry.register(
     id: z.number().int(),
     label: z.string(),
     artistIds: z.array(z.number().int()),
+    // #715: display names for `artistIds`, in the same order. A withdrawn
+    // artist keeps its id there and has no entry here. Write `artistIds` back.
+    artists: z.array(z.object({ id: z.number().int(), name: z.string() })),
     tags: z.array(z.string()),
     notTags: z.array(z.string()),
     communityIds: z.array(z.number().int()),
