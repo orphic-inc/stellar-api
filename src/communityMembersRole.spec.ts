@@ -38,7 +38,8 @@ describe('POST /api/communities/:id/members — role (#709)', () => {
       .post('/api/communities/1/members')
       .send({ userId: 8, role: 'contributor' });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
     expect(prismaMock.contributor.upsert).toHaveBeenCalledWith({
       where: { userId: 8 },
       create: { userId: 8, communities: { connect: { id: 1 } } },
@@ -54,7 +55,8 @@ describe('POST /api/communities/:id/members — role (#709)', () => {
       .post('/api/communities/1/members')
       .send({ userId: 8 });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
     expect(prismaMock.consumer.upsert).toHaveBeenCalled();
     expect(prismaMock.contributor.upsert).not.toHaveBeenCalled();
   });

@@ -371,7 +371,8 @@ describe('POST /api/communities/:id/members', () => {
       .post('/api/communities/1/members')
       .send({ userId: 8 });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
     expect(prismaMock.consumer.upsert).toHaveBeenCalledWith({
       where: { userId: 8 },
       create: { userId: 8, communities: { connect: { id: 1 } } },

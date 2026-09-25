@@ -5094,7 +5094,9 @@ registry.registerPath({
   description:
     'Community admin or curator only. `role` defaults to `consumer`. Admit ' +
     'as `contributor` a member who is to upload: an upload requires ' +
-    'membership and cannot itself be the way in (#709, ADR-0050).',
+    'membership and cannot itself be the way in (#709, ADR-0050). Answers ' +
+    '204 whether or not the member already held the role; read the ' +
+    'resulting roles from `members` on GET /communities/{id} (#711).',
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5106,9 +5108,8 @@ registry.registerPath({
     }
   },
   responses: {
-    201: {
-      description: 'Member added',
-      content: { 'application/json': { schema: CommunityMember } }
+    204: {
+      description: 'Member admitted'
     },
     403: msgResponse('Not a community admin or curator'),
     404: msgResponse('User not found')
@@ -5146,10 +5147,6 @@ registry.registerPath({
   path: '/communities/{id}/curators',
   tags: ['Communities'],
   summary: 'Promote a user to community curator',
-  description:
-    'Answers **204, not 201**, unlike POST /communities/{id}/members which ' +
-    'answers 201. The asymmetry is existing behaviour and is documented ' +
-    'rather than changed.',
   request: {
     params: z.object({ id: z.string() }),
     body: {
