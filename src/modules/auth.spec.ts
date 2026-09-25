@@ -7,7 +7,7 @@
  */
 jest.mock('../lib/prisma', () => ({ prisma: {} }));
 
-import { toAuthUser } from './auth';
+import { authUserSelect, toAuthUser } from './auth';
 
 const rank = (limits: {
   personalCollageLimit: number;
@@ -128,5 +128,41 @@ describe('toAuthUser — ratio policy on the session', () => {
       disabledCause: 'STAFF'
     };
     expect(toAuthUser(withPolicy(disabled)).ratioPolicy).toEqual(disabled);
+  });
+});
+
+describe('toAuthUser — the notification filter allowance (#715)', () => {
+  // The primary rank's value, as `getFilterAllowance` enforces it: a member
+  // shown one allowance and held to another is the #369 bug again.
+  const withLimits = (primary: number | null, secondary?: number | null) => {
+    const raw = rawUser(
+      { personalCollageLimit: 0, authorStylesheetLimit: 0 },
+      secondary === undefined
+        ? []
+        : [{ personalCollageLimit: 0, authorStylesheetLimit: 0 }]
+    ) as unknown as {
+      userRank: Record<string, unknown>;
+      secondaryRanks: { userRank: Record<string, unknown> }[];
+    };
+    raw.userRank.notificationFilterLimit = primary;
+    if (secondary !== undefined)
+      raw.secondaryRanks[0].userRank.notificationFilterLimit = secondary;
+    return toAuthUser(raw as unknown as Parameters<typeof toAuthUser>[0]);
+  };
+
+  it('is selected for the session', () => {
+    expect(authUserSelect.userRank.select.notificationFilterLimit).toBe(true);
+  });
+
+  it('carries the primary rank’s cap', () => {
+    expect(withLimits(3).userRank.notificationFilterLimit).toBe(3);
+  });
+
+  it('keeps unlimited as null, never 0: 0 means the rank has none', () => {
+    expect(withLimits(null).userRank.notificationFilterLimit).toBeNull();
+  });
+
+  it('is not raised by a secondary rank, which enforcement does not read', () => {
+    expect(withLimits(0, 5).userRank.notificationFilterLimit).toBe(0);
   });
 });

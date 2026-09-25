@@ -6,6 +6,11 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **The session's rank carries `notificationFilterLimit`** (#715): `GET /auth` → `userRank.notificationFilterLimit`, the primary rank's allowance as `getFilterAllowance` enforces it. `null` is unlimited and `0` is none, so a client can hide the filters entry point without a request that answers 403.
+- **A `NotificationFilter` names its artists** (#715): `artists: { id, name }[]` beside `artistIds`, in the same order, on the list, create, replace and staff read. It is display only; `artistIds` stays the value written back. A withdrawn artist keeps its id in `artistIds` and has no entry in `artists`.
+
 ### Changed
 
 - **`POST /communities/{id}/members` answers `204` with no body**, not `201` (#711). The admit is an upsert, so re-admitting an existing member created nothing, yet answered `201 Created` with the raw role row. That row was not the `CommunityMember` the contract declared, and its `id` was the role row's, not the user's. Read the member's resulting roles from `members` on `GET /communities/{id}`. stellar-ui discards the body, so it needs only the re-vendor. AGENTS.md now records the rule: `201` for a create, `200` for an unpredictable outcome, `204` for an idempotent edit.

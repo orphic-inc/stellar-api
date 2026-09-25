@@ -56,7 +56,11 @@ export const authUserSelect = {
       badge: true,
       permissions: true,
       personalCollageLimit: true,
-      authorStylesheetLimit: true
+      authorStylesheetLimit: true,
+      // The primary rank's alone (#715), because that is what
+      // getFilterAllowance enforces. Null is unlimited and stays null on the
+      // wire: `0` means the rank has no filters, unlike the two limits above.
+      notificationFilterLimit: true
     }
   },
   secondaryRanks: {
