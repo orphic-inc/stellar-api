@@ -39,7 +39,8 @@ const rawUser = (
     secondaryRanks: secondaries.map((limits, i) => ({
       userRankId: i + 2,
       userRank: rank(limits)
-    }))
+    })),
+    warnings: []
   }) as unknown as Parameters<typeof toAuthUser>[0];
 
 describe('toAuthUser — advertised rank quotas', () => {
@@ -164,5 +165,52 @@ describe('toAuthUser — the notification filter allowance (#715)', () => {
 
   it('is not raised by a secondary rank, which enforcement does not read', () => {
     expect(withLimits(0, 5).userRank.notificationFilterLimit).toBe(0);
+  });
+});
+
+/**
+ * `warnedUntil` (#719): when the member's own warned state ends, for the expiry
+ * tooltip on their own name. On the session, not AuthorRef, so no viewer ever
+ * receives another member's expiry.
+ */
+describe('toAuthUser — warnedUntil on the session', () => {
+  const HOUR = 3_600_000;
+  const at = (offsetMs: number) => new Date(Date.now() + offsetMs);
+  const withWarnings = (warnings: { expiresAt: Date | null }[]) =>
+    toAuthUser({
+      ...(rawUser({ personalCollageLimit: 0, authorStylesheetLimit: 0 }) as
+        object | Record<string, unknown>),
+      warnings
+    } as unknown as Parameters<typeof toAuthUser>[0]);
+
+  it('is selected for the session', () => {
+    expect(authUserSelect.warnings).toEqual({ select: { expiresAt: true } });
+  });
+
+  it('is the latest expiry among active warnings', () => {
+    const later = at(48 * HOUR);
+    expect(
+      withWarnings([
+        { expiresAt: at(HOUR) },
+        { expiresAt: later },
+        { expiresAt: at(-HOUR) }
+      ]).warnedUntil
+    ).toBe(later.toISOString());
+  });
+
+  it('is null once every warning has expired', () => {
+    expect(withWarnings([{ expiresAt: at(-HOUR) }]).warnedUntil).toBeNull();
+  });
+
+  it('is null while a permanent warning is active', () => {
+    expect(
+      withWarnings([{ expiresAt: at(HOUR) }, { expiresAt: null }]).warnedUntil
+    ).toBeNull();
+  });
+
+  it('does not ship the warning rows themselves', () => {
+    expect(withWarnings([{ expiresAt: at(HOUR) }])).not.toHaveProperty(
+      'warnings'
+    );
   });
 });

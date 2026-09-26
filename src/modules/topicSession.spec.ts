@@ -72,7 +72,7 @@ jest.mock('../lib/bbcode/sanitizeConfig', () => ({
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
 import { prisma } from '../lib/prisma';
-import { makeForumTopic } from '../test/factories';
+import { makeAuthorRefRow, makeForumTopic } from '../test/factories';
 import {
   createPost as forumCreatePost,
   updateTopic as forumUpdateTopic,
@@ -145,7 +145,7 @@ describe('getTopicSession', () => {
     isSticky: false,
     numPosts: 2,
     deletedAt: null,
-    author: { id: 5, username: 'alice', avatar: null },
+    author: makeAuthorRefRow({ id: 5, username: 'alice' }),
     notes: []
   };
 

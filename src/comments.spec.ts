@@ -76,7 +76,9 @@ describe('GET /api/comments', () => {
         id: 12,
         author: makeAuthorRefRow({
           isDonor: true,
-          warned: new Date('2026-03-01T00:00:00.000Z'),
+          warnings: [
+            { createdAt: new Date('2026-03-01T00:00:00.000Z'), expiresAt: null }
+          ],
           donorRank: {
             expiresAt: null,
             donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }

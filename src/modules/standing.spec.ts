@@ -1,4 +1,9 @@
-import { computeStanding, isWarningActive } from './standing';
+import {
+  activeWarnedAt,
+  activeWarnedUntil,
+  computeStanding,
+  isWarningActive
+} from './standing';
 
 // PRD-05 #2 / ADR-0004 — pure standing computation over UserWarning + ban state.
 // Ladder is settled; thresholds (POOR_AT=2, HAMMER_AT=4, PRISTINE_TENURE=365d)
@@ -17,6 +22,56 @@ describe('isWarningActive', () => {
   });
   it('treats a past-expiry warning as inactive', () => {
     expect(isWarningActive({ expiresAt: past() }, NOW)).toBe(false);
+  });
+});
+
+// #719 — the warning sign and its expiry read only active warnings.
+describe('activeWarnedAt', () => {
+  const issued = (iso: string) => new Date(iso);
+
+  it('is null with no warnings', () => {
+    expect(activeWarnedAt([], NOW)).toBeNull();
+  });
+  it('is null once every warning has expired', () => {
+    expect(
+      activeWarnedAt(
+        [{ createdAt: issued('2025-12-01T00:00:00Z'), expiresAt: past() }],
+        NOW
+      )
+    ).toBeNull();
+  });
+  it('is the latest issue date among ACTIVE warnings only', () => {
+    expect(
+      activeWarnedAt(
+        [
+          { createdAt: issued('2026-02-01T00:00:00Z'), expiresAt: null },
+          { createdAt: issued('2026-03-01T00:00:00Z'), expiresAt: future() },
+          // Issued last, but expired — must not date the sign.
+          { createdAt: issued('2026-06-01T00:00:00Z'), expiresAt: past() }
+        ],
+        NOW
+      )
+    ).toEqual(issued('2026-03-01T00:00:00Z'));
+  });
+});
+
+describe('activeWarnedUntil', () => {
+  it('is null with no active warning', () => {
+    expect(activeWarnedUntil([{ expiresAt: past() }], NOW)).toBeNull();
+  });
+  it('is null while a permanent warning is active', () => {
+    expect(
+      activeWarnedUntil([{ expiresAt: future() }, { expiresAt: null }], NOW)
+    ).toBeNull();
+  });
+  it('is the latest expiry among active warnings', () => {
+    const later = new Date('2027-03-01T00:00:00Z');
+    expect(
+      activeWarnedUntil(
+        [{ expiresAt: future() }, { expiresAt: later }, { expiresAt: past() }],
+        NOW
+      )
+    ).toEqual(later);
   });
 });
 

@@ -72,7 +72,8 @@ function mockSysopTransaction() {
         permissions: { admin: true },
         personalCollageLimit: 0
       },
-      secondaryRanks: []
+      secondaryRanks: [],
+      warnings: []
     } as never);
     return (cb as (tx: typeof prismaMock) => Promise<unknown>)(tx);
   });

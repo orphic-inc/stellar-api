@@ -4,6 +4,7 @@
  */
 
 import { prismaMock, resetApiTestState } from './test/apiTestHarness';
+import { makeAuthorRefRow } from './test/factories';
 import type * as ReportsModule from './modules/reports';
 const {
   fileReport,
@@ -293,7 +294,7 @@ describe('pm.listInbox', () => {
         senderId: 3,
         body: 'Hey there',
         createdAt: new Date(),
-        sender: { id: 3, username: 'sender', avatar: null }
+        sender: makeAuthorRefRow({ id: 3, username: 'sender' })
       }
     ]
   };
@@ -707,14 +708,7 @@ describe('staffInbox.listMyTickets', () => {
         id: 1,
         userId: 7,
         status: 'Unanswered',
-        user: {
-          id: 7,
-          username: 'testuser',
-          avatar: null,
-          isDonor: false,
-          warned: null,
-          donorRank: null
-        },
+        user: makeAuthorRefRow({ id: 7, username: 'testuser' }),
         assignedUser: null,
         resolver: null,
         messages: []
@@ -1135,14 +1129,7 @@ describe('staffInbox.viewTicket', () => {
       id: 1,
       userId: 7,
       isReadByUser: false,
-      user: {
-        id: 7,
-        username: 'testuser',
-        avatar: null,
-        isDonor: false,
-        warned: null,
-        donorRank: null
-      },
+      user: makeAuthorRefRow({ id: 7, username: 'testuser' }),
       assignedUser: null,
       resolver: null,
       messages: []

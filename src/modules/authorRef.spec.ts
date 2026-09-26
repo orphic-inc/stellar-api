@@ -5,7 +5,7 @@ const makeRow = (overrides: Partial<AuthorRefRow> = {}): AuthorRefRow => ({
   username: 'testuser',
   avatar: null,
   isDonor: false,
-  warned: null,
+  warnings: [],
   donorRank: null,
   ...overrides
 });
@@ -15,7 +15,9 @@ describe('toAuthorRef', () => {
     const ref = toAuthorRef(
       makeRow({
         isDonor: true,
-        warned: new Date('2026-01-15T12:00:00.000Z'),
+        warnings: [
+          { createdAt: new Date('2026-01-15T12:00:00.000Z'), expiresAt: null }
+        ],
         donorRank: {
           expiresAt: null,
           donorRank: { name: 'Patron', badge: 'patron.png', color: '#ffd700' }
@@ -75,6 +77,44 @@ describe('toAuthorRef', () => {
       badge: 'patron.png',
       color: '#ffd700'
     });
+  });
+});
+
+describe('toAuthorRef warning sign (#719)', () => {
+  const HOUR = 3_600_000;
+  const at = (offsetMs: number) => new Date(Date.now() + offsetMs);
+
+  it('drops the sign once every warning has expired', () => {
+    const ref = toAuthorRef(
+      makeRow({
+        warnings: [{ createdAt: at(-48 * HOUR), expiresAt: at(-HOUR) }]
+      })
+    );
+
+    expect(ref.warned).toBeNull();
+  });
+
+  it('dates the sign from the most recent ACTIVE warning, not the latest issued', () => {
+    const olderActive = at(-72 * HOUR);
+    const ref = toAuthorRef(
+      makeRow({
+        warnings: [
+          { createdAt: olderActive, expiresAt: at(HOUR) },
+          { createdAt: at(-2 * HOUR), expiresAt: at(-HOUR) }
+        ]
+      })
+    );
+
+    expect(ref.warned).toBe(olderActive.toISOString());
+  });
+
+  it('keeps the sign for a dated warning that has not yet expired', () => {
+    const issued = at(-HOUR);
+    const ref = toAuthorRef(
+      makeRow({ warnings: [{ createdAt: issued, expiresAt: at(HOUR) }] })
+    );
+
+    expect(ref.warned).toBe(issued.toISOString());
   });
 });
 

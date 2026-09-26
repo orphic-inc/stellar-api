@@ -51,7 +51,8 @@ const createdUser = () =>
       permissions: {},
       personalCollageLimit: 0
     },
-    secondaryRanks: []
+    secondaryRanks: [],
+    warnings: []
   });
 
 describe('POST /api/auth/register — invite expiry (#627)', () => {

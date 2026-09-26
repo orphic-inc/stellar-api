@@ -14,7 +14,7 @@ import { sanitizePlain } from '../lib/sanitize';
 import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
-import { computeStanding } from './standing';
+import { activeWarnedAt, computeStanding } from './standing';
 import {
   getInviteSubtreeRows,
   getMemberInviteTreeView,
@@ -173,9 +173,8 @@ const PROFILE_BASE_SELECT = {
   isArtist: true,
   isDonor: true,
   disabled: true,
-  warned: true,
   banDate: true,
-  warnings: { select: { expiresAt: true } },
+  warnings: { select: { createdAt: true, expiresAt: true } },
   inviteCount: true,
   canInvite: true,
   staffBio: true,
@@ -1003,7 +1002,8 @@ const buildProfileView = async (
     isArtist: user.isArtist,
     isDonor: user.isDonor,
     disabled: user.disabled,
-    warned: user.warned?.toISOString() ?? null,
+    // The rows, not User.warned, which outlives expiry (#719).
+    warned: activeWarnedAt(user.warnings, now)?.toISOString() ?? null,
     standing,
     inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
     // Same visibility as the balance it governs (#636): a revoke is not public.

@@ -8,6 +8,7 @@ import {
   authorRefSelect,
   toAuthorRef,
   toAuthorRefOrNull,
+  type AuthorRef,
   type AuthorRefRow
 } from './authorRef';
 import { hasPermission } from '../lib/rankPermissions';
@@ -31,7 +32,9 @@ export type StaffMessage = Prisma.StaffInboxMessageGetPayload<{
 // Shapes a ticket's user/assignedUser/resolver/message-sender relations so the
 // donor sign + warning sign follow staff and members alike in the inbox
 // (#231), not just on their profile.
-const mapTicketMessage = <T extends { sender: AuthorRefRow }>(message: T) => ({
+const mapTicketMessage = <T extends { sender: AuthorRefRow }>(
+  message: T
+): Omit<T, 'sender'> & { sender: AuthorRef } => ({
   ...message,
   sender: toAuthorRef(message.sender)
 });

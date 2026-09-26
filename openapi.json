@@ -271,6 +271,10 @@
               "disabledCause"
             ]
           },
+          "warnedUntil": {
+            "type": "string",
+            "nullable": true
+          },
           "userRank": {
             "type": "object",
             "properties": {
@@ -7858,6 +7862,26 @@
           "isDonor": {
             "type": "boolean"
           },
+          "donorRank": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "badge": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "badge",
+              "color"
+            ]
+          },
           "disabled": {
             "type": "boolean"
           },
@@ -7896,6 +7920,7 @@
           "username",
           "rankName",
           "isDonor",
+          "donorRank",
           "disabled",
           "depth",
           "stats",

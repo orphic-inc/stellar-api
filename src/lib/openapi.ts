@@ -277,8 +277,9 @@ const StaffUserRef = z.object({ id: z.number(), username: z.string() });
 // posts/topics, comments, blog-post comments, PMs, staff inbox). Carries the
 // donor sign + warning sign so they follow the user site-wide, mirroring the
 // fields the profile shapes already expose. `donorRank` is null when no active
-// (unexpired) grant exists; `warned` is the ISO timestamp of the active warning
-// or null. Backed by src/modules/authorRef.ts.
+// (unexpired) grant exists; `warned` is when the most recent ACTIVE warning was
+// issued, or null once every warning has expired (#719). Backed by
+// src/modules/authorRef.ts.
 const AuthorRef = registry.register(
   'AuthorRef',
   z.object({
@@ -349,6 +350,10 @@ const AuthUser = registry.register(
       })
       .nullable()
       .optional(),
+    // #719: when the caller's own warned state ends, for the expiry tooltip on
+    // their own name. Null for no active warning and for a permanent one; the
+    // author's AuthorRef `warned` tells those apart. Only ever the caller's own.
+    warnedUntil: z.string().nullable().optional(),
     userRank: z.object({
       level: z.number(),
       name: z.string(),
@@ -986,6 +991,8 @@ const PublicProfile = registry.register(
     isArtist: z.boolean(),
     isDonor: z.boolean(),
     disabled: z.boolean(),
+    // When the most recent ACTIVE warning was issued; null once every warning
+    // has expired (#719). The same rows `standing` reads.
     warned: z.string().nullable(),
     standing: z.enum(['pristine', 'clean', 'neutral', 'poor', 'hammer']),
     inviteCount: z.number().nullable(),
@@ -9383,6 +9390,11 @@ const MemberInviteTreeNodeSchema: z.ZodType<any> = z.lazy(() =>
     username: z.string(),
     rankName: z.string(),
     isDonor: z.boolean(),
+    // #719: the active donor tier, null once a grant expires — the same rule as
+    // AuthorRef, so the tree can render the tiered sign.
+    donorRank: z
+      .object({ name: z.string(), badge: z.string(), color: z.string() })
+      .nullable(),
     disabled: z.boolean(),
     depth: z.number(),
     stats: InviteTreeRatioStats.nullable(),

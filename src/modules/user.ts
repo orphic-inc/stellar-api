@@ -7,6 +7,11 @@ import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { computeRatio } from './ratio';
 import { CONTAGION_REACH } from './contagion';
 import {
+  activeDonorRank,
+  donorRankSelect,
+  type DonorRankRef
+} from './authorRef';
+import {
   buildInviteSubtree,
   summarizeInviteTree,
   type InviteTreeRow,
@@ -236,6 +241,8 @@ export interface InviteSubtreeRow {
   email: string;
   disabled: boolean;
   isDonor: boolean;
+  /** The active donor tier, null once a grant expires (#719). */
+  donorRank: DonorRankRef | null;
   rankName: string;
   showContributedStats: boolean;
   showConsumedStats: boolean;
@@ -282,6 +289,7 @@ export const getInviteSubtreeRows = async (
       email: true,
       disabled: true,
       isDonor: true,
+      donorRank: donorRankSelect,
       dateRegistered: true,
       lastLogin: true,
       contributed: true,
@@ -296,6 +304,7 @@ export const getInviteSubtreeRows = async (
     }
   });
 
+  const now = new Date();
   return users.map((u) => {
     const e = meta.get(u.id);
     return {
@@ -306,6 +315,7 @@ export const getInviteSubtreeRows = async (
       email: u.email,
       disabled: u.disabled,
       isDonor: u.isDonor,
+      donorRank: activeDonorRank(u.donorRank, now),
       rankName: u.userRank?.name ?? '',
       showContributedStats: u.userSettings?.showContributedStats ?? true,
       showConsumedStats: u.userSettings?.showConsumedStats ?? true,
@@ -362,6 +372,7 @@ export interface InviteTreeViewNode {
   username: string;
   rankName: string;
   isDonor: boolean;
+  donorRank: DonorRankRef | null;
   disabled: boolean;
   depth: number;
   /** Null when the member's privacy flags hide their stats from this viewer. */
@@ -387,6 +398,7 @@ export const getMemberInviteTreeView = async (
     disabled: r.disabled,
     rankName: r.rankName,
     isDonor: r.isDonor,
+    donorRank: r.donorRank,
     contributed: r.contributed,
     consumed: r.consumed,
     statsVisible:
@@ -400,6 +412,7 @@ export const getMemberInviteTreeView = async (
       username: n.username,
       rankName: n.rankName,
       isDonor: n.isDonor,
+      donorRank: n.donorRank,
       disabled: n.disabled,
       depth: n.depth,
       stats: n.statsVisible
