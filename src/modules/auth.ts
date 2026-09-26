@@ -4,6 +4,7 @@ import { Prisma, RecoveryPurpose } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { computeRatio } from './ratio';
+import { activeWarnedUntil } from './standing';
 import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
 import { getDefaultStylesheetName } from './stylesheet';
 import { normalizePassword } from './badPasswords';
@@ -86,7 +87,10 @@ export const authUserSelect = {
   // A 1:1 relation keyed on the primary key, so this is an indexed join.
   ratioPolicyState: {
     select: { status: true, watchExpiresAt: true, disabledCause: true }
-  }
+  },
+  // For `warnedUntil` (#719). A member's warnings are few, so the whole set is
+  // filtered by the clock in toAuthUser rather than in the query.
+  warnings: { select: { expiresAt: true } }
 } as const;
 
 type RawAuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
@@ -96,7 +100,7 @@ export type SessionRatioPolicy = RawAuthUser['ratioPolicyState'];
 
 export type AuthUser = Omit<
   RawAuthUser,
-  'contributed' | 'consumed' | 'ratioPolicyState'
+  'contributed' | 'consumed' | 'ratioPolicyState' | 'warnings'
 > & {
   contributed: string;
   consumed: string;
@@ -105,12 +109,17 @@ export type AuthUser = Omit<
   // Renamed off the relation: consumers read a policy, not a table row. Null
   // when no row exists, which the policy itself reads as OK (getPolicyState).
   ratioPolicy: SessionRatioPolicy;
+  // When the member's own warned state ends (#719), for the expiry tooltip on
+  // their own name. Here rather than on AuthorRef, which would send every
+  // author's expiry to every viewer. Null for no active warning AND for a
+  // permanent one: the author's `warned` tells those apart.
+  warnedUntil: string | null;
 };
 
 export const toAuthUser = (raw: RawAuthUser): AuthUser => {
   // Destructured out rather than spread: the wire name is `ratioPolicy`, and
   // leaving the relation in would ship both spellings of the same thing.
-  const { ratioPolicyState, ...rest } = raw;
+  const { ratioPolicyState, warnings, ...rest } = raw;
   const rankQuotaInputs = (
     field: 'personalCollageLimit' | 'authorStylesheetLimit'
   ): number[] => [
@@ -157,7 +166,8 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => {
     // `?? null` so the key is always present on the wire. Prisma returns null
     // for a missing relation, but an undefined here would drop the field from
     // the JSON entirely and make "no row" indistinguishable from "old server".
-    ratioPolicy: ratioPolicyState ?? null
+    ratioPolicy: ratioPolicyState ?? null,
+    warnedUntil: activeWarnedUntil(warnings, new Date())?.toISOString() ?? null
   };
 };
 

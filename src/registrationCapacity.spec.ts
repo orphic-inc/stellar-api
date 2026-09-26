@@ -146,7 +146,8 @@ describe('POST /api/auth/register — capacity (#624)', () => {
           permissions: {},
           personalCollageLimit: 0
         },
-        secondaryRanks: []
+        secondaryRanks: [],
+        warnings: []
       })
     );
 

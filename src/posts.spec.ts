@@ -68,7 +68,12 @@ describe('GET /api/posts', () => {
             user: makeAuthorRefRow({
               id: 9,
               username: 'warneduser',
-              warned: new Date('2026-06-01T00:00:00.000Z')
+              warnings: [
+                {
+                  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+                  expiresAt: null
+                }
+              ]
             })
           })
         ]

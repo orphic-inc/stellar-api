@@ -54,6 +54,45 @@ const PRISTINE_TENURE_DAYS = 365; // a clean year → pristine (the ×10 reward)
 export const isWarningActive = (w: WarningRecord, now: Date): boolean =>
   w.expiresAt === null || w.expiresAt.getTime() > now.getTime();
 
+/** A warning row as the warning sign reads it: when it was issued, and when it ends. */
+export interface IssuedWarningRecord extends WarningRecord {
+  createdAt: Date;
+}
+
+/**
+ * The warning sign (#719): when the most recent *active* warning was issued, or
+ * null when none is. Not `User.warned` — that column is stamped on issue and
+ * cleared only when the last row is deleted, so it outlives every expiry.
+ */
+export const activeWarnedAt = (
+  warnings: IssuedWarningRecord[],
+  now: Date
+): Date | null =>
+  warnings
+    .filter((w) => isWarningActive(w, now))
+    .reduce<Date | null>(
+      (latest, w) => (latest && latest >= w.createdAt ? latest : w.createdAt),
+      null
+    );
+
+/**
+ * When the member stops being warned (#719): the latest expiry among active
+ * warnings. Null both when none is active and when an active warning is
+ * permanent; read it with `activeWarnedAt` to tell those apart.
+ */
+export const activeWarnedUntil = (
+  warnings: WarningRecord[],
+  now: Date
+): Date | null => {
+  const active = warnings.filter((w) => isWarningActive(w, now));
+  if (active.some((w) => w.expiresAt === null)) return null;
+  return active.reduce<Date | null>(
+    (latest, w) =>
+      latest && w.expiresAt && latest >= w.expiresAt ? latest : w.expiresAt,
+    null
+  );
+};
+
 export const computeStanding = (input: StandingInput): Standing => {
   // Ban (and ban evasion) is terminal — the hammer, regardless of warning count.
   if (input.banned || input.banEvasion) return 'hammer';

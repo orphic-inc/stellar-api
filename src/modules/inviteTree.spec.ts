@@ -16,6 +16,7 @@ const row = (
   disabled: false,
   rankName: 'User',
   isDonor: false,
+  donorRank: null,
   contributed: 0n,
   consumed: 0n,
   statsVisible: true,

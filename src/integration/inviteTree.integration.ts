@@ -123,4 +123,33 @@ describe('getMemberInviteTreeView', () => {
       ratio: '2.00'
     });
   });
+
+  // #719 — the tiered donor sign, with AuthorRef's expiry rule: an expired
+  // grant shows no tier even while the hourly sweep has left isDonor set.
+  it('carries the active donor tier, and none for an expired grant', async () => {
+    const { root, a, c } = await seedTree();
+    const tier = await testPrisma.donorRank.create({
+      data: { name: 'Patron', minDonation: 10, badge: '★', color: '#fc0' }
+    });
+    const grant = (userId: number, expiresAt: Date | null) =>
+      testPrisma.$transaction([
+        testPrisma.user.update({
+          where: { id: userId },
+          data: { isDonor: true }
+        }),
+        testPrisma.userDonorRank.create({
+          data: { userId, donorRankId: tier.id, expiresAt }
+        })
+      ]);
+    await grant(a.id, null);
+    await grant(c.id, new Date(Date.now() - 60_000));
+
+    const { tree } = await getMemberInviteTreeView(root.id, false);
+
+    expect(find(tree, a.id)).toMatchObject({
+      isDonor: true,
+      donorRank: { name: 'Patron', badge: '★', color: '#fc0' }
+    });
+    expect(find(tree, c.id)).toMatchObject({ isDonor: true, donorRank: null });
+  });
 });

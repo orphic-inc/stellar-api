@@ -80,7 +80,7 @@ const makeSenderRow = (overrides: Record<string, unknown> = {}) => ({
   username: 'testuser',
   avatar: null,
   isDonor: false,
-  warned: null,
+  warnings: [],
   donorRank: null,
   ...overrides
 });
@@ -315,7 +315,7 @@ describe('replyToConversation', () => {
     mockTx.privateMessage.create.mockResolvedValue({
       id: 11,
       body: 'Reply',
-      sender: { id: 7 }
+      sender: makeSenderRow()
     });
 
     const result = await replyToConversation(1, 7, 'Reply');
@@ -386,7 +386,7 @@ describe('viewConversation', () => {
               id: 9,
               username: 'donorwarned',
               isDonor: true,
-              warned: warnedAt,
+              warnings: [{ createdAt: warnedAt, expiresAt: null }],
               donorRank: {
                 expiresAt: null,
                 donorRank: { name: 'Patron', badge: 'p.png', color: '#fff' }

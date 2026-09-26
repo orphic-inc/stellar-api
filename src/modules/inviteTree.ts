@@ -12,6 +12,7 @@
  * builds the substrate, not that governance signal.
  */
 import { computeRatio } from './ratio';
+import type { DonorRankRef } from './authorRef';
 
 /** A member row as fetched for the tree — the member plus their inviter pointer. */
 export interface InviteTreeRow {
@@ -22,6 +23,8 @@ export interface InviteTreeRow {
   disabled: boolean;
   rankName: string;
   isDonor: boolean;
+  /** The active donor tier, null once a grant expires (#719). */
+  donorRank: DonorRankRef | null;
   contributed: bigint;
   consumed: bigint;
   /** False when the member's privacy flags hide their byte stats from the viewer. */
@@ -34,6 +37,7 @@ export interface InviteTreeNode {
   disabled: boolean;
   rankName: string;
   isDonor: boolean;
+  donorRank: DonorRankRef | null;
   /** 1 for a direct invitee of the root, +1 per level below. */
   depth: number;
   contributed: bigint;
@@ -103,6 +107,7 @@ export const buildInviteSubtree = (
           disabled: r.disabled,
           rankName: r.rankName,
           isDonor: r.isDonor,
+          donorRank: r.donorRank,
           depth,
           contributed: r.contributed,
           consumed: r.consumed,

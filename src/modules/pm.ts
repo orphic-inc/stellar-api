@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import {
   authorRefSelect,
   toAuthorRefOrNull,
+  type AuthorRef,
   type AuthorRefRow
 } from './authorRef';
 
@@ -12,7 +13,9 @@ const senderSelect = authorRefSelect;
 // Shapes the sender/participant relations a PM conversation carries so the
 // donor sign + warning sign follow the sender everywhere a message renders
 // (#231), not just on their profile.
-const mapMessage = <T extends { sender: AuthorRefRow | null }>(message: T) => ({
+const mapMessage = <T extends { sender: AuthorRefRow | null }>(
+  message: T
+): Omit<T, 'sender'> & { sender: AuthorRef | null } => ({
   ...message,
   sender: toAuthorRefOrNull(message.sender)
 });

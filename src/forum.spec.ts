@@ -578,7 +578,12 @@ describe('GET /api/forums/:forumId/topics', () => {
           author: makeAuthorRefRow({
             id: 9,
             username: 'warneduser',
-            warned: new Date('2026-04-01T00:00:00.000Z')
+            warnings: [
+              {
+                createdAt: new Date('2026-04-01T00:00:00.000Z'),
+                expiresAt: null
+              }
+            ]
           })
         }
       } as never
@@ -811,7 +816,9 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
         ...makeForumPost({ id: 21, body: 'Post body' }),
         author: makeAuthorRefRow({
           isDonor: true,
-          warned: new Date('2026-05-01T00:00:00.000Z'),
+          warnings: [
+            { createdAt: new Date('2026-05-01T00:00:00.000Z'), expiresAt: null }
+          ],
           donorRank: {
             expiresAt: null,
             donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' }

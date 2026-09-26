@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { activeWarnedAt } from './standing';
 
 /**
  * The author identity every PostBox-rendering surface needs — forum
@@ -8,50 +9,61 @@ import type { Prisma } from '@prisma/client';
  * `toAuthorRef` (or `toAuthorRefOrNull` for a nullable relation, e.g. a
  * system PM with no sender) before sending it in a response.
  */
+
+/** A member's donor grant, with the expiry `activeDonorRank` needs. */
+export const donorRankSelect = {
+  select: {
+    expiresAt: true,
+    donorRank: { select: { name: true, badge: true, color: true } }
+  }
+} satisfies Prisma.User$donorRankArgs;
+
 export const authorRefSelect = {
   id: true,
   username: true,
   avatar: true,
   isDonor: true,
-  warned: true,
-  donorRank: {
-    select: {
-      expiresAt: true,
-      donorRank: { select: { name: true, badge: true, color: true } }
-    }
-  }
+  // The rows rather than `User.warned`, which outlives expiry (#719). A
+  // member's warnings are few, so the whole set is filtered in toAuthorRef.
+  warnings: { select: { createdAt: true, expiresAt: true } },
+  donorRank: donorRankSelect
 } satisfies Prisma.UserSelect;
 
 export type AuthorRefRow = Prisma.UserGetPayload<{
   select: typeof authorRefSelect;
 }>;
 
+export type DonorRankRef = { name: string; badge: string; color: string };
+
 export type AuthorRef = {
   id: number;
   username: string;
   avatar: string | null;
   isDonor: boolean;
-  donorRank: { name: string; badge: string; color: string } | null;
+  donorRank: DonorRankRef | null;
   warned: string | null;
 };
 
 // Mirrors the expiry rule in profile.ts's buildDonorPresentation: an expired
 // grant renders as no donor rank, even if the hourly sweep hasn't cleared
 // isDonor/donorRank yet.
-export const toAuthorRef = (user: AuthorRefRow): AuthorRef => {
-  const grant = user.donorRank;
-  const activeRank =
-    grant && (grant.expiresAt === null || grant.expiresAt > new Date())
-      ? grant.donorRank
-      : null;
+export const activeDonorRank = (
+  grant: AuthorRefRow['donorRank'],
+  now: Date
+): DonorRankRef | null =>
+  grant && (grant.expiresAt === null || grant.expiresAt > now)
+    ? grant.donorRank
+    : null;
 
+export const toAuthorRef = (user: AuthorRefRow): AuthorRef => {
+  const now = new Date();
   return {
     id: user.id,
     username: user.username,
     avatar: user.avatar,
     isDonor: user.isDonor,
-    donorRank: activeRank,
-    warned: user.warned?.toISOString() ?? null
+    donorRank: activeDonorRank(user.donorRank, now),
+    warned: activeWarnedAt(user.warnings, now)?.toISOString() ?? null
   };
 };
 

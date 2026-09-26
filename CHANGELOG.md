@@ -10,10 +10,16 @@ All notable changes to stellar-api are documented here.
 
 - **The session's rank carries `notificationFilterLimit`** (#715): `GET /auth` → `userRank.notificationFilterLimit`, the primary rank's allowance as `getFilterAllowance` enforces it. `null` is unlimited and `0` is none, so a client can hide the filters entry point without a request that answers 403.
 - **A `NotificationFilter` names its artists** (#715): `artists: { id, name }[]` beside `artistIds`, in the same order, on the list, create, replace and staff read. It is display only; `artistIds` stays the value written back. A withdrawn artist keeps its id in `artistIds` and has no entry in `artists`.
+- **The session carries `warnedUntil`** (#719): `GET /auth` → `warnedUntil`, when the member's own active warnings end. It is `null` both with no active warning and while a permanent one is active; the member's `warned` tells those apart. It is on the session rather than `AuthorRef`, so no viewer receives another member's expiry.
+- **Invite-tree nodes carry `donorRank`** (#719): `{ name, badge, color } | null` on `MemberInviteTreeNode`, with `AuthorRef`'s expiry rule, so the tree can show the tiered donor sign. An expired grant is `null` even while `isDonor` is still set.
 
 ### Changed
 
 - **`POST /communities/{id}/members` answers `204` with no body**, not `201` (#711). The admit is an upsert, so re-admitting an existing member created nothing, yet answered `201 Created` with the raw role row. That row was not the `CommunityMember` the contract declared, and its `id` was the role row's, not the user's. Read the member's resulting roles from `members` on `GET /communities/{id}`. stellar-ui discards the body, so it needs only the re-vendor. AGENTS.md now records the rule: `201` for a create, `200` for an unpredictable outcome, `204` for an idempotent edit.
+
+### Fixed
+
+- **The warning sign clears when a warning expires** (#719). `warned` on `AuthorRef` and on the profile read `User.warned`, which is stamped when a warning is issued and cleared only when the last warning row is deleted, so it outlived every expiry. It is now when the most recent **active** warning was issued, or `null`, from the same rows `standing` reads. The shape is unchanged.
 
 ## [0.9.7] — 2026-09-23
 

@@ -149,7 +149,7 @@ export type AuthorRefRowFactory = {
   username: string;
   avatar: string | null;
   isDonor: boolean;
-  warned: Date | null;
+  warnings: { createdAt: Date; expiresAt: Date | null }[];
   donorRank: {
     expiresAt: Date | null;
     donorRank: { name: string; badge: string; color: string };
@@ -164,7 +164,7 @@ export function makeAuthorRefRow(
     username: 'testuser',
     avatar: null,
     isDonor: false,
-    warned: null,
+    warnings: [],
     donorRank: null,
     ...overrides
   };
