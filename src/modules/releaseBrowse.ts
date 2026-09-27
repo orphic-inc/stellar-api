@@ -28,6 +28,7 @@ export const listCommunityReleases = async (input: {
             type: true,
             sizeInBytes: true,
             linkStatus: true,
+            ratioExempt: true,
             user: { select: { id: true, username: true } },
             _count: { select: { consumers: true } }
           }

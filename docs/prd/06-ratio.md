@@ -75,7 +75,7 @@ Freepass is the lever for letting members rebuild ratio (consume without penalty
 1. ✅ **Relief LinkHealth gate** — `eligibleContributionBytes` filtered by `linkStatus ≠ FAIL`; required ratio rises when a covered contribution flips `FAIL`, `WARN`/`UNKNOWN` still count. **Shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96).**
 2. 🟡 **72h WARN→FAIL sweep** — `linkStatusChangedAt` + `sweepStaleWarnLinks` in `linkHealthJob.ts`. **Promotion shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96)**; the contributor-PM + staff-report notification on promotion is still TODO.
 3. ✅ **`RatioScore` dimension** — bounded CRS sub-score from current ratio health, one-way into PRD-01's registry. **Shipped [#96](https://github.com/orphic-inc/stellar-api/pull/96).**
-4. 🔲 **Freepass / Neutralpass** — boolean flags on `Contribution`; the consumption-accounting path skips `consumed` accrual for both and `contributed` accrual for Neutralpass. Not yet started.
+4. ✅ **Freepass / Neutralpass** — the `RatioExempt` enum on `Contribution` (`NONE` / `FREEPASS` / `NEUTRALPASS`); the consumption-accounting path skips `consumed` accrual for both and `contributed` accrual for Neutralpass. Staff set and clear it with `PUT /api/contributions/{id}/ratio-exempt` (`contributions_manage`). **Shipped [#322](https://github.com/orphic-inc/stellar-api/pull/322).**
 
 ## Open questions
 

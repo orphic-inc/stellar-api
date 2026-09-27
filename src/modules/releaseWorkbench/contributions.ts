@@ -49,6 +49,7 @@ export const listReleaseContributions = async (
       sizeInBytes: true,
       linkStatus: true,
       linkCheckedAt: true,
+      ratioExempt: true,
       type: true,
       createdAt: true,
       updatedAt: true,

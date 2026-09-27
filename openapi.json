@@ -5187,6 +5187,256 @@
           "members"
         ]
       },
+      "ReleaseBrowseContribution": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "mp3",
+              "flac",
+              "wav",
+              "ogg",
+              "aac",
+              "m4a",
+              "m4b",
+              "mp4",
+              "mkv",
+              "avi",
+              "mov",
+              "zip",
+              "exe",
+              "dmg",
+              "apk",
+              "pdf",
+              "epub",
+              "mobi",
+              "cbz",
+              "cbr",
+              "jpg",
+              "png",
+              "gif",
+              "txt"
+            ]
+          },
+          "sizeInBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "linkStatus": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "PASS",
+              "WARN",
+              "FAIL"
+            ]
+          },
+          "ratioExempt": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "FREEPASS",
+              "NEUTRALPASS"
+            ]
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "consumers": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "consumers"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "sizeInBytes",
+          "linkStatus",
+          "ratioExempt",
+          "user",
+          "_count"
+        ]
+      },
+      "ReleaseBrowseItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "communityId": {
+            "type": "number",
+            "nullable": true
+          },
+          "year": {
+            "type": "number",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Music",
+              "Applications",
+              "EBooks",
+              "ELearningVideos",
+              "Audiobooks",
+              "Comedy",
+              "Comics"
+            ]
+          },
+          "releaseType": {
+            "type": "string",
+            "enum": [
+              "Album",
+              "Single",
+              "EP",
+              "Anthology",
+              "Compilation",
+              "DJMix",
+              "Live",
+              "Remix",
+              "Bootleg",
+              "Interview",
+              "Mixtape",
+              "Demo",
+              "ConcertRecording",
+              "Unknown"
+            ]
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionHtml": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "artist": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseArtist"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "credits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseCredit"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseTag"
+            }
+          },
+          "releaseTags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseTagEnriched"
+            }
+          },
+          "myVote": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "up",
+              "down",
+              null
+            ]
+          },
+          "voteAggregate": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "ups": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "score": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "ups",
+              "total",
+              "score"
+            ]
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseBrowseContribution"
+            }
+          },
+          "isContributor": {
+            "type": "boolean"
+          },
+          "releaseGroupId": {
+            "type": "number",
+            "nullable": true
+          },
+          "group": {
+            "$ref": "#/components/schemas/ReleaseGroupRef"
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "contributions": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "contributions"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "communityId",
+          "type",
+          "releaseType",
+          "contributions",
+          "_count"
+        ]
+      },
       "CommunityVoteState": {
         "type": "object",
         "properties": {
@@ -21964,7 +22214,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/Release"
+                        "$ref": "#/components/schemas/ReleaseBrowseItem"
                       }
                     },
                     "meta": {
@@ -25849,11 +26099,28 @@
         },
         "responses": {
           "200": {
-            "description": "Updated contribution",
+            "description": "The contribution id and its resulting exemption",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Contribution"
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "ratioExempt": {
+                      "type": "string",
+                      "enum": [
+                        "NONE",
+                        "FREEPASS",
+                        "NEUTRALPASS"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ratioExempt"
+                  ]
                 }
               }
             }

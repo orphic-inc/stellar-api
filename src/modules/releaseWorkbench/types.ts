@@ -1,4 +1,4 @@
-import type { ArtistRole, Prisma } from '@prisma/client';
+import type { ArtistRole, Prisma, RatioExempt } from '@prisma/client';
 import type { GroupProjection } from '../releaseGroup';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
 
@@ -61,6 +61,7 @@ export type ReleaseContributionDetailView = {
   sizeInBytes: number | null;
   linkStatus: string | null;
   linkCheckedAt: Date | null;
+  ratioExempt: RatioExempt;
   type: string;
   createdAt: Date;
   updatedAt: Date;

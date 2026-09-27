@@ -5007,6 +5007,36 @@ registry.registerPath({
   }
 });
 
+// One contribution on a community browse row (#728), read off `releaseBrowse`'s
+// select rather than borrowed from `ReleaseContribution`: the browse sends no
+// `downloadUrl` or `collaborators`, and does send link health, the ratio
+// exemption and the consumer count.
+const ReleaseBrowseContribution = registry.register(
+  'ReleaseBrowseContribution',
+  z.object({
+    id: z.number(),
+    type: z.nativeEnum(FileType),
+    sizeInBytes: z.number().nullable(),
+    linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']),
+    ratioExempt: z.enum(['NONE', 'FREEPASS', 'NEUTRALPASS']),
+    user: z.object({ id: z.number(), username: z.string() }),
+    _count: z.object({ consumers: z.number() })
+  })
+);
+
+// A release row on the community browse (#728). Spread from `Release.shape`
+// rather than `Release.extend(...)`: replacing `contributions` is a change to an
+// existing field, and an extend that changes a field collapses to
+// `Release & Record<string, never>` in the generated client.
+const ReleaseBrowseItem = registry.register(
+  'ReleaseBrowseItem',
+  z.object({
+    ...Release.shape,
+    contributions: z.array(ReleaseBrowseContribution),
+    _count: z.object({ contributions: z.number() })
+  })
+);
+
 // `{communityId}`, not `{id}`: the route mounts this router at
 // `/:communityId/releases`, and the sibling POST on this very path was already
 // registered as `{communityId}`. The `{id}` spelling made one operation of a
@@ -5022,7 +5052,7 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            data: z.array(Release),
+            data: z.array(ReleaseBrowseItem),
             meta: PaginationMeta
           })
         }
@@ -6074,8 +6104,18 @@ registry.registerPath({
   },
   responses: {
     200: {
-      description: 'Updated contribution',
-      content: { 'application/json': { schema: Contribution } }
+      // Only the id and the resulting exemption (#728): the module selects
+      // nothing else, so declaring the full `Contribution` promised fields
+      // this response never carries.
+      description: 'The contribution id and its resulting exemption',
+      content: {
+        'application/json': {
+          schema: z.object({
+            id: z.number(),
+            ratioExempt: z.enum(['NONE', 'FREEPASS', 'NEUTRALPASS'])
+          })
+        }
+      }
     },
     404: msgResponse('Contribution not found')
   }
