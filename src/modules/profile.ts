@@ -131,6 +131,7 @@ type ProfilePercentileSummary = {
   requestsFilled: ProfilePercentile;
   /** Bytes staked on requests, which `addBounty` charges to `consumed` — so gated with it. */
   bountySpent: ProfilePercentile | null;
+  /** Artist credits the member attached to releases (`ReleaseArtist.addedById`, #722). */
   artistsAdded: ProfilePercentile;
   /**
    * Weighted blend of the dimensions above, scaled by ratio. See OVERALL_WEIGHTS.
@@ -644,7 +645,8 @@ const buildPercentile = (
  * Provisional weights for the Overall composite. They encode what the site wants
  * to reward: contributing the catalog outweighs consuming it, and forum/metadata
  * activity is a tiebreaker rather than a route to the top. They match the legacy
- * implementation's weights, bounty spent included (#723).
+ * implementation's weights, bounty spent included (#723). `artistsAdded` is
+ * credits attached (#722), the metadata curation the legacy weight rewarded.
  */
 const OVERALL_WEIGHTS = {
   contributed: 15,
@@ -762,38 +764,26 @@ export const getPercentileSummary = async (
       ) ranked
       WHERE ranked.metric_count > ${activitySummary.requestsFilled}
     `,
-    // An artist has no creator column; the author of its earliest history row is
-    // the member who added it (see createArtist in modules/artist.ts).
+    // Credits the member attached to releases (#722), as the legacy statistic
+    // counted: at creation or afterwards (#721), their own releases included.
     prisma.$queryRaw<CountRows>`
       SELECT COUNT(*)::bigint AS count
-      FROM (
-        SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
-        FROM "artist_histories" h
-        ORDER BY h."artistId", h."id" ASC
-      ) creators
-      WHERE creators."editedBy" = ${user.id}
+      FROM "release_artists"
+      WHERE "addedById" = ${user.id}
     `,
     prisma.$queryRaw<CountRows>`
       SELECT COUNT(*)::bigint AS count
       FROM (
-        SELECT u."id", COUNT(creators."artistId")::bigint AS metric_count
+        SELECT u."id", COUNT(ra."id")::bigint AS metric_count
         FROM "users" u
-        LEFT JOIN (
-          SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
-          FROM "artist_histories" h
-          ORDER BY h."artistId", h."id" ASC
-        ) creators ON creators."editedBy" = u."id"
+        LEFT JOIN "release_artists" ra ON ra."addedById" = u."id"
         WHERE u."disabled" = false
         GROUP BY u."id"
       ) ranked
       WHERE ranked.metric_count > (
         SELECT COUNT(*)::bigint
-        FROM (
-          SELECT DISTINCT ON (h."artistId") h."artistId", h."editedBy"
-          FROM "artist_histories" h
-          ORDER BY h."artistId", h."id" ASC
-        ) mine
-        WHERE mine."editedBy" = ${user.id}
+        FROM "release_artists"
+        WHERE "addedById" = ${user.id}
       )
     `,
     // Bounty on a withdrawn (soft-deleted) request does not count, matching the

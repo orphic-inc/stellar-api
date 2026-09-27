@@ -29,6 +29,8 @@ All notable changes to stellar-api are documented here.
 
   Owner and staff views are unchanged. `stats.ratio` keeps its own flag, as in the legacy implementation. stellar-ui omits a tile whose block is `null` (ui#165).
 
+- **`artistsAdded` counts the artist credits a member attached** (#722), as the legacy statistic did, not the artists they created. Credits a member wrote when creating a release count, as do credits added later (#721), their own releases included. A migration attributes every credit written before #721 to the actor of its release's `created` history row, or failing that to the uploader of its earliest contribution. Credits with neither stay unattributed and count for nobody. The field's shape is unchanged.
+
 ### Fixed
 
 - **The warning sign clears when a warning expires** (#719). `warned` on `AuthorRef` and on the profile read `User.warned`, which is stamped when a warning is issued and cleared only when the last warning row is deleted, so it outlived every expiry. It is now when the most recent **active** warning was issued, or `null`, from the same rows `standing` reads. The shape is unchanged.
