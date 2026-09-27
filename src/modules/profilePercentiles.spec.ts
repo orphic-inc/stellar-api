@@ -70,7 +70,7 @@ const classify = (sql: string): Query => {
   if (sql.includes('"forum_posts"')) return 'forumPostsAbove';
   if (sql.includes('"request_fills"')) return 'requestsFilledAbove';
   if (sql.includes('metric_count > (')) return 'artistsAddedAbove';
-  if (sql.includes('"artist_histories"')) return 'artistsAdded';
+  if (sql.includes('"release_artists"')) return 'artistsAdded';
   return 'total';
 };
 
@@ -187,8 +187,8 @@ describe('getPercentileSummary', () => {
     expect(summary.artistsAdded.raw).toBe(9);
   });
 
-  it('ranks artistsAdded off the earliest artist-history author', async () => {
-    // 4 members added more artists than this one, out of 101.
+  it('ranks artistsAdded by the credits the member attached (#722)', async () => {
+    // 4 members attached more credits than this one, out of 101.
     mockDb({ ...TOP_OF_EVERY_DIMENSION, artistsAddedAbove: 4 });
 
     const summary = await getPercentileSummary(
