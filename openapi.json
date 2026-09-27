@@ -763,8 +763,7 @@
             "type": "number"
           },
           "raw": {
-            "type": "number",
-            "nullable": true
+            "type": "number"
           }
         },
         "required": [
@@ -778,10 +777,20 @@
         "type": "object",
         "properties": {
           "contributed": {
-            "$ref": "#/components/schemas/ProfilePercentile"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfilePercentile"
+              }
+            ],
+            "nullable": true
           },
           "consumed": {
-            "$ref": "#/components/schemas/ProfilePercentile"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfilePercentile"
+              }
+            ],
+            "nullable": true
           },
           "contributions": {
             "$ref": "#/components/schemas/ProfilePercentile"
@@ -792,11 +801,20 @@
           "requestsFilled": {
             "$ref": "#/components/schemas/ProfilePercentile"
           },
+          "bountySpent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfilePercentile"
+              }
+            ],
+            "nullable": true
+          },
           "artistsAdded": {
             "$ref": "#/components/schemas/ProfilePercentile"
           },
           "overall": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           }
         },
         "required": [
@@ -805,6 +823,7 @@
           "contributions",
           "forumPosts",
           "requestsFilled",
+          "bountySpent",
           "artistsAdded",
           "overall"
         ]
