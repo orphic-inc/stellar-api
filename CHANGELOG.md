@@ -12,10 +12,17 @@ All notable changes to stellar-api are documented here.
 - **A `NotificationFilter` names its artists** (#715): `artists: { id, name }[]` beside `artistIds`, in the same order, on the list, create, replace and staff read. It is display only; `artistIds` stays the value written back. A withdrawn artist keeps its id in `artistIds` and has no entry in `artists`.
 - **The session carries `warnedUntil`** (#719): `GET /auth` → `warnedUntil`, when the member's own active warnings end. It is `null` both with no active warning and while a permanent one is active; the member's `warned` tells those apart. It is on the session rather than `AuthorRef`, so no viewer receives another member's expiry.
 - **Invite-tree nodes carry `donorRank`** (#719): `{ name, badge, color } | null` on `MemberInviteTreeNode`, with `AuthorRef`'s expiry rule, so the tree can show the tiered donor sign. An expired grant is `null` even while `isDonor` is still set.
+- **The profile ranks bounty spent** (#723): `percentiles.bountySpent`, the bytes a member has staked on requests that are not withdrawn, ranked like the other dimensions. It joins the Overall composite at weight 1, which restores the legacy weights exactly (53 in total). It is gated with consumed, since `addBounty` charges the stake to it.
 
 ### Changed
 
 - **`POST /communities/{id}/members` answers `204` with no body**, not `201` (#711). The admit is an upsert, so re-admitting an existing member created nothing, yet answered `201 Created` with the raw role row. That row was not the `CommunityMember` the contract declared, and its `id` was the role row's, not the user's. Read the member's resulting roles from `members` on `GET /communities/{id}`. stellar-ui discards the body, so it needs only the re-vendor. AGENTS.md now records the rule: `201` for a create, `200` for an unpredictable outcome, `204` for an idempotent edit.
+- **A hidden profile stat can no longer be worked out from the rest of the profile** (#723). Three fields gave one back:
+  - **`percentiles.contributed` / `consumed`** are `null` when the member hides that stat, not only their `raw`: the percentile and rank narrowed the hidden value down. `raw` is now never `null`.
+  - **`percentiles.overall`** is `null` unless contributed, consumed and ratio are all visible. Every input percentile was public, so dividing them out gave back the ratio, capped at 1, even with `showRatioStats` off.
+  - **`stats.buffer`** is returned only when **both** contributed and consumed are visible. With one visible, `contributed − buffer` gave the other.
+
+  Owner and staff views are unchanged. `stats.ratio` keeps its own flag, as in the legacy implementation. stellar-ui omits a tile whose block is `null` (ui#165).
 
 ### Fixed
 

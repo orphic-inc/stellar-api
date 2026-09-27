@@ -718,6 +718,7 @@ describe('API auth/profile/user flows', () => {
         contributions: { percentile: 100, rank: 1, total: 1, raw: 0 },
         forumPosts: { percentile: 100, rank: 1, total: 1, raw: 0 },
         requestsFilled: { percentile: 100, rank: 1, total: 1, raw: 0 },
+        bountySpent: { percentile: 100, rank: 1, total: 1, raw: 0 },
         artistsAdded: { percentile: 100, rank: 1, total: 1, raw: 0 },
         overall: 100
       },
@@ -839,6 +840,7 @@ describe('API auth/profile/user flows', () => {
         contributions: { percentile: 70, rank: 4, total: 10, raw: 1 },
         forumPosts: { percentile: 60, rank: 5, total: 10, raw: 5 },
         requestsFilled: { percentile: 50, rank: 6, total: 10, raw: 3 },
+        bountySpent: { percentile: 45, rank: 7, total: 10, raw: 100 },
         artistsAdded: { percentile: 40, rank: 7, total: 10, raw: 2 },
         overall: 72
       },
@@ -910,13 +912,15 @@ describe('API auth/profile/user flows', () => {
         collageEntries: 0
       },
       percentiles: {
-        contributed: { percentile: 10, rank: 9, total: 10, raw: 0 },
-        consumed: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        // Hidden stats hide their whole percentile block and Overall (#723).
+        contributed: null,
+        consumed: null,
         contributions: { percentile: 10, rank: 9, total: 10, raw: 0 },
         forumPosts: { percentile: 10, rank: 9, total: 10, raw: 0 },
         requestsFilled: { percentile: 10, rank: 9, total: 10, raw: 0 },
+        bountySpent: null,
         artistsAdded: { percentile: 10, rank: 9, total: 10, raw: 0 },
-        overall: 10
+        overall: null
       },
       donorPresentation: null,
       collageShelves: {

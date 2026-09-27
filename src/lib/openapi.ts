@@ -830,20 +830,21 @@ const ProfilePercentile = registry.register(
     percentile: z.number(),
     rank: z.number(),
     total: z.number(),
-    raw: z.number().nullable()
+    raw: z.number()
   })
 );
 
 const ProfilePercentiles = registry.register(
   'ProfilePercentiles',
   z.object({
-    contributed: ProfilePercentile,
-    consumed: ProfilePercentile,
+    contributed: ProfilePercentile.nullable(),
+    consumed: ProfilePercentile.nullable(),
     contributions: ProfilePercentile,
     forumPosts: ProfilePercentile,
     requestsFilled: ProfilePercentile,
+    bountySpent: ProfilePercentile.nullable(),
     artistsAdded: ProfilePercentile,
-    overall: z.number()
+    overall: z.number().nullable()
   })
 );
 
@@ -11742,12 +11743,17 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
     securitySchemes: SECURITY_SCHEMES
   };
 
-  // Only PublicProfile and MyProfile (which spreads PublicProfile.shape) hit
-  // the nullable-ref registered-schema path (#295) — scope the reshape to
-  // those instead of walking the whole document.
+  // Scoped to the schemas the nullable-ref registered-schema path (#295) is
+  // known to reach, rather than walking the whole document: PublicProfile,
+  // MyProfile (which spreads PublicProfile.shape), and ProfilePercentiles,
+  // whose privacy-gated dimensions are nullable refs since #723.
   const schemas = doc.components?.schemas;
   if (schemas) {
-    for (const name of ['PublicProfile', 'MyProfile'] as const) {
+    for (const name of [
+      'PublicProfile',
+      'MyProfile',
+      'ProfilePercentiles'
+    ] as const) {
       const schema = schemas[name];
       if (schema) {
         schemas[name] = normalizeNullableRefsDeep(schema) as typeof schema;
