@@ -9,6 +9,8 @@ export type ReleaseWorkbenchAuthority = {
   releaseId: number;
   canEditMetadata: boolean;
   canManageTags: boolean;
+  /** Change or remove any credit; a credit's adder may change or remove their own (#721). */
+  canManageCredits: boolean;
   canVote: boolean;
   canAttachContribution: boolean;
   canRevertHistory: boolean;
@@ -45,6 +47,7 @@ export const loadReleaseWorkbenchAuthority = async (
     releaseId: ref.releaseId,
     canEditMetadata: canModerateRelease || isContributor,
     canManageTags,
+    canManageCredits: canManageTags,
     canVote: true,
     canAttachContribution: true,
     canRevertHistory: canManageTags

@@ -615,6 +615,7 @@ model User {
   releaseTagVotes          ReleaseTagVote[]
   releaseTagsAdded         ReleaseTag[]                     @relation("ReleaseTagAdder")
   releaseHistoriesAuthored ReleaseHistory[]                 @relation("ReleaseHistoryActor")
+  releaseCreditsAdded      ReleaseArtist[]                  @relation("ReleaseArtistAddedBy")
   donorRank                UserDonorRank?
   wikiPagesAuthored        WikiPage[]                       @relation("WikiPageAuthor")
   wikiRevisionsAuthored    WikiRevision[]                   @relation("WikiRevisionAuthor")
@@ -1444,9 +1445,16 @@ model ReleaseArtist {
   artistId  Int
   artist    Artist     @relation(fields: [artistId], references: [id])
   role      ArtistRole @default(Main)
+  /// Who attached this credit (#721): the release's creator for credits written
+  /// at creation, the member for one added afterwards. A role change keeps it,
+  /// so a moderator's correction does not move the attribution. Null for rows
+  /// that predate the column until #722 backfills them.
+  addedById Int?
+  addedBy   User?      @relation("ReleaseArtistAddedBy", fields: [addedById], references: [id])
 
   @@unique([releaseId, artistId, role])
   @@index([artistId])
+  @@index([addedById])
   @@map("release_artists")
 }
 
@@ -2099,6 +2107,9 @@ enum ReleaseHistoryAction {
   tag_added
   tag_removed
   contribution_added
+  credit_added
+  credit_removed
+  credit_role_changed
 }
 
 model ReleaseHistory {

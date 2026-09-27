@@ -82,7 +82,7 @@ describe('releaseLifecycle', () => {
       data: expect.objectContaining({
         communityId: 1,
         image: null,
-        credits: { create: [{ artistId: 2, role: 'Main' }] },
+        credits: { create: [{ artistId: 2, role: 'Main', addedById: 7 }] },
         editions: { create: { year: 1959, isUnknownEdition: true } }
       })
     });

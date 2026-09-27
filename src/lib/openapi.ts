@@ -23,7 +23,8 @@ import {
   ReportTargetType,
   SubscriptionPage,
   RequestStatus,
-  RequestActionType
+  RequestActionType,
+  ArtistRole
 } from '@prisma/client';
 import { appVersion } from './version';
 import { INVITE_GATE_ORDER } from '../modules/inviteGates';
@@ -86,6 +87,8 @@ import {
   updateReleaseSchema,
   releaseVoteSchema,
   releaseTagSchema,
+  releaseCreditSchema,
+  releaseCreditRoleSchema,
   releaseTagVoteSchema,
   addCuratorSchema,
   addMemberSchema
@@ -4500,6 +4503,18 @@ const ReleaseArtist = registry.register(
   })
 );
 
+// One artist credit on a release (#721). `id` addresses it for a role change
+// or removal; `addedById` is who attached it, null on rows that predate it.
+const ReleaseCredit = registry.register(
+  'ReleaseCredit',
+  z.object({
+    id: z.number(),
+    role: z.nativeEnum(ArtistRole),
+    addedById: z.number().nullable(),
+    artist: ReleaseArtist
+  })
+);
+
 const ReleaseContribution = registry.register(
   'ReleaseContribution',
   z.object({
@@ -4670,7 +4685,10 @@ const ReleaseHistoryEntry = registry.register(
       'edit',
       'tag_added',
       'tag_removed',
-      'contribution_added'
+      'contribution_added',
+      'credit_added',
+      'credit_removed',
+      'credit_role_changed'
     ]),
     summary: z.string(),
     changedFields: z.array(z.string()),
@@ -4758,6 +4776,9 @@ const Release = registry.register(
     descriptionHtml: z.string().optional(),
     createdAt: z.string().optional(),
     artist: ReleaseArtist.nullable().optional(),
+    // Every credit, on the release detail (#721). `artist` above is derived
+    // from these: the Main credit, else the first.
+    credits: z.array(ReleaseCredit).optional(),
     tags: z.array(ReleaseTag).optional(),
     releaseTags: z.array(ReleaseTagEnriched).optional(),
     myVote: z.enum(['up', 'down']).nullable().optional(),
@@ -5806,6 +5827,79 @@ registry.registerPath({
       content: { 'application/json': { schema: ReleaseTagEnriched } }
     },
     404: msgResponse('Not found')
+  }
+});
+
+const creditPathParams = z.object({
+  communityId: z.string(),
+  releaseId: z.string(),
+  creditId: z.string()
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{communityId}/releases/{releaseId}/credits',
+  tags: ['Communities'],
+  summary: 'Add an artist credit to a release (#721)',
+  description:
+    'Any member who can see the release may add a credit. The artist must ' +
+    'already exist; there is no add-by-name. The caller is recorded as the ' +
+    "credit's `addedById`.",
+  request: {
+    params: z.object({ communityId: z.string(), releaseId: z.string() }),
+    body: {
+      content: { 'application/json': { schema: releaseCreditSchema } }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Credit added',
+      content: { 'application/json': { schema: ReleaseCredit } }
+    },
+    404: msgResponse('Release not found, or the artist is withdrawn'),
+    409: msgResponse('That artist already holds this role on the release')
+  }
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/communities/{communityId}/releases/{releaseId}/credits/{creditId}',
+  tags: ['Communities'],
+  summary: "Change a credit's role (#721)",
+  description:
+    "A moderator (`communities_manage` or `admin`) or the credit's adder. " +
+    '`addedById` is kept. Setting the role a credit already has is a no-op.',
+  request: {
+    params: creditPathParams,
+    body: {
+      content: { 'application/json': { schema: releaseCreditRoleSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The credit with its new role',
+      content: { 'application/json': { schema: ReleaseCredit } }
+    },
+    403: msgResponse("Neither a moderator nor the credit's adder"),
+    404: msgResponse('Release or credit not found'),
+    409: msgResponse('That artist already holds this role on the release')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{communityId}/releases/{releaseId}/credits/{creditId}',
+  tags: ['Communities'],
+  summary: 'Remove a credit (#721)',
+  description:
+    "A moderator (`communities_manage` or `admin`) or the credit's adder. " +
+    'A release keeps at least one credit. The artist itself is untouched.',
+  request: { params: creditPathParams },
+  responses: {
+    204: { description: 'Credit removed' },
+    403: msgResponse("Neither a moderator nor the credit's adder"),
+    404: msgResponse('Release or credit not found'),
+    409: msgResponse('A release keeps at least one artist credit')
   }
 });
 

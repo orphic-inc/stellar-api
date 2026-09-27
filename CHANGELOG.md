@@ -13,6 +13,11 @@ All notable changes to stellar-api are documented here.
 - **The session carries `warnedUntil`** (#719): `GET /auth` → `warnedUntil`, when the member's own active warnings end. It is `null` both with no active warning and while a permanent one is active; the member's `warned` tells those apart. It is on the session rather than `AuthorRef`, so no viewer receives another member's expiry.
 - **Invite-tree nodes carry `donorRank`** (#719): `{ name, badge, color } | null` on `MemberInviteTreeNode`, with `AuthorRef`'s expiry rule, so the tree can show the tiered donor sign. An expired grant is `null` even while `isDonor` is still set.
 - **The profile ranks bounty spent** (#723): `percentiles.bountySpent`, the bytes a member has staked on requests that are not withdrawn, ranked like the other dimensions. It joins the Overall composite at weight 1, which restores the legacy weights exactly (53 in total). It is gated with consumed, since `addBounty` charges the stake to it.
+- **Artist credits can be edited on an existing release** (#721). Before this, a release's credits were fixed at creation.
+  - `POST …/releases/{releaseId}/credits` `{ artistId, role }` → `201` + the credit. Open to anyone who can see the release; the artist must exist and not be withdrawn.
+  - `PATCH …/credits/{creditId}` `{ role }` → `200`, and `DELETE …/credits/{creditId}` → `204`. Both are for a moderator (`communities_manage` or `admin`) or the credit's adder. A role change keeps the adder. A release keeps at least one credit (`409`).
+  - A credit is `ReleaseCredit`: `{ id, role, artist, addedById }`. The release detail now returns `credits`. `ReleaseArtist.addedById` is set on every new credit; older rows are `null` until #722.
+  - `ReleaseHistoryEntry.action` gains `credit_added`, `credit_removed` and `credit_role_changed`. None of them is revertable.
 
 ### Changed
 
@@ -27,6 +32,7 @@ All notable changes to stellar-api are documented here.
 ### Fixed
 
 - **The warning sign clears when a warning expires** (#719). `warned` on `AuthorRef` and on the profile read `User.warned`, which is stamped when a warning is issued and cleared only when the last warning row is deleted, so it outlived every expiry. It is now when the most recent **active** warning was issued, or `null`, from the same rows `standing` reads. The shape is unchanged.
+- **The release page shows its artist again** (#721). Since the credits remodel (#72), `GET /communities/{id}/releases/{releaseId}` sent raw `credits` and no `artist`, although the contract declared `artist` and stellar-ui reads it. It is now derived from the Main credit, falling back to the first credit, like every other release surface.
 
 ## [0.9.7] — 2026-09-23
 

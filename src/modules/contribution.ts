@@ -195,7 +195,7 @@ export const createContributionSubmission = async ({
       const key = `${artist.id}:${role}`;
       if (seenCredits.has(key)) return [];
       seenCredits.add(key);
-      return [{ artistId: artist.id, role }];
+      return [{ artistId: artist.id, role, addedById: userId }];
     });
 
     const tagRecords =

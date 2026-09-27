@@ -146,6 +146,36 @@ describe('GET /api/communities/:communityId/releases/:releaseId', () => {
     expect(res.body.isContributor).toBe(false);
   });
 
+  // #721: the contract declared `artist` but the route sent only raw credits,
+  // so the release page never showed its artist.
+  it('derives artist from the Main credit and returns every credit', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    const credits = [
+      {
+        id: 40,
+        role: 'Guest',
+        addedById: 5,
+        artist: { id: 9, name: 'John Coltrane' }
+      },
+      {
+        id: 41,
+        role: 'Main',
+        addedById: null,
+        artist: { id: 2, name: 'Miles Davis' }
+      }
+    ];
+    prismaMock.release.findFirst.mockResolvedValue(
+      makeRelease({ credits }) as never
+    );
+    prismaMock.releaseVote.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1/releases/3');
+
+    expect(res.status).toBe(200);
+    expect(res.body.artist).toEqual({ id: 2, name: 'Miles Davis' });
+    expect(res.body.credits).toEqual(credits);
+  });
+
   it('returns isContributor true when the current user has a contribution', async () => {
     prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
     prismaMock.release.findFirst.mockResolvedValue(
@@ -337,7 +367,7 @@ describe('POST /api/communities/:communityId/releases', () => {
       data: expect.objectContaining({
         communityId: 1,
         image: null,
-        credits: { create: [{ artistId: 2, role: 'Main' }] },
+        credits: { create: [{ artistId: 2, role: 'Main', addedById: 7 }] },
         editions: { create: { year: 1959, isUnknownEdition: true } }
       })
     });
