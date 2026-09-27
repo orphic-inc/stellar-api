@@ -23,6 +23,11 @@ import {
   listReleaseContributions
 } from './contributions';
 import { revertReleaseWorkbenchHistory } from './history';
+import {
+  addReleaseWorkbenchCredit,
+  changeReleaseWorkbenchCreditRole,
+  removeReleaseWorkbenchCredit
+} from './credits';
 
 const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
   getView: () => getReleaseWorkbenchView(ref),
@@ -47,7 +52,11 @@ const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
   listContributions: () => listReleaseContributions(ref),
   revertHistory: (input: {
     historyId: number;
-  }): Promise<ReleaseWorkbenchView> => revertReleaseWorkbenchHistory(ref, input)
+  }): Promise<ReleaseWorkbenchView> =>
+    revertReleaseWorkbenchHistory(ref, input),
+  addCredit: (input) => addReleaseWorkbenchCredit(ref, input),
+  changeCreditRole: (input) => changeReleaseWorkbenchCreditRole(ref, input),
+  removeCredit: (input) => removeReleaseWorkbenchCredit(ref, input)
 });
 
 export const releaseWorkbench: ReleaseWorkbenchModule = {

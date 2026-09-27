@@ -4027,6 +4027,40 @@
           "name"
         ]
       },
+      "ReleaseCredit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Main",
+              "Guest",
+              "Composer",
+              "Conductor",
+              "DJ",
+              "Remixer",
+              "Producer",
+              "Arranger"
+            ]
+          },
+          "addedById": {
+            "type": "number",
+            "nullable": true
+          },
+          "artist": {
+            "$ref": "#/components/schemas/ReleaseArtist"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "addedById",
+          "artist"
+        ]
+      },
       "ReleaseContribution": {
         "type": "object",
         "properties": {
@@ -4617,7 +4651,10 @@
               "edit",
               "tag_added",
               "tag_removed",
-              "contribution_added"
+              "contribution_added",
+              "credit_added",
+              "credit_removed",
+              "credit_role_changed"
             ]
           },
           "summary": {
@@ -4808,6 +4845,12 @@
                 "nullable": true
               }
             ]
+          },
+          "credits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseCredit"
+            }
           },
           "tags": {
             "type": "array",
@@ -24612,6 +24655,375 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/communities/{communityId}/releases/{releaseId}/credits": {
+      "post": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "Add an artist credit to a release (#721)",
+        "description": "Any member who can see the release may add a credit. The artist must already exist; there is no add-by-name. The caller is recorded as the credit's `addedById`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "communityId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "releaseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "artistId": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "Main",
+                      "Guest",
+                      "Composer",
+                      "Conductor",
+                      "DJ",
+                      "Remixer",
+                      "Producer",
+                      "Arranger"
+                    ]
+                  }
+                },
+                "required": [
+                  "artistId",
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Credit added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseCredit"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found, or the artist is withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That artist already holds this role on the release",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/communities/{communityId}/releases/{releaseId}/credits/{creditId}": {
+      "patch": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "Change a credit's role (#721)",
+        "description": "A moderator (`communities_manage` or `admin`) or the credit's adder. `addedById` is kept. Setting the role a credit already has is a no-op.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "communityId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "releaseId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "creditId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "Main",
+                      "Guest",
+                      "Composer",
+                      "Conductor",
+                      "DJ",
+                      "Remixer",
+                      "Producer",
+                      "Arranger"
+                    ]
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The credit with its new role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseCredit"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Neither a moderator nor the credit's adder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release or credit not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That artist already holds this role on the release",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "Remove a credit (#721)",
+        "description": "A moderator (`communities_manage` or `admin`) or the credit's adder. A release keeps at least one credit. The artist itself is untouched.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "communityId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "releaseId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "creditId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Credit removed"
+          },
+          "400": {
+            "description": "Invalid path parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Neither a moderator nor the credit's adder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release or credit not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A release keeps at least one artist credit",
             "content": {
               "application/json": {
                 "schema": {

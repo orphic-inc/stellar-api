@@ -16,11 +16,15 @@ import {
   releaseVoteSchema,
   releaseTagSchema,
   releaseTagVoteSchema,
+  releaseCreditSchema,
+  releaseCreditRoleSchema,
   type CreateReleaseInput,
   type UpdateReleaseInput,
   type ReleaseVoteInput,
   type ReleaseTagInput,
-  type ReleaseTagVoteInput
+  type ReleaseTagVoteInput,
+  type ReleaseCreditInput,
+  type ReleaseCreditRoleInput
 } from '../../../schemas/community';
 import {
   addContributionToReleaseSchema,
@@ -40,6 +44,7 @@ import {
 } from '../../../modules/releaseLifecycle';
 import { listCommunityReleases } from '../../../modules/releaseBrowse';
 import { setReleaseGroup } from '../../../modules/releaseGroup';
+import { primaryArtist } from '../../../modules/releaseCredits';
 import {
   setReleaseGroupSchema,
   type SetReleaseGroupInput
@@ -67,6 +72,10 @@ const serializeReleaseWorkbenchView = async (
 ) => {
   return {
     ...view.release,
+    // The contract has always declared `artist`, but this route sent only the
+    // raw `credits` since the credits remodel (#72), so the release page never
+    // showed its artist. Derived like every other release surface (#721).
+    artist: primaryArtist(view.release.credits),
     // Additive render-at-read: raw `description` is unchanged; `descriptionHtml`
     // is the server-rendered BBCode transcription the detail view consumes (#402).
     descriptionHtml: await renderSiteBBCode(view.release.description, bbViewer),
@@ -418,6 +427,81 @@ router.delete(
       permissions: req.user.permissions
     });
     await session.removeTag({ tagId });
+    res.status(204).send();
+  })
+);
+
+// ─── Credit routes (#721) ─────────────────────────────────────────────────────
+
+const creditParamsSchema = z.object({
+  communityId: z.coerce.number().int().positive(),
+  releaseId: z.coerce.number().int().positive(),
+  creditId: z.coerce.number().int().positive()
+});
+
+// POST /api/communities/:communityId/releases/:releaseId/credits
+router.post(
+  '/:releaseId/credits',
+  requireAuth,
+  validateParams(releaseParamsSchema),
+  validate(releaseCreditSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+    }>(res);
+    const session = await releaseWorkbench.open({
+      actorId: req.user.id,
+      communityId,
+      releaseId,
+      permissions: req.user.permissions
+    });
+    const credit = await session.addCredit(parsedBody<ReleaseCreditInput>(res));
+    res.status(201).json(credit);
+  })
+);
+
+// PATCH /api/communities/:communityId/releases/:releaseId/credits/:creditId
+router.patch(
+  '/:releaseId/credits/:creditId',
+  requireAuth,
+  validateParams(creditParamsSchema),
+  validate(releaseCreditRoleSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId, creditId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+      creditId: number;
+    }>(res);
+    const session = await releaseWorkbench.open({
+      actorId: req.user.id,
+      communityId,
+      releaseId,
+      permissions: req.user.permissions
+    });
+    const { role } = parsedBody<ReleaseCreditRoleInput>(res);
+    res.json(await session.changeCreditRole({ creditId, role }));
+  })
+);
+
+// DELETE /api/communities/:communityId/releases/:releaseId/credits/:creditId
+router.delete(
+  '/:releaseId/credits/:creditId',
+  requireAuth,
+  validateParams(creditParamsSchema),
+  authHandler(async (req, res) => {
+    const { communityId, releaseId, creditId } = parsedParams<{
+      communityId: number;
+      releaseId: number;
+      creditId: number;
+    }>(res);
+    const session = await releaseWorkbench.open({
+      actorId: req.user.id,
+      communityId,
+      releaseId,
+      permissions: req.user.permissions
+    });
+    await session.removeCredit({ creditId });
     res.status(204).send();
   })
 );

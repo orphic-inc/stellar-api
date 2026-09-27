@@ -722,6 +722,7 @@ erDiagram
     "release_files" |o--|| contributions : "contribution"
     "release_artists" }o--|| releases : "release"
     "release_artists" }o--|| artists : "artist"
+    "release_artists" }o--|o users : "addedBy"
     "editions" }o--|| releases : "release"
     "do_not_contribute" }o--|| communities : "community"
     "comments" }o--|| users : "author"

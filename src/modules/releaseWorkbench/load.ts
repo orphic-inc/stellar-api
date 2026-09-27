@@ -8,6 +8,7 @@ import type {
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { buildPlainTags, buildReleaseTagPayload } from '../releaseTags';
 import { groupProjectionSelect, toGroupProjection } from '../releaseGroup';
+import { releaseCreditSelect } from './credits';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -33,9 +34,7 @@ export const getReleaseWorkbenchView = async (
     prisma.release.findFirst({
       where: { id: ref.releaseId, communityId: ref.communityId },
       include: {
-        credits: {
-          select: { role: true, artist: { select: { id: true, name: true } } }
-        },
+        credits: { select: releaseCreditSelect, orderBy: { id: 'asc' } },
         releaseTags: {
           include: {
             tag: { select: { id: true, name: true, occurrences: true } },

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { ArtistRole, Prisma } from '@prisma/client';
 import type { GroupProjection } from '../releaseGroup';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
 
@@ -7,6 +7,14 @@ export type ReleaseWorkbenchRef = {
   communityId: number;
   releaseId: number;
   permissions?: Record<string, boolean>;
+};
+
+/** One artist credit on a release (#721). `addedById` is null on rows that predate it. */
+export type ReleaseCreditView = {
+  id: number;
+  role: ArtistRole;
+  addedById: number | null;
+  artist: { id: number; name: string };
 };
 
 export type ReleaseTagView = {
@@ -92,7 +100,12 @@ export type ReleaseWorkbenchView = {
   release: Prisma.ReleaseGetPayload<{
     include: {
       credits: {
-        select: { role: true; artist: { select: { id: true; name: true } } };
+        select: {
+          id: true;
+          role: true;
+          addedById: true;
+          artist: { select: { id: true; name: true } };
+        };
       };
       voteAggregate: true;
       contributions: {
@@ -165,6 +178,15 @@ export type ReleaseWorkbenchSession = {
   ): Promise<ReleaseContributionView>;
   listContributions(): Promise<ReleaseContributionDetailView[]>;
   revertHistory(input: { historyId: number }): Promise<ReleaseWorkbenchView>;
+  addCredit(input: {
+    artistId: number;
+    role: ArtistRole;
+  }): Promise<ReleaseCreditView>;
+  changeCreditRole(input: {
+    creditId: number;
+    role: ArtistRole;
+  }): Promise<ReleaseCreditView>;
+  removeCredit(input: { creditId: number }): Promise<void>;
 };
 
 export type ReleaseWorkbenchModule = {

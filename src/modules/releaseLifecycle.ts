@@ -42,7 +42,8 @@ export const createCommunityRelease = async (input: {
         credits: {
           create: credits.map((credit) => ({
             artistId: credit.artistId,
-            role: credit.role ?? ArtistRole.Main
+            role: credit.role ?? ArtistRole.Main,
+            addedById: input.actorId
           }))
         },
         editions: {

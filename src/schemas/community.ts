@@ -105,6 +105,16 @@ export const releaseTagSchema = z.object({
   name: z.string().min(1).max(50)
 });
 
+// #721 — a credit names an existing artist; there is no add-by-name.
+export const releaseCreditSchema = z.object({
+  artistId: z.number().int().positive(),
+  role: artistRoleEnum
+});
+
+export const releaseCreditRoleSchema = z.object({
+  role: artistRoleEnum
+});
+
 export const releaseTagVoteSchema = z.object({
   direction: z.enum(['up', 'down'])
 });
@@ -128,6 +138,8 @@ export type CreateReleaseInput = z.infer<typeof createReleaseSchema>;
 export type UpdateReleaseInput = z.infer<typeof updateReleaseSchema>;
 export type ReleaseVoteInput = z.infer<typeof releaseVoteSchema>;
 export type ReleaseTagInput = z.infer<typeof releaseTagSchema>;
+export type ReleaseCreditInput = z.infer<typeof releaseCreditSchema>;
+export type ReleaseCreditRoleInput = z.infer<typeof releaseCreditRoleSchema>;
 export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;
 export type AddCuratorInput = z.infer<typeof addCuratorSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
