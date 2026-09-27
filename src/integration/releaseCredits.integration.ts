@@ -40,10 +40,13 @@ const createUser = async (tag: string) => {
   const rank = await testPrisma.userRank.findFirstOrThrow();
   const settings = await testPrisma.userSettings.create({ data: {} });
   const profile = await testPrisma.profile.create({ data: {} });
+  // Not nested inside the email's template literal: Lizard (Codacy) misreads a
+  // template literal within a template literal and runs this function to EOF.
+  const username = uniqueName(`rc-${tag}`);
   return testPrisma.user.create({
     data: {
-      username: uniqueName(`rc-${tag}`),
-      email: `${uniqueName(`rc-${tag}`)}@example.com`,
+      username,
+      email: `${username}@example.com`,
       password: 'x',
       avatar: '',
       userRankId: rank.id,
