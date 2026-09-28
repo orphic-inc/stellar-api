@@ -88,6 +88,7 @@ npm run db:seed          # recreate default user ranks after a DB reset; then go
 npm run db:reset         # prisma migrate reset
 npm run db:generate      # only needed when pulling someone else's schema changes
 npm run db:studio        # prisma studio
+npm run images:backfill  # queue, import and report every stored remote image (#738); run before the ui closes img-src
 ```
 
 ## Commit workflow
@@ -279,8 +280,10 @@ src/
     inviteGates.ts            # Invite send gates (#637, ADR-0043) — pure: the first refusal, in order, for the send and the eligibility read
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
-    remoteImage.ts            # Remote image import (#737): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), registerWriteImages (bodies and fields together), collectImageColumns (the one list of image columns)
+    remoteImage.ts            # Remote image import (#737): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), registerWriteImages (bodies and fields together)
     remoteImageJob.ts         # Background job driving that import — a few fetches at a time, one cycle at a time
+    imageColumns.ts           # The one list of image columns (#738), each value tagged with its author and time; the asset sweep and the backfill read it
+    remoteImageBackfill.ts    # The one-time backfill (#738): each image owned by its earliest author, queued exempt, drained, reported. Script in scripts/
     imageSrc.ts               # addImageSrcs (#737 slice 3): each image field in a payload gains a `*Src` sibling, a same-origin path or null. One lookup per body; a failed lookup yields null
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard

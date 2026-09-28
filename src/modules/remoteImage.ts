@@ -13,8 +13,8 @@
  * 2. `processDueRemoteImages`: the job leases due rows and imports them with
  *    bounded concurrency; a retryable failure backs off, a final one records why.
  * 3. `importedAssetUrls`: rendering asks which URLs are imported, and where.
- * 4. `collectReferencedRemoteUrls`: every remote image URL any stored content
- *    still references, which the asset sweep keeps and the backfill (#738) walks.
+ * 4. The asset sweep and the backfill (#738) walk every image column through
+ *    `imageColumns.ts`, which lists them once.
  */
 import {
   AssetKind,
@@ -67,7 +67,7 @@ export const isImportableUrl = (url: string): boolean => {
 };
 
 /** An image field's value, as the one remote URL it holds, if any. */
-const remoteField = (value: string | null | undefined): string[] =>
+export const remoteField = (value: string | null | undefined): string[] =>
   value && isImportableUrl(value.trim()) ? [value.trim()] : [];
 
 type Text = string | null | undefined;
@@ -359,157 +359,3 @@ export async function importedAssetUrls(
   for (const r of rows) if (r.assetHash) out.set(r.url, assetUrl(r.assetHash));
   return out;
 }
-
-/**
- * One table's contribution to the walk: the BBCode bodies it holds and the
- * fields that hold an image URL. Adding a surface that renders a remote image
- * means adding its source here (ADR-0051 §5).
- */
-type Source = (
-  client: PrismaClient
-) => Promise<{ bodies?: Text[]; fields?: Text[] }>;
-
-// Only rows whose text mentions an [img] tag can hold one.
-const HAS_IMG = { contains: '[img', mode: 'insensitive' as const };
-
-const SOURCES: Source[] = [
-  async (c) => ({
-    bodies: (
-      await c.forumPost.findMany({
-        where: { body: HAS_IMG },
-        select: { body: true }
-      })
-    ).map((r) => r.body)
-  }),
-  async (c) => ({
-    bodies: (
-      await c.comment.findMany({
-        where: { body: HAS_IMG },
-        select: { body: true }
-      })
-    ).map((r) => r.body)
-  }),
-  async (c) => ({
-    bodies: (
-      await c.collage.findMany({
-        where: { description: HAS_IMG },
-        select: { description: true }
-      })
-    ).map((r) => r.description)
-  }),
-  async (c) => ({
-    bodies: (
-      await c.wikiPage.findMany({
-        where: { body: HAS_IMG },
-        select: { body: true }
-      })
-    ).map((r) => r.body)
-  }),
-  async (c) => ({
-    bodies: (
-      await c.news.findMany({
-        where: { body: HAS_IMG },
-        select: { body: true }
-      })
-    ).map((r) => r.body)
-  }),
-  async (c) => {
-    const rows = await c.release.findMany({
-      select: { description: true, image: true }
-    });
-    return {
-      bodies: rows.map((r) => r.description),
-      fields: rows.map((r) => r.image)
-    };
-  },
-  async (c) => {
-    const rows = await c.profile.findMany({
-      select: { profileInfo: true, avatar: true }
-    });
-    return {
-      bodies: rows.map((r) => r.profileInfo),
-      fields: rows.map((r) => r.avatar)
-    };
-  },
-  async (c) => {
-    const rows = await c.user.findMany({
-      where: { OR: [{ avatar: { not: null } }, { staffBio: HAS_IMG }] },
-      select: { avatar: true, staffBio: true }
-    });
-    return {
-      bodies: rows.map((r) => r.staffBio),
-      fields: rows.map((r) => r.avatar)
-    };
-  },
-  async (c) => ({
-    fields: (
-      await c.donorReward.findMany({
-        select: { customIcon: true, secondAvatar: true }
-      })
-    ).flatMap((r) => [r.customIcon, r.secondAvatar])
-  }),
-  async (c) => ({
-    fields: (await c.community.findMany({ select: { image: true } })).map(
-      (r) => r.image
-    )
-  }),
-  async (c) => ({
-    fields: (await c.coverArt.findMany({ select: { image: true } })).map(
-      (r) => r.image
-    )
-  }),
-  async (c) => ({
-    fields: (
-      await c.request.findMany({
-        where: { image: { not: null } },
-        select: { image: true }
-      })
-    ).map((r) => r.image)
-  }),
-  async (c) => ({
-    fields: (await c.featuredAlbum.findMany({ select: { image: true } })).map(
-      (r) => r.image
-    )
-  })
-];
-
-/** Every stored value that can hold an image, from the one list of columns. */
-export interface ImageColumns {
-  /** The BBCode bodies the api renders. */
-  bodies: Text[];
-  /** The fields that hold one image each: a remote URL or an asset path. */
-  fields: Text[];
-}
-
-/**
- * Read every image-bearing column, once. The asset sweep derives both of its
- * reference sets from this, the remote URLs and the `/api/asset/` hashes, so
- * a new image column is added in one place (#740).
- *
- * Soft-deleted rows count. A trashed post can be restored, and its images
- * should come back with it.
- *
- * Reads every row of those tables, like the rest of the sweep. That is fine at
- * today's size; the sources are the place to add paging if it stops being.
- */
-export async function collectImageColumns(
-  client: PrismaClient = prisma
-): Promise<ImageColumns> {
-  const found = await Promise.all(SOURCES.map((source) => source(client)));
-  return {
-    bodies: found.flatMap((f) => f.bodies ?? []),
-    fields: found.flatMap((f) => f.fields ?? [])
-  };
-}
-
-/** The remote image URLs among `columns`. */
-export const remoteUrlsIn = (columns: ImageColumns): Set<string> =>
-  new Set([
-    ...columns.bodies.flatMap(remoteImageUrls),
-    ...columns.fields.flatMap(remoteField)
-  ]);
-
-/** Every remote image URL that stored content still references. */
-export const collectReferencedRemoteUrls = async (
-  client: PrismaClient = prisma
-): Promise<Set<string>> => remoteUrlsIn(await collectImageColumns(client));

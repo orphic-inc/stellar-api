@@ -37,7 +37,7 @@ import {
   collectImageColumns,
   collectReferencedRemoteUrls,
   remoteUrlsIn
-} from './remoteImage';
+} from './imageColumns';
 
 const log = getLogger('assetSweep');
 

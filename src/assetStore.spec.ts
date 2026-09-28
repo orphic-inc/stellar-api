@@ -5,7 +5,7 @@
  */
 
 import { mockDeep, mockReset } from 'jest-mock-extended';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 const prismaMock = mockDeep<PrismaClient>();
 jest.mock('./lib/prisma', () => ({ prisma: prismaMock }));
@@ -29,6 +29,12 @@ const PNG = Buffer.concat([
 
 // sha256 of PNG, computed by the module under test — asserted stable below.
 const PNG_HASH = hashAsset(PNG);
+
+const uniqueViolation = () =>
+  new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: 'test'
+  });
 
 describe('hashAsset', () => {
   it('is a 64-char sha256 hex digest', () => {
@@ -119,6 +125,29 @@ describe('putAsset', () => {
 
     expect(result).toBe(existing);
     expect(prismaMock.asset.update).not.toHaveBeenCalled();
+  });
+
+  // #738: two stores of the same bytes at once both find no row; the loser's
+  // create hits the unique hash, and the winner's row is the answer.
+  it('returns the row a concurrent store of the same bytes created', async () => {
+    const winner = { id: 8, hash: PNG_HASH, ownerId: 42 } as never;
+    prismaMock.asset.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winner);
+    prismaMock.asset.create.mockRejectedValue(uniqueViolation());
+
+    const result = await putAsset({ data: PNG, kind: 'Imported', ownerId: 9 });
+
+    expect(result).toBe(winner);
+  });
+
+  it('rethrows any other failure to create', async () => {
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      putAsset({ data: PNG, kind: 'ThemeImage', ownerId: 9 })
+    ).rejects.toThrow('db down');
   });
 
   it('rejects an unvalidated payload without touching the table', async () => {

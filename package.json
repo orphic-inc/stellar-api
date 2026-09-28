@@ -33,6 +33,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "ts-node prisma/seed.ts",
     "db:seed-e2e": "ts-node src/scripts/seed-e2e-users.ts",
+    "images:backfill": "ts-node src/scripts/backfill-remote-images.ts",
     "db:studio": "prisma studio",
     "prepare": "husky || true"
   },
