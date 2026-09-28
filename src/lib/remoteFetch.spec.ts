@@ -111,8 +111,8 @@ describe('fetchRemote', () => {
   });
 
   it('gives up on a redirect loop', async () => {
-    const port = await serve((req, res) => {
-      res.writeHead(302, { location: req.url });
+    const port = await serve((_req, res) => {
+      res.writeHead(302, { location: '/loop' });
       res.end();
     });
     const result = await fetchRemote(

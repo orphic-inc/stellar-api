@@ -306,69 +306,97 @@ describe('importedAssetUrls', () => {
   });
 });
 
+const img = (n: string) => `[img]https://h.example/${n}.png[/img]`;
+const url = (n: string) => `https://h.example/${n}`;
+
+// Each table the walker reads, the rows it returns, and the URLs they hold.
+// A BBCode body contributes the images it would draw; a field its URL.
+const WALKED_SOURCES: {
+  table: keyof PrismaClient;
+  rows: Record<string, string | null>[];
+  expected: string[];
+}[] = [
+  {
+    table: 'forumPost',
+    rows: [{ body: img('post') }],
+    expected: [url('post.png')]
+  },
+  {
+    table: 'comment',
+    rows: [{ body: img('comment') }],
+    expected: [url('comment.png')]
+  },
+  {
+    table: 'collage',
+    rows: [{ description: img('collage') }],
+    expected: [url('collage.png')]
+  },
+  {
+    table: 'wikiPage',
+    rows: [{ body: img('wiki') }],
+    expected: [url('wiki.png')]
+  },
+  {
+    table: 'news',
+    rows: [{ body: img('news') }],
+    expected: [url('news.png')]
+  },
+  {
+    table: 'release',
+    rows: [{ description: img('release'), image: url('rimg.jpg') }],
+    expected: [url('release.png'), url('rimg.jpg')]
+  },
+  {
+    table: 'profile',
+    rows: [{ profileInfo: img('profile'), avatar: url('pavatar') }],
+    expected: [url('profile.png'), url('pavatar')]
+  },
+  {
+    table: 'user',
+    rows: [{ staffBio: img('staff'), avatar: url('uavatar') }],
+    expected: [url('staff.png'), url('uavatar')]
+  },
+  {
+    table: 'donorReward',
+    rows: [{ customIcon: url('icon'), secondAvatar: '' }],
+    expected: [url('icon')]
+  },
+  {
+    table: 'community',
+    rows: [{ image: url('community') }],
+    expected: [url('community')]
+  },
+  {
+    table: 'coverArt',
+    rows: [{ image: url('cover') }],
+    expected: [url('cover')]
+  },
+  {
+    table: 'request',
+    rows: [{ image: url('request') }],
+    expected: [url('request')]
+  },
+  {
+    // Already in the store: an asset path is not a remote image.
+    table: 'featuredAlbum',
+    rows: [{ image: `/api/asset/${'a'.repeat(64)}` }],
+    expected: []
+  }
+];
+
 describe('collectReferencedRemoteUrls', () => {
   it('walks every rendered BBCode body and every image field', async () => {
-    const img = (n: string) => `[img]https://h.example/${n}.png[/img]`;
-    prismaMock.forumPost.findMany.mockResolvedValue([
-      { body: img('post') }
-    ] as never);
-    prismaMock.comment.findMany.mockResolvedValue([
-      { body: img('comment') }
-    ] as never);
-    prismaMock.collage.findMany.mockResolvedValue([
-      { description: img('collage') }
-    ] as never);
-    prismaMock.release.findMany.mockResolvedValue([
-      { description: img('release'), image: 'https://h.example/rimg.jpg' }
-    ] as never);
-    prismaMock.wikiPage.findMany.mockResolvedValue([
-      { body: img('wiki') }
-    ] as never);
-    prismaMock.profile.findMany.mockResolvedValue([
-      { profileInfo: img('profile'), avatar: 'https://h.example/pavatar' }
-    ] as never);
-    prismaMock.user.findMany.mockResolvedValue([
-      { staffBio: img('staff'), avatar: 'https://h.example/uavatar' }
-    ] as never);
-    prismaMock.news.findMany.mockResolvedValue([
-      { body: img('news') }
-    ] as never);
-    prismaMock.donorReward.findMany.mockResolvedValue([
-      { customIcon: 'https://h.example/icon', secondAvatar: '' }
-    ] as never);
-    prismaMock.community.findMany.mockResolvedValue([
-      { image: 'https://h.example/community' }
-    ] as never);
-    prismaMock.coverArt.findMany.mockResolvedValue([
-      { image: 'https://h.example/cover' }
-    ] as never);
-    prismaMock.request.findMany.mockResolvedValue([
-      { image: 'https://h.example/request' }
-    ] as never);
-    prismaMock.featuredAlbum.findMany.mockResolvedValue([
-      { image: `/api/asset/${'a'.repeat(64)}` } // already in the store
-    ] as never);
+    for (const { table, rows } of WALKED_SOURCES) {
+      const delegate = prismaMock[table] as unknown as {
+        findMany: jest.Mock;
+      };
+      delegate.findMany.mockResolvedValue(rows as never);
+    }
 
     const urls = await collectReferencedRemoteUrls();
 
     expect([...urls].sort()).toEqual(
-      [
-        'https://h.example/post.png',
-        'https://h.example/comment.png',
-        'https://h.example/collage.png',
-        'https://h.example/release.png',
-        'https://h.example/rimg.jpg',
-        'https://h.example/wiki.png',
-        'https://h.example/profile.png',
-        'https://h.example/pavatar',
-        'https://h.example/staff.png',
-        'https://h.example/uavatar',
-        'https://h.example/news.png',
-        'https://h.example/icon',
-        'https://h.example/community',
-        'https://h.example/cover',
-        'https://h.example/request'
-      ].sort()
+      WALKED_SOURCES.flatMap((source) => source.expected).sort()
     );
   });
 });
