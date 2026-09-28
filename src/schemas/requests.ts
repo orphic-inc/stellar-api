@@ -1,5 +1,6 @@
 import { RequestStatus, ReleaseType } from '@prisma/client';
 import { z } from 'zod';
+import { httpImageUrl } from './imageUrl';
 
 const releaseTypeEnum = z.enum(
   Object.values(ReleaseType) as [ReleaseType, ...ReleaseType[]]
@@ -15,7 +16,7 @@ export const createRequestSchema = z.object({
   title: z.string().min(1, 'Title is required').max(256),
   year: z.number().int().min(1900).max(2100).optional(),
   image: z
-    .union([z.string().url(), z.literal('')])
+    .union([httpImageUrl, z.literal('')])
     .optional()
     .transform((v) => v || undefined),
   description: z.string().min(1, 'Description is required'),
@@ -31,7 +32,7 @@ export const updateRequestSchema = z.object({
   type: releaseTypeEnum.optional(),
   year: z.number().int().min(1900).max(2100).nullable().optional(),
   image: z
-    .union([z.string().url(), z.literal('')])
+    .union([httpImageUrl, z.literal('')])
     .optional()
     .transform((v) => (v === '' ? null : v))
 });

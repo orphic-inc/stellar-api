@@ -42,6 +42,7 @@ import {
   paginationBase
 } from '../../../lib/pagination';
 import releaseRouter from './release';
+import { registerBodyImages } from '../../../middleware/imageSrc';
 
 /**
  * Load a community and assert the caller may administer its membership.
@@ -352,6 +353,7 @@ router.post(
   '/',
   ...requirePermission('communities_manage'),
   validate(createCommunitySchema),
+  registerBodyImages('image'),
   asyncHandler(async (req: Request, res: Response) => {
     const {
       name,
@@ -442,6 +444,7 @@ router.put(
   ...requirePermission('communities_manage'),
   validateParams(communityIdParamsSchema),
   validate(updateCommunitySchema),
+  registerBodyImages('image'),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     const existing = await prisma.community.findUnique({ where: { id } });

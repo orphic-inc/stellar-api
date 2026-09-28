@@ -156,6 +156,10 @@ describe('PUT /api/profile/me', () => {
     ['asset store', `/api/asset/${'a'.repeat(64)}`],
     ['empty (clears the slot)', '']
   ])('accepts a %s avatar', async (_s, avatar) => {
+    // Known already, so registering it costs nothing (#737).
+    prismaMock.remoteImage.findMany.mockResolvedValue([
+      { url: avatar }
+    ] as never);
     const res = await request(app).put('/api/profile/me').send({ avatar });
 
     expect(res.status).toBe(200);

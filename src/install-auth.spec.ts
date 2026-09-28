@@ -269,7 +269,7 @@ describe('API auth/profile/user flows', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ user: authUser });
+    expect(res.body).toEqual({ user: { ...authUser, avatarSrc: null } });
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([expect.stringContaining('token=signed-jwt')])
     );
@@ -1004,6 +1004,9 @@ describe('API auth/profile/user flows', () => {
       activeAuthorStylesheetId: null
     });
 
+    prismaMock.remoteImage.findMany.mockResolvedValue([
+      { url: 'https://example.com/avatar.png' }
+    ] as never);
     const res = await request(app).put('/api/users/settings').send({
       siteAppearance: 'light',
       externalStylesheet: 'https://example.com/style.css',

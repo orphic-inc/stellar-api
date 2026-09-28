@@ -4,7 +4,7 @@ import { AppError } from '../lib/errors';
 import type { CreateReleaseInput } from '../schemas/community';
 import { snapshotRelease } from './releaseWorkbench/snapshot';
 import { attachTagWithVotes, buildPlainTags } from './releaseTags';
-import { registerBBCodeImages } from './remoteImage';
+import { registerWriteImages } from './remoteImage';
 
 export const createCommunityRelease = async (input: {
   actorId: number;
@@ -30,7 +30,10 @@ export const createCommunityRelease = async (input: {
   } = input.data;
   const uniqueTagIds = tagIds ? [...new Set(tagIds)] : [];
   // Before the write, so a 429 refuses the release whole (#737).
-  await registerBBCodeImages(description, input.actorId);
+  await registerWriteImages(
+    { bodies: [description], fields: [image] },
+    input.actorId
+  );
 
   return prisma.$transaction(async (tx) => {
     const created = await tx.release.create({

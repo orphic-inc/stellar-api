@@ -11,11 +11,15 @@ const prismaMock = mockDeep<PrismaClient>();
 jest.mock('./lib/prisma', () => ({ prisma: prismaMock }));
 
 // The walker over every image-bearing column has its own tests (remoteImage
-// spec); here it is one input to the sweep. A plain function over a variable,
-// not a jest.fn, because resetMocks would strip a factory mock's behaviour.
+// spec); here it is one input to the sweep. Plain functions over variables,
+// not jest.fn, because resetMocks would strip a factory mock's behaviour.
 let mockRemoteUrls = new Set<string>();
+let mockFields: (string | null)[] = [];
 jest.mock('./modules/remoteImage', () => ({
-  collectReferencedRemoteUrls: () => Promise.resolve(mockRemoteUrls)
+  collectImageColumns: () =>
+    Promise.resolve({ bodies: [], fields: mockFields }),
+  collectReferencedRemoteUrls: () => Promise.resolve(mockRemoteUrls),
+  remoteUrlsIn: () => mockRemoteUrls
 }));
 
 import {
@@ -29,14 +33,12 @@ import {
 beforeEach(() => {
   mockReset(prismaMock);
   // Default every referrer to "references nothing", so a test that cares about
-  // one arm states only that arm. collectReferencedHashes queries all three
-  // unconditionally, and an unstubbed deep mock resolves undefined, which the
-  // spread would throw on — a failure about the mock, not about the sweep.
+  // one arm states only that arm. An unstubbed deep mock resolves undefined,
+  // which the sweep would throw on — a failure about the mock, not the sweep.
   prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
-  prismaMock.user.findMany.mockResolvedValue([] as never);
-  prismaMock.profile.findMany.mockResolvedValue([] as never);
   prismaMock.remoteImage.findMany.mockResolvedValue([] as never);
   mockRemoteUrls = new Set();
+  mockFields = [];
 });
 
 const H1 = 'a'.repeat(64);
@@ -75,42 +77,29 @@ describe('collectReferencedHashes', () => {
     expect(refs).toEqual(new Set([H1, H2]));
   });
 
-  // #396: an avatar stored in the asset store is a reference. Without this the
-  // sweep collects it 24 hours after upload and the member's profile 404s — the
-  // exact failure the scan approach trades away compile-time safety for.
-  it('counts an avatar stored through either write path', async () => {
-    // PUT /api/users/settings writes User.avatar...
-    prismaMock.user.findMany.mockResolvedValue([
-      { avatar: `/api/asset/${H1}` }
-    ] as never);
-    // ...while PUT /api/profile/me writes Profile.avatar. Two columns, no code
-    // reconciling them: scanning one would delete assets stored via the other.
-    prismaMock.profile.findMany.mockResolvedValue([
-      { avatar: `/api/asset/${H2}` }
-    ] as never);
+  // #396, #740: an image field holding an asset path is a reference, whichever
+  // column it is in (an avatar, a donor icon). Without this the sweep collects
+  // it 24 hours after upload and the image 404s — the exact failure the scan
+  // approach trades away compile-time safety for.
+  it('counts every image field holding an asset path', async () => {
+    mockFields = [`/api/asset/${H1}`, null, `/api/asset/${H2}`];
 
     expect(await collectReferencedHashes()).toEqual(new Set([H1, H2]));
   });
 
-  it('ignores a remote avatar, which references no asset', async () => {
-    prismaMock.user.findMany.mockResolvedValue([
-      { avatar: 'https://example.com/me.png' },
-      // The dev generator's sentinel, written straight through Prisma — a stored
-      // avatar that is not a URL at all. It must not throw here.
-      { avatar: 'seeded' }
-    ] as never);
+  it('ignores a remote field, which references no asset', async () => {
+    // The second is the dev generator's sentinel, written straight through
+    // Prisma — a stored avatar that is not a URL at all. It must not throw.
+    mockFields = ['https://example.com/me.png', 'seeded'];
 
     expect(await collectReferencedHashes()).toEqual(new Set());
   });
 
-  it('unions sheets and avatars, deduping a hash used by both', async () => {
+  it('unions sheets and fields, deduping a hash used by both', async () => {
     prismaMock.authorStylesheet.findMany.mockResolvedValue([
       { source: `body{background:url(/api/asset/${H1})}` }
     ] as never);
-    prismaMock.user.findMany.mockResolvedValue([
-      { avatar: `/api/asset/${H1}` },
-      { avatar: `/api/asset/${H3}` }
-    ] as never);
+    mockFields = [`/api/asset/${H1}`, `/api/asset/${H3}`];
 
     expect(await collectReferencedHashes()).toEqual(new Set([H1, H3]));
   });

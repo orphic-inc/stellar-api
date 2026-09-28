@@ -95,6 +95,7 @@ import {
   cancelInvite
 } from '../../modules/inviteControls';
 import { rotateFeedToken } from '../../modules/feedToken';
+import { registerBodyImages } from '../../middleware/imageSrc';
 
 const router = express.Router();
 const userIdParamsSchema = z.object({
@@ -268,6 +269,7 @@ router.put(
   '/settings',
   requireAuth,
   validate(userSettingsSchema),
+  registerBodyImages('avatar'),
   authHandler(async (req, res) => {
     const data = parsedBody<UserSettingsInput>(res);
     const result = await updateUserSettings(req.user.id, data);

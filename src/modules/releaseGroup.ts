@@ -9,6 +9,7 @@ import { assertArtistLive } from './artist';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
 import { audit } from '../lib/audit';
 import { translatePrismaError } from '../lib/prismaErrors';
+import { registerWriteImages } from './remoteImage';
 
 // ReleaseGroup — cross-community content identity (ADR-0023, #265).
 //
@@ -804,6 +805,8 @@ export const addGroupCover = async (input: {
   summary?: string | null;
 }) => {
   await resolveGroupForViewer(input.groupId, input.actorId);
+  // After the access check and before the write, so a 429 refuses it whole.
+  await registerWriteImages({ fields: [input.image] }, input.actorId);
 
   return prisma.$transaction(async (tx) => {
     let cover;

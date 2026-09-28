@@ -279,8 +279,9 @@ src/
     inviteGates.ts            # Invite send gates (#637, ADR-0043) — pure: the first refusal, in order, for the send and the eligibility read
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
-    remoteImage.ts            # Remote image import (#737, ADR-0051): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), collectReferencedRemoteUrls (every image-bearing column; the sweep and the backfill share it)
+    remoteImage.ts            # Remote image import (#737, ADR-0051): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), registerWriteImages (a write's bodies and image fields at once), collectImageColumns (every image-bearing column, the one list: the sweep's asset hashes, its remote URLs, and the backfill all read it)
     remoteImageJob.ts         # Background job driving that import — a few fetches at a time, one cycle at a time
+    imageSrc.ts               # addImageSrcs (#737 slice 3): every `avatar`/`image`/`customIcon`/`secondAvatar` in a payload gains its `*Src` sibling — a same-origin path or null, never a remote URL; one lookup per body, fails closed
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
@@ -307,6 +308,7 @@ src/
     permissions.ts          # loadPermissions, requirePermission, requireOwnerOrPermission, requireAdminOnly, requireStrictAdmin (no role helpers — ADR-0001)
     rateLimiter.ts          # authLimiter, writeLimiter, installLimiter, downloadLimiter, feedAuthLimiter, feedLimiter
     serviceAuth.ts          # requireServiceKey — Bearer gate for korin.pink inbound calls (ADR-0013; fails closed)
+    imageSrc.ts             # resolveImageSrcs (wraps res.json: every JSON body gains its image `*Src` siblings); registerBodyImages (register a validated body's image fields, where the route's gate is the whole authorization)
     validate.ts             # validate(bodySchema), validateParams(paramsSchema)
   lib/
     prisma.ts               # Singleton PrismaClient
@@ -315,6 +317,7 @@ src/
     mailer.ts               # SMTP email utility (sendInviteEmail)
     openapi.ts              # Zod→OpenAPI registry (@asteasolutions/zod-to-openapi) — the contract source of truth. Registration is manual: a route absent from it is invisible to openapi.json and to stellar-ui
     openapiCompleteness.ts  # Pure checker (#474): mounted routes vs registered operations, with a shrink-only baseline. CLI wrapper in scripts/
+    openapiImageSrc.ts      # applyImageSrcDerivations: declares each image field's `*Src` sibling on everything a 2xx response returns, by the hook's rule
     expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
     pagination.ts           # paginationBase (Zod) + parsedPage(res) → { page, limit, skip }
                             # paginatedResponse(res, data, total, pg)

@@ -9,7 +9,7 @@ import {
   snapshotRelease
 } from './snapshot';
 import type { ReleaseWorkbenchRef, ReleaseWorkbenchView } from './types';
-import { registerBBCodeImages } from '../remoteImage';
+import { registerWriteImages } from '../remoteImage';
 
 export const revertReleaseWorkbenchHistory = async (
   ref: ReleaseWorkbenchRef,
@@ -49,7 +49,10 @@ export const revertReleaseWorkbenchHistory = async (
   const currentSnapshot = snapshotRelease(existing);
   // A revert writes an old description again, and its images may since have
   // been collected (ADR-0051 §5).
-  await registerBBCodeImages(restoreState.description, ref.actorId);
+  await registerWriteImages(
+    { bodies: [restoreState.description], fields: [restoreState.image] },
+    ref.actorId
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.release.update({

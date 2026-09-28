@@ -173,6 +173,24 @@ describe('sweepOrphanedAssets', () => {
     ).not.toBeNull();
   });
 
+  // #740: a donor icon was the one image column the sweep did not read, so an
+  // uploaded icon was deleted a day after upload.
+  it('spares an asset referenced only by a donor icon', async () => {
+    const icon = await uploadAsset(
+      { data: png('icon'), kind: 'Avatar', ownerId, assetLimit: null },
+      testPrisma
+    );
+    await age(icon.hash);
+    await testPrisma.donorReward.create({
+      data: { userId: ownerId, customIcon: `/api/asset/${icon.hash}` }
+    });
+
+    expect(await sweepOrphanedAssets(testPrisma)).toBe(0);
+    expect(
+      await testPrisma.asset.findUnique({ where: { hash: icon.hash } })
+    ).not.toBeNull();
+  });
+
   it('spares an asset inside the grace window', async () => {
     // Uploaded just now, no ageing — survives regardless of references.
     await uploadAsset(

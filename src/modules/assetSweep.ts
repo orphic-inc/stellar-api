@@ -33,7 +33,11 @@
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
-import { collectReferencedRemoteUrls } from './remoteImage';
+import {
+  collectImageColumns,
+  collectReferencedRemoteUrls,
+  remoteUrlsIn
+} from './remoteImage';
 
 const log = getLogger('assetSweep');
 
@@ -60,53 +64,48 @@ export const extractAssetHashes = (text: string | null): string[] => {
  * consumer that forgets to add itself here does not fail loudly, it has its
  * assets collected 24 hours later.
  *
- * Two referrers today:
+ * Three referrers:
  *
  * - **Author stylesheet sources** — `url(/api/asset/…)`, the only form ADR-0031
  *   permits. Deliberately unfiltered by `deletedAt`: a withdrawn sheet still
  *   serves via `/css` to existing adopters (ADR-0032 §3), so its assets are live
  *   even though every other read path hides the row. This looks like an oversight
  *   next to the filtering elsewhere in this module; it is not.
- * - **Avatars** (#396) — both columns, because there are two. `Profile.avatar` is
- *   what `PUT /api/profile/me` writes and `User.avatar` is what
- *   `PUT /api/users/settings` writes, and no code reconciles them. Scanning only
- *   the one the profile view happens to read would delete an avatar stored
- *   through the other route.
+ * - **Image fields** — every column `collectImageColumns` lists: both avatar
+ *   columns (#396; `Profile.avatar` and `User.avatar` are written by different
+ *   routes and nothing reconciles them), the donor icon and second avatar (#740,
+ *   which this list once missed, deleting an uploaded donor icon a day after
+ *   upload), and the rest. One list serves this and the remote URLs below, so a
+ *   new image column is added in one place.
+ * - **Imported remote images** — the asset behind each still-referenced URL.
  *
- * Avatars are scanned as text through the same `extractAssetHashes` as CSS rather
+ * Fields are scanned as text through the same `extractAssetHashes` as CSS rather
  * than matched as whole values: over-counting a reference leaks an asset, while
  * under-counting deletes a live one, and only one of those is recoverable.
  */
 export const collectReferencedHashes = async (
   client: PrismaClient = prisma
 ): Promise<Set<string>> => {
-  const [sheets, users, profiles] = await Promise.all([
+  const [sheets, columns] = await Promise.all([
     client.authorStylesheet.findMany({ select: { source: true } }),
-    client.user.findMany({
-      where: { avatar: { not: null } },
-      select: { avatar: true }
-    }),
-    client.profile.findMany({
-      where: { avatar: { not: null } },
-      select: { avatar: true }
-    })
+    collectImageColumns(client)
   ]);
   const referenced = new Set<string>();
-  for (const sheet of sheets) {
-    for (const hash of extractAssetHashes(sheet.source)) referenced.add(hash);
+  const texts = [...sheets.map((sheet) => sheet.source), ...columns.fields];
+  for (const text of texts) {
+    for (const hash of extractAssetHashes(text ?? null)) referenced.add(hash);
   }
-  for (const row of [...users, ...profiles]) {
-    for (const hash of extractAssetHashes(row.avatar)) referenced.add(hash);
-  }
-  for (const hash of await referencedImportHashes(client)) referenced.add(hash);
+  const urls = remoteUrlsIn(columns);
+  for (const hash of await referencedImportHashes(client, urls))
+    referenced.add(hash);
   return referenced;
 };
 
 /** The assets behind remote image URLs that stored content still references. */
 const referencedImportHashes = async (
-  client: PrismaClient
+  client: PrismaClient,
+  urls: Set<string>
 ): Promise<string[]> => {
-  const urls = await collectReferencedRemoteUrls(client);
   if (urls.size === 0) return [];
   const rows = await client.remoteImage.findMany({
     where: { url: { in: [...urls] }, assetHash: { not: null } },

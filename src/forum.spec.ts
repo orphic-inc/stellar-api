@@ -835,7 +835,7 @@ describe('GET /api/forums/:forumId/topics/:forumTopicId/posts', () => {
     expect(res.body.data[0].author).toEqual({
       id: 7,
       username: 'testuser',
-      avatar: null,
+      ...{ avatar: null, avatarSrc: null },
       isDonor: true,
       donorRank: { name: 'Patron', badge: 'p.png', color: '#ffd700' },
       warned: '2026-05-01T00:00:00.000Z'

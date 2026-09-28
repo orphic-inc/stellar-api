@@ -6,6 +6,7 @@ import { economy } from './config';
 import { floorSub } from './ratio';
 import { CreateRequestInput, UpdateRequestInput } from '../schemas/requests';
 import { emitNotifications } from '../lib/notifications';
+import { registerWriteImages } from './remoteImage';
 
 export const MINIMUM_BOUNTY = BigInt(economy.minimumBounty);
 
@@ -233,6 +234,8 @@ export async function updateRequest({
 
   if (existing.userId !== actorId && !canModerateRequests)
     throw new AppError(403, 'Permission denied');
+  // Before the write, so a 429 refuses the edit whole (#737).
+  await registerWriteImages({ fields: [input.image] }, actorId);
 
   const updated = await prisma.request.update({
     where: { id: requestId },
@@ -259,6 +262,7 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
   if (input.bounty < MINIMUM_BOUNTY) {
     throw new AppError(400, `Minimum bounty is ${MINIMUM_BOUNTY} bytes`);
   }
+  await registerWriteImages({ fields: [input.image] }, userId);
 
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });

@@ -137,6 +137,11 @@
           "warned": {
             "type": "string",
             "nullable": true
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -145,7 +150,8 @@
           "avatar",
           "isDonor",
           "donorRank",
-          "warned"
+          "warned",
+          "avatarSrc"
         ]
       },
       "LoginBody": {
@@ -317,13 +323,19 @@
               "color",
               "notificationFilterLimit"
             ]
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
           "id",
           "username",
           "avatar",
-          "userRank"
+          "userRank",
+          "avatarSrc"
         ]
       },
       "ChangePasswordBody": {
@@ -491,11 +503,21 @@
               },
               "profileInfoHtml": {
                 "type": "string"
+              },
+              "avatarSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
               "id"
             ]
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -506,7 +528,8 @@
           "isArtist",
           "isDonor",
           "userRank",
-          "profile"
+          "profile",
+          "avatarSrc"
         ]
       },
       "ProfileDetails": {
@@ -533,6 +556,11 @@
           },
           "profileInfoHtml": {
             "type": "string"
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -733,6 +761,11 @@
                   "id",
                   "name"
                 ]
+              },
+              "imageSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
@@ -740,7 +773,8 @@
               "title",
               "communityId",
               "image",
-              "artist"
+              "artist",
+              "imageSrc"
             ]
           }
         },
@@ -960,6 +994,16 @@
                 "body"
               ]
             }
+          },
+          "customIconSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
+          },
+          "secondAvatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -969,7 +1013,9 @@
           "secondAvatar",
           "iconMouseOverText",
           "avatarMouseOverText",
-          "profileBlocks"
+          "profileBlocks",
+          "customIconSrc",
+          "secondAvatarSrc"
         ]
       },
       "ProfileStaffPmSummary": {
@@ -1342,6 +1388,11 @@
               }
             ],
             "nullable": true
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -1370,7 +1421,8 @@
           "recentContributions",
           "recentSnatches",
           "inviteTree",
-          "community"
+          "community",
+          "avatarSrc"
         ]
       },
       "MyProfile": {
@@ -1510,6 +1562,11 @@
           },
           "userSettings": {
             "$ref": "#/components/schemas/UserSettings"
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -1539,7 +1596,8 @@
           "recentSnatches",
           "inviteTree",
           "community",
-          "userSettings"
+          "userSettings",
+          "avatarSrc"
         ]
       },
       "AdminCreatedUser": {
@@ -2049,13 +2107,19 @@
             "required": [
               "profileTitle"
             ]
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
           "id",
           "username",
           "avatar",
-          "profile"
+          "profile",
+          "avatarSrc"
         ]
       },
       "CrsDimension": {
@@ -2265,6 +2329,16 @@
               },
               "profileInfo4": {
                 "type": "string"
+              },
+              "customIconSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
+              },
+              "secondAvatarSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
@@ -2280,7 +2354,9 @@
               "profileInfoTitle3",
               "profileInfo3",
               "profileInfoTitle4",
-              "profileInfo4"
+              "profileInfo4",
+              "customIconSrc",
+              "secondAvatarSrc"
             ]
           },
           "perks": {
@@ -2370,6 +2446,11 @@
               "id",
               "name"
             ]
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -2456,6 +2537,11 @@
               "avatar": {
                 "type": "string",
                 "nullable": true
+              },
+              "avatarSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
@@ -2711,6 +2797,11 @@
               "avatar": {
                 "type": "string",
                 "nullable": true
+              },
+              "avatarSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
@@ -3988,6 +4079,11 @@
               "contributors",
               "consumers"
             ]
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -4628,6 +4724,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -4636,7 +4737,8 @@
           "image",
           "year",
           "tagIds",
-          "tagNames"
+          "tagNames",
+          "imageSrc"
         ]
       },
       "ReleaseHistoryEntry": {
@@ -4768,10 +4870,16 @@
               "image": {
                 "type": "string",
                 "nullable": true
+              },
+              "imageSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
-              "image"
+              "image",
+              "imageSrc"
             ]
           }
         ]
@@ -4910,6 +5018,11 @@
           },
           "group": {
             "$ref": "#/components/schemas/ReleaseGroupRef"
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -5427,6 +5540,11 @@
             "required": [
               "contributions"
             ]
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -5540,6 +5658,11 @@
               "id",
               "name"
             ]
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -5548,7 +5671,8 @@
           "year",
           "image",
           "communityId",
-          "artist"
+          "artist",
+          "imageSrc"
         ]
       },
       "ReleaseGroupDetail": {
@@ -5606,6 +5730,11 @@
               "id",
               "username"
             ]
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -5614,7 +5743,8 @@
           "summary",
           "userId",
           "addedAt",
-          "user"
+          "user",
+          "imageSrc"
         ]
       },
       "ReleaseGroupLogEntry": {
@@ -6732,6 +6862,11 @@
           },
           "filledContribution": {
             "nullable": true
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -6751,7 +6886,8 @@
           "createdAt",
           "updatedAt",
           "deletedAt",
-          "_count"
+          "_count",
+          "imageSrc"
         ]
       },
       "RequestDetail": {
@@ -7503,6 +7639,11 @@
           },
           "rankLevel": {
             "type": "number"
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -7518,7 +7659,8 @@
           "consumeSpeed",
           "joinedAt",
           "rankName",
-          "rankLevel"
+          "rankLevel",
+          "avatarSrc"
         ]
       },
       "Top10TagItem": {
@@ -7825,12 +7967,18 @@
           "avatar": {
             "type": "string",
             "nullable": true
+          },
+          "avatarSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
           "id",
           "username",
-          "avatar"
+          "avatar",
+          "avatarSrc"
         ]
       },
       "FriendEntry": {
@@ -8450,6 +8598,11 @@
           },
           "ended": {
             "type": "string"
+          },
+          "imageSrc": {
+            "type": "string",
+            "nullable": true,
+            "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -8459,7 +8612,8 @@
           "title",
           "image",
           "started",
-          "ended"
+          "ended",
+          "imageSrc"
         ]
       },
       "DeletedCollageItem": {
@@ -8573,12 +8727,18 @@
               "avatar": {
                 "type": "string",
                 "nullable": true
+              },
+              "avatarSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
               "id",
               "username",
-              "avatar"
+              "avatar",
+              "avatarSrc"
             ]
           },
           "_count": {
@@ -8746,6 +8906,11 @@
                   "id",
                   "name"
                 ]
+              },
+              "imageSrc": {
+                "type": "string",
+                "nullable": true,
+                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
               }
             },
             "required": [
@@ -8754,7 +8919,8 @@
               "image",
               "year",
               "releaseType",
-              "artist"
+              "artist",
+              "imageSrc"
             ]
           },
           "user": {
@@ -12959,6 +13125,11 @@
                       "properties": {
                         "avatar": {
                           "type": "string"
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       }
                     }
@@ -12998,7 +13169,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -14871,7 +15042,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -21719,7 +21890,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -21932,7 +22103,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -24190,7 +24361,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -30415,7 +30586,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -31146,7 +31317,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -33902,12 +34073,18 @@
                               "avatar": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "avatarSrc": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                               }
                             },
                             "required": [
                               "id",
                               "username",
-                              "avatar"
+                              "avatar",
+                              "avatarSrc"
                             ]
                           },
                           "targetType": {
@@ -33962,12 +34139,18 @@
                               "avatar": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "avatarSrc": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                               }
                             },
                             "required": [
                               "id",
                               "username",
-                              "avatar"
+                              "avatar",
+                              "avatarSrc"
                             ]
                           },
                           "claimedAt": {
@@ -33991,12 +34174,18 @@
                               "avatar": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "avatarSrc": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                               }
                             },
                             "required": [
                               "id",
                               "username",
-                              "avatar"
+                              "avatar",
+                              "avatarSrc"
                             ]
                           },
                           "resolvedAt": {
@@ -34047,12 +34236,18 @@
                                     "avatar": {
                                       "type": "string",
                                       "nullable": true
+                                    },
+                                    "avatarSrc": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                                     }
                                   },
                                   "required": [
                                     "id",
                                     "username",
-                                    "avatar"
+                                    "avatar",
+                                    "avatarSrc"
                                   ]
                                 },
                                 "body": {
@@ -34305,12 +34500,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "targetType": {
@@ -34365,12 +34566,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "claimedAt": {
@@ -34394,12 +34601,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "resolvedAt": {
@@ -34450,12 +34663,18 @@
                               "avatar": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "avatarSrc": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                               }
                             },
                             "required": [
                               "id",
                               "username",
-                              "avatar"
+                              "avatar",
+                              "avatarSrc"
                             ]
                           },
                           "body": {
@@ -34592,12 +34811,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "targetType": {
@@ -34652,12 +34877,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "claimedAt": {
@@ -34681,12 +34912,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "resolvedAt": {
@@ -34737,12 +34974,18 @@
                               "avatar": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "avatarSrc": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                               }
                             },
                             "required": [
                               "id",
                               "username",
-                              "avatar"
+                              "avatar",
+                              "avatarSrc"
                             ]
                           },
                           "body": {
@@ -35212,12 +35455,18 @@
                         "avatar": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "avatarSrc": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051)."
                         }
                       },
                       "required": [
                         "id",
                         "username",
-                        "avatar"
+                        "avatar",
+                        "avatarSrc"
                       ]
                     },
                     "body": {
@@ -38887,7 +39136,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {

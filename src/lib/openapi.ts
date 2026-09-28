@@ -144,6 +144,7 @@ import {
   subscribeSchema,
   subscribeCommentsSchema
 } from '../schemas/subscription';
+import { applyImageSrcDerivations } from './openapiImageSrc';
 import {
   announcementSchema,
   globalNoticeSchema
@@ -265,8 +266,8 @@ export const validationResponse = (description: string) => ({
 });
 
 /**
- * The 429 of a write whose BBCode can introduce remote images (#737,
- * ADR-0051): past the member's daily ceiling on new image URLs, the write is
+ * The 429 of a write whose BBCode or image fields can introduce remote images
+ * (#737, ADR-0051): past the member's daily ceiling on new image URLs, the write is
  * refused whole. Registered wins over the write limiter's derived 429, so the
  * description names both causes; the `msg` tells them apart.
  */
@@ -1836,7 +1837,8 @@ registry.registerPath({
         }
       }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('Not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -2499,7 +2501,8 @@ registry.registerPath({
       description: 'Updated donor reward settings',
       content: { 'application/json': { schema: DonorRewardsSchema } }
     },
-    403: msgResponse('No active donor rank')
+    403: msgResponse('No active donor rank'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5123,7 +5126,8 @@ registry.registerPath({
       content: { 'application/json': { schema: Community } }
     },
     404: msgResponse('Leader user not found'),
-    409: msgResponse('A community with that name already exists')
+    409: msgResponse('A community with that name already exists'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5150,7 +5154,8 @@ registry.registerPath({
       content: { 'application/json': { schema: Community } }
     },
     404: msgResponse('Community, or the named leader user, not found'),
-    409: msgResponse('A community with that name already exists')
+    409: msgResponse('A community with that name already exists'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5707,7 +5712,8 @@ registry.registerPath({
       content: { 'application/json': { schema: ReleaseGroupCover } }
     },
     404: msgResponse('Release group not found, or no member is visible to you'),
-    409: msgResponse('This group already carries that cover')
+    409: msgResponse('This group already carries that cover'),
+    429: imageCeilingResponse
   }
 });
 
@@ -7349,7 +7355,8 @@ registry.registerPath({
     },
     403: msgResponse('Neither the owner nor a request moderator'),
     404: msgResponse('Request not found'),
-    422: msgResponse('Only open requests can be edited')
+    422: msgResponse('Only open requests can be edited'),
+    429: imageCeilingResponse
   }
 });
 
@@ -7475,7 +7482,8 @@ registry.registerPath({
       description: 'Request created',
       content: { 'application/json': { schema: Request } }
     },
-    403: msgResponse('Missing requests_create')
+    403: msgResponse('Missing requests_create'),
+    429: imageCeilingResponse
   }
 });
 
@@ -9734,7 +9742,8 @@ registry.registerPath({
     },
     400: validationResponse(
       'Validation error, or groupId names no release in a public community. Featuring is an act of publication (ADR-0036 §4), so a private-community release is refused at set time rather than filtered at read time — and 400 rather than 404 because the route exists and it is the body id that does not resolve. Covers a dangling groupId too: FeaturedAlbum.groupId carries no foreign key.'
-    )
+    ),
+    429: imageCeilingResponse
   }
 });
 
@@ -11925,6 +11934,7 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
     }
   }
 
+  applyImageSrcDerivations(doc);
   applyGateDerivations(doc.paths ?? {}, routes);
 
   return doc;

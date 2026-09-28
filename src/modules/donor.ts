@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { AppError } from '../lib/errors';
+import { registerWriteImages } from './remoteImage';
 
 export type PerksMap = {
   iconMouseOverText?: boolean;
@@ -152,6 +153,11 @@ export const updateDonorRewards = async (
   }
 
   if (Object.keys(allowed).length > 0) {
+    // After the perk filter and before the write, so a 429 refuses it whole.
+    await registerWriteImages(
+      { fields: [allowed.customIcon, allowed.secondAvatar] },
+      userId
+    );
     await prisma.donorReward.upsert({
       where: { userId },
       create: { userId, ...allowed },
