@@ -6,6 +6,28 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.8] — 2026-09-28
+
+**Upgrade note: take a database backup before deploying.** Three migrations
+run, all additive:
+
+- `20260927120000_release_credit_editing` adds `release_artists.addedById` and
+  three release history actions (#721).
+- `20260928120000_backfill_release_credit_adders` is a **data migration**. It
+  attributes every existing credit to its release's `created` actor, or else to
+  the uploader of the release's earliest contribution (#722).
+- `20260929120000_ratio_exempt_history` adds the history action
+  `ratio_exempt_changed` (#732).
+
+Reverting the pin to 0.9.7 is a rollback only until the first credit edit or
+Freepass / Neutralpass change. Either one writes a history row with an action
+0.9.7 does not know, and 0.9.7 cannot read a release history that holds one.
+After that, rolling back means restoring the backup.
+
+Two contract changes are breaking for an older client: `POST
+/communities/{id}/members` answers `204` (#711), and profile percentile blocks
+can be `null` (#723). stellar-ui 0.9.8 consumes both.
+
 ### Added
 
 - **The session's rank carries `notificationFilterLimit`** (#715): `GET /auth` → `userRank.notificationFilterLimit`, the primary rank's allowance as `getFilterAllowance` enforces it. `null` is unlimited and `0` is none, so a client can hide the filters entry point without a request that answers 403.
@@ -3431,7 +3453,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...HEAD
+[0.9.8]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/orphic-inc/stellar-api/compare/v0.9.4...v0.9.5
