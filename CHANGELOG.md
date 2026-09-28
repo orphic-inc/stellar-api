@@ -18,17 +18,25 @@ All notable changes to stellar-api are documented here.
 - `ssrfGuard`'s result now carries the addresses it vetted, so a caller that dials can pin them.
 - **A BBCode `[img]` is drawn only from the asset store** (#737, ADR-0051). Every write of the eight prose fields the api renders (forum posts, comments, collage and release descriptions, wiki pages, profile info, staff bios and news) registers its remote images before it saves.
   - An imported image renders as `<img src="/api/asset/<hash>">`. One still pending, failed, or never registered renders as its link followed by "(image)", as the legacy implementation did; no render emits a remote `src` any more. The member's text is unchanged.
-  - A render holding a pending image is not cached, so the image appears as soon as its import lands. **Until the backfill (#738) runs, every `[img]` written before this release renders as a link**, so this ships in the same release as #738.
+  - A render holding a pending image is not cached, so the image appears as soon as its import lands. **Until the backfill (#738, below) runs, every `[img]` written before this release renders as a link.**
   - **Contract:** the `429` on the 18 operations that write those fields now also covers the image ceiling, and its description says so. No status or body shape changes.
 - **Every image field gains a resolved `*Src` sibling** (#737, ADR-0051). Wherever a response carries `avatar`, `image`, `customIcon` or `secondAvatar`, it now also carries `avatarSrc`, `imageSrc`, `customIconSrc` or `secondAvatarSrc`. That is 82 operations and 26 schemas.
   - A `*Src` is a path on this origin, such as `/api/asset/<hash>` for an uploaded or imported image or a community's default image, or `null` while a remote image is not imported. **It is never a remote URL.** The raw field is unchanged, so edit forms keep prefilling from it. stellar-ui renders from `*Src` in stellar-ui#403, and the CSP (stellar-ui#402) waits on that.
   - One response hook (`middleware/imageSrc.ts`) adds the siblings to every JSON body, with one lookup per response, so a new surface cannot forget them. The OpenAPI document declares them by the same rule. If the lookup fails, every remote image resolves to `null`.
   - Every write of an image field registers its remote URL before it saves: both avatar columns, the donor icon and second avatar, community, featured-album, request and release images, the release a contribution creates, and release covers. **Contract:** 8 more operations' `429` now covers the image ceiling.
   - **Contract:** `community`, `featuredAlbum` and `requests` image fields accept only `http(s)` URLs, not any URL (`ftp:` and the rest were never importable).
+- **The remote image backfill** (#738, ADR-0051 §6): a one-time job that queues every remote image already stored, imports them, and reports.
+  - **Run it after deploying this release and before deploying the stellar-ui release that closes `img-src` (stellar-ui#402).** Until it has run, every image written before this release renders as a link, or as the surface's default. Proceed only on a clean report.
+  - `docker compose exec api node dist/scripts/backfill-remote-images.js` in production, or `npm run images:backfill` in development. It keeps importing for up to 90 minutes (`--wait-minutes=N`; `--no-wait` only queues and reports), because a failing host is retried with backoff for over an hour.
+  - Each URL is owned by the author of the earliest content holding it, or by the System user where the table has no author (news, releases, featured albums). The daily ceiling does not apply.
+  - The report gives the distinct URLs found per surface, the imported, failed and pending counts, and each failed URL with its reason, grouped by host. The script exits `1` while anything is still pending. A failure stays failed: that image renders as its link, and nothing retries it.
+  - Safe to re-run: it queues nothing already known, imports nothing twice and changes no owner.
+  - The list of image columns moves to `modules/imageColumns.ts`, now tagged with each value's author and time. The asset sweep and the backfill both read it.
 
 ### Fixed
 
-- **The asset sweep no longer deletes an uploaded donor icon** a day after upload (#740). It read only avatars, never `customIcon` or `secondAvatar`. It now reads every image column from the one list the remote-image walker uses (`collectImageColumns`), so a new image column is added in one place.
+- **Two stores of the same bytes at once no longer fail** (#738). `putAsset` read, then created, so a concurrent store of identical bytes lost to the unique hash with a database error. Two imported URLs serving the same image in one cycle hit it, and the loser waited five minutes for its lease to lapse. It now returns the row the other store created.
+- **The asset sweep no longer deletes an uploaded donor icon** a day after upload (#740). It read only avatars, never `customIcon` or `secondAvatar`. It now reads every image column from the one list, `modules/imageColumns.ts`, so a new image column is added in one place.
 
 ## [0.9.8] — 2026-09-28
 

@@ -23,7 +23,9 @@ jest.mock('./lib/remoteFetch', () => ({
 
 import {
   collectImageColumns,
-  collectReferencedRemoteUrls,
+  collectReferencedRemoteUrls
+} from './modules/imageColumns';
+import {
   importRemoteImage,
   importedAssetUrls,
   processDueRemoteImages,

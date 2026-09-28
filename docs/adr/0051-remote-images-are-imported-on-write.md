@@ -57,11 +57,11 @@ The rest bounds what a hostile or broken host can cost:
 
 ### 5. The sweep keeps an import while its URL is referenced
 
-The member's text holds the remote URL, not an asset path, so the asset sweep also walks every image-bearing column for remote URLs (`collectReferencedRemoteUrls`). It keeps any asset a still-referenced URL points at. When an import is collected, its row goes with it (Cascade), and a later reference imports the image again. The backfill (#738) walks the same columns, so the list of image-bearing columns exists once.
+The member's text holds the remote URL, not an asset path, so the asset sweep also walks every image-bearing column for remote URLs (`modules/imageColumns.ts`). It keeps any asset a still-referenced URL points at. When an import is collected, its row goes with it (Cascade), and a later reference imports the image again. The backfill (#738) walks the same columns, so the list of image-bearing columns exists once.
 
 ### 6. Existing images are backfilled before the CSP tightens
 
-A one-time, idempotent backfill (#738) registers every remote image URL already stored. It is owned by the earliest author and exempt from the ceiling, and it reports imported and failed counts, with reasons. **The CSP change ships only after a clean report**, because tightening first would break every image not yet imported. Grandfathering existing references was rejected: `img-src 'self'` cannot coexist with remote images, so the CSP could never tighten.
+A one-time, idempotent backfill (#738) registers every remote image URL already stored. It is owned by the earliest author and exempt from the ceiling, and it reports imported and failed counts, with reasons. A value from a table with no author (news, releases, featured albums) is owned by the System user. The backfill is `scripts/backfill-remote-images.ts`; the CHANGELOG for its release says how to run it. **The CSP change ships only after a clean report**, because tightening first would break every image not yet imported. Grandfathering existing references was rejected: `img-src 'self'` cannot coexist with remote images, so the CSP could never tighten.
 
 ## Consequences
 
@@ -70,4 +70,4 @@ A one-time, idempotent backfill (#738) registers every remote image URL already 
 - A new image appears a job interval after it is saved (`IMAGE_IMPORT_INTERVAL_MS`, 30 s by default), and until then renders as its link.
 - The server now makes outbound requests on members' behalf. Its egress is the api's, so an operator who restricts egress has to allow it for images to import.
 - A failed import stays failed. The member can upload the image instead, and the reason is on the row.
-- Adding a surface that renders a remote image means adding its column to `collectReferencedRemoteUrls`, and calling `registerRemoteImages` on its write path.
+- Adding a surface that renders a remote image means adding its column to `modules/imageColumns.ts`, and calling `registerRemoteImages` on its write path.

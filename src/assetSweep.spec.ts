@@ -15,7 +15,7 @@ jest.mock('./lib/prisma', () => ({ prisma: prismaMock }));
 // not jest.fn, because resetMocks would strip a factory mock's behaviour.
 let mockRemoteUrls = new Set<string>();
 let mockFields: (string | null)[] = [];
-jest.mock('./modules/remoteImage', () => ({
+jest.mock('./modules/imageColumns', () => ({
   collectImageColumns: () =>
     Promise.resolve({ bodies: [], fields: mockFields }),
   collectReferencedRemoteUrls: () => Promise.resolve(mockRemoteUrls),

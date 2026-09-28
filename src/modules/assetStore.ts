@@ -14,7 +14,7 @@
  * bodies here without touching a caller.
  */
 import { createHash } from 'crypto';
-import { AssetKind, type PrismaClient } from '@prisma/client';
+import { AssetKind, Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { validateAsset } from '../lib/assetValidate';
@@ -67,16 +67,28 @@ export const putAsset = async (
     return existing;
   }
 
-  return client.asset.create({
-    data: {
-      hash,
-      mime,
-      size: input.data.length,
-      kind: input.kind,
-      data: new Uint8Array(input.data),
-      ownerId: input.ownerId ?? null
-    }
-  });
+  try {
+    return await client.asset.create({
+      data: {
+        hash,
+        mime,
+        size: input.data.length,
+        kind: input.kind,
+        data: new Uint8Array(input.data),
+        ownerId: input.ownerId ?? null
+      }
+    });
+  } catch (err) {
+    // Two stores of the same bytes at once both found no row, and the other
+    // created it first (#738: two imported URLs serving identical bytes in one
+    // cycle). The bytes are the same, so its row is the answer.
+    const raced =
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002' &&
+      (await client.asset.findUnique({ where: { hash } }));
+    if (raced) return raced;
+    throw err;
+  }
 };
 
 /** Resolve a stored asset by its content address. Null when absent. */
