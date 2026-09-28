@@ -15,6 +15,11 @@
  * stellar-ui/e2e/release.spec.ts cannot pass without it (#339). That lives in
  * `modules/e2eFixtures.ts`, which explains what each row is for.
  *
+ * Opens invites too (#734): registration is set to `invite` and testuser holds
+ * a fixed invite balance, because a fresh install leaves registration `closed`
+ * and a new account holds none, and either one refuses the send (ADR-0043) and
+ * hides stellar-ui/e2e/invite.spec.ts's form.
+ *
  * Idempotent — re-running updates the fixtures in place (no duplicates).
  * Requires ranks to exist (run `npm run db:seed` first) and the default
  * community to exist (created by POST /api/install). Credentials come from the
@@ -34,6 +39,9 @@ import bcrypt from 'bcryptjs';
 import { seedE2eRelease } from '../modules/e2eFixtures';
 
 const prisma = new PrismaClient();
+
+// testuser's invite balance: enough to send, and fixed, so a re-run restores it.
+const TESTUSER_INVITES = 3;
 
 const REGULAR = {
   username: process.env.TEST_USER ?? 'testuser',
@@ -59,6 +67,7 @@ interface UpsertArgs {
   consumed?: bigint;
   isDonor?: boolean;
   disabled?: boolean;
+  inviteCount?: number;
 }
 
 /** Idempotently create or refresh a user (with its required 1:1 settings + profile). */
@@ -81,7 +90,8 @@ async function upsertUser(a: UpsertArgs): Promise<number> {
     contributed: a.contributed ?? 0n,
     consumed: a.consumed ?? 0n,
     isDonor: a.isDonor ?? false,
-    disabled: a.disabled ?? false
+    disabled: a.disabled ?? false,
+    inviteCount: a.inviteCount ?? 0
   };
 
   const existing = await prisma.user.findUnique({
@@ -135,7 +145,18 @@ async function main(): Promise<void> {
     );
   }
 
-  const testuserId = await upsertUser({ ...REGULAR, rankLevel: 100 });
+  // `update`, not upsert: POST /install creates the row, and the fixtures need
+  // an installed site anyway (the default community comes from it).
+  await prisma.siteSettings.update({
+    where: { id: 1 },
+    data: { registrationStatus: 'invite' }
+  });
+
+  const testuserId = await upsertUser({
+    ...REGULAR,
+    rankLevel: 100,
+    inviteCount: TESTUSER_INVITES
+  });
   const staffuserId = await upsertUser({ ...STAFF, rankLevel: 500 });
 
   // A fixed subtree under testuser so the invite-tree surface has real data:
@@ -199,6 +220,9 @@ async function main(): Promise<void> {
   );
   console.log(
     `  release: id ${releaseId} with contribution id ${contributionId} (by e2e_alpha)`
+  );
+  console.log(
+    `  invites: registration 'invite', ${REGULAR.username} holds ${TESTUSER_INVITES}`
   );
 }
 
