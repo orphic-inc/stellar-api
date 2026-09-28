@@ -29,6 +29,7 @@ import {
 import { sanitizePlain } from '../../lib/sanitize';
 import { emitNotifications } from '../../lib/notifications';
 import { registerBBCodeImages } from '../../modules/remoteImage';
+import { registerBodyImages } from '../../middleware/imageSrc';
 
 const router = express.Router();
 const idParamsSchema = z.object({
@@ -135,6 +136,7 @@ router.post(
   '/album-of-month',
   ...requirePermission('news_manage'),
   validate(featuredAlbumSchema),
+  registerBodyImages('image'),
   asyncHandler(async (_req: Request, res: Response) => {
     const { groupId, threadId, title, image, started, ended } =
       parsedBody<FeaturedAlbumInput>(res);

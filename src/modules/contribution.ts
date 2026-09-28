@@ -19,7 +19,7 @@ import { runInBackground } from './backgroundTasks';
 import { assertWithinSizeCap } from './contributionLimits';
 import { resolveTagNames } from './tag';
 import { hasCommunityAccess } from './communityAccess';
-import { registerBBCodeImages } from './remoteImage';
+import { registerWriteImages } from './remoteImage';
 import type {
   AddContributionToReleaseInput,
   CreateContributionInput
@@ -115,8 +115,8 @@ const recordContributorRole = (
 
 /**
  * Whether `userId` may submit to the input's community. If so, record the
- * remote images the new release's description would draw (#737), before the
- * write, so a 429 refuses the submission whole.
+ * remote images the new release's description and image would draw (#737),
+ * before the write, so a 429 refuses the submission whole.
  */
 const admitSubmission = async (
   input: CreateContributionInput,
@@ -126,8 +126,11 @@ const admitSubmission = async (
     where: { id: input.communityId }
   });
   if (!(await mayUploadTo(community, userId))) return false;
-  await registerBBCodeImages(
-    input.description ?? input.releaseDescription ?? input.title,
+  await registerWriteImages(
+    {
+      bodies: [input.description ?? input.releaseDescription ?? input.title],
+      fields: [input.image]
+    },
     userId
   );
   return true;

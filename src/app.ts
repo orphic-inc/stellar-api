@@ -27,6 +27,7 @@ if (sentry.dsn) {
 }
 import { isInstalled } from './modules/installState';
 import { mutationRateLimit } from './middleware/rateLimiter';
+import { resolveImageSrcs } from './middleware/imageSrc';
 import { startLinkHealthJob } from './modules/linkHealthJob';
 import { startStatsJob } from './modules/statsJob';
 import { startDonorExpiryJob } from './modules/donorExpiryJob';
@@ -40,7 +41,6 @@ import { startInactivityJob } from './modules/inactivityJob';
 import { startInviteGrantJob } from './modules/inviteGrantJob';
 import { startInviteExpiryJob } from './modules/inviteExpiryJob';
 import { startRatioPolicyJob } from './modules/ratioPolicyJob';
-
 import installRouter from './routes/api/install';
 import homeRouter from './routes/api/home';
 import { specRouter, uiRouter } from './routes/api/docs';
@@ -173,7 +173,11 @@ export const createApp = () => {
   // Because this already counts every mutation, a route must NOT mount
   // `writeLimiter` again: one instance twice on a request counts it twice,
   // which halved the forum topic and post limits to 15 a minute (#560).
-  app.use('/api', mutationRateLimit);
+  //
+  // `resolveImageSrcs` rides on the same mount: every JSON response gains the
+  // `*Src` sibling of each image field, the one address a browser may load and
+  // never a remote host (#737, ADR-0051).
+  app.use('/api', mutationRateLimit, resolveImageSrcs);
 
   app.use('/api/install', installRouter);
   app.use('/api/version', versionRouter);

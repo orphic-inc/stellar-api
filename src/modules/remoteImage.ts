@@ -66,6 +66,12 @@ export const isImportableUrl = (url: string): boolean => {
   }
 };
 
+/** An image field's value, as the one remote URL it holds, if any. */
+const remoteField = (value: string | null | undefined): string[] =>
+  value && isImportableUrl(value.trim()) ? [value.trim()] : [];
+
+type Text = string | null | undefined;
+
 export interface RegisterOptions {
   /**
    * Skip the daily ceiling. Only the backfill (#738) sets it: the ceiling limits
@@ -136,6 +142,22 @@ export const registerBBCodeImages = (
   client: PrismaClient = prisma
 ): Promise<number> =>
   registerRemoteImages(remoteImageUrls(body), requesterId, opts, client);
+
+/**
+ * `registerRemoteImages` for one write's BBCode bodies and image fields
+ * together, so the write meets the ceiling once, whole (#737 slice 3).
+ */
+export const registerWriteImages = (
+  write: { bodies?: Text[]; fields?: Text[] },
+  requesterId: number
+): Promise<number> =>
+  registerRemoteImages(
+    [
+      ...(write.bodies ?? []).flatMap(remoteImageUrls),
+      ...(write.fields ?? []).flatMap(remoteField)
+    ],
+    requesterId
+  );
 
 export type ImportOutcome = 'imported' | 'retry' | 'failed';
 
@@ -338,11 +360,6 @@ export async function importedAssetUrls(
   return out;
 }
 
-const remoteField = (value: string | null | undefined): string[] =>
-  value && isImportableUrl(value.trim()) ? [value.trim()] : [];
-
-type Text = string | null | undefined;
-
 /**
  * One table's contribution to the walk: the BBCode bodies it holds and the
  * fields that hold an image URL. Adding a surface that renders a remote image
@@ -456,9 +473,18 @@ const SOURCES: Source[] = [
   })
 ];
 
+/** Every stored value that can hold an image, from the one list of columns. */
+export interface ImageColumns {
+  /** The BBCode bodies the api renders. */
+  bodies: Text[];
+  /** The fields that hold one image each: a remote URL or an asset path. */
+  fields: Text[];
+}
+
 /**
- * Every remote image URL that stored content still references: the BBCode
- * bodies the api renders, and the fields that hold an image URL.
+ * Read every image-bearing column, once. The asset sweep derives both of its
+ * reference sets from this, the remote URLs and the `/api/asset/` hashes, so
+ * a new image column is added in one place (#740).
  *
  * Soft-deleted rows count. A trashed post can be restored, and its images
  * should come back with it.
@@ -466,18 +492,24 @@ const SOURCES: Source[] = [
  * Reads every row of those tables, like the rest of the sweep. That is fine at
  * today's size; the sources are the place to add paging if it stops being.
  */
-export async function collectReferencedRemoteUrls(
+export async function collectImageColumns(
   client: PrismaClient = prisma
-): Promise<Set<string>> {
+): Promise<ImageColumns> {
   const found = await Promise.all(SOURCES.map((source) => source(client)));
-  const out = new Set<string>();
-  for (const { bodies = [], fields = [] } of found) {
-    for (const body of bodies) {
-      for (const url of remoteImageUrls(body)) out.add(url);
-    }
-    for (const field of fields) {
-      for (const url of remoteField(field)) out.add(url);
-    }
-  }
-  return out;
+  return {
+    bodies: found.flatMap((f) => f.bodies ?? []),
+    fields: found.flatMap((f) => f.fields ?? [])
+  };
 }
+
+/** The remote image URLs among `columns`. */
+export const remoteUrlsIn = (columns: ImageColumns): Set<string> =>
+  new Set([
+    ...columns.bodies.flatMap(remoteImageUrls),
+    ...columns.fields.flatMap(remoteField)
+  ]);
+
+/** Every remote image URL that stored content still references. */
+export const collectReferencedRemoteUrls = async (
+  client: PrismaClient = prisma
+): Promise<Set<string>> => remoteUrlsIn(await collectImageColumns(client));

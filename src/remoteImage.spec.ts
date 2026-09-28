@@ -22,6 +22,7 @@ jest.mock('./lib/remoteFetch', () => ({
 }));
 
 import {
+  collectImageColumns,
   collectReferencedRemoteUrls,
   importRemoteImage,
   importedAssetUrls,
@@ -384,19 +385,41 @@ const WALKED_SOURCES: {
   }
 ];
 
+const mockWalkedSources = () => {
+  for (const { table, rows } of WALKED_SOURCES) {
+    const delegate = prismaMock[table] as unknown as { findMany: jest.Mock };
+    delegate.findMany.mockResolvedValue(rows as never);
+  }
+};
+
+// Every image field column, as the sweep scans them for asset paths (#740).
+const FIELD_VALUES = [
+  url('rimg.jpg'),
+  url('pavatar'),
+  url('uavatar'),
+  url('icon'),
+  url('community'),
+  url('cover'),
+  url('request'),
+  `/api/asset/${'a'.repeat(64)}`
+];
+
 describe('collectReferencedRemoteUrls', () => {
   it('walks every rendered BBCode body and every image field', async () => {
-    for (const { table, rows } of WALKED_SOURCES) {
-      const delegate = prismaMock[table] as unknown as {
-        findMany: jest.Mock;
-      };
-      delegate.findMany.mockResolvedValue(rows as never);
-    }
+    mockWalkedSources();
 
     const urls = await collectReferencedRemoteUrls();
 
     expect([...urls].sort()).toEqual(
       WALKED_SOURCES.flatMap((source) => source.expected).sort()
     );
+  });
+
+  it('lists every image field for the asset sweep, donor icons included', async () => {
+    mockWalkedSources();
+
+    const { fields } = await collectImageColumns();
+
+    expect(fields).toEqual(expect.arrayContaining(FIELD_VALUES));
   });
 });

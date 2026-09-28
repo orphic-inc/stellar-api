@@ -8,7 +8,7 @@ All notable changes to stellar-api are documented here.
 
 ### Added
 
-- **Remote images can be imported into the asset store** (#737, [ADR-0051](docs/adr/0051-remote-images-are-imported-on-write.md)). This is the pipeline that will let the CSP close `img-src` to `'self'` (#457). The BBCode surfaces use it (below); the image fields follow in #737's next slice.
+- **Remote images can be imported into the asset store** (#737, [ADR-0051](docs/adr/0051-remote-images-are-imported-on-write.md)). This is the pipeline that will let the CSP close `img-src` to `'self'` (#457). The BBCode surfaces and the image fields use it (below).
   - `registerRemoteImages` records each remote image URL a write introduces, once per URL site-wide. A member may introduce `STELLAR_IMAGE_IMPORT_DAILY_LIMIT` new URLs per rolling 24 hours (default 50), and a write past that is refused with `429`. Reusing a known URL is free.
   - A background job (`IMAGE_IMPORT_INTERVAL_MS`, default 30 s) fetches each URL once and stores the bytes as an asset of the new kind `Imported`, owned by whoever first referenced it. It retries a timeout or 5xx with backoff, and records a final failure with its reason.
   - The fetch (`lib/remoteFetch.ts`) vets every redirect hop with `ssrfGuard` and **pins the vetted address** into the connection, closing the DNS-rebinding window the guard leaves open for HEAD probes. It streams against the asset size cap and uses one timeout. Magic bytes decide what was fetched, and only images are kept.
@@ -20,6 +20,15 @@ All notable changes to stellar-api are documented here.
   - An imported image renders as `<img src="/api/asset/<hash>">`. One still pending, failed, or never registered renders as its link followed by "(image)", as the legacy implementation did; no render emits a remote `src` any more. The member's text is unchanged.
   - A render holding a pending image is not cached, so the image appears as soon as its import lands. **Until the backfill (#738) runs, every `[img]` written before this release renders as a link**, so this ships in the same release as #738.
   - **Contract:** the `429` on the 18 operations that write those fields now also covers the image ceiling, and its description says so. No status or body shape changes.
+- **Every image field gains a resolved `*Src` sibling** (#737, ADR-0051). Wherever a response carries `avatar`, `image`, `customIcon` or `secondAvatar`, it now also carries `avatarSrc`, `imageSrc`, `customIconSrc` or `secondAvatarSrc`. That is 82 operations and 26 schemas.
+  - A `*Src` is a path on this origin, such as `/api/asset/<hash>` for an uploaded or imported image or a community's default image, or `null` while a remote image is not imported. **It is never a remote URL.** The raw field is unchanged, so edit forms keep prefilling from it. stellar-ui renders from `*Src` in stellar-ui#403, and the CSP (stellar-ui#402) waits on that.
+  - One response hook (`middleware/imageSrc.ts`) adds the siblings to every JSON body, with one lookup per response, so a new surface cannot forget them. The OpenAPI document declares them by the same rule. If the lookup fails, every remote image resolves to `null`.
+  - Every write of an image field registers its remote URL before it saves: both avatar columns, the donor icon and second avatar, community, featured-album, request and release images, the release a contribution creates, and release covers. **Contract:** 8 more operations' `429` now covers the image ceiling.
+  - **Contract:** `community`, `featuredAlbum` and `requests` image fields accept only `http(s)` URLs, not any URL (`ftp:` and the rest were never importable).
+
+### Fixed
+
+- **The asset sweep no longer deletes an uploaded donor icon** a day after upload (#740). It read only avatars, never `customIcon` or `secondAvatar`. It now reads every image column from the one list the remote-image walker uses (`collectImageColumns`), so a new image column is added in one place.
 
 ## [0.9.8] — 2026-09-28
 

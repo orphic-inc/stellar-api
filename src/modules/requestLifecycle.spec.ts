@@ -81,7 +81,8 @@ jest.mock('../lib/prisma', () => ({
 }));
 
 jest.mock('./config', () => ({
-  economy: { minimumBounty: 104857600 }
+  economy: { minimumBounty: 104857600 },
+  logging: {}
 }));
 
 import {

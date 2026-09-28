@@ -19,6 +19,7 @@ import { sweepOrphanedAssets, GRACE_MS } from '../modules/assetSweep';
 import { imageImport } from '../modules/config';
 import { createPost, createTopic } from '../modules/forum';
 import { renderSiteBBCode } from '../modules/bbcodeRender';
+import { addImageSrcs } from '../modules/imageSrc';
 import type { UrlGuardResult } from '../lib/ssrfGuard';
 
 const PNG = Buffer.concat([
@@ -264,5 +265,27 @@ describe('a forum post (#737 slice 2)', () => {
       await testPrisma.forumPost.count({ where: { forumTopicId: topic.id } })
     ).toBe(1);
     expect(await testPrisma.remoteImage.count({ where: { url } })).toBe(0);
+  });
+});
+
+describe('an image field (#737 slice 3)', () => {
+  it('resolves to null until imported, then to the asset, leaving the raw URL', async () => {
+    const url = urlFor('/field.png');
+    await registerRemoteImages([url], userId, {}, testPrisma);
+
+    const pending = { avatar: url };
+    await addImageSrcs(pending, testPrisma);
+    expect(pending).toEqual({ avatar: url, avatarSrc: null });
+
+    await runJob();
+    const { assetHash } = await testPrisma.remoteImage.findUniqueOrThrow({
+      where: { url }
+    });
+    const imported = { avatar: url };
+    await addImageSrcs(imported, testPrisma);
+    expect(imported).toEqual({
+      avatar: url,
+      avatarSrc: `/api/asset/${assetHash}`
+    });
   });
 });
