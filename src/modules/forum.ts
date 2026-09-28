@@ -154,16 +154,56 @@ export const deleteTopic = async (
   });
 };
 
+/**
+ * Tell a new post's topic subscribers, and anyone it quotes. Through
+ * `emitNotifications`, not a direct write, so a recipient who cannot read this
+ * forum is not notified (#695). It drops the author.
+ */
+const notifyNewPost = async (
+  tx: Tx,
+  post: { forumTopicId: number; authorId: number; postId: number; body: string }
+) => {
+  const target = {
+    actorId: post.authorId,
+    page: 'forums',
+    pageId: post.forumTopicId,
+    postId: post.postId
+  } as const;
+  const subs = await tx.subscription.findMany({
+    where: { topicId: post.forumTopicId },
+    select: { userId: true }
+  });
+  await emitNotifications(tx, {
+    ...target,
+    userIds: subs.map((s) => s.userId),
+    type: 'forum_sub'
+  });
+
+  const quotedUsernames = extractMentionedUsernames(post.body);
+  if (quotedUsernames.length === 0) return;
+  const quotedUsers = await tx.user.findMany({
+    where: {
+      username: { in: quotedUsernames, mode: 'insensitive' },
+      disabled: false
+    },
+    select: { id: true }
+  });
+  await emitNotifications(tx, {
+    ...target,
+    userIds: quotedUsers.map((u) => u.id),
+    type: 'forum_quote'
+  });
+};
+
 export const createPost = async (
   forumId: number,
   forumTopicId: number,
   authorId: number,
   body: string
 ) => {
-  await registerBBCodeImages(sanitizeHtml(body), authorId);
+  const sanitizedBody = sanitizeHtml(body);
+  await registerBBCodeImages(sanitizedBody, authorId);
   return prisma.$transaction(async (tx) => {
-    const sanitizedBody = sanitizeHtml(body);
-
     // If the last post in this topic was made by the same author, append to it
     // instead of creating a new post (prevents consecutive double-posting).
     const topic = await tx.forumTopic.findUnique({
@@ -206,39 +246,7 @@ export const createPost = async (
       data: { lastTopicId: forumTopicId, numPosts: { increment: 1 } }
     });
 
-    const subs = await tx.subscription.findMany({
-      where: { topicId: forumTopicId },
-      select: { userId: true }
-    });
-    // Through `emitNotifications`, not a direct write, so a subscriber who
-    // cannot read this forum is not notified (#695). It drops the author.
-    await emitNotifications(tx, {
-      userIds: subs.map((s) => s.userId),
-      type: 'forum_sub',
-      actorId: authorId,
-      page: 'forums',
-      pageId: forumTopicId,
-      postId: post.id
-    });
-
-    const quotedUsernames = extractMentionedUsernames(body);
-    if (quotedUsernames.length > 0) {
-      const quotedUsers = await tx.user.findMany({
-        where: {
-          username: { in: quotedUsernames, mode: 'insensitive' },
-          disabled: false
-        },
-        select: { id: true }
-      });
-      await emitNotifications(tx, {
-        userIds: quotedUsers.map((u) => u.id),
-        type: 'forum_quote',
-        actorId: authorId,
-        page: 'forums',
-        pageId: forumTopicId,
-        postId: post.id
-      });
-    }
+    await notifyNewPost(tx, { forumTopicId, authorId, postId: post.id, body });
 
     return post;
   });
