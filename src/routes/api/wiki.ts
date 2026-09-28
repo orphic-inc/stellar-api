@@ -22,6 +22,7 @@ import { sanitizePlain } from '../../lib/sanitize';
 // cached, sanitized `bodyHtml` alongside the raw `body` so the editor round-trips
 // the source and the view renders the HTML.
 import { withBodyHtml, resolveViewer } from '../../modules/bbcodeRender';
+import { registerBBCodeImages } from '../../modules/remoteImage';
 import { audit } from '../../lib/audit';
 import {
   createWikiPageSchema,
@@ -451,6 +452,9 @@ router.post(
         .status(409)
         .json({ msg: 'A page with this slug already exists' });
 
+    // Before the write, so a 429 refuses the page whole (#737).
+    await registerBBCodeImages(body, authReq.user.id);
+
     let page;
     try {
       page = await prisma.$transaction(async (tx) => {
@@ -539,6 +543,9 @@ router.put(
     );
 
     const effectiveEditLevel = Math.max(minEditLevel, minReadLevel);
+    // Before the write, so a 429 refuses the edit whole (#737). Only a new
+    // body: a title edit must not charge the editor for images already there.
+    await registerBBCodeImages(input.body, authReq.user.id);
 
     let updated;
     try {
@@ -745,6 +752,9 @@ router.post(
       where: { pageId_revision: { pageId: id, revision: rev } }
     });
     if (!target) return res.status(404).json({ msg: 'Revision not found' });
+    // A revert writes the old body again, and its images may since have been
+    // collected (ADR-0051 §5).
+    await registerBBCodeImages(target.body, authReq.user.id);
 
     let updated;
     try {

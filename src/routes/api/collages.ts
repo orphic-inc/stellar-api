@@ -31,6 +31,7 @@ import {
 } from '../../modules/releaseGroup';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
+import { registerBBCodeImages } from '../../modules/remoteImage';
 import {
   parsedPage,
   paginatedResponse,
@@ -533,12 +534,16 @@ router.post(
       return res.status(400).json({ msg: overQuota });
     }
 
+    const stored = sanitizeHtml(description);
+    // Before the write, so a 429 refuses the collage whole (#737).
+    await registerBBCodeImages(stored, userId);
+
     let collage;
     try {
       collage = await prisma.collage.create({
         data: {
           name,
-          description: sanitizeHtml(description),
+          description: stored,
           userId,
           categoryId,
           tags
@@ -595,6 +600,8 @@ router.put(
       return res.status(built.error.status).json({ msg: built.error.msg });
     }
     const data = built.data;
+    // Before the write, so a 429 refuses the edit whole (#737).
+    await registerBBCodeImages(data.description as string | undefined, userId);
 
     let updated;
     try {

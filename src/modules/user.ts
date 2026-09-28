@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors';
 import { getDefaultStylesheetName } from './stylesheet';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { computeRatio } from './ratio';
+import { registerBBCodeImages } from './remoteImage';
 import { CONTAGION_REACH } from './contagion';
 import {
   activeDonorRank,
@@ -648,6 +649,8 @@ export const updateStaffBio = async (
   if (!user) throw new AppError(404, 'User not found');
 
   const normalized = staffBio?.trim() || null;
+  // The bio's writer is the actor, so the images are theirs (#737).
+  await registerBBCodeImages(normalized, actorId);
   await prisma.user.update({
     where: { id: userId },
     data: { staffBio: normalized }

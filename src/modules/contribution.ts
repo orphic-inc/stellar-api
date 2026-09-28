@@ -19,6 +19,7 @@ import { runInBackground } from './backgroundTasks';
 import { assertWithinSizeCap } from './contributionLimits';
 import { resolveTagNames } from './tag';
 import { hasCommunityAccess } from './communityAccess';
+import { registerBBCodeImages } from './remoteImage';
 import type {
   AddContributionToReleaseInput,
   CreateContributionInput
@@ -112,6 +113,26 @@ const recordContributorRole = (
     create: { userId, communities: { connect: { id: communityId } } }
   });
 
+/**
+ * Whether `userId` may submit to the input's community. If so, record the
+ * remote images the new release's description would draw (#737), before the
+ * write, so a 429 refuses the submission whole.
+ */
+const admitSubmission = async (
+  input: CreateContributionInput,
+  userId: number
+): Promise<boolean> => {
+  const community = await prisma.community.findUnique({
+    where: { id: input.communityId }
+  });
+  if (!(await mayUploadTo(community, userId))) return false;
+  await registerBBCodeImages(
+    input.description ?? input.releaseDescription ?? input.title,
+    userId
+  );
+  return true;
+};
+
 export const createContributionSubmission = async ({
   userId,
   input
@@ -149,10 +170,7 @@ export const createContributionSubmission = async ({
   // is in the body on this path.
   assertWithinSizeCap(type, sizeInBytes);
 
-  const community = await prisma.community.findUnique({
-    where: { id: communityId }
-  });
-  if (!(await mayUploadTo(community, userId))) return null;
+  if (!(await admitSubmission(input, userId))) return null;
 
   const canonicalTags = await resolveTagNames(splitTagList(tags));
 

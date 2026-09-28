@@ -1,5 +1,18 @@
+import { RemoteImageStatus } from '@prisma/client';
+import { assetUrl } from '../../modules/assetStore';
 import { BBCtx } from './ctx';
+import { treeImageUrls } from './images';
 import { Node } from './types';
+
+/**
+ * A remote `[img]` source and what became of its import (#737, ADR-0051).
+ * `src` is the asset path, set only once imported: a pending or failed image is
+ * never drawn from its remote host.
+ */
+export interface ResolvedImage {
+  status: RemoteImageStatus;
+  src: string | null;
+}
 
 // Batch-resolved lookup maps for the DB-dependent tags. Pass 1 collects the
 // references from the tree; one query per type fills these; pass 2 (render)
@@ -11,6 +24,7 @@ export interface ResolveMaps {
   releasesById: Map<number, { id: number; communityId: number | null }>;
   wikisByRef: Map<string, { id: number; title: string }>;
   postsById: Map<number, { id: number; forumTopicId: number; forumId: number }>;
+  imagesByUrl: Map<string, ResolvedImage>;
 }
 
 function textContent(node: Node): string {
@@ -81,7 +95,8 @@ const empty = (): ResolveMaps => ({
   artistsByName: new Map(),
   releasesById: new Map(),
   wikisByRef: new Map(),
-  postsById: new Map()
+  postsById: new Map(),
+  imagesByUrl: new Map()
 });
 
 export async function resolveRefs(
@@ -201,6 +216,29 @@ export async function resolveRefs(
               id: r.id,
               forumTopicId: r.forumTopicId,
               forumId: r.forumTopic.forumId
+            });
+          }
+        })
+    );
+  }
+
+  // Collected by the importer's own walk, so what resolves here is exactly
+  // what a write registered (ADR-0051 §2).
+  const imageUrls = treeImageUrls(nodes);
+  if (imageUrls.length) {
+    jobs.push(
+      db.remoteImage
+        .findMany({
+          where: { url: { in: imageUrls } },
+          select: { url: true, status: true, assetHash: true }
+        })
+        .then((rows) => {
+          for (const r of rows) {
+            const imported =
+              r.status === RemoteImageStatus.imported && r.assetHash;
+            maps.imagesByUrl.set(r.url, {
+              status: r.status,
+              src: imported ? assetUrl(r.assetHash!) : null
             });
           }
         })

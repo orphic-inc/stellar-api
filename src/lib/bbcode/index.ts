@@ -1,9 +1,10 @@
 import { createHash } from 'crypto';
+import { RemoteImageStatus } from '@prisma/client';
 import { TtlCache } from '../ttlCache';
 import { BBCtx } from './ctx';
 import { parse } from './parse';
 import { render } from './render';
-import { resolveRefs } from './resolve';
+import { ResolveMaps, resolveRefs } from './resolve';
 import { sanitizeBBCode } from './sanitizeConfig';
 import { tokenize } from './tokenize';
 import { PARSER_VERSION } from './version';
@@ -48,6 +49,14 @@ export async function renderBBCode(raw: string, ctx: BBCtx): Promise<string> {
   const maps = await resolveRefs(tree, ctx);
   const html = sanitizeBBCode(render(tree, maps, ctx));
 
-  cache.set(key, html, RENDER_TTL_MS);
+  // A pending image renders as its link until the import lands, and caching
+  // that would keep the link up for the whole TTL after it did (#737). A failed
+  // one is final, so it caches like anything else.
+  if (!hasPendingImage(maps)) cache.set(key, html, RENDER_TTL_MS);
   return html;
 }
+
+const hasPendingImage = (maps: ResolveMaps): boolean =>
+  [...maps.imagesByUrl.values()].some(
+    (image) => image.status === RemoteImageStatus.pending
+  );

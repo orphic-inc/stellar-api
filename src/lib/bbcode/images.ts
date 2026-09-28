@@ -29,10 +29,13 @@ function collect(nodes: Node[], out: Set<string>): void {
   }
 }
 
-/** Every distinct remote image URL a BBCode body would render as an image. */
-export function remoteImageUrls(raw: string | null | undefined): string[] {
-  if (!raw) return [];
+/** Every distinct remote image URL a parsed tree would render as an image. */
+export function treeImageUrls(nodes: Node[]): string[] {
   const out = new Set<string>();
-  collect(parse(tokenize(raw)), out);
+  collect(nodes, out);
   return [...out];
 }
+
+/** Every distinct remote image URL a BBCode body would render as an image. */
+export const remoteImageUrls = (raw: string | null | undefined): string[] =>
+  raw ? treeImageUrls(parse(tokenize(raw))) : [];

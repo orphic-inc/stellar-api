@@ -35,6 +35,7 @@ import {
   deleteComment
 } from '../../modules/comment';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
+import { registerBBCodeImages } from '../../modules/remoteImage';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
 /** Which comment page maps to which subscription page, and the id field on the
@@ -248,13 +249,17 @@ router.post(
     if (!(await canSeeCommentThread(page, subTarget!.pageId!, req.user.id)))
       return res.status(400).json({ msg: 'The commented item was not found' });
 
+    const stored = sanitizeHtml(body);
+    // Before the write, so a 429 refuses the comment whole (#737).
+    await registerBBCodeImages(stored, req.user.id);
+
     let comment;
     try {
       comment = await prisma.$transaction(async (tx) => {
         const created = await tx.comment.create({
           data: {
             page,
-            body: sanitizeHtml(body),
+            body: stored,
             authorId: req.user.id,
             ...(communityId && { communityId }),
             ...(contributionId && { contributionId }),
@@ -316,6 +321,9 @@ router.put(
     if (comment.authorId !== req.user.id)
       return res.status(403).json({ msg: 'Not authorized' });
 
+    const stored = sanitizeHtml(body);
+    await registerBBCodeImages(stored, req.user.id);
+
     let updated;
     try {
       updated = await prisma.$transaction(async (tx) => {
@@ -323,7 +331,7 @@ router.put(
         const result = await tx.comment.update({
           where: { id, deletedAt: null },
           data: {
-            body: sanitizeHtml(body),
+            body: stored,
             editedUserId: req.user.id,
             editedAt: new Date()
           }

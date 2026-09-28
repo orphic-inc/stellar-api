@@ -17,6 +17,8 @@ import {
 import { getOwnedAssetCount } from '../modules/assetStore';
 import { sweepOrphanedAssets, GRACE_MS } from '../modules/assetSweep';
 import { imageImport } from '../modules/config';
+import { createPost, createTopic } from '../modules/forum';
+import { renderSiteBBCode } from '../modules/bbcodeRender';
 import type { UrlGuardResult } from '../lib/ssrfGuard';
 
 const PNG = Buffer.concat([
@@ -183,5 +185,84 @@ describe('sweep', () => {
     expect(await testPrisma.asset.count()).toBe(0);
     // The row went with its asset, so a later reference imports it afresh.
     expect(await testPrisma.remoteImage.count()).toBe(0);
+  });
+});
+
+describe('a forum post (#737 slice 2)', () => {
+  const viewer = { showMature: false };
+
+  const createForum = async () => {
+    const category = await testPrisma.forumCategory.create({
+      data: { name: 'General', sort: 0 }
+    });
+    return testPrisma.forum.create({
+      data: { forumCategoryId: category.id, sort: 0, name: 'Forum' }
+    });
+  };
+
+  it('renders its [img] as a link until imported, then from the asset store', async () => {
+    const url = urlFor('/post.png');
+    const body = `Look: [img]${url}[/img]`;
+    const forum = await createForum();
+    const topic = await createTopic(forum.id, userId, { title: 'T', body });
+    const post = await testPrisma.forumPost.findFirstOrThrow({
+      where: { forumTopicId: topic.id }
+    });
+
+    const pending = await renderSiteBBCode(post.body, viewer);
+    expect(pending).toContain(`href="${url}"`);
+    expect(pending).toContain('(image)');
+    expect(pending).not.toContain('<img');
+
+    expect(await runJob()).toEqual({ imported: 1, retry: 0, failed: 0 });
+    const { assetHash } = await testPrisma.remoteImage.findUniqueOrThrow({
+      where: { url }
+    });
+    // Rendered again straight away: the pending render was not cached.
+    expect(await renderSiteBBCode(post.body, viewer)).toContain(
+      `<img src="/api/asset/${assetHash}"`
+    );
+    // The member's text is never rewritten.
+    const stored = await testPrisma.forumPost.findUniqueOrThrow({
+      where: { id: post.id }
+    });
+    expect(stored.body).toBe(body);
+  });
+
+  it('refuses a reply past the ceiling whole', async () => {
+    const forum = await createForum();
+    const topic = await createTopic(forum.id, userId, {
+      title: 'T',
+      body: 'opener'
+    });
+    // Another author, so the reply is not merged into the opener.
+    const rank = await testPrisma.userRank.findFirstOrThrow();
+    const replier = await testPrisma.user.create({
+      data: {
+        username: 'replier',
+        email: 'replier@test.local',
+        password: 'x',
+        avatar: '',
+        userRankId: rank.id,
+        userSettingsId: (await testPrisma.userSettings.create({ data: {} })).id,
+        profileId: (await testPrisma.profile.create({ data: {} })).id
+      }
+    });
+    await testPrisma.remoteImage.createMany({
+      data: Array.from({ length: imageImport.dailyLimit }, (_, i) => ({
+        url: urlFor(`/seen-${i}.png`),
+        requestedById: replier.id
+      }))
+    });
+    const url = urlFor('/new.png');
+
+    await expect(
+      createPost(forum.id, topic.id, replier.id, `[img]${url}[/img]`)
+    ).rejects.toMatchObject({ statusCode: 429 });
+
+    expect(
+      await testPrisma.forumPost.count({ where: { forumTopicId: topic.id } })
+    ).toBe(1);
+    expect(await testPrisma.remoteImage.count({ where: { url } })).toBe(0);
   });
 });

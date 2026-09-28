@@ -264,6 +264,17 @@ export const validationResponse = (description: string) => ({
   }
 });
 
+/**
+ * The 429 of a write whose BBCode can introduce remote images (#737,
+ * ADR-0051): past the member's daily ceiling on new image URLs, the write is
+ * refused whole. Registered wins over the write limiter's derived 429, so the
+ * description names both causes; the `msg` tells them apart.
+ */
+const imageCeilingResponse = msgResponse(
+  'Rate limited, or the body adds more new remote images than the ' +
+    'daily ceiling allows'
+);
+
 const PaginationMeta = registry.register(
   'PaginationMeta',
   z.object({
@@ -2043,7 +2054,8 @@ registry.registerPath({
       description: 'Updated current user profile',
       content: { 'application/json': { schema: MyProfile } }
     },
-    404: msgResponse('Profile not found')
+    404: msgResponse('Profile not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -2808,7 +2820,8 @@ registry.registerPath({
     201: {
       description: 'Announcement created',
       content: { 'application/json': { schema: Announcement } }
-    }
+    },
+    429: imageCeilingResponse
   }
 });
 
@@ -2831,7 +2844,8 @@ registry.registerPath({
       description: 'Updated news item',
       content: { 'application/json': { schema: Announcement } }
     },
-    404: msgResponse('No announcement with that id')
+    404: msgResponse('No announcement with that id'),
+    429: imageCeilingResponse
   }
 });
 
@@ -4166,7 +4180,8 @@ registry.registerPath({
       content: { 'application/json': { schema: ForumTopic } }
     },
     403: msgResponse('Insufficient class to create topics in this forum'),
-    404: msgResponse('Forum not found')
+    404: msgResponse('Forum not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -4304,7 +4319,8 @@ registry.registerPath({
       description: 'Post created',
       content: { 'application/json': { schema: ForumPost } }
     },
-    403: msgResponse('Topic locked')
+    403: msgResponse('Topic locked'),
+    429: imageCeilingResponse
   }
 });
 
@@ -4325,7 +4341,8 @@ registry.registerPath({
       description: 'Post updated',
       content: { 'application/json': { schema: ForumPost } }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('Not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5265,7 +5282,8 @@ registry.registerPath({
       description: 'Release created',
       content: { 'application/json': { schema: Release } }
     },
-    404: msgResponse('Community not found')
+    404: msgResponse('Community not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5292,7 +5310,8 @@ registry.registerPath({
       content: { 'application/json': { schema: Release } }
     },
     403: msgResponse('Not permitted to edit this release'),
-    404: msgResponse('Release not found')
+    404: msgResponse('Release not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -5788,7 +5807,8 @@ registry.registerPath({
       content: { 'application/json': { schema: Release } }
     },
     404: msgResponse('Not found'),
-    422: msgResponse('Not an edit revision')
+    422: msgResponse('Not an edit revision'),
+    429: imageCeilingResponse
   }
 });
 
@@ -6033,7 +6053,8 @@ registry.registerPath({
         }
       }
     },
-    404: msgResponse('Community not found, or one you cannot see')
+    404: msgResponse('Community not found, or one you cannot see'),
+    429: imageCeilingResponse
   }
 });
 
@@ -6523,7 +6544,8 @@ registry.registerPath({
   responses: {
     200: msgResponse('Staff bio updated'),
     403: msgResponse('Not the subject and missing admin'),
-    404: msgResponse('User not found')
+    404: msgResponse('User not found'),
+    429: imageCeilingResponse
   }
 });
 
@@ -6568,7 +6590,8 @@ registry.registerPath({
     201: {
       description: 'Comment created',
       content: { 'application/json': { schema: Comment } }
-    }
+    },
+    429: imageCeilingResponse
   }
 });
 
@@ -6615,7 +6638,8 @@ registry.registerPath({
     403: msgResponse('Not the comment author'),
     404: msgResponse(
       'Not found, or in a thread the caller cannot see — checked before authorship'
-    )
+    ),
+    429: imageCeilingResponse
   }
 });
 
@@ -9906,7 +9930,8 @@ registry.registerPath({
       'Validation error, or a creation rule rejected the request'
     ),
     403: msgResponse('Not permitted to create collages'),
-    409: msgResponse('A collage with that name already exists')
+    409: msgResponse('A collage with that name already exists'),
+    429: imageCeilingResponse
   }
 });
 
@@ -9954,7 +9979,8 @@ registry.registerPath({
       'Not the owner or collage staff, or a staff-only field was sent by a non-staff caller (isLocked, maxEntries, maxEntriesPerUser, or name on a public collage)'
     ),
     404: msgResponse('Collage not found'),
-    409: msgResponse('Collage name already taken')
+    409: msgResponse('Collage name already taken'),
+    429: imageCeilingResponse
   }
 });
 
@@ -10275,7 +10301,8 @@ registry.registerPath({
       content: { 'application/json': { schema: WikiPage } }
     },
     403: msgResponse('Neither wiki_edit nor a managing permission'),
-    409: msgResponse('A page with this slug already exists')
+    409: msgResponse('A page with this slug already exists'),
+    429: imageCeilingResponse
   }
 });
 
@@ -10336,7 +10363,8 @@ registry.registerPath({
     },
     403: msgResponse('Insufficient permission to edit this page'),
     404: msgResponse('Not found, or above the caller read level'),
-    409: msgResponse('The page changed while you were editing, reload')
+    409: msgResponse('The page changed while you were editing, reload'),
+    429: imageCeilingResponse
   }
 });
 
@@ -10450,7 +10478,8 @@ registry.registerPath({
     },
     403: msgResponse('Insufficient permission to edit this page'),
     404: msgResponse('Page or revision not found'),
-    409: msgResponse('The page changed while you were rolling back, reload')
+    409: msgResponse('The page changed while you were rolling back, reload'),
+    429: imageCeilingResponse
   }
 });
 

@@ -6,6 +6,7 @@ import {
   extractMentionedUsernames,
   extractNewMentionedUsernames
 } from '../lib/notifications';
+import { registerBBCodeImages } from './remoteImage';
 
 type DeleteForumResult =
   { ok: true } | { ok: false; reason: 'not_found' | 'is_trash' | 'no_trash' };
@@ -81,13 +82,16 @@ export const createTopic = async (
   forumId: number,
   authorId: number,
   data: { title: string; body: string; question?: string; answers?: string }
-) =>
-  prisma.$transaction(async (tx) => {
+) => {
+  const body = sanitizeHtml(data.body);
+  // Before the write, so a 429 refuses the topic whole (#737).
+  await registerBBCodeImages(body, authorId);
+  return prisma.$transaction(async (tx) => {
     const topic = await tx.forumTopic.create({
       data: { title: data.title, forumId, authorId }
     });
     const post = await tx.forumPost.create({
-      data: { forumTopicId: topic.id, authorId, body: sanitizeHtml(data.body) }
+      data: { forumTopicId: topic.id, authorId, body }
     });
     await tx.forumTopic.update({
       where: { id: topic.id },
@@ -112,6 +116,7 @@ export const createTopic = async (
     }
     return topic;
   });
+};
 
 export const deleteTopic = async (
   id: number,
@@ -154,8 +159,9 @@ export const createPost = async (
   forumTopicId: number,
   authorId: number,
   body: string
-) =>
-  prisma.$transaction(async (tx) => {
+) => {
+  await registerBBCodeImages(sanitizeHtml(body), authorId);
+  return prisma.$transaction(async (tx) => {
     const sanitizedBody = sanitizeHtml(body);
 
     // If the last post in this topic was made by the same author, append to it
@@ -236,6 +242,7 @@ export const createPost = async (
 
     return post;
   });
+};
 
 export const updatePost = async (
   id: number,
@@ -243,11 +250,13 @@ export const updatePost = async (
   currentBody: string,
   newBody: string,
   forumTopicId: number
-) =>
-  prisma.$transaction(async (tx) => {
+) => {
+  const body = sanitizeHtml(newBody);
+  await registerBBCodeImages(body, editorId);
+  return prisma.$transaction(async (tx) => {
     const post = await tx.forumPost.update({
       where: { id },
-      data: { body: sanitizeHtml(newBody) }
+      data: { body }
     });
     await tx.forumPostEdit.create({
       data: { forumPostId: id, editorId, previousBody: currentBody }
@@ -277,6 +286,7 @@ export const updatePost = async (
 
     return post;
   });
+};
 
 export const deletePost = async (
   id: number,

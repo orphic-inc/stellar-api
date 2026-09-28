@@ -1,3 +1,4 @@
+import { RemoteImageStatus } from '@prisma/client';
 import { BBCtx } from './ctx';
 import { parse } from './parse';
 import { render } from './render';
@@ -19,16 +20,27 @@ const emptyMaps = (): ResolveMaps => ({
   artistsByName: new Map(),
   releasesById: new Map(),
   wikisByRef: new Map(),
-  postsById: new Map()
+  postsById: new Map(),
+  imagesByUrl: new Map()
 });
 
 // The pure pipeline (no DB, no cache, no sanitize) for the non-DB tags.
-const bb = (src: string): string =>
-  render(parse(tokenize(src)), emptyMaps(), {
+const bb = (src: string, maps: ResolveMaps = emptyMaps()): string =>
+  render(parse(tokenize(src)), maps, {
     db: {} as BBCtx['db'],
     siteUrl: SITE,
     viewer: { showMature: true }
   });
+
+const IMG = 'https://x.com/a.png';
+const ASSET = '/api/asset/abc123';
+const IMG_LINK = `<a href="${IMG}" rel="noopener noreferrer" target="_blank">${IMG}</a> (image)`;
+
+const withImage = (status: RemoteImageStatus, src: string | null) => {
+  const maps = emptyMaps();
+  maps.imagesByUrl.set(IMG, { status, src });
+  return maps;
+};
 
 describe('bbcode — inline formatting', () => {
   const cases: [string, string, string][] = [
@@ -117,13 +129,36 @@ describe('bbcode — links and images', () => {
   it('refuses a javascript: url, keeping the label', () => {
     expect(bb('[url=javascript:alert(1)]click[/url]')).toBe('click');
   });
-  it('image with a valid extension', () => {
-    expect(bb('[img]https://x.com/a.png[/img]')).toBe(
-      '<img src="https://x.com/a.png" alt="" class="bbcode-img" />'
-    );
-  });
   it('image with a bad extension degrades to text', () => {
     expect(bb('[img]https://x.com/a.txt[/img]')).toBe('https://x.com/a.txt');
+  });
+});
+
+// ─── [img] from the asset store (#737, ADR-0051) ────────────────────────────
+//
+// No render may emit a remote `src`: that is what lets the CSP close img-src.
+describe('bbcode — [img] draws only imported images', () => {
+  it('draws an imported image from the asset store', () => {
+    expect(
+      bb(`[img]${IMG}[/img]`, withImage(RemoteImageStatus.imported, ASSET))
+    ).toBe(`<img src="${ASSET}" alt="" class="bbcode-img" />`);
+  });
+
+  const undrawn: [string, ResolveMaps][] = [
+    ['pending', withImage(RemoteImageStatus.pending, null)],
+    ['failed', withImage(RemoteImageStatus.failed, null)],
+    ['unknown', emptyMaps()]
+  ];
+  it.each(undrawn)('renders a %s image as its link, marked', (_s, maps) => {
+    const html = bb(`[img]${IMG}[/img]`, maps);
+    expect(html).toBe(IMG_LINK);
+    expect(html).not.toContain('<img');
+  });
+
+  it('renders the bare URL inside a link, never nesting an <a>', () => {
+    expect(bb(`[url=/x][img]${IMG}[/img][/url]`)).toBe(
+      `<a href="/x">${IMG} (image)</a>`
+    );
   });
 });
 
@@ -283,6 +318,32 @@ describe('bbcode — DB-resolved tags', () => {
     );
   });
 
+  const withImage = (status: RemoteImageStatus) =>
+    ({
+      ...db,
+      remoteImage: {
+        findMany: async () => [{ url: IMG, status, assetHash: 'abc123' }]
+      }
+    }) as unknown as BBCtx['db'];
+
+  it('resolves an imported [img] to its asset', async () => {
+    expect(
+      await renderBBCode(`[b][img]${IMG}[/img][/b]`, {
+        ...ctx,
+        db: withImage(RemoteImageStatus.imported)
+      })
+    ).toBe(`<strong><img src="${ASSET}" alt="" class="bbcode-img" /></strong>`);
+  });
+
+  it('draws only a row the importer marked imported, whatever it holds', async () => {
+    expect(
+      await renderBBCode(`[img]${IMG}[/img] marked failed`, {
+        ...ctx,
+        db: withImage(RemoteImageStatus.failed)
+      })
+    ).toContain(IMG_LINK);
+  });
+
   it('falls back to plain text for an unresolved reference', async () => {
     const emptyDb = {
       user: { findMany: async () => [] },
@@ -416,5 +477,46 @@ describe('bbcode — the [mature] viewer gate', () => {
     expect(await renderBBCode(raw, ctxFor(true))).toBe(
       await renderBBCode(raw, ctxFor(false))
     );
+  });
+});
+
+// ─── The render cache and pending images (#737) ─────────────────────────────
+//
+// Each case renders a body, lets the import land, and renders it again. The
+// second render shows whether the first was cached.
+describe('bbcode — a pending image is never cached', () => {
+  const ctxFor = (row: {
+    status: RemoteImageStatus;
+    assetHash: string | null;
+  }) => ({
+    db: {
+      remoteImage: { findMany: async () => [{ url: IMG, ...row }] }
+    } as unknown as BBCtx['db'],
+    siteUrl: SITE,
+    viewer: { showMature: true }
+  });
+  const landed = ctxFor({
+    status: RemoteImageStatus.imported,
+    assetHash: 'abc123'
+  });
+
+  it('draws the image once a pending import lands', async () => {
+    const raw = `[img]${IMG}[/img] pending case`;
+    const pending = ctxFor({
+      status: RemoteImageStatus.pending,
+      assetHash: null
+    });
+    expect(await renderBBCode(raw, pending)).toContain(IMG_LINK);
+    expect(await renderBBCode(raw, landed)).toContain(`src="${ASSET}"`);
+  });
+
+  it('caches a failed image, which is final', async () => {
+    const raw = `[img]${IMG}[/img] failed case`;
+    const failed = ctxFor({
+      status: RemoteImageStatus.failed,
+      assetHash: null
+    });
+    expect(await renderBBCode(raw, failed)).toContain(IMG_LINK);
+    expect(await renderBBCode(raw, landed)).toContain(IMG_LINK);
   });
 });
