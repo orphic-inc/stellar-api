@@ -280,7 +280,7 @@ src/
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     remoteImage.ts            # Remote image import (#737, ADR-0051): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), collectReferencedRemoteUrls (every image-bearing column; the sweep and the backfill share it)
-    remoteImageJob.ts         # Background job driving that import — a few fetches at a time, never two cycles at once
+    remoteImageJob.ts         # Background job driving that import — a few fetches at a time, one cycle at a time
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
