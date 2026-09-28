@@ -13,6 +13,7 @@ import type {
   UpdateReleaseMetadataInput
 } from './types';
 import { ReleaseHistoryAction } from '@prisma/client';
+import { registerBBCodeImages } from '../remoteImage';
 
 export const updateReleaseWorkbenchMetadata = async (
   ref: ReleaseWorkbenchRef,
@@ -39,6 +40,8 @@ export const updateReleaseWorkbenchMetadata = async (
   }
 
   const before = snapshotRelease(existing);
+  // Before the write, so a 429 refuses the edit whole (#737).
+  await registerBBCodeImages(input.description, ref.actorId);
 
   await prisma.$transaction(async (tx) => {
     await tx.release.update({

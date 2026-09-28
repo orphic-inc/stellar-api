@@ -96,6 +96,24 @@ function emitText(value: string, ctx: BBCtx, opts: Opts): string {
   return out;
 }
 
+// Drawn only from the asset store, once imported (#737, ADR-0051). A pending,
+// failed or unknown image renders as its link, marked "(image)" as the legacy
+// implementation did, so no viewer ever fetches the remote host. Inside a
+// link it is the bare URL, since an <a> cannot nest in an <a>.
+function emitImage(
+  src: string,
+  maps: ResolveMaps,
+  ctx: BBCtx,
+  opts: Opts
+): string {
+  if (!isRemoteImageSrc(src)) return escapeFlow(src);
+  const imported = maps.imagesByUrl.get(src)?.src;
+  if (imported)
+    return `<img src="${escapeAttr(imported)}" alt="" class="bbcode-img" />`;
+  const link = opts.autoLink ? linkFromUrl(src, ctx) : escapeFlow(src);
+  return `${link} (image)`;
+}
+
 function emitChildren(
   nodes: Node[],
   maps: ResolveMaps,
@@ -163,12 +181,8 @@ function emitElement(
       }
       return linkFromUrl(body(), ctx);
     }
-    case 'img': {
-      const src = body();
-      if (isRemoteImageSrc(src))
-        return `<img src="${escapeAttr(src)}" alt="" class="bbcode-img" />`;
-      return escapeFlow(src);
-    }
+    case 'img':
+      return emitImage(body(), maps, ctx, opts);
 
     case 'quote': {
       const content = inner();

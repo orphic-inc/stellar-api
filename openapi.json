@@ -13672,7 +13672,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -15155,7 +15155,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -15264,7 +15264,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -20041,7 +20041,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -20673,7 +20673,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -20859,7 +20859,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -22452,7 +22452,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -22973,7 +22973,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -24611,7 +24611,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -25882,7 +25882,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -28043,7 +28043,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -28262,7 +28262,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -28428,7 +28428,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -39232,7 +39232,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -39436,7 +39436,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -40407,7 +40407,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -40672,7 +40672,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {
@@ -41124,7 +41124,7 @@
             }
           },
           "429": {
-            "description": "Rate limited",
+            "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
               "application/json": {
                 "schema": {

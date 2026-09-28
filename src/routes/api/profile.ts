@@ -29,6 +29,7 @@ import { requireAuth } from '../../middleware/auth';
 import { loadPermissions } from '../../middleware/permissions';
 import { hasPermission } from '../../lib/rankPermissions';
 import { audit } from '../../lib/audit';
+import { registerBBCodeImages } from '../../modules/remoteImage';
 import { z } from 'zod';
 import {
   validate,
@@ -237,6 +238,8 @@ router.put(
   validate(profileUpdateSchema),
   authHandler(async (req, res) => {
     const data = parsedBody<ProfileUpdateInput>(res);
+    // Before the write, so a 429 refuses the save whole (#737).
+    await registerBBCodeImages(data.profileInfo, req.user.id);
     const updated = await updateProfile(
       req.user.id,
       data,

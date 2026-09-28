@@ -28,6 +28,7 @@ import {
 } from '../../schemas/featuredAlbum';
 import { sanitizePlain } from '../../lib/sanitize';
 import { emitNotifications } from '../../lib/notifications';
+import { registerBBCodeImages } from '../../modules/remoteImage';
 
 const router = express.Router();
 const idParamsSchema = z.object({
@@ -61,11 +62,14 @@ router.post(
   '/',
   ...requirePermission('news_manage'),
   validate(announcementSchema),
-  authHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { title, body } = parsedBody<AnnouncementInput>(res);
+    const stored = sanitizePlain(body);
+    // Before the write, so a 429 refuses the announcement whole (#737).
+    await registerBBCodeImages(stored, req.user.id);
     const news = await prisma.$transaction(async (tx) => {
       const created = await tx.news.create({
-        data: { title: sanitizePlain(title), body: sanitizePlain(body) }
+        data: { title: sanitizePlain(title), body: stored }
       });
       const recipients = await tx.user.findMany({
         where: { disabled: false },
@@ -210,13 +214,15 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);
     const { title, body } = parsedBody<AnnouncementInput>(res);
+    const stored = body && sanitizePlain(body);
+    await registerBBCodeImages(stored, req.user!.id);
     let news;
     try {
       news = await prisma.news.update({
         where: { id },
         data: {
           ...(title && { title: sanitizePlain(title) }),
-          ...(body && { body: sanitizePlain(body) })
+          ...(stored && { body: stored })
         }
       });
     } catch (err) {
