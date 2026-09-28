@@ -196,6 +196,8 @@ Copy `.env.default` → `.env`.
 | `STELLAR_STAFFPM_PATH`              | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                                                                            |
 | `STELLAR_PUBLIC_KB_BASE`            | Public wiki root for `${*_article}` guidance links — korin.pink, readable pre-account (PRD-09, #126; default `https://korin.pink/wiki`)       |
 | `STELLAR_ASSET_MAX_BYTES`           | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                                                                   |
+| `STELLAR_IMAGE_IMPORT_DAILY_LIMIT`  | New remote image URLs one member may add per rolling 24 h (#737, ADR-0051; default 50). Reusing an imported URL is free                       |
+| `IMAGE_IMPORT_INTERVAL_MS`          | Remote image import job interval (#737; default 30000 = 30 s): roughly how long a new image renders as its link first                         |
 | `STELLAR_FEED_SECRET`               | Member Feed token secret (#262; ≥ 32 chars). Unset: every feed 404s. Rotating it revokes every member's feed links                            |
 | `INACTIVITY_MODE`                   | Dormancy sweep: `off` (default) / `dryRun` / `on` (#279, ADR-0038). `dryRun` evaluates everything and writes nothing                          |
 | `INACTIVITY_MAX_DISABLES_PER_CYCLE` | Ceiling on disables per run (#279; default 50). Warns are uncapped — signing in undoes one                                                    |
@@ -277,6 +279,8 @@ src/
     inviteGates.ts            # Invite send gates (#637, ADR-0043) — pure: the first refusal, in order, for the send and the eligibility read
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
+    remoteImage.ts            # Remote image import (#737, ADR-0051): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), collectReferencedRemoteUrls (every image-bearing column; the sweep and the backfill share it)
+    remoteImageJob.ts         # Background job driving that import — a few fetches at a time, never two cycles at once
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
@@ -318,6 +322,7 @@ src/
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
     cssValidate.ts          # Store-time CSS boundary (ADR-0031): detects and REJECTS, stores bytes verbatim; reports every violation with rule + location
     assetValidate.ts        # Magic-byte identification + size cap for stored binaries (ADR-0026); validate-and-reject, like cssValidate
+    remoteFetch.ts          # Fetch a member-supplied URL server-side (#737): ssrfGuard every hop, the vetted address pinned (closes DNS rebinding), streaming byte cap, one timeout
     jsonHelpers.ts          # appendToJsonArray, jsonObjectArray, removeFromJsonArrayAtIndex
     ttlCache.ts             # Generic TtlCache<K,V> + top10Cache singleton
     bbcode/                 # renderBBCode — content-addressed BBCode → sanitized HTML, cached, render-at-read (#398)

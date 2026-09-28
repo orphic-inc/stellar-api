@@ -307,6 +307,22 @@ export const assets = {
   maxBytes: parseInt(process.env.STELLAR_ASSET_MAX_BYTES ?? '2000000', 10) // 2 MB
 };
 
+/**
+ * Remote image import (#737, ADR-0051). Two dials: how many NEW remote image
+ * URLs one member may introduce in a rolling 24 hours, and how often the import
+ * job wakes. A URL already imported costs nothing to reuse, and each import is
+ * bounded by `assets.maxBytes`, so the ceiling bounds what one member can make
+ * the server fetch and store in a day. The per-fetch timeout is a constant in
+ * `remoteImage.ts`, because it is a safety bound, not a tuning knob.
+ */
+export const imageImport = {
+  dailyLimit: parseInt(
+    process.env.STELLAR_IMAGE_IMPORT_DAILY_LIMIT || '50',
+    10
+  ),
+  intervalMs: parseInt(process.env.IMAGE_IMPORT_INTERVAL_MS || '30000', 10)
+};
+
 // `||` rather than `??` throughout: `.env.default` ships every one of these
 // blank, and an empty string must mean "unset" (#667). Through `??` a copied
 // default gave `smtpPort: NaN` and `fromAddress: ''`. Both stay latent while

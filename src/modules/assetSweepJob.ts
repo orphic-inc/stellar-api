@@ -4,7 +4,10 @@
  * collection work while it seeds, then a daily cycle.
  */
 import { getLogger } from './logging';
-import { sweepOrphanedAssets } from './assetSweep';
+import {
+  pruneUnreferencedRemoteImages,
+  sweepOrphanedAssets
+} from './assetSweep';
 
 const log = getLogger('assetSweepJob');
 
@@ -14,6 +17,9 @@ const STARTUP_DELAY_MS = 5 * 60_000; // 5 minutes after boot
 const runCycle = async (): Promise<void> => {
   await sweepOrphanedAssets().catch((err) =>
     log.error('Asset orphan sweep failed', { err })
+  );
+  await pruneUnreferencedRemoteImages().catch((err) =>
+    log.error('Remote image prune failed', { err })
   );
 };
 

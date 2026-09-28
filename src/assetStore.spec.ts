@@ -241,12 +241,13 @@ describe('uploadAsset', () => {
 });
 
 describe('getOwnedAssetCount', () => {
-  it('counts the caller-owned rows', async () => {
+  it('counts the caller-owned rows, leaving imports out (#737)', async () => {
     prismaMock.asset.count.mockResolvedValue(3);
 
     expect(await getOwnedAssetCount(42)).toBe(3);
+    // The limit governs uploads; an import answers to its own daily ceiling.
     expect(prismaMock.asset.count).toHaveBeenCalledWith({
-      where: { ownerId: 42 }
+      where: { ownerId: 42, kind: { not: 'Imported' } }
     });
   });
 });

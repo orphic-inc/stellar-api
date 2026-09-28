@@ -167,6 +167,7 @@ jest.mock('../modules/config', () => ({
   },
   logging: { level: 'error', timestampFormat: undefined },
   assets: { maxBytes: 2000000 },
+  imageImport: { dailyLimit: 50, intervalMs: 30000 },
   economy: { minimumBounty: 104857600 },
   ranks: { progressionIntervalMs: 3600000 },
   // Must be present, or startInactivityJob reads `.mode` off undefined and the

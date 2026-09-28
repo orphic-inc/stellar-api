@@ -10,9 +10,18 @@ import type { PrismaClient } from '@prisma/client';
 const prismaMock = mockDeep<PrismaClient>();
 jest.mock('./lib/prisma', () => ({ prisma: prismaMock }));
 
+// The walker over every image-bearing column has its own tests (remoteImage
+// spec); here it is one input to the sweep. A plain function over a variable,
+// not a jest.fn, because resetMocks would strip a factory mock's behaviour.
+let mockRemoteUrls = new Set<string>();
+jest.mock('./modules/remoteImage', () => ({
+  collectReferencedRemoteUrls: () => Promise.resolve(mockRemoteUrls)
+}));
+
 import {
   extractAssetHashes,
   collectReferencedHashes,
+  pruneUnreferencedRemoteImages,
   sweepOrphanedAssets,
   GRACE_MS
 } from './modules/assetSweep';
@@ -26,6 +35,8 @@ beforeEach(() => {
   prismaMock.authorStylesheet.findMany.mockResolvedValue([] as never);
   prismaMock.user.findMany.mockResolvedValue([] as never);
   prismaMock.profile.findMany.mockResolvedValue([] as never);
+  prismaMock.remoteImage.findMany.mockResolvedValue([] as never);
+  mockRemoteUrls = new Set();
 });
 
 const H1 = 'a'.repeat(64);
@@ -181,5 +192,61 @@ describe('sweepOrphanedAssets', () => {
     expect(prismaMock.asset.findMany.mock.calls[0][0]!.select).toEqual({
       hash: true
     });
+  });
+});
+
+describe('imported remote images (#737)', () => {
+  const URL_A = 'https://images.example/a.png';
+
+  it('keeps an asset that a still-referenced remote URL was imported as', async () => {
+    mockRemoteUrls = new Set([URL_A]);
+    prismaMock.remoteImage.findMany.mockResolvedValue([
+      { assetHash: H1 }
+    ] as never);
+    prismaMock.asset.findMany.mockResolvedValue([
+      { hash: H1 }, // behind URL_A
+      { hash: H2 } // nothing
+    ] as never);
+    prismaMock.asset.deleteMany.mockResolvedValue({ count: 1 } as never);
+
+    await sweepOrphanedAssets();
+
+    expect(prismaMock.remoteImage.findMany).toHaveBeenCalledWith({
+      where: { url: { in: [URL_A] }, assetHash: { not: null } },
+      select: { assetHash: true }
+    });
+    expect(prismaMock.asset.deleteMany).toHaveBeenCalledWith({
+      where: { hash: { in: [H2] } }
+    });
+  });
+
+  it('collects an imported asset once no content references its URL', async () => {
+    // No referenced URLs: the lookup is skipped, and the asset is an orphan.
+    prismaMock.asset.findMany.mockResolvedValue([{ hash: H1 }] as never);
+    prismaMock.asset.deleteMany.mockResolvedValue({ count: 1 } as never);
+
+    await sweepOrphanedAssets();
+
+    expect(prismaMock.remoteImage.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.asset.deleteMany).toHaveBeenCalledWith({
+      where: { hash: { in: [H1] } }
+    });
+  });
+
+  it('prunes only asset-less rows past grace whose URL nothing references', async () => {
+    mockRemoteUrls = new Set([URL_A]);
+    prismaMock.remoteImage.deleteMany.mockResolvedValue({ count: 2 } as never);
+
+    expect(await pruneUnreferencedRemoteImages()).toBe(2);
+
+    const where = prismaMock.remoteImage.deleteMany.mock.calls[0][0]!.where as {
+      assetHash: unknown;
+      url: unknown;
+      createdAt: { lt: Date };
+    };
+    expect(where.assetHash).toBeNull();
+    expect(where.url).toEqual({ notIn: [URL_A] });
+    const ageMs = Date.now() - where.createdAt.lt.getTime();
+    expect(Math.abs(ageMs - GRACE_MS)).toBeLessThan(5000);
   });
 });

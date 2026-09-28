@@ -66,8 +66,20 @@ BLOCKED.addSubnet('fc00::', 7, 'ipv6'); // unique local
 BLOCKED.addSubnet('fe80::', 10, 'ipv6'); // link-local
 BLOCKED.addSubnet('ff00::', 8, 'ipv6'); // multicast
 
+/**
+ * `addresses` are the ones the check vetted: every address the name resolved to,
+ * all public. A caller that dials must dial one of these, not resolve the name
+ * again, or a hostile resolver can answer the second lookup differently
+ * (`remoteFetch.ts` pins them; the HEAD probe does not need to).
+ */
 export type UrlGuardResult =
-  { ok: true; url: URL } | { ok: false; reason: string };
+  | { ok: true; url: URL; addresses: VettedAddress[] }
+  | { ok: false; reason: string };
+
+export interface VettedAddress {
+  address: string;
+  family: 4 | 6;
+}
 
 /**
  * True when a literal address sits in blocked space.
@@ -121,10 +133,14 @@ export const checkPublicUrl = async (raw: string): Promise<UrlGuardResult> => {
   if (isIP(host) !== 0) {
     return isBlockedAddress(host)
       ? { ok: false, reason: `address '${host}' is not publicly routable` }
-      : { ok: true, url };
+      : {
+          ok: true,
+          url,
+          addresses: [{ address: host, family: isIP(host) as 4 | 6 }]
+        };
   }
 
-  let resolved: { address: string }[];
+  let resolved: { address: string; family: number }[];
   try {
     resolved = await lookup(host, { all: true });
   } catch {
@@ -142,5 +158,12 @@ export const checkPublicUrl = async (raw: string): Promise<UrlGuardResult> => {
     };
   }
 
-  return { ok: true, url };
+  return {
+    ok: true,
+    url,
+    addresses: resolved.map((r) => ({
+      address: r.address,
+      family: r.family === 6 ? 6 : 4
+    }))
+  };
 };

@@ -2995,7 +2995,8 @@
             "enum": [
               "ThemeImage",
               "ThemeFont",
-              "Avatar"
+              "Avatar",
+              "Imported"
             ]
           }
         },
