@@ -5,6 +5,7 @@ import {
   RatioExempt,
   RegistrationStatus,
   ReleaseCategory,
+  ReleaseHistoryAction,
   ReleaseType
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -385,24 +386,36 @@ export const addContributionToRelease = async ({
     });
 };
 
+const RATIO_EXEMPT_LABELS: Record<RatioExempt, string> = {
+  NONE: 'None',
+  FREEPASS: 'Freepass',
+  NEUTRALPASS: 'Neutralpass'
+};
+
 // Staff lever (PRD-06 #4): set/clear a Contribution's ratio exemption. Applies to
 // future consumption only — already-completed grants snapshotted their exemption,
-// so this never retroactively rewrites past accounting. Audited as an economy lever.
+// so this never retroactively rewrites past accounting. Audited as an economy lever,
+// and recorded in the release's history so members can see it (#732).
 export const setContributionRatioExempt = async (
   actorId: number,
   contributionId: number,
   ratioExempt: RatioExempt
-): Promise<{ id: number; ratioExempt: RatioExempt }> => {
-  const contribution = await prisma.contribution.findUnique({
-    where: { id: contributionId },
-    select: { id: true, ratioExempt: true }
-  });
-  if (!contribution) throw new AppError(404, 'Contribution not found');
+): Promise<{ id: number; ratioExempt: RatioExempt }> =>
+  prisma.$transaction(async (tx) => {
+    // Locked, so that two concurrent changes each record the value they
+    // actually replaced, and the history reads as one unbroken chain.
+    await tx.$queryRaw`
+      SELECT "id" FROM "contributions" WHERE "id" = ${contributionId} FOR UPDATE
+    `;
+    const contribution = await tx.contribution.findUnique({
+      where: { id: contributionId },
+      select: { id: true, ratioExempt: true, releaseId: true, type: true }
+    });
+    if (!contribution) throw new AppError(404, 'Contribution not found');
 
-  if (contribution.ratioExempt === ratioExempt)
-    return { id: contribution.id, ratioExempt };
+    if (contribution.ratioExempt === ratioExempt)
+      return { id: contribution.id, ratioExempt };
 
-  return prisma.$transaction(async (tx) => {
     const updated = await tx.contribution.update({
       where: { id: contributionId },
       data: { ratioExempt },
@@ -416,6 +429,16 @@ export const setContributionRatioExempt = async (
       contributionId,
       { from: contribution.ratioExempt, to: ratioExempt }
     );
+    await tx.releaseHistory.create({
+      data: {
+        releaseId: contribution.releaseId,
+        actorId,
+        action: ReleaseHistoryAction.ratio_exempt_changed,
+        summary: `${contribution.type.toUpperCase()} set to ${RATIO_EXEMPT_LABELS[ratioExempt]} (was ${RATIO_EXEMPT_LABELS[contribution.ratioExempt]})`,
+        changedFields: ['ratioExempt'],
+        before: { contributionId, ratioExempt: contribution.ratioExempt },
+        after: { contributionId, ratioExempt }
+      }
+    });
     return updated;
   });
-};
