@@ -66,6 +66,11 @@ erDiagram
     }
   
 
+  "remote_images" {
+
+    }
+  
+
   "forum_categories" {
 
     }
@@ -663,6 +668,8 @@ erDiagram
     "friend_relationships" }o--|| users : "recipient"
     "author_stylesheets" }o--|| users : "author"
     "assets" }o--|o users : "owner"
+    "remote_images" }o--|o assets : "asset"
+    "remote_images" }o--|| users : "requestedBy"
     "forums" }o--|| forum_categories : "forumCategory"
     "forums" }o--|o forum_topics : "lastTopic"
     "forum_topics" }o--|| forums : "forum"

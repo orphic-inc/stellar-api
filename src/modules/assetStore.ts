@@ -14,7 +14,7 @@
  * bodies here without touching a caller.
  */
 import { createHash } from 'crypto';
-import type { AssetKind, PrismaClient } from '@prisma/client';
+import { AssetKind, type PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { validateAsset } from '../lib/assetValidate';
@@ -83,11 +83,20 @@ export const putAsset = async (
 export const getAssetByHash = (hash: string, client: PrismaClient = prisma) =>
   client.asset.findUnique({ where: { hash } });
 
-/** How many assets a member owns — the figure the rank `assetLimit` count caps. */
+/**
+ * How many assets a member owns — the figure the rank `assetLimit` count caps.
+ * `Imported` assets are not counted: the limit governs uploads, and an import
+ * is a remote image the member referenced, bounded by its own daily ceiling
+ * instead (#737, ADR-0051). At the default `assetLimit` of 0, counting imports
+ * would stop most members from posting an image at all.
+ */
 export const getOwnedAssetCount = (
   ownerId: number,
   client: PrismaClient = prisma
-): Promise<number> => client.asset.count({ where: { ownerId } });
+): Promise<number> =>
+  client.asset.count({
+    where: { ownerId, kind: { not: AssetKind.Imported } }
+  });
 
 /**
  * Store a member's uploaded asset — the quota-gated, image-only entry point, as

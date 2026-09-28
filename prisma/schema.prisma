@@ -626,6 +626,7 @@ model User {
   tagAliasesCreated        TagAlias[]                       @relation("TagAliasCreator")
   authoredStylesheets      AuthorStylesheet[]
   ownedAssets              Asset[]
+  remoteImagesRequested    RemoteImage[]
   coverArtAdded            CoverArt[]
   groupLogsAuthored        GroupLog[]
 
@@ -778,6 +779,9 @@ enum AssetKind {
   ThemeImage
   ThemeFont
   Avatar
+  /// A remote image a member referenced, fetched once by the server (#737,
+  /// ADR-0051). Exempt from the rank `assetLimit`, which governs uploads.
+  Imported
 }
 
 /// A binary asset a stored row references — theme imagery and web fonts today,
@@ -808,8 +812,50 @@ model Asset {
   owner     User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
 
+  remoteImages RemoteImage[]
+
   @@index([ownerId])
   @@map("assets")
+}
+
+enum RemoteImageStatus {
+  pending
+  imported
+  failed
+}
+
+/// One remote image URL a member referenced, and what became of it (#737,
+/// ADR-0051). The server fetches each URL once, validates the bytes and stores
+/// them as an `Imported` asset, so no viewer's browser ever fetches the remote
+/// host. Rendering resolves `url` to the asset; the member's text keeps the URL.
+///
+/// Keyed by URL site-wide: a popular image is fetched once however many posts
+/// use it. `requestedById` is whoever first referenced it and owns the asset,
+/// so delivery is member-gated and abuse traces to someone.
+///
+/// When the sweep reclaims the asset, this row goes with it (Cascade), so a URL
+/// that is referenced again later is simply imported again.
+model RemoteImage {
+  id            Int               @id @default(autoincrement())
+  url           String            @unique @db.VarChar(2000)
+  status        RemoteImageStatus @default(pending)
+  /// Why the last attempt failed, in words a member can act on.
+  reason        String?           @db.VarChar(300)
+  attempts      Int               @default(0)
+  /// When the job may next try a pending row; pushed back after a retryable
+  /// failure.
+  nextAttemptAt DateTime          @default(now())
+  assetHash     String?
+  asset         Asset?            @relation(fields: [assetHash], references: [hash], onDelete: Cascade)
+  requestedById Int
+  requestedBy   User              @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([requestedById, createdAt])
+  @@index([assetHash])
+  @@map("remote_images")
 }
 
 // ─── Forum ────────────────────────────────────────────────────────────────────

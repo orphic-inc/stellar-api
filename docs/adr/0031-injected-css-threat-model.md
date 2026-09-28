@@ -76,6 +76,8 @@ The accepted cost is that a false positive blocks an honest save outright, which
 - **`connect-src` tightens to `'self'` plus the Sentry ingest host.** CSS cannot issue XHR, so this defends nothing in this threat model; it is adjacent hygiene taken while the file is open.
 - **`img-src` stays open.** Tightening it to `'self'` would break every remote avatar (§2). This is the honest statement of the boundary: the CSP constrains fonts, and deliberately does not constrain images, because a non-CSS feature requires the allowance.
 
+  **Amended 2026-09-28 ([#457](https://github.com/orphic-inc/stellar-api/issues/457), [ADR-0051](0051-remote-images-are-imported-on-write.md)).** `img-src` closes to `'self' data:`. Remote images are imported on write: the server fetches each one once and serves it from the asset store, so the non-CSS feature that needed the allowance no longer does. The change ships in stellar-ui ([#402](https://github.com/orphic-inc/stellar-ui/issues/402)) after the backfill ([#738](https://github.com/orphic-inc/stellar-api/issues/738)), together with the `font-src` and `connect-src` tightening above, which had not shipped either.
+
 The CSP is therefore a partial backstop, precisely scoped, and must be described that way everywhere. It is not "the real exfiltration backstop", and no document in either repository may say so again.
 
 ## Consequences
@@ -94,4 +96,7 @@ The CSP is therefore a partial backstop, precisely scoped, and must be described
 - **An https CDN allowlist for `url()`.** Reintroduces exactly the third-party fetch this boundary exists to prevent, in exchange for convenience the asset store already provides.
 - **Tightening `img-src` now.** Correct in isolation, but it breaks avatars, and the avatar hole is a wider problem than CSS. Deferred to its own decision rather than half-solved here.
 - **An image proxy for external references.** Already NO-GO (2026-07-04, #301) as disproportionate attack and ops surface. Recorded here because that rejection reasoned from "a CSP-scopeable SPA" while the shipped CSP does not scope images — the premise deserves re-examination when the avatar hole is decided, and #301's own escape hatch (a `renderExternalImages` toggle) is the same control §2 requires for member themes.
+
+  **Superseded 2026-09-28 ([ADR-0051](0051-remote-images-are-imported-on-write.md)).** The re-examination chose import on write: one fetch per image, at write time, not a proxy fetching on every read. `renderExternalImages` is retired, because with no remote fetches it would protect nothing. It was also **not** the same control as §2's. That one answers visual evasion by a member's theme, not disclosure, and stays [stellar-ui#194](https://github.com/orphic-inc/stellar-ui/issues/194).
+
 - **Keeping the cleaning sanitizer and fixing #340 alone.** Fixes the instance, keeps the class: a cleaner that normalizes to detect will always rewrite bytes it was not asked to change.

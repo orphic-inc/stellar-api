@@ -34,6 +34,7 @@ import { startIrcJob } from './modules/ircJob';
 import { startAnnounceJob } from './modules/announceJob';
 import { startRankProgressionJob } from './modules/rankProgressionJob';
 import { startAssetSweepJob } from './modules/assetSweepJob';
+import { startRemoteImageJob } from './modules/remoteImageJob';
 import { startMembershipJob } from './modules/membershipJob';
 import { startInactivityJob } from './modules/inactivityJob';
 import { startInviteGrantJob } from './modules/inviteGrantJob';
@@ -290,6 +291,7 @@ export const createApp = () => {
     startAnnounceJob();
     startRankProgressionJob();
     startAssetSweepJob();
+    startRemoteImageJob();
     startMembershipJob();
     startInactivityJob();
     startInviteGrantJob();

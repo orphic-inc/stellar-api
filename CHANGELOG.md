@@ -6,6 +6,17 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Remote images can be imported into the asset store** (#737, [ADR-0051](docs/adr/0051-remote-images-are-imported-on-write.md)). This is the pipeline that will let the CSP close `img-src` to `'self'` (#457). Nothing calls it yet; the next two slices of #737 wire it into the BBCode surfaces and the image fields.
+  - `registerRemoteImages` records each remote image URL a write introduces, once per URL site-wide. A member may introduce `STELLAR_IMAGE_IMPORT_DAILY_LIMIT` new URLs per rolling 24 hours (default 50), and a write past that is refused with `429`. Reusing a known URL is free.
+  - A background job (`IMAGE_IMPORT_INTERVAL_MS`, default 30 s) fetches each URL once and stores the bytes as an asset of the new kind `Imported`, owned by whoever first referenced it. It retries a timeout or 5xx with backoff, and records a final failure with its reason.
+  - The fetch (`lib/remoteFetch.ts`) vets every redirect hop with `ssrfGuard` and **pins the vetted address** into the connection, closing the DNS-rebinding window the guard leaves open for HEAD probes. It streams against the asset size cap and uses one timeout. Magic bytes decide what was fetched, and only images are kept.
+  - `Imported` assets do not count toward the rank `assetLimit`, which governs uploads. The asset sweep keeps one while any stored content still references its URL.
+  - **Contract:** an asset's `kind` can now be `Imported`.
+  - **Migration** `20260930120000_remote_image_import`: the `remote_images` table and the `Imported` asset kind. Additive. A release that predates it cannot read an `Imported` asset, so once one exists, rolling back past this release needs the backup.
+- `ssrfGuard`'s result now carries the addresses it vetted, so a caller that dials can pin them.
+
 ## [0.9.8] — 2026-09-28
 
 **Upgrade note: take a database backup before deploying.** Three migrations

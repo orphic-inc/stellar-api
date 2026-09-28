@@ -1,5 +1,6 @@
 import katex from 'katex';
 import { BBCtx } from './ctx';
+import { isRemoteImageSrc } from './images';
 import { extractReleaseId, ResolveMaps } from './resolve';
 import { Node } from './types';
 
@@ -9,7 +10,6 @@ const SIZE_EM = [0.85, 1, 1.15, 1.35, 1.6, 1.9, 2.2, 2.5, 2.8, 3.2];
 const HEX = /^#[0-9a-f]{6}$/i;
 const NAMED = /^[a-z]+$/i; // letters-only named colors are safe in a style value
 const RULE_CODE = /^h?\d+(?:\.\d+)*$/;
-const IMG_EXT = /\.(gif|jpe?g|png)$/i;
 
 const escapeText = (s: string): string =>
   s
@@ -165,7 +165,7 @@ function emitElement(
     }
     case 'img': {
       const src = body();
-      if (/^https?:\/\//i.test(src) && IMG_EXT.test(src))
+      if (isRemoteImageSrc(src))
         return `<img src="${escapeAttr(src)}" alt="" class="bbcode-img" />`;
       return escapeFlow(src);
     }

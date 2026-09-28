@@ -21,10 +21,19 @@
  * Site-owned assets (`ownerId: null`) are never swept — they are seeded from the
  * repository, and a boot that seeds assets before stylesheets would otherwise
  * present a window where a fixture looks unreferenced.
+ *
+ * **Imported remote images (#737, ADR-0051)** are referenced by their remote URL,
+ * not by an `/api/asset/` path: the member's text keeps the URL they wrote. So an
+ * asset is also live while any stored content still references a URL whose
+ * `RemoteImage` row points at it, whatever the asset's kind — identical bytes
+ * collapse to one row, so an import can share an asset with an upload. When an
+ * imported asset is collected its row goes with it (Cascade), and a URL that is
+ * referenced again later is simply imported again.
  */
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
+import { collectReferencedRemoteUrls } from './remoteImage';
 
 const log = getLogger('assetSweep');
 
@@ -89,7 +98,42 @@ export const collectReferencedHashes = async (
   for (const row of [...users, ...profiles]) {
     for (const hash of extractAssetHashes(row.avatar)) referenced.add(hash);
   }
+  for (const hash of await referencedImportHashes(client)) referenced.add(hash);
   return referenced;
+};
+
+/** The assets behind remote image URLs that stored content still references. */
+const referencedImportHashes = async (
+  client: PrismaClient
+): Promise<string[]> => {
+  const urls = await collectReferencedRemoteUrls(client);
+  if (urls.size === 0) return [];
+  const rows = await client.remoteImage.findMany({
+    where: { url: { in: [...urls] }, assetHash: { not: null } },
+    select: { assetHash: true }
+  });
+  return rows.flatMap((r) => (r.assetHash ? [r.assetHash] : []));
+};
+
+/**
+ * Drop `RemoteImage` rows that never became an asset (pending or failed) and
+ * whose URL nothing references any more, past the grace window. They hold no
+ * bytes; this only keeps the table from accumulating dead URLs. Imported rows go
+ * with their asset instead.
+ */
+export const pruneUnreferencedRemoteImages = async (
+  client: PrismaClient = prisma
+): Promise<number> => {
+  const urls = await collectReferencedRemoteUrls(client);
+  const { count } = await client.remoteImage.deleteMany({
+    where: {
+      assetHash: null,
+      createdAt: { lt: new Date(Date.now() - GRACE_MS) },
+      url: { notIn: [...urls] }
+    }
+  });
+  if (count > 0) log.info('Pruned unreferenced remote images', { count });
+  return count;
 };
 
 /**
