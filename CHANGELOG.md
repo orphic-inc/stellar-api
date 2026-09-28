@@ -18,6 +18,11 @@ All notable changes to stellar-api are documented here.
   - `PATCH …/credits/{creditId}` `{ role }` → `200`, and `DELETE …/credits/{creditId}` → `204`. Both are for a moderator (`communities_manage` or `admin`) or the credit's adder. A role change keeps the adder. A release keeps at least one credit (`409`).
   - A credit is `ReleaseCredit`: `{ id, role, artist, addedById }`. The release detail now returns `credits`. `ReleaseArtist.addedById` is set on every new credit; older rows are `null` until #722.
   - `ReleaseHistoryEntry.action` gains `credit_added`, `credit_removed` and `credit_role_changed`. None of them is revertable.
+- **A Freepass / Neutralpass change appears in the release's history** (#732). `PUT /contributions/{id}/ratio-exempt` also writes a `ratio_exempt_changed` history row on the contribution's release: `FLAC set to Freepass (was None)`, with `before` / `after` of `{ contributionId, ratioExempt }`.
+  - Before this, the change was recorded only in the audit log, which no route reads.
+  - Setting the value it already has writes nothing, as before.
+  - The row cannot be reverted: `revert` accepts only `edit`.
+  - `ReleaseHistoryEntry.action` gains `ratio_exempt_changed`. The migration adds the enum value.
 
 ### Changed
 

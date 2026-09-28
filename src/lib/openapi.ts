@@ -4688,7 +4688,8 @@ const ReleaseHistoryEntry = registry.register(
       'contribution_added',
       'credit_added',
       'credit_removed',
-      'credit_role_changed'
+      'credit_role_changed',
+      'ratio_exempt_changed'
     ]),
     summary: z.string(),
     changedFields: z.array(z.string()),

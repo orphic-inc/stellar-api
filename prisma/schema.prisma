@@ -2110,6 +2110,7 @@ enum ReleaseHistoryAction {
   credit_added
   credit_removed
   credit_role_changed
+  ratio_exempt_changed
 }
 
 model ReleaseHistory {
