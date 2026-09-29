@@ -33,6 +33,13 @@ export const IMAGE_FIELDS = [
   'secondAvatar'
 ] as const;
 
+/**
+ * The keys that hold a list of images, such as a collage's `coverImages`. The
+ * sibling is the list a browser may load: each resolved, the unimported
+ * dropped.
+ */
+export const IMAGE_LIST_FIELDS = ['coverImages'] as const;
+
 export const srcKey = (field: string): string => `${field}Src`;
 
 type Plain = Record<string, unknown>;
@@ -54,7 +61,7 @@ function holders(payload: unknown): Plain[] {
     }
     if (!isPlainObject(node) || seen.has(node)) return;
     seen.add(node);
-    if (IMAGE_FIELDS.some((field) => isImageValue(node, field))) out.push(node);
+    if (holdsImage(node)) out.push(node);
     Object.values(node).forEach(visit);
   };
   visit(payload);
@@ -64,6 +71,26 @@ function holders(payload: unknown): Plain[] {
 /** A field present as a string or null; any other type is not an image. */
 const isImageValue = (node: Plain, field: string): boolean =>
   field in node && (node[field] === null || typeof node[field] === 'string');
+
+/** A list field present as an array of strings. */
+const isImageList = (node: Plain, field: string): boolean =>
+  Array.isArray(node[field]) &&
+  (node[field] as unknown[]).every((v) => typeof v === 'string');
+
+const holdsImage = (node: Plain): boolean =>
+  IMAGE_FIELDS.some((field) => isImageValue(node, field)) ||
+  IMAGE_LIST_FIELDS.some((field) => isImageList(node, field));
+
+/** Every raw image value one holder carries, lists included. */
+const rawValues = (node: Plain): string[] =>
+  [
+    ...IMAGE_FIELDS.filter((field) => isImageValue(node, field)).map((field) =>
+      String(node[field] ?? '')
+    ),
+    ...IMAGE_LIST_FIELDS.filter((field) => isImageList(node, field)).flatMap(
+      (field) => node[field] as string[]
+    )
+  ].map((value) => value.trim());
 
 /** The imported asset paths of the remote URLs among `values`. */
 async function importedPaths(
@@ -111,17 +138,21 @@ export async function addImageSrcs(
   const found = holders(payload);
   if (found.length === 0) return;
 
-  const values = found.flatMap((node) =>
-    IMAGE_FIELDS.filter((field) => isImageValue(node, field)).map((field) =>
-      String(node[field] ?? '').trim()
-    )
-  );
+  const values = found.flatMap(rawValues);
   const imported = await importedPaths([...new Set(values)], client);
+  for (const node of found) assignSrcs(node, imported);
+}
 
-  for (const node of found) {
-    for (const field of IMAGE_FIELDS) {
-      if (isImageValue(node, field))
-        node[srcKey(field)] = resolveOne(node[field], imported);
-    }
+/** Write one holder's siblings from the resolved lookup. */
+function assignSrcs(node: Plain, imported: Map<string, string>): void {
+  for (const field of IMAGE_FIELDS) {
+    if (isImageValue(node, field))
+      node[srcKey(field)] = resolveOne(node[field], imported);
+  }
+  for (const field of IMAGE_LIST_FIELDS) {
+    if (!isImageList(node, field)) continue;
+    node[srcKey(field)] = (node[field] as string[])
+      .map((value) => resolveOne(value, imported))
+      .filter((src): src is string => src !== null);
   }
 }
