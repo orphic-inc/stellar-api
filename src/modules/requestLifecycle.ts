@@ -1,7 +1,7 @@
 import { Prisma, ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { translatePrismaError } from '../lib/prismaErrors';
-import { requestVisibleTo } from './communityAccess';
+import { communityReadableWhere, requestVisibleTo } from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { debitBalance, decrementFloored } from './ratio';
@@ -149,9 +149,10 @@ export async function getRequestDetail(
 
 // ─── getBountyHistory ─────────────────────────────────────────────────────────
 
-export async function getBountyHistory(requestId: number) {
-  const request = await prisma.request.findUnique({
-    where: { id: requestId, deletedAt: null },
+export async function getBountyHistory(requestId: number, viewerId: number) {
+  // A request the viewer cannot reach answers as a missing one (#755).
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, deletedAt: null, ...requestVisibleTo(viewerId) },
     select: { id: true }
   });
   if (!request) throw new AppError(404, 'Request not found');
@@ -182,8 +183,8 @@ export async function toggleVote(
   requestId: number,
   userId: number
 ): Promise<{ voted: boolean }> {
-  const request = await prisma.request.findUnique({
-    where: { id: requestId, deletedAt: null },
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, deletedAt: null, ...requestVisibleTo(userId) },
     select: { id: true }
   });
   if (!request) throw new AppError(404, 'Request not found');
@@ -242,8 +243,8 @@ export async function updateRequest({
   canModerateRequests: boolean;
   input: UpdateRequestInput;
 }): Promise<SerializedRequest> {
-  const existing = await prisma.request.findUnique({
-    where: { id: requestId, deletedAt: null },
+  const existing = await prisma.request.findFirst({
+    where: { id: requestId, deletedAt: null, ...requestVisibleTo(actorId) },
     select: { userId: true, status: true }
   });
   if (!existing) throw new AppError(404, 'Request not found');
@@ -285,6 +286,14 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'User not found');
+
+    // Unreachable answers as unknown does, the P2003 arm below (#755).
+    const community = await tx.community.findFirst({
+      where: { id: input.communityId, ...communityReadableWhere(userId) },
+      select: { id: true }
+    });
+    if (!community)
+      throw new AppError(400, 'communityId or an artist id names nothing');
     await debitBalance(tx, userId, user, input.bounty);
 
     // A repeated artist id means the same artist; de-duplicated rather than
@@ -368,6 +377,24 @@ async function pledgeBounty(
   }
 }
 
+/**
+ * An open request the viewer can reach, or null (#755). A request in a
+ * community they cannot see is not found, exactly as a missing one is.
+ */
+const findOpenRequest = (
+  tx: Prisma.TransactionClient,
+  requestId: number,
+  viewerId: number
+) =>
+  tx.request.findFirst({
+    where: {
+      id: requestId,
+      status: 'open',
+      deletedAt: null,
+      ...requestVisibleTo(viewerId)
+    }
+  });
+
 export async function addBounty(
   userId: number,
   requestId: number,
@@ -381,6 +408,10 @@ export async function addBounty(
   }
 
   return await prisma.$transaction(async (tx) => {
+    // Visibility is read here (#755), not in the claim's scalar updateMany.
+    if (!(await findOpenRequest(tx, requestId, userId)))
+      throw new AppError(404, 'Request not found or not open');
+
     // Claim the request row first (#767). A fill, unfill or delete claims the
     // same row, so this bounty either commits before theirs, and they read it
     // after their claim, or waits and then finds the request no longer open.
@@ -453,9 +484,7 @@ export async function fillRequest(
     }
 
     // Pre-validate against the request before the atomic step
-    const request = await tx.request.findUnique({
-      where: { id: requestId, status: 'open', deletedAt: null }
-    });
+    const request = await findOpenRequest(tx, requestId, userId);
     if (!request) throw new AppError(404, 'Request not found or not open');
 
     if (contribution.release.communityId !== request.communityId) {
@@ -649,8 +678,8 @@ export async function unfillRequest({
   reason?: string;
 }): Promise<SerializedRequest> {
   return await prisma.$transaction(async (tx) => {
-    const request = await tx.request.findUnique({
-      where: { id: requestId, deletedAt: null }
+    const request = await tx.request.findFirst({
+      where: { id: requestId, deletedAt: null, ...requestVisibleTo(actorId) }
     });
     if (!request) throw new AppError(404, 'Request not found');
     if (request.status !== 'filled')
@@ -721,8 +750,8 @@ export async function deleteRequest({
   canModerateRequests: boolean;
 }) {
   return await prisma.$transaction(async (tx) => {
-    const request = await tx.request.findUnique({
-      where: { id: requestId, deletedAt: null }
+    const request = await tx.request.findFirst({
+      where: { id: requestId, deletedAt: null, ...requestVisibleTo(actorId) }
     });
     if (!request) throw new AppError(404, 'Request not found');
 

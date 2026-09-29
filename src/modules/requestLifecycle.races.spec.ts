@@ -28,6 +28,7 @@ const mockTx = {
   requestAction: { create: jest.fn() },
   requestFill: { create: jest.fn(), findFirst: jest.fn() },
   contribution: { findUnique: jest.fn() },
+  community: { findFirst: jest.fn() },
   notification: { createMany: jest.fn() }
 };
 
@@ -94,6 +95,8 @@ beforeEach(() => {
   mockTx.user.updateMany.mockResolvedValue({ count: 1 });
   mockTx.user.findUnique.mockResolvedValue({ id: 1, ...balance });
   mockTx.requestBounty.findMany.mockResolvedValue([]);
+  mockTx.request.findFirst.mockResolvedValue({ id: 10 });
+  mockTx.community.findFirst.mockResolvedValue({ id: 1 });
 });
 
 describe('createRequest', () => {
@@ -178,8 +181,9 @@ describe('fillRequest', () => {
       userId: 1,
       release: { communityId: 1, type: 'Music' }
     });
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findFirst.mockResolvedValue(null);
+    mockTx.request.findUnique.mockResolvedValue(makeRequest());
     mockTx.requestBounty.findMany.mockResolvedValue([bounty(2, late)]);
 
     await fillRequest(1, 10, 5);
@@ -203,6 +207,7 @@ describe('unfillRequest', () => {
     unfillRequest({ requestId: 10, actorId: 99, canModerateRequests: true });
 
   beforeEach(() => {
+    mockTx.request.findFirst.mockResolvedValue(filled());
     mockTx.request.findUnique.mockResolvedValue(filled());
   });
 
@@ -237,7 +242,7 @@ describe('unfillRequest', () => {
   });
 
   it("claws back the latest fill's awarded amount, not the bounty total", async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({
         status: 'filled',
         fillerId: 7,
@@ -281,7 +286,7 @@ describe('deleteRequest', () => {
     deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: true });
 
   it('claims with the status it read pinned, then refunds the bounties read after', async () => {
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValue(makeRequest());
     mockTx.requestBounty.findMany.mockResolvedValue([bounty(2, 50n)]);
 
     await del();
@@ -305,7 +310,7 @@ describe('deleteRequest', () => {
   });
 
   it('answers 404 and refunds nothing when a concurrent delete or fill claimed first', async () => {
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValue(makeRequest());
     mockTx.request.updateMany.mockResolvedValue({ count: 0 });
     await expect(del()).rejects.toMatchObject({ statusCode: 404 });
     expect(mockTx.requestBounty.findMany).not.toHaveBeenCalled();
@@ -313,7 +318,7 @@ describe('deleteRequest', () => {
   });
 
   it('refunds nothing on a filled request, whose bounties were paid out', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ status: 'filled' })
     );
     await del();

@@ -107,9 +107,9 @@ router.get(
   '/:id/bounty-history',
   requireAuth,
   validateParams(requestIdParamsSchema),
-  authHandler(async (_req, res) => {
+  authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    const result = await requestLifecycle.getBountyHistory(id);
+    const result = await requestLifecycle.getBountyHistory(id, req.user.id);
     res.json(result);
   })
 );

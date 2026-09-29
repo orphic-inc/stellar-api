@@ -124,7 +124,7 @@ const ROUTES: RouteCase[] = [
   {
     name: 'PUT /api/requests/:id',
     setup: () =>
-      prismaMock.request.findUnique.mockResolvedValue({
+      prismaMock.request.findFirst.mockResolvedValue({
         userId: 7,
         status: 'open'
       } as never),
