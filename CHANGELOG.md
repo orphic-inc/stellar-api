@@ -15,6 +15,11 @@ All notable changes to stellar-api are documented here.
   - **`noHardDelete.spec.ts`** gains artists and editions. It also checks that a release delete cannot cascade into its editions or contributions, and it now skips comment lines.
   - The attach route's existing duplicate-format `409` is now declared too.
 
+- **Editing or deleting a canned Staff PM response that another staff member just deleted no longer answers `500`** (#784, the seventh guard-coverage burn-down under ADR-0048: `staffInbox.ts`). It answers the existing `404 Response not found`.
+  - **Resolved:** all 9 of `staffInbox.ts`'s `unreviewed` sites. 2 are guarded, and 7 are recorded as internally derived, since tickets, messages and users are never hard-deleted.
+  - **`noHardDelete.spec.ts`** gains Staff PM tickets and messages.
+  - The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

@@ -334,6 +334,11 @@ export async function bulkResolve(ids: number[], resolverId: number) {
 
 // ─── Canned responses ─────────────────────────────────────────────────────────
 
+// A canned response deleted by another staff member between the read and the
+// write (#596) raises P2025: the write answers the read's own not_found.
+const hasPrismaCode = (err: unknown, code: string) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
+
 export async function listResponses() {
   return prisma.staffInboxResponse.findMany({
     orderBy: [{ name: 'asc' }, { id: 'asc' }]
@@ -352,11 +357,17 @@ export async function updateResponse(
     where: { id }
   });
   if (!existing) return { ok: false as const, reason: 'not_found' };
-  const updated = await prisma.staffInboxResponse.update({
-    where: { id },
-    data
-  });
-  return { ok: true as const, response: updated };
+  try {
+    const updated = await prisma.staffInboxResponse.update({
+      where: { id },
+      data
+    });
+    return { ok: true as const, response: updated };
+  } catch (err) {
+    if (hasPrismaCode(err, 'P2025'))
+      return { ok: false as const, reason: 'not_found' };
+    throw err;
+  }
 }
 
 export async function deleteResponse(id: number) {
@@ -364,6 +375,12 @@ export async function deleteResponse(id: number) {
     where: { id }
   });
   if (!existing) return { ok: false as const, reason: 'not_found' };
-  await prisma.staffInboxResponse.delete({ where: { id } });
+  try {
+    await prisma.staffInboxResponse.delete({ where: { id } });
+  } catch (err) {
+    if (hasPrismaCode(err, 'P2025'))
+      return { ok: false as const, reason: 'not_found' };
+    throw err;
+  }
   return { ok: true as const };
 }

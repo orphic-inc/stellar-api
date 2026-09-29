@@ -45,6 +45,9 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   // Withdrawn by `deletedAt` (DELETE /artists/:id); editions have no delete.
   ['artist', 'artists'],
   ['edition', 'editions'],
+  // Staff PM tickets are resolved, never deleted (#596).
+  ['staffInboxConversation', 'staff_inbox_conversations'],
+  ['staffInboxMessage', 'staff_inbox_messages'],
   ['downloadAccessGrant', 'download_access_grants'],
   ['consumer', 'consumers']
 ];
