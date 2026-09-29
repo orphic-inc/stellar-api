@@ -77,6 +77,31 @@ describe('captureCrsSnapshots', () => {
     );
   });
 
+  // #596 / ADR-0048: one user's failed read used to reject the whole batch,
+  // so every active user lost the period's snapshot and the prune was skipped.
+  it("skips a user whose reputation read throws, and still writes everyone else's", async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 1 },
+      { id: 2 },
+      { id: 3 }
+    ] as never);
+    getReputation.mockImplementation((id: number) =>
+      id === 2
+        ? Promise.reject(new Error('reputation read failed'))
+        : Promise.resolve({ score: id, dimensions: [] })
+    );
+    prismaMock.crsSnapshot.createMany.mockResolvedValue({ count: 2 } as never);
+    prismaMock.crsSnapshot.deleteMany.mockResolvedValue({ count: 0 } as never);
+
+    await captureCrsSnapshots('Monthly');
+
+    const createArg = prismaMock.crsSnapshot.createMany.mock.calls[0][0] as {
+      data: Array<{ userId: number }>;
+    };
+    expect(createArg.data.map((row) => row.userId)).toEqual([1, 3]);
+    expect(prismaMock.crsSnapshot.deleteMany).toHaveBeenCalled();
+  });
+
   it('skips createMany when no users are active, still prunes', async () => {
     prismaMock.user.findMany.mockResolvedValue([] as never);
     prismaMock.crsSnapshot.deleteMany.mockResolvedValue({ count: 0 } as never);

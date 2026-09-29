@@ -1,6 +1,6 @@
 # Module writes meet the same constraint-guard rule as routes
 
-**Status: Accepted (2026-09-29).** Accepted as the gate on [#596](https://github.com/orphic-inc/stellar-api/issues/596). It records the [2026-09-11 grill](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5637740340) and its [2026-09-28 follow-up](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5882190645). It is also the record #564's rule never had: until now the rule lived only in `AGENTS.md`.
+**Status: Accepted (2026-09-29).** Accepted as the gate on [#596](https://github.com/orphic-inc/stellar-api/issues/596). It records the [2026-09-11 grill](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5637740340) and its [2026-09-28 follow-up](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5882190645). Amended 2026-09-29: Decision 4 gains a fourth job policy and classifies every job ([outcome](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5889229216)). It is also the record #564's rule never had: until now the rule lived only in `AGENTS.md`.
 
 ## Context
 
@@ -54,17 +54,26 @@ The commitment:
 
 ### 4. A job's per-item failure policy is pinned by a spec, not a checker
 
-Every `*Job.ts` gets a spec that makes one item fail and asserts the job's declared policy held. Three deliberate policies are known:
+Every `*Job.ts` gets a spec that makes one item fail and asserts the job's declared policy held. There are four policies. The fourth was added on 2026-09-29, when the last five jobs were read ([recorded on the issue](https://github.com/orphic-inc/stellar-api/issues/596#issuecomment-5889229216)):
 
-| Policy                                                                                                                                                                                                                                         | Jobs                                                                                                                                 |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Stop at the failure, retry from there next cycle:** at-least-once and in order, where order matters                                                                                                                                          | `announceJob`                                                                                                                        |
-| **Catch, log, continue:** each item is independent                                                                                                                                                                                             | `membershipJob`, `ratioPolicyJob`, `inviteExpiryJob`, `remoteImageJob`, and, since PR #749, `inactivityJob` and `rankProgressionJob` |
-| **Set-based conditional writes:** one `updateMany` per bucket, so no single item can fail alone and aborting on an outage is safe. The spec asserts that members a failed batch did not reach keep their clocks: granted next run, never twice | `inviteGrantJob`                                                                                                                     |
+| Policy                                                                                                                                      | Jobs                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stop at the failure, retry from there next cycle:** at-least-once and in order, where order matters                                       | `announceJob`                                                                                                                                         |
+| **Catch, log, continue:** each item is independent                                                                                          | `membershipJob`, `ratioPolicyJob`, `inviteExpiryJob`, `remoteImageJob`, `linkHealthJob`, and, since PR #749, `inactivityJob` and `rankProgressionJob` |
+| **Set-based writes:** no single item can fail alone, so aborting on an outage is safe. Independent tasks in one cycle are caught separately | `inviteGrantJob`, `assetSweepJob`, `donorExpiryJob`, `statsJob`                                                                                       |
+| **One unit per cycle, and a failure keeps the last good state**                                                                             | `ircJob`                                                                                                                                              |
 
-`assetSweepJob`, `donorExpiryJob`, `ircJob`, `linkHealthJob` and `statsJob` are not yet classified. Their specs do that, and a job fitting none of the three is a decision to make, not a spec to write.
+What each spec pins:
+
+- **`inviteGrantJob`:** the grant and its clock move in one write, so a member a failed batch did not reach is granted next run: never twice, never lost.
+- **`donorExpiryJob`:** it deletes by condition, not by a list read earlier, so a failed run is safe to repeat.
+- **`ircJob`:** it writes nothing to the database. A failed or non-200 poll leaves the cached metrics in place, so a korin outage does not blank anyone's IRC reputation dimension.
 
 `inactivityJob` and `rankProgressionJob` used to abort the whole cycle on one failure, with no deliberate policy behind it. [PR #749](https://github.com/orphic-inc/stellar-api/pull/749) moved both to catch, log, continue before this gate landed.
+
+Reading the last five jobs found a third case. `statsJob`'s reputation snapshot (`captureCrsSnapshots`) read every active user through one `Promise.all`. One user's failed read therefore lost the period's snapshot for everyone, and skipped the retention prune. It now skips only that user, like the sweeps.
+
+A job fitting none of the four is a decision to make, not a spec to write.
 
 ## Consequences
 

@@ -2,6 +2,9 @@ import { Prisma, StatSnapshotPeriod } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getReputation } from './reputation';
 import { getBucket, getRetentionCutoff } from './statsHistory';
+import { getLogger } from './logging';
+
+const log = getLogger('crsHistory');
 
 // ─── Capture ───────────────────────────────────────────────────────────────
 
@@ -26,6 +29,22 @@ const CONCURRENCY = 25;
  * the source of truth. Mirrors `captureCommunityHealth`: bucket, write with
  * `skipDuplicates`, then prune past the period's retention cutoff.
  */
+/** One user's snapshot row for a bucket. */
+const snapshotOf = async (
+  userId: number,
+  period: StatSnapshotPeriod,
+  bucketAt: Date
+): Promise<Prisma.CrsSnapshotCreateManyInput> => {
+  const crs = await getReputation(userId);
+  return {
+    userId,
+    period,
+    bucketAt,
+    score: crs.score,
+    dimensions: crs.dimensions as unknown as Prisma.InputJsonValue
+  };
+};
+
 export async function captureCrsSnapshots(
   period: StatSnapshotPeriod
 ): Promise<void> {
@@ -42,22 +61,24 @@ export async function captureCrsSnapshots(
   // Recompute CRS in concurrency-bounded chunks rather than fanning out every
   // active user's ~8-query read at once.
   const data: Prisma.CrsSnapshotCreateManyInput[] = [];
+  let failed = 0;
   for (let i = 0; i < users.length; i += CONCURRENCY) {
     const chunk = users.slice(i, i + CONCURRENCY);
     const results = await Promise.all(
-      chunk.map(async (u) => {
-        const crs = await getReputation(u.id);
-        return {
-          userId: u.id,
-          period,
-          bucketAt,
-          score: crs.score,
-          dimensions: crs.dimensions as unknown as Prisma.InputJsonValue
-        };
-      })
+      chunk.map((u) =>
+        snapshotOf(u.id, period, bucketAt).catch((err) => {
+          // One user's failed read skips that user's snapshot only (#596).
+          // Uncaught, it rejected the batch, and every active user lost the
+          // period's snapshot along with the retention prune.
+          failed += 1;
+          log.error('CRS snapshot failed for a user', { userId: u.id, err });
+          return null;
+        })
+      )
     );
-    data.push(...results);
+    for (const row of results) if (row) data.push(row);
   }
+  if (failed > 0) log.warn('CRS snapshots skipped', { period, failed });
 
   if (data.length > 0) {
     await prisma.crsSnapshot.createMany({ data, skipDuplicates: true });

@@ -251,6 +251,56 @@ describe('runInviteGrantCycle — writes', () => {
   });
 });
 
+// ADR-0048 (#596): set-based conditional writes. No member can fail alone, so
+// an outage may abort the cycle. What must hold is that the grant and its
+// clock move in ONE write: a member is either granted with the clock advanced,
+// or left untouched to be granted next run. Never twice, never lost.
+describe('runInviteGrantCycle — a failed batch write', () => {
+  const twoRanks = () => [
+    row({ id: 1, rank: { id: 2, level: 150, perPeriod: 2, cap: 6 } }),
+    row({ id: 3, rank: { id: 3, level: 200, perPeriod: 5, cap: 10 } })
+  ];
+
+  it('stops the cycle, and writes no audit row for a pass that did not finish', async () => {
+    mockPages(twoRanks());
+    prismaMock.user.updateMany
+      .mockResolvedValueOnce({ count: 1 } as never)
+      .mockRejectedValueOnce(new Error('connection lost'));
+
+    await expect(runInviteGrantCycle(NOW)).rejects.toThrow('connection lost');
+    expect(mockAudit).not.toHaveBeenCalled();
+  });
+
+  it('moves the grant and the clock in the same write', async () => {
+    mockPages(twoRanks());
+    prismaMock.user.updateMany
+      .mockResolvedValueOnce({ count: 1 } as never)
+      .mockRejectedValueOnce(new Error('connection lost'));
+
+    await expect(runInviteGrantCycle(NOW)).rejects.toThrow();
+    for (const n of [0, 1]) {
+      expect(grantCall(n).data.inviteCount).toBeDefined();
+      expect(grantCall(n).data.lastInviteGrantAt).toBe(NOW);
+    }
+  });
+
+  it('grants the missed member on the next run, and not the one it reached', async () => {
+    // The state the failed run left: member 1's clock moved, member 3's did not.
+    mockPages([
+      row({ id: 1, lastInviteGrantAt: NOW }),
+      row({
+        id: 3,
+        rank: { id: 3, level: 200, perPeriod: 5, cap: 10 }
+      })
+    ]);
+
+    const tally = await runInviteGrantCycle(NOW);
+
+    expect(tally.granted).toBe(1);
+    expect(grantCall(0).where.id).toEqual({ in: [3] });
+  });
+});
+
 describe('runInviteGrantCycle — dryRun', () => {
   it('evaluates everything and writes nothing', async () => {
     mockConfig.mode = 'dryRun';
