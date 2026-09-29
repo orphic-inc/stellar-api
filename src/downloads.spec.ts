@@ -13,6 +13,7 @@ import {
 } from './test/apiTestHarness';
 import { DownloadGrantStatus } from '@prisma/client';
 import { AppError } from './lib/errors';
+import { contributionVisibleTo } from './modules/communityAccess';
 
 const setStaffPerms = () =>
   prismaMock.userRank.findUnique.mockResolvedValue(
@@ -154,7 +155,7 @@ describe('GET /api/contributions/:id/access/latest', () => {
       status: DownloadGrantStatus.COMPLETED,
       createdAt
     } as never);
-    prismaMock.contribution.findUnique.mockResolvedValue({
+    prismaMock.contribution.findFirst.mockResolvedValue({
       downloadUrl: 'https://example.com/latest.zip'
     } as never);
 
@@ -171,8 +172,9 @@ describe('GET /api/contributions/:id/access/latest', () => {
         orderBy: { createdAt: 'desc' }
       })
     );
-    expect(prismaMock.contribution.findUnique).toHaveBeenCalledWith({
-      where: { id: 8 },
+    // Scoped to the caller (#778): a contribution they cannot see is missing.
+    expect(prismaMock.contribution.findFirst).toHaveBeenCalledWith({
+      where: { id: 8, ...contributionVisibleTo(7) },
       select: { downloadUrl: true }
     });
     expect(res.body).toEqual({
@@ -191,7 +193,7 @@ describe('GET /api/contributions/:id/access/latest', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.msg).toBe('No recent grant found');
-    expect(prismaMock.contribution.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.contribution.findFirst).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the contribution no longer exists', async () => {
@@ -201,7 +203,7 @@ describe('GET /api/contributions/:id/access/latest', () => {
       status: DownloadGrantStatus.COMPLETED,
       createdAt: new Date('2026-05-18T12:00:00.000Z')
     } as never);
-    prismaMock.contribution.findUnique.mockResolvedValue(null);
+    prismaMock.contribution.findFirst.mockResolvedValue(null);
 
     const res = await request(app).get('/api/contributions/8/access/latest');
 

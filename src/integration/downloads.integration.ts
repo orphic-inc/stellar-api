@@ -52,14 +52,19 @@ const createUser = async (
 const createContribution = async (
   userId: number,
   sizeBytes = 1_000_000,
-  ratioExempt: RatioExempt = RatioExempt.NONE
+  ratioExempt: RatioExempt = RatioExempt.NONE,
+  /** A closed community with this one member, rather than an open one. */
+  closedTo?: number
 ) => {
   const community = await testPrisma.community.create({
     data: {
-      name: `DL-Community-${Date.now()}`,
+      name: `DL-Community-${Date.now()}-${Math.random()}`,
       image: '',
-      registrationStatus: RegistrationStatus.open,
-      type: CommunityType.Music
+      registrationStatus: closedTo
+        ? RegistrationStatus.closed
+        : RegistrationStatus.open,
+      type: CommunityType.Music,
+      ...(closedTo && { consumers: { create: { userId: closedTo } } })
     }
   });
   const artist = await testPrisma.artist.create({
@@ -72,6 +77,9 @@ const createContribution = async (
       type: ReleaseType.Music,
       releaseType: 'Album',
       year: 2020,
+      // In the community, as every real contribution's release is: a release
+      // with no community is visible to everyone (releaseVisibleTo's null arm).
+      communityId: community.id,
       credits: { create: { artistId: artist.id } }
     }
   });
@@ -368,5 +376,51 @@ describe('grantDownloadAccess — ratio-exempt (PRD-06 #4)', () => {
     });
     expect(c.consumed).toBe(0n);
     expect(k.contributed).toBe(BigInt(COST));
+  });
+});
+
+// #778: a contribution in a community the consumer cannot see is found as a
+// missing one is. No URL, no debit, no grant.
+describe('download access to a hidden contribution (#778)', () => {
+  it('answers an outsider as for a missing contribution, and moves nothing', async () => {
+    const COST = 1_000_000;
+    const contributor = await createUser('hid-contrib');
+    const member = await createUser('hid-member', {
+      contributed: BigInt(COST * 5)
+    });
+    const outsider = await createUser('hid-outsider', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(
+      contributor.id,
+      COST,
+      RatioExempt.NONE,
+      member.id
+    );
+
+    const refusal = async (id: number) => {
+      const err = (await grantDownloadAccess(outsider.id, id).catch(
+        (e: unknown) => e
+      )) as { statusCode?: number; message?: string };
+      return { statusCode: err.statusCode, message: err.message };
+    };
+
+    const hidden = await refusal(contribution.id);
+    expect(hidden).toEqual(await refusal(2_000_000_000));
+    expect(hidden.statusCode).toBe(404);
+
+    const after = await testPrisma.user.findUniqueOrThrow({
+      where: { id: outsider.id }
+    });
+    expect(after.consumed).toBe(0n);
+    expect(
+      await testPrisma.downloadAccessGrant.count({
+        where: { consumerId: outsider.id }
+      })
+    ).toBe(0);
+
+    // The member can still download it: a gate, not a blanket refusal.
+    const grant = await grantDownloadAccess(member.id, contribution.id);
+    expect(grant.downloadUrl).toBe(contribution.downloadUrl);
   });
 });

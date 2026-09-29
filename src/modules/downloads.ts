@@ -7,6 +7,7 @@ import {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { translatePrismaError } from '../lib/prismaErrors';
+import { contributionVisibleTo } from './communityAccess';
 import { getLogger } from './logging';
 import { debitBalance, decrementFloored } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
@@ -67,8 +68,10 @@ export const grantDownloadAccess = async (
   idempotencyKey?: string
 ): Promise<GrantResult> => {
   const result = await prisma.$transaction(async (tx) => {
-    const contribution = await tx.contribution.findUnique({
-      where: { id: contributionId },
+    // A contribution the consumer cannot see is not found, exactly as a
+    // missing one is (#778): no download, no debit, and no oracle.
+    const contribution = await tx.contribution.findFirst({
+      where: { id: contributionId, ...contributionVisibleTo(consumerId) },
       select: {
         id: true,
         userId: true,
