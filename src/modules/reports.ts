@@ -9,6 +9,7 @@ import type { ReportResolutionAction } from '../schemas/reports';
 import { audit } from '../lib/audit';
 import { getLogger } from './logging';
 import { sendSystemMessage } from './pm';
+import { resolveSourceUrls, type SourceViewer } from './reportSourceUrls';
 
 const log = getLogger('reports');
 
@@ -53,210 +54,8 @@ export type ReportSummary = {
 
 // ─── UI deep-link paths ───────────────────────────────────────────────────────
 
-/**
- * The UI routes a report's `sourceUrl` points at.
- *
- * Named rather than spelled inline because several repeat — the release path
- * four times, artists, collages and forum topics twice each — so a route change
- * is one edit per shape instead of hunting fourteen literals. Which is how the
- * last one was missed: these all carried a `/private/` prefix that the 0.8.x
- * flattening removed from the UI's route model, and every link had been leaning
- * on stellar-ui's `LegacyPrivateRedirect` shim to resolve (#338).
- *
- * `userPath` takes a username deliberately: the UI route reads `user/:id`, but
- * `getProfileByLookup` resolves a numeric id *or* a case-insensitive username.
- */
-const userPath = (username: string): string => `/user/${username}`;
-const releasePath = (communityId: number, releaseId: number): string =>
-  `/communities/${communityId}/releases/${releaseId}`;
-const topicPath = (forumId: number, topicId: number): string =>
-  `/forums/${forumId}/topics/${topicId}`;
-const artistPath = (artistId: number): string => `/artists/${artistId}`;
-const collagePath = (collageId: number): string => `/collages/${collageId}`;
-const requestPath = (requestId: number): string => `/requests/${requestId}`;
-const communityPath = (communityId: number): string =>
-  `/communities/${communityId}`;
+// The rest live with the source url resolver, in reportSourceUrls.ts.
 const reportPath = (reportId: number): string => `/reports/${reportId}`;
-
-// ─── Source URL resolution ────────────────────────────────────────────────────
-
-async function resolveSourceUrls(
-  items: Array<{ id: number; targetType: ReportTargetType; targetId: number }>
-): Promise<Map<number, string | null>> {
-  const urlMap = new Map<number, string | null>();
-
-  const byType = new Map<
-    ReportTargetType,
-    Array<{ reportId: number; targetId: number }>
-  >();
-  for (const r of items) {
-    const existing = byType.get(r.targetType) ?? [];
-    existing.push({ reportId: r.id, targetId: r.targetId });
-    byType.set(r.targetType, existing);
-  }
-
-  for (const [type, entries] of byType) {
-    const targetIds = entries.map((e) => e.targetId);
-
-    switch (type) {
-      case 'User': {
-        const users = await prisma.user.findMany({
-          where: { id: { in: targetIds } },
-          select: { id: true, username: true }
-        });
-        const usernameById = new Map(users.map((u) => [u.id, u.username]));
-        for (const { reportId, targetId } of entries) {
-          const username = usernameById.get(targetId);
-          urlMap.set(reportId, username ? userPath(username) : null);
-        }
-        break;
-      }
-      case 'Release': {
-        const releases = await prisma.release.findMany({
-          where: { id: { in: targetIds } },
-          select: { id: true, communityId: true }
-        });
-        const byId = new Map(releases.map((r) => [r.id, r]));
-        for (const { reportId, targetId } of entries) {
-          const rel = byId.get(targetId);
-          urlMap.set(
-            reportId,
-            rel?.communityId ? releasePath(rel.communityId, targetId) : null
-          );
-        }
-        break;
-      }
-      case 'Contribution': {
-        const contribs = await prisma.contribution.findMany({
-          where: { id: { in: targetIds } },
-          select: {
-            id: true,
-            releaseId: true,
-            release: { select: { communityId: true } }
-          }
-        });
-        const byId = new Map(contribs.map((c) => [c.id, c]));
-        for (const { reportId, targetId } of entries) {
-          const c = byId.get(targetId);
-          urlMap.set(
-            reportId,
-            c?.release?.communityId
-              ? releasePath(c.release.communityId, c.releaseId)
-              : null
-          );
-        }
-        break;
-      }
-      case 'ForumTopic': {
-        const topics = await prisma.forumTopic.findMany({
-          where: { id: { in: targetIds } },
-          select: { id: true, forumId: true }
-        });
-        const byId = new Map(topics.map((t) => [t.id, t]));
-        for (const { reportId, targetId } of entries) {
-          const t = byId.get(targetId);
-          urlMap.set(reportId, t ? topicPath(t.forumId, targetId) : null);
-        }
-        break;
-      }
-      case 'ForumPost': {
-        const posts = await prisma.forumPost.findMany({
-          where: { id: { in: targetIds } },
-          select: {
-            id: true,
-            forumTopicId: true,
-            forumTopic: { select: { forumId: true } }
-          }
-        });
-        const byId = new Map(posts.map((p) => [p.id, p]));
-        for (const { reportId, targetId } of entries) {
-          const p = byId.get(targetId);
-          urlMap.set(
-            reportId,
-            p ? topicPath(p.forumTopic.forumId, p.forumTopicId) : null
-          );
-        }
-        break;
-      }
-      case 'Collage': {
-        for (const { reportId, targetId } of entries) {
-          urlMap.set(reportId, collagePath(targetId));
-        }
-        break;
-      }
-      case 'Artist': {
-        for (const { reportId, targetId } of entries) {
-          urlMap.set(reportId, artistPath(targetId));
-        }
-        break;
-      }
-      case 'Comment': {
-        const comments = await prisma.comment.findMany({
-          where: { id: { in: targetIds } },
-          select: {
-            id: true,
-            page: true,
-            artistId: true,
-            releaseId: true,
-            release: { select: { communityId: true } },
-            collageId: true,
-            requestId: true,
-            communityId: true,
-            contributionId: true,
-            contribution: {
-              select: {
-                releaseId: true,
-                release: { select: { communityId: true } }
-              }
-            }
-          }
-        });
-        const byId = new Map(comments.map((c) => [c.id, c]));
-        for (const { reportId, targetId } of entries) {
-          const c = byId.get(targetId);
-          if (!c) {
-            urlMap.set(reportId, null);
-            break;
-          }
-          let url: string | null = null;
-          if (c.page === 'artist' && c.artistId) {
-            url = artistPath(c.artistId);
-          } else if (
-            c.page === 'release' &&
-            c.releaseId &&
-            c.release?.communityId
-          ) {
-            url = releasePath(c.release.communityId, c.releaseId);
-          } else if (c.page === 'collages' && c.collageId) {
-            url = collagePath(c.collageId);
-          } else if (c.page === 'requests' && c.requestId) {
-            url = requestPath(c.requestId);
-          } else if (
-            c.page === 'contributions' &&
-            c.contributionId &&
-            c.contribution?.release?.communityId
-          ) {
-            url = releasePath(
-              c.contribution.release.communityId,
-              c.contribution.releaseId
-            );
-          } else if (c.page === 'communities' && c.communityId) {
-            url = communityPath(c.communityId);
-          }
-          urlMap.set(reportId, url);
-        }
-        break;
-      }
-      default: {
-        for (const { reportId } of entries) {
-          urlMap.set(reportId, null);
-        }
-      }
-    }
-  }
-
-  return urlMap;
-}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -348,9 +147,13 @@ export async function listReports(opts: {
   return { total, page, pageSize: PAGE_SIZE, reports };
 }
 
+/**
+ * One report, for staff or for its reporter. The reporter's `sourceUrl` is
+ * resolved as them (#773), as in `listMyReports`; staff see every link.
+ */
 export async function getReport(
   id: number,
-  requesterId: number,
+  requester: SourceViewer,
   isStaff: boolean
 ) {
   const report = await prisma.report.findUnique({
@@ -358,12 +161,19 @@ export async function getReport(
     include: reportInclude
   });
   if (!report) return { ok: false as const, reason: 'not_found' };
-  if (!isStaff && report.reporterId !== requesterId) {
+  if (!isStaff && report.reporterId !== requester.id) {
     return { ok: false as const, reason: 'forbidden' };
   }
-  const urlMap = await resolveSourceUrls([
-    { id: report.id, targetType: report.targetType, targetId: report.targetId }
-  ]);
+  const urlMap = await resolveSourceUrls(
+    [
+      {
+        id: report.id,
+        targetType: report.targetType,
+        targetId: report.targetId
+      }
+    ],
+    isStaff ? undefined : requester
+  );
   return {
     ok: true as const,
     report: { ...report, sourceUrl: urlMap.get(report.id) ?? null }
@@ -483,8 +293,12 @@ export async function addNote(id: number, authorId: number, body: string) {
   return { ok: true as const, note };
 }
 
-export async function listMyReports(userId: number, page: number) {
-  const where = { reporterId: userId };
+/**
+ * The reporter's own reports. Each `sourceUrl` is resolved as the reporter
+ * (#773): a target they cannot see links nowhere, as a missing one does.
+ */
+export async function listMyReports(viewer: SourceViewer, page: number) {
+  const where = { reporterId: viewer.id };
   const [total, rawReports] = await Promise.all([
     prisma.report.count({ where }),
     prisma.report.findMany({
@@ -511,7 +325,8 @@ export async function listMyReports(userId: number, page: number) {
       id: r.id,
       targetType: r.targetType,
       targetId: r.targetId
-    }))
+    })),
+    viewer
   );
   const reports: ReportSummary[] = rawReports.map((r) => ({
     ...r,

@@ -138,7 +138,11 @@ describe('listReports', () => {
       makeReport({ id: 9, status: 'Claimed', claimedById: 7 })
     ]);
     prismaMock.forumPost.findMany.mockResolvedValue([
-      { id: 42, forumTopicId: 5, forumTopic: { forumId: 3 } }
+      {
+        id: 42,
+        forumTopicId: 5,
+        forumTopic: { forum: { id: 3, minClassRead: 0 } }
+      }
     ]);
 
     const result = await listReports({
@@ -169,7 +173,9 @@ describe('getReport', () => {
 
   it('returns not_found and forbidden variants', async () => {
     prismaMock.report.findUnique.mockResolvedValueOnce(null);
-    await expect(getReport(1, 7, false)).resolves.toEqual({
+    await expect(
+      getReport(1, { id: 7, userRankLevel: 100 }, false)
+    ).resolves.toEqual({
       ok: false,
       reason: 'not_found'
     });
@@ -177,7 +183,9 @@ describe('getReport', () => {
     prismaMock.report.findUnique.mockResolvedValueOnce(
       makeReport({ reporterId: 9 })
     );
-    await expect(getReport(1, 7, false)).resolves.toEqual({
+    await expect(
+      getReport(1, { id: 7, userRankLevel: 100 }, false)
+    ).resolves.toEqual({
       ok: false,
       reason: 'forbidden'
     });
@@ -189,7 +197,7 @@ describe('getReport', () => {
     );
     prismaMock.user.findMany.mockResolvedValue([{ id: 11, username: 'alice' }]);
 
-    const result = await getReport(1, 7, true);
+    const result = await getReport(1, { id: 7, userRankLevel: 100 }, true);
 
     expect(result).toEqual({
       ok: true,
@@ -411,7 +419,7 @@ describe('listMyReports', () => {
       { id: 99, releaseId: 123, release: { communityId: 5 } }
     ]);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBe('/communities/5/releases/123');
   });
