@@ -1439,7 +1439,8 @@ registry.registerPath({
   },
   responses: {
     201: msgResponse('Donor status granted'),
-    404: msgResponse('User or donor rank not found')
+    404: msgResponse('User or donor rank not found'),
+    409: msgResponse('A concurrent grant changed this donor status; retry')
   }
 });
 
@@ -1864,7 +1865,7 @@ registry.registerPath({
         }
       }
     },
-    400: msgResponse('User already exists')
+    400: msgResponse('User already exists, or userRankId names no rank')
   }
 });
 

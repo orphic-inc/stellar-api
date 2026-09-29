@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { audit } from '../lib/audit';
 import { AppError } from '../lib/errors';
 import { getDefaultStylesheetName } from './stylesheet';
@@ -142,21 +143,30 @@ export const createUser = async (
       data: { siteAppearance: defaultTheme }
     });
     const profile = await tx.profile.create({ data: {} });
-    return tx.user.create({
-      data: {
-        username: data.username,
-        email: data.email.toLowerCase(),
-        password: hashedPassword,
-        avatar: '',
-        userRankId: rankId,
-        userSettingsId: settings.id,
-        profileId: profile.id,
-        contributed: 5_368_709_120n, // 5 GiB startup buffer
-        // Staff-created: nobody invited them (#633, ADR-0042).
-        inviteTree: { create: { inviterId: null } }
-      },
-      select: { id: true, username: true, email: true }
-    });
+    try {
+      return await tx.user.create({
+        data: {
+          username: data.username,
+          email: data.email.toLowerCase(),
+          password: hashedPassword,
+          avatar: '',
+          userRankId: rankId,
+          userSettingsId: settings.id,
+          profileId: profile.id,
+          contributed: 5_368_709_120n, // 5 GiB startup buffer
+          // Staff-created: nobody invited them (#633, ADR-0042).
+          inviteTree: { create: { inviterId: null } }
+        },
+        select: { id: true, username: true, email: true }
+      });
+    } catch (err) {
+      // `userRankId` comes from the body and nothing checked it; the duplicate
+      // is the race past the route's own pre-check, answered the same (#758).
+      translatePrismaError(err, {
+        P2002: [400, 'User already exists'],
+        P2003: [400, 'Rank not found']
+      });
+    }
   });
 
   await audit(prisma, actorId, 'user.create', 'User', user.id, {
@@ -493,7 +503,12 @@ export const deleteWarning = async (
   if (!warning || warning.userId !== userId) {
     throw new AppError(404, 'Warning not found');
   }
-  await prisma.userWarning.delete({ where: { id: warnId } });
+  try {
+    await prisma.userWarning.delete({ where: { id: warnId } });
+  } catch (err) {
+    // A concurrent delete of the same warning (#758).
+    translatePrismaError(err, { P2025: [404, 'Warning not found'] });
+  }
 
   const remaining = await prisma.userWarning.count({ where: { userId } });
   if (remaining === 0) {
@@ -534,21 +549,27 @@ export const setUserRank = async (
     }
   }
 
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: userId }, data: { userRankId } }),
-    prisma.userSecondaryRank.deleteMany({ where: { userId } }),
-    ...(uniqueSecondaryRankIds.length > 0
-      ? [
-          prisma.userSecondaryRank.createMany({
-            data: uniqueSecondaryRankIds.map((secondaryRankId) => ({
-              userId,
-              userRankId: secondaryRankId,
-              assignedById: actorId
-            }))
-          })
-        ]
-      : [])
-  ]);
+  // The ranks tool refuses to delete a rank a user holds, but can delete one
+  // between the check above and this write (#758).
+  try {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { userRankId } }),
+      prisma.userSecondaryRank.deleteMany({ where: { userId } }),
+      ...(uniqueSecondaryRankIds.length > 0
+        ? [
+            prisma.userSecondaryRank.createMany({
+              data: uniqueSecondaryRankIds.map((secondaryRankId) => ({
+                userId,
+                userRankId: secondaryRankId,
+                assignedById: actorId
+              }))
+            })
+          ]
+        : [])
+    ]);
+  } catch (err) {
+    translatePrismaError(err, { P2003: [404, 'Rank not found'] });
+  }
 
   await audit(prisma, actorId, 'user.rank_changed', 'User', userId, {
     userRankId,
@@ -577,24 +598,33 @@ export const grantDonorStatus = async (
       ? new Date(Date.now() + donorRank.expiresAfterDays * 86_400_000)
       : null;
 
-  await prisma.$transaction([
-    prisma.userDonorRank.upsert({
-      where: { userId },
-      create: {
-        userId,
-        donorRankId,
-        grantedById: actorId,
-        ...(computedExpiresAt ? { expiresAt: computedExpiresAt } : {})
-      },
-      update: {
-        donorRankId,
-        grantedAt: new Date(),
-        grantedById: actorId,
-        expiresAt: computedExpiresAt
-      }
-    }),
-    prisma.user.update({ where: { id: userId }, data: { isDonor: true } })
-  ]);
+  // Two concurrent grants can both insert on the unique userId, and a donor
+  // rank can be deleted between the check above and this write (#758).
+  try {
+    await prisma.$transaction([
+      prisma.userDonorRank.upsert({
+        where: { userId },
+        create: {
+          userId,
+          donorRankId,
+          grantedById: actorId,
+          ...(computedExpiresAt ? { expiresAt: computedExpiresAt } : {})
+        },
+        update: {
+          donorRankId,
+          grantedAt: new Date(),
+          grantedById: actorId,
+          expiresAt: computedExpiresAt
+        }
+      }),
+      prisma.user.update({ where: { id: userId }, data: { isDonor: true } })
+    ]);
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'A concurrent grant changed this donor status; retry'],
+      P2003: [404, 'Donor rank not found']
+    });
+  }
 
   await audit(prisma, actorId, 'user.donor_granted', 'User', userId);
 };

@@ -25,6 +25,16 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Staff creating a user with an unknown rank no longer gets `500`** (#758, the third guard-coverage burn-down under ADR-0048).
+  - `POST /users` never checked the body's `userRankId`. It now answers `400 Rank not found`.
+  - Four races now answer their client errors instead of `500`:
+    - a duplicate username or email past the route's pre-check: `400 User already exists`, as the pre-check does;
+    - a concurrent delete of one warning: `404`;
+    - a rank deleted during `PUT /users/{id}/rank`: `404`;
+    - a concurrent donor grant, or a donor rank deleted mid-grant, on `POST /users/{id}/donor`: `409` or `404`.
+  - All 12 of `user.ts`'s `unreviewed` sites are resolved: 5 guarded, 7 recorded as internally derived.
+  - `noHardDelete.spec.ts` gains `UserSettings`.
+
 - **Creating a request no longer answers `500` for a bad id or a repeated artist** (#756, the second guard-coverage burn-down under ADR-0048).
   - `POST /requests` with a `communityId` or artist id naming nothing now answers `400`.
   - A repeated artist id is now treated as one; it used to hit the per-request unique key.

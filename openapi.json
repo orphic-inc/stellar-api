@@ -11575,6 +11575,16 @@
               }
             }
           },
+          "409": {
+            "description": "A concurrent grant changed this donor status; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -13245,7 +13255,7 @@
             }
           },
           "400": {
-            "description": "User already exists",
+            "description": "User already exists, or userRankId names no rank",
             "content": {
               "application/json": {
                 "schema": {
