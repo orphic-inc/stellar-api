@@ -2,7 +2,6 @@
  * Service-level unit tests for the downloads module.
  */
 
-import { AppError } from '../lib/errors';
 import {
   DownloadGrantStatus,
   EconomyTransactionReason,
@@ -12,7 +11,7 @@ import {
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
 const mockTx = {
-  contribution: { findUnique: jest.fn() },
+  contribution: { findFirst: jest.fn() },
   user: {
     findUnique: jest.fn(),
     findUniqueOrThrow: jest.fn(),
@@ -44,6 +43,7 @@ jest.mock('../lib/prisma', () => ({
 }));
 
 import { grantDownloadAccess, reverseDownloadAccess } from './downloads';
+import { contributionVisibleTo } from './communityAccess';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -90,13 +90,25 @@ beforeEach(() => {
 // ─── grantDownloadAccess ───────────────────────────────────────────────────────
 
 describe('grantDownloadAccess', () => {
-  it('throws 404 when contribution not found', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(null);
-    await expect(grantDownloadAccess(7, 5)).rejects.toThrow(AppError);
+  // #778: a contribution the consumer cannot see is found exactly as a
+  // missing one is: 404, before any balance check, debit or grant.
+  it('answers 404 for a missing or hidden contribution, and writes nothing', async () => {
+    mockTx.contribution.findFirst.mockResolvedValue(null);
+    await expect(grantDownloadAccess(7, 5)).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Contribution not found'
+    });
+    expect(mockTx.contribution.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 5, ...contributionVisibleTo(7) }
+      })
+    );
+    expect(mockTx.user.updateMany).not.toHaveBeenCalled();
+    expect(mockTx.downloadAccessGrant.create).not.toHaveBeenCalled();
   });
 
   it('throws 403 when canDownload is false', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser({ canDownload: false }));
     await expect(grantDownloadAccess(7, 5)).rejects.toMatchObject({
       statusCode: 403
@@ -104,7 +116,7 @@ describe('grantDownloadAccess', () => {
   });
 
   it('throws 400 when no accounting size is available', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(
+    mockTx.contribution.findFirst.mockResolvedValue(
       makeContribution({ sizeInBytes: null, approvedAccountingBytes: null })
     );
     mockTx.user.findUnique.mockResolvedValue(makeUser());
@@ -114,7 +126,7 @@ describe('grantDownloadAccess', () => {
   });
 
   it('throws 400 when balance is insufficient', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(
       makeUser({ contributed: BigInt(1000) })
     );
@@ -125,7 +137,7 @@ describe('grantDownloadAccess', () => {
   });
 
   it('throws 409 on CAS failure (concurrent balance drain)', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 0 });
@@ -138,7 +150,7 @@ describe('grantDownloadAccess', () => {
   // The guard answers 409; the transaction, debit included, rolls back.
   it('throws 409 when a concurrent first download inserted the consumer row', async () => {
     const { Prisma } = jest.requireActual('@prisma/client');
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
     mockTx.user.updateMany.mockResolvedValue({ count: 1 });
@@ -157,7 +169,7 @@ describe('grantDownloadAccess', () => {
 
   it('reuses existing grant within idempotency window', async () => {
     const existing = makeGrant();
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.downloadAccessGrant.findFirst.mockResolvedValue(existing);
 
@@ -171,7 +183,7 @@ describe('grantDownloadAccess', () => {
 
   it('uses approvedAccountingBytes over sizeInBytes when both present', async () => {
     const cost = BigInt('524288000'); // 500 MiB
-    mockTx.contribution.findUnique.mockResolvedValue(
+    mockTx.contribution.findFirst.mockResolvedValue(
       makeContribution({
         approvedAccountingBytes: cost,
         sizeInBytes: 209715200
@@ -214,7 +226,7 @@ describe('grantDownloadAccess', () => {
   it('debits consumer, credits contributor, creates grant and 2 ledger rows on success', async () => {
     const cost = BigInt('209715200');
     const grant = makeGrant();
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),

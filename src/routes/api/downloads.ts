@@ -9,6 +9,7 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import { authHandler } from '../../modules/asyncHandler';
+import { contributionVisibleTo } from '../../modules/communityAccess';
 import {
   grantDownloadAccess,
   reverseDownloadAccess
@@ -60,8 +61,10 @@ router.get(
       orderBy: { createdAt: 'desc' }
     });
     if (!grant) throw new AppError(404, 'No recent grant found');
-    const contribution = await prisma.contribution.findUnique({
-      where: { id },
+    // Gated as the grant itself is (#778): a contribution the caller can no
+    // longer see is not found.
+    const contribution = await prisma.contribution.findFirst({
+      where: { id, ...contributionVisibleTo(req.user.id) },
       select: { downloadUrl: true }
     });
     if (!contribution) throw new AppError(404, 'Contribution not found');

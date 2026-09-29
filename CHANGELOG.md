@@ -25,6 +25,12 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A member can no longer download a contribution in a community they cannot see** (#778, an instance of #771).
+  - **What was open:** `POST /contributions/{id}/access` looked the contribution up with no visibility rule. Any signed-in member could pass any contribution id, including one in a private community, and get its download URL, with their balance debited.
+  - **Now:** a contribution the caller cannot see answers the same `404 Contribution not found` as a missing one, before any balance check, debit or grant. `GET /contributions/{id}/access/latest` takes the same gate.
+  - **Membership:** a download never granted community membership; it links the contribution only.
+  - The contract is unchanged.
+
 - **A reporter's own reports no longer reveal targets they cannot see** (#773, the third instance of #771).
   - **What was open:** `GET /reports/mine` and a reporter's `GET /reports/{id}` looked each target up without a visibility rule, then linked it. A member could learn from a report's link whether a release, contribution, comment or forum topic existed, and which community or forum held it, even when that community is private or the forum is above their rank.
   - **Now:** each link resolves as the reporter.
