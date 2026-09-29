@@ -25,6 +25,17 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A reporter's own reports no longer reveal targets they cannot see** (#773, the third instance of #771).
+  - **What was open:** `GET /reports/mine` and a reporter's `GET /reports/{id}` looked each target up without a visibility rule, then linked it. A member could learn from a report's link whether a release, contribution, comment or forum topic existed, and which community or forum held it, even when that community is private or the forum is above their rank.
+  - **Now:** each link resolves as the reporter.
+    - Releases and contributions follow the community rule.
+    - Comments follow their thread's rule.
+    - Topics and posts follow the forum's `minClassRead`, or the reporter's permitted forums.
+    - A target the reporter cannot see links nowhere (`null`), as a missing one does.
+  - **Staff** still see every link.
+  - **A second fix:** one missing comment in a batch no longer drops the links of every comment reported after it.
+  - The link resolver moves into `modules/reportSourceUrls.ts`, one resolver per target type. The contract is unchanged.
+
 - **Community and request bookmarks no longer reveal what the member cannot see** (#772, the second instance of #771).
   - **What was open:** bookmarking any community or request id and then reading the bookmark list returned a private community's name, which the community list hides, or the title of a request in a community the member cannot see.
   - **The toggles:** as release bookmarks already did (ADR-0036 §5), the create arm answers a community or request the member cannot reach with the same `404` as a missing one. Un-bookmarking stays open, so a member who lost access can still remove the row.

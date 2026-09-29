@@ -148,10 +148,14 @@ describe('reports.listMyReports', () => {
     prismaMock.report.findMany.mockResolvedValue([summary] as never);
     // resolveSourceUrls calls forumPost.findMany for ForumPost targets
     prismaMock.forumPost.findMany.mockResolvedValue([
-      { id: 42, forumTopicId: 5, forumTopic: { forumId: 3 } }
+      {
+        id: 42,
+        forumTopicId: 5,
+        forumTopic: { forum: { id: 3, minClassRead: 0 } }
+      }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(prismaMock.report.count).toHaveBeenCalledWith({
       where: { reporterId: 7 }
@@ -164,10 +168,14 @@ describe('reports.listMyReports', () => {
     prismaMock.report.count.mockResolvedValue(1);
     prismaMock.report.findMany.mockResolvedValue([summary] as never);
     prismaMock.forumPost.findMany.mockResolvedValue([
-      { id: 42, forumTopicId: 5, forumTopic: { forumId: 3 } }
+      {
+        id: 42,
+        forumTopicId: 5,
+        forumTopic: { forum: { id: 3, minClassRead: 0 } }
+      }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBe('/forums/3/topics/5');
   });
@@ -181,7 +189,7 @@ describe('reports.listMyReports', () => {
       { id: 42, communityId: 5 }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBe('/communities/5/releases/42');
   });
@@ -195,7 +203,7 @@ describe('reports.listMyReports', () => {
       { id: 42, communityId: null }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBeNull();
   });
@@ -206,10 +214,10 @@ describe('reports.listMyReports', () => {
       { ...summary, targetType: 'ForumTopic' as const, targetId: 44 }
     ] as never);
     prismaMock.forumTopic.findMany.mockResolvedValue([
-      { id: 44, forumId: 9 }
+      { id: 44, forum: { id: 9, minClassRead: 0 } }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBe('/forums/9/topics/44');
   });
@@ -220,7 +228,7 @@ describe('reports.listMyReports', () => {
       { ...summary, targetType: 'Collage' as const, targetId: 7 }
     ] as never);
 
-    const result = await listMyReports(7, 1);
+    const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 
     expect(result.reports[0].sourceUrl).toBe('/collages/7');
   });
@@ -361,14 +369,14 @@ describe('reports.getReport', () => {
 
   it('returns not_found when report does not exist', async () => {
     prismaMock.report.findUnique.mockResolvedValue(null);
-    const result = await getReport(1, 7, false);
+    const result = await getReport(1, { id: 7, userRankLevel: 100 }, false);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('not_found');
   });
 
   it('returns forbidden when non-staff requester is not the reporter', async () => {
     prismaMock.report.findUnique.mockResolvedValue(baseReport);
-    const result = await getReport(1, 99, false);
+    const result = await getReport(1, { id: 99, userRankLevel: 100 }, false);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('forbidden');
   });
@@ -376,10 +384,14 @@ describe('reports.getReport', () => {
   it('resolves sourceUrl for ForumPost targets', async () => {
     prismaMock.report.findUnique.mockResolvedValue(baseReport);
     prismaMock.forumPost.findMany.mockResolvedValue([
-      { id: 42, forumTopicId: 5, forumTopic: { forumId: 3 } }
+      {
+        id: 42,
+        forumTopicId: 5,
+        forumTopic: { forum: { id: 3, minClassRead: 0 } }
+      }
     ] as never);
 
-    const result = await getReport(1, 7, false);
+    const result = await getReport(1, { id: 7, userRankLevel: 100 }, false);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -390,10 +402,14 @@ describe('reports.getReport', () => {
   it('allows staff to view any report regardless of reporter', async () => {
     prismaMock.report.findUnique.mockResolvedValue(baseReport);
     prismaMock.forumPost.findMany.mockResolvedValue([
-      { id: 42, forumTopicId: 5, forumTopic: { forumId: 3 } }
+      {
+        id: 42,
+        forumTopicId: 5,
+        forumTopic: { forum: { id: 3, minClassRead: 0 } }
+      }
     ] as never);
 
-    const result = await getReport(1, 99, true);
+    const result = await getReport(1, { id: 99, userRankLevel: 100 }, true);
     expect(result.ok).toBe(true);
   });
 });

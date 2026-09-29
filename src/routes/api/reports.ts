@@ -76,7 +76,7 @@ router.get(
   validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
   authHandler(async (req, res) => {
     const { page } = parsedQuery<{ page: number }>(res);
-    const result = await listMyReports(req.user.id, page);
+    const result = await listMyReports(req.user, page);
     res.json(result);
   })
 );
@@ -137,7 +137,7 @@ router.get(
       await loadPermissions(req, res),
       'reports_manage'
     );
-    const result = await getReport(id, req.user.id, isStaff);
+    const result = await getReport(id, req.user, isStaff);
     if (!result.ok) {
       if (result.reason === 'forbidden')
         return res.status(403).json({ msg: 'Permission denied' });
