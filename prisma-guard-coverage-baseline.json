@@ -84,7 +84,13 @@
     "src/modules/staffInbox.ts::unresolveTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts). The update clears resolverId and sets no foreign key.",
     "src/modules/staffInbox.ts::assignTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts). assignedUserId is null or a user read just before, and users are never hard-deleted.",
     "src/modules/bootstrap.ts::seedRanks::userRank.update": "Seed code, run by the boot seed before the server listens (docker-entrypoint.sh) and by POST /install only while installedAt is null, when no user yet holds a permission. The rank is read by id just before, and deleting a rank needs rank_permissions_manage (tools.ts), so none can vanish in between. The update writes no foreign key, and name is rewritten only when it already matches (the skip above), so neither unique can be violated.",
-    "src/modules/bootstrap.ts::seedForums::forum.create": "Seed code, run by the boot seed before the server listens (docker-entrypoint.sh) and by POST /install only while installedAt is null, when no user yet holds a permission. forumCategoryId is the category created just before, and deleting one needs forums_manage (forumCategory.ts). Forum carries no unique constraint."
+    "src/modules/bootstrap.ts::seedForums::forum.create": "Seed code, run by the boot seed before the server listens (docker-entrypoint.sh) and by POST /install only while installedAt is null, when no user yet holds a permission. forumCategoryId is the category created just before, and deleting one needs forums_manage (forumCategory.ts). Forum carries no unique constraint.",
+    "src/modules/pm.ts::viewConversation::privateConversationParticipant.update": "The conversation and its participants are read just before, the update is addressed by the caller's own participant key, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts). It writes no foreign key or unique column.",
+    "src/modules/pm.ts::updateConversationFlags::privateConversationParticipant.update": "The caller's participant row is read by (conversationId, userId) just before the update, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts). The update writes no foreign key or unique column.",
+    "src/modules/pm.ts::deleteConversation::privateConversationParticipant.update": "The caller's participant row is read by (conversationId, userId) just before the update, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts). The update writes no foreign key or unique column. A delete only hides the conversation from both boxes.",
+    "src/modules/pm.ts::msg::privateMessage.create": "conversationId is the conversation of the caller's participant row, read just before, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts); senderId is session-derived. PrivateMessage carries no unique constraint.",
+    "src/modules/pm.ts::message::privateConversationParticipant.update": "The sender's own row: every participant row is read by conversationId before the transaction, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts). The update writes no foreign key or unique column.",
+    "src/modules/pm.ts::message::privateConversationParticipant.update#2": "Each other participant's row: every participant row is read by conversationId before the transaction, and PM conversations, participants and messages are never hard-deleted (noHardDelete.spec.ts). The update writes no foreign key or unique column."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
@@ -114,12 +120,6 @@
     "src/modules/linkHealth.ts::recordContributionReport::contribution.update",
     "src/modules/linkHealth.ts::recordContributionReport::contributionReport.create",
     "src/modules/notificationFilters.ts::created::notificationFilter.create",
-    "src/modules/pm.ts::deleteConversation::privateConversationParticipant.update",
-    "src/modules/pm.ts::message::privateConversationParticipant.update",
-    "src/modules/pm.ts::message::privateConversationParticipant.update#2",
-    "src/modules/pm.ts::msg::privateMessage.create",
-    "src/modules/pm.ts::updateConversationFlags::privateConversationParticipant.update",
-    "src/modules/pm.ts::viewConversation::privateConversationParticipant.update",
     "src/modules/profile.ts::updateProfile::profile.update",
     "src/modules/profile.ts::updateProfile::userSettings.update",
     "src/modules/rankProgressionJob.ts::applyRankChange::notification.create",
