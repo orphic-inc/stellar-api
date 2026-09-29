@@ -1,10 +1,7 @@
 import express, { Request, Response } from 'express';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import {
-  requirePermission,
-  requireAdminOnly
-} from '../../middleware/permissions';
+import { requirePermission } from '../../middleware/permissions';
 import { prisma } from '../../lib/prisma';
 import { getSystemStats } from '../../modules/stats';
 import {
@@ -119,7 +116,7 @@ router.get(
 // GET /api/stats/site-info — aggregate DB counts (admin only)
 router.get(
   '/site-info',
-  ...requireAdminOnly(),
+  ...requirePermission('admin'),
   asyncHandler(async (_req: Request, res: Response) => {
     const [
       totalUsers,

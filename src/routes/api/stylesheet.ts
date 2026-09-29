@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { requireStrictAdmin } from '../../middleware/permissions';
+import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
@@ -164,7 +164,7 @@ router.post(
 // GET /api/stylesheet/admin/stats — must be before /:id
 router.get(
   '/admin/stats',
-  ...requireStrictAdmin(),
+  ...requirePermission('admin'),
   asyncHandler(async (_req: Request, res: Response) => {
     const stats = await getStylesheetStats();
     res.json(stats);
@@ -200,7 +200,7 @@ router.get(
 // POST /api/stylesheet
 router.post(
   '/',
-  ...requireStrictAdmin(),
+  ...requirePermission('admin'),
   validate(stylesheetSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const data = parsedBody<StylesheetInput>(res);
@@ -217,7 +217,7 @@ router.post(
 // PUT /api/stylesheet/:id
 router.put(
   '/:id',
-  ...requireStrictAdmin(),
+  ...requirePermission('admin'),
   validateParams(stylesheetIdParamsSchema),
   validate(stylesheetUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
@@ -231,7 +231,7 @@ router.put(
 // DELETE /api/stylesheet/:id
 router.delete(
   '/:id',
-  ...requireStrictAdmin(),
+  ...requirePermission('admin'),
   validateParams(stylesheetIdParamsSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parsedParams<{ id: number }>(res);

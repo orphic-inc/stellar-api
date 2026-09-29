@@ -308,7 +308,7 @@ src/
     releaseWorkbench/         # The release edit surface, split by concern: authority, contributions, history, load, metadata, snapshot, tags, votes
   middleware/
     auth.ts                 # JWT cookie decode → DB lookup → req.user; exports requireAuth
-    permissions.ts          # loadPermissions, requirePermission, requireOwnerOrPermission, requireAdminOnly, requireStrictAdmin (no role helpers — ADR-0001)
+    permissions.ts          # loadPermissions, requirePermission, requireOwnerOrPermission (no role helpers — ADR-0001)
     rateLimiter.ts          # authLimiter, writeLimiter, installLimiter, downloadLimiter, feedAuthLimiter, feedLimiter
     serviceAuth.ts          # requireServiceKey — Bearer gate for korin.pink inbound calls (ADR-0013; fails closed)
     imageSrc.ts             # resolveImageSrcs (wraps res.json to add the image `*Src` siblings); registerBodyImages (registers a body's image fields where the gate is the whole authorization)
