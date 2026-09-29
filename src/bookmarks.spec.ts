@@ -1,6 +1,9 @@
 import { Prisma } from '@prisma/client';
 import { makeRelease } from './test/factories';
-import { releaseVisibleToViewer } from './modules/communityAccess';
+import {
+  releaseVisibleToViewer,
+  requestVisibleTo
+} from './modules/communityAccess';
 import {
   request,
   app,
@@ -240,6 +243,7 @@ describe('GET /api/bookmarks/communities', () => {
 
 describe('POST /api/bookmarks/communities/:communityId', () => {
   it('toggles a community bookmark on', async () => {
+    prismaMock.community.findFirst.mockResolvedValue({ id: 3 } as never);
     prismaMock.bookmarkCommunity.findUnique.mockResolvedValue(null);
     prismaMock.bookmarkCommunity.create.mockResolvedValue({} as never);
 
@@ -299,6 +303,7 @@ describe('GET /api/bookmarks/requests', () => {
 
 describe('POST /api/bookmarks/requests/:requestId', () => {
   it('toggles a request bookmark on', async () => {
+    prismaMock.request.findFirst.mockResolvedValue({ id: 10 } as never);
     prismaMock.bookmarkRequest.findUnique.mockResolvedValue(null);
     prismaMock.bookmarkRequest.create.mockResolvedValue({} as never);
 
@@ -370,12 +375,15 @@ describe.each([
       };
 
     beforeEach(() => {
-      // The releases route gained a visibility check ahead of the create
-      // (ADR-0036 §5), which answers 404 before Prisma is ever reached. Stub it
-      // OPEN so these tests keep exercising the constraint arms they are about
-      // — without this they would still pass, for the wrong reason, and #564's
-      // coverage would quietly lapse. Inert for the other three segments.
+      // The release, community and request routes check visibility ahead of
+      // the create (ADR-0036 §5, #772), which answers 404 before Prisma is
+      // ever reached. Stub each OPEN so these tests keep exercising the
+      // constraint arms they are about — without this the 404 case would
+      // still pass, for the wrong reason, and #564's coverage would quietly
+      // lapse. Each stub is inert for the other segments.
       prismaMock.release.findFirst.mockResolvedValue(makeRelease());
+      prismaMock.community.findFirst.mockResolvedValue({ id: 5 } as never);
+      prismaMock.request.findFirst.mockResolvedValue({ id: 5 } as never);
     });
 
     it('answers 404, not 500, when the path id names nothing', async () => {
@@ -439,7 +447,10 @@ describe('GET /api/bookmarks/requests — withdrawn requests (#598)', () => {
 
     expect(prismaMock.bookmarkRequest.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: 7, request: { deletedAt: null } }
+        where: {
+          userId: 7,
+          request: { deletedAt: null, ...requestVisibleTo(7) }
+        }
       })
     );
   });

@@ -10,6 +10,10 @@ import {
   reverseDownloadAccess
 } from '../modules/downloads';
 import { removeConsumedReleaseBookmarks } from '../modules/bookmark';
+import {
+  communityReadableWhere,
+  requestVisibleTo
+} from '../modules/communityAccess';
 
 beforeEach(async () => {
   await truncateAll();
@@ -201,5 +205,68 @@ describe('bookmark constraint behaviour (#564)', () => {
         where: { userId: user.id, artistId: 2_000_000_000 }
       })
     ).resolves.toEqual({ count: 0 });
+  });
+});
+
+// #772: the lists filter through the bookmark to its community or request.
+// The route test pins that the route uses these where clauses; this proves
+// the nested relation filters select the right rows in a real database.
+describe('bookmark list visibility (#772)', () => {
+  it('drops a closed community and its requests once the member leaves', async () => {
+    const member = await createUser('member', 10n);
+    const closed = await testPrisma.community.create({
+      data: {
+        name: `BM-Closed-${Date.now()}-${Math.random()}`,
+        image: '',
+        registrationStatus: RegistrationStatus.closed,
+        type: CommunityType.Music,
+        consumers: { create: { userId: member.id } }
+      }
+    });
+    const req = await testPrisma.request.create({
+      data: {
+        communityId: closed.id,
+        userId: member.id,
+        title: 'secret-request',
+        description: 'd',
+        type: ReleaseType.Music
+      }
+    });
+    await testPrisma.bookmarkCommunity.create({
+      data: { userId: member.id, communityId: closed.id }
+    });
+    await testPrisma.bookmarkRequest.create({
+      data: { userId: member.id, requestId: req.id }
+    });
+
+    const communities = () =>
+      testPrisma.bookmarkCommunity.findMany({
+        where: {
+          userId: member.id,
+          community: communityReadableWhere(member.id)
+        }
+      });
+    const requests = () =>
+      testPrisma.bookmarkRequest.findMany({
+        where: {
+          userId: member.id,
+          request: { deletedAt: null, ...requestVisibleTo(member.id) }
+        }
+      });
+
+    expect(await communities()).toHaveLength(1);
+    expect(await requests()).toHaveLength(1);
+
+    // Leaving the community: the rows stay (ADR-0036 §7), the lists hide them.
+    await testPrisma.consumer.update({
+      where: { userId: member.id },
+      data: { communities: { disconnect: { id: closed.id } } }
+    });
+
+    expect(await communities()).toHaveLength(0);
+    expect(await requests()).toHaveLength(0);
+    expect(
+      await testPrisma.bookmarkRequest.count({ where: { userId: member.id } })
+    ).toBe(1);
   });
 });

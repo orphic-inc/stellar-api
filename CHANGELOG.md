@@ -25,6 +25,13 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Community and request bookmarks no longer reveal what the member cannot see** (#772, the second instance of #771).
+  - **What was open:** bookmarking any community or request id and then reading the bookmark list returned a private community's name, which the community list hides, or the title of a request in a community the member cannot see.
+  - **The toggles:** as release bookmarks already did (ADR-0036 §5), the create arm answers a community or request the member cannot reach with the same `404` as a missing one. Un-bookmarking stays open, so a member who lost access can still remove the row.
+  - **The lists:** now filtered by the same rule.
+  - **Deleted requests:** bookmarking one now answers `404`, as the request's own page does, rather than creating a bookmark the list never shows.
+  - The contract adds no codes.
+
 - **Request surfaces now apply community access, as the request reads do** (#755, the first instance of #771).
   - **What was open:** any signed-in member could vote on, bounty, fill, edit, unfill or delete a request in a community they cannot see, given its id. They could also read its bounty history. Bounty, fill, edit and unfill returned the full request.
   - **Now:** every one of these surfaces answers a request the caller cannot reach exactly as it answers a missing one (`404`), and writes nothing.
