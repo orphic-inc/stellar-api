@@ -102,6 +102,15 @@ describe('requirePermission', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("staff alone does not satisfy requirePermission('admin')", async () => {
+    getUserRankAccessMock.mockResolvedValue({ permissions: { staff: true } });
+    const [req, res, next] = makeReqRes();
+    const [, checkMw] = requirePermission('admin');
+    await checkMw(req, res as unknown as Response, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('propagates errors from loadPermissions via next(err)', async () => {
     const dbError = new Error('DB connection lost');
     getUserRankAccessMock.mockRejectedValue(dbError);

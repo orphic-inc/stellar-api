@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **`requireAdminOnly` and `requireStrictAdmin` are gone** (#515). Both reduced to the same test as `requirePermission('admin')`, whose `admin` check runs first, and their comments promised a staff exclusion that never existed. Their five routes (`GET /stylesheet/admin/stats`, stylesheet create, update and delete, and `GET /stats/site-info`) now use `requirePermission('admin')`: same answers, same contract. The four stylesheet routes also log their denials, as every other permission gate does.
+
 ## [0.9.9] — 2026-09-28
 
 **Upgrade note: take a database backup before deploying.** One migration runs,
