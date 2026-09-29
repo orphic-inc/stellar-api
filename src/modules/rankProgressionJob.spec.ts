@@ -136,7 +136,7 @@ describe('runRankProgressionSweep', () => {
 
     const result = await runRankProgressionSweep();
 
-    expect(result).toEqual({ scanned: 1, promoted: 1, demoted: 0 });
+    expect(result).toEqual({ scanned: 1, promoted: 1, demoted: 0, failed: 0 });
     // Primary rank moved to Member (id 2)…
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 5 },
@@ -189,7 +189,7 @@ describe('runRankProgressionSweep', () => {
 
     const result = await runRankProgressionSweep();
 
-    expect(result).toEqual({ scanned: 1, promoted: 0, demoted: 0 });
+    expect(result).toEqual({ scanned: 1, promoted: 0, demoted: 0, failed: 0 });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
@@ -212,13 +212,39 @@ describe('runRankProgressionSweep', () => {
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
+  // One user's failure used to abandon the sweep, so everyone later in the
+  // cursor went unevaluated until the next day's run (#596).
+  it('keeps going past a user whose rank change throws', async () => {
+    mockLadder();
+    prismaMock.user.findFirst.mockResolvedValue({ id: 9 } as never);
+    prismaMock.user.findMany.mockResolvedValueOnce([
+      promotingUser,
+      { ...promotingUser, id: 6 }
+    ] as never);
+    mockedEligibleBytes.mockResolvedValue(20n * GiB);
+    prismaMock.contribution.count.mockResolvedValue(0 as never);
+    prismaMock.contribution.findMany.mockResolvedValue([] as never);
+    prismaMock.userWarning.count.mockResolvedValue(0 as never);
+    prismaMock.user.update.mockRejectedValueOnce(
+      new Error('Record to update not found')
+    );
+
+    const result = await runRankProgressionSweep();
+
+    expect(result).toEqual({ scanned: 2, promoted: 1, demoted: 0, failed: 1 });
+    expect(prismaMock.user.update).toHaveBeenLastCalledWith({
+      where: { id: 6 },
+      data: { userRankId: 2 }
+    });
+  });
+
   it('no-ops when there is no SysOp actor to attribute changes to', async () => {
     mockLadder();
     prismaMock.user.findFirst.mockResolvedValue(null);
 
     const result = await runRankProgressionSweep();
 
-    expect(result).toEqual({ scanned: 0, promoted: 0, demoted: 0 });
+    expect(result).toEqual({ scanned: 0, promoted: 0, demoted: 0, failed: 0 });
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 });
