@@ -16,6 +16,8 @@ jest.mock('../lib/prisma', () => ({
 import {
   computeRatio,
   floorSub,
+  debitBalance,
+  decrementFloored,
   getConsumptionBracket,
   computeRequiredRatio,
   getEligibleContributionBytes,
@@ -51,6 +53,79 @@ describe('floorSub', () => {
   it('floors at zero rather than going negative', () => {
     expect(floorSub(3n, 10n)).toBe(0n);
     expect(floorSub(0n, 1n)).toBe(0n);
+  });
+});
+
+// ─── debitBalance ────────────────────────────────────────────────────────────
+
+describe('debitBalance', () => {
+  const balance = { contributed: 1000n, consumed: 200n };
+  const makeTx = (count: number) => {
+    const updateMany = jest.fn().mockResolvedValue({ count });
+    return { tx: { user: { updateMany } } as never, updateMany };
+  };
+
+  it('refuses 400 without writing when the balance does not cover the amount', async () => {
+    const { tx, updateMany } = makeTx(1);
+    await expect(debitBalance(tx, 7, balance, 801n)).rejects.toMatchObject({
+      statusCode: 400
+    });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('debits with a snapshot compare-and-swap on both columns as read', async () => {
+    const { tx, updateMany } = makeTx(1);
+    await debitBalance(tx, 7, balance, 800n);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 7, consumed: 200n, contributed: 1000n },
+      data: { consumed: { increment: 800n } }
+    });
+  });
+
+  it('answers 409 when either column moved since the read', async () => {
+    const { tx } = makeTx(0);
+    await expect(debitBalance(tx, 7, balance, 800n)).rejects.toMatchObject({
+      statusCode: 409
+    });
+  });
+});
+
+// ─── decrementFloored ────────────────────────────────────────────────────────
+
+describe('decrementFloored', () => {
+  const makeTx = (...counts: number[]) => {
+    const updateMany = jest.fn();
+    counts.forEach((count) => updateMany.mockResolvedValueOnce({ count }));
+    return { tx: { user: { updateMany } } as never, updateMany };
+  };
+
+  it('decrements in place when the balance covers the amount', async () => {
+    const { tx, updateMany } = makeTx(1);
+    await decrementFloored(tx, 7, 'contributed', 100n);
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 7, contributed: { gte: 100n } },
+      data: { contributed: { decrement: 100n } }
+    });
+  });
+
+  it('floors at zero, conditionally, when the balance is below the amount', async () => {
+    const { tx, updateMany } = makeTx(0, 1);
+    await decrementFloored(tx, 7, 'consumed', 100n);
+    expect(updateMany).toHaveBeenLastCalledWith({
+      where: { id: 7, consumed: { lt: 100n } },
+      data: { consumed: 0n }
+    });
+  });
+
+  it('retries when a concurrent credit makes neither statement match', async () => {
+    const { tx, updateMany } = makeTx(0, 0, 1);
+    await decrementFloored(tx, 7, 'contributed', 100n);
+    expect(updateMany).toHaveBeenCalledTimes(3);
+    expect(updateMany).toHaveBeenLastCalledWith({
+      where: { id: 7, contributed: { gte: 100n } },
+      data: { contributed: { decrement: 100n } }
+    });
   });
 });
 

@@ -327,4 +327,46 @@ describe('grantDownloadAccess — ratio-exempt (PRD-06 #4)', () => {
     expect(c.consumed).toBe(0n);
     expect(k.contributed).toBe(0n);
   });
+  // #760: two concurrent reversals of one grant. The claim lets exactly one
+  // through; the other answers 409 and writes nothing.
+  it('a concurrent double reversal posts one ledger pair and refunds once', async () => {
+    const COST = 1_000_000;
+    const staff = await createUser('dbl-staff');
+    const contributor = await createUser('dbl-contrib', {
+      contributed: BigInt(COST)
+    });
+    const consumer = await createUser('dbl-consumer', {
+      contributed: BigInt(COST * 5)
+    });
+    const contribution = await createContribution(contributor.id, COST);
+    const grant = await grantDownloadAccess(consumer.id, contribution.id);
+
+    const results = await Promise.allSettled([
+      reverseDownloadAccess(staff.id, grant.grantId, 'first'),
+      reverseDownloadAccess(staff.id, grant.grantId, 'second')
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected'
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ statusCode: 409 });
+
+    const reversals = await testPrisma.economyTransaction.findMany({
+      where: {
+        contextId: grant.grantId,
+        reason: EconomyTransactionReason.STAFF_REVERSAL
+      }
+    });
+    expect(reversals).toHaveLength(2);
+    const c = await testPrisma.user.findUniqueOrThrow({
+      where: { id: consumer.id }
+    });
+    const k = await testPrisma.user.findUniqueOrThrow({
+      where: { id: contributor.id }
+    });
+    expect(c.consumed).toBe(0n);
+    expect(k.contributed).toBe(BigInt(COST));
+  });
 });

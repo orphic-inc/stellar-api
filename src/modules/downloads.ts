@@ -8,7 +8,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { translatePrismaError } from '../lib/prismaErrors';
 import { getLogger } from './logging';
-import { floorSub } from './ratio';
+import { debitBalance, decrementFloored } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
 import { runInBackground } from './backgroundTasks';
 
@@ -134,23 +134,7 @@ export const grantDownloadAccess = async (
     const suppressConsumer = exempt !== RatioExempt.NONE;
     const suppressContributor = exempt === RatioExempt.NEUTRALPASS;
 
-    if (!suppressConsumer) {
-      if (consumer.contributed - consumer.consumed < cost)
-        throw new AppError(400, 'Insufficient contributed balance');
-
-      // CAS: atomically increment consumed, guarding against concurrent balance drain
-      const debited = await tx.user.updateMany({
-        where: {
-          id: consumerId,
-          consumed: { lte: consumer.contributed - cost }
-        },
-        data: {
-          consumed: { increment: cost }
-        }
-      });
-      if (debited.count === 0)
-        throw new AppError(409, 'Balance changed concurrently, please retry');
-    }
+    if (!suppressConsumer) await debitBalance(tx, consumerId, consumer, cost);
 
     // Credit contributor balance (skipped for NEUTRALPASS).
     if (!suppressContributor) {
@@ -237,16 +221,19 @@ export const reverseDownloadAccess = async (
     if (grant.status !== DownloadGrantStatus.COMPLETED)
       throw new AppError(409, 'Grant is not in COMPLETED state');
 
-    const [consumer, contributor] = await Promise.all([
-      tx.user.findUniqueOrThrow({
-        where: { id: grant.consumerId },
-        select: { consumed: true, contributed: true }
-      }),
-      tx.user.findUniqueOrThrow({
-        where: { id: grant.contributorId },
-        select: { consumed: true, contributed: true }
-      })
-    ]);
+    // Claim the reversal before any money moves (#760): of two concurrent
+    // reversals only one matches COMPLETED, and the other writes nothing.
+    const claimed = await tx.downloadAccessGrant.updateMany({
+      where: { id: grantId, status: DownloadGrantStatus.COMPLETED },
+      data: {
+        status: DownloadGrantStatus.REVERSED,
+        reversedAt: new Date(),
+        reversalReason: reason ?? null,
+        reversedById: staffId
+      }
+    });
+    if (claimed.count === 0)
+      throw new AppError(409, 'Grant is not in COMPLETED state');
 
     // Mirror the grant's exemption (snapshotted at grant time): only reverse a
     // side that actually accrued. Clawing back `amountBytes` on a suppressed side
@@ -254,23 +241,23 @@ export const reverseDownloadAccess = async (
     const suppressConsumer = grant.ratioExempt !== RatioExempt.NONE;
     const suppressContributor = grant.ratioExempt === RatioExempt.NEUTRALPASS;
 
-    // Refund consumer (consumed decrements; contributed unchanged). floorSub keeps
-    // the balance from going negative if it was set out-of-band below the grant.
+    // Refund the consumer (consumed decrements; contributed unchanged) and claw
+    // back from the contributor, each floored at zero.
     if (!suppressConsumer) {
-      await tx.user.update({
-        where: { id: grant.consumerId },
-        data: { consumed: floorSub(consumer.consumed, grant.amountBytes) }
-      });
+      await decrementFloored(
+        tx,
+        grant.consumerId,
+        'consumed',
+        grant.amountBytes
+      );
     }
-
-    // Claw back from contributor balance, floored at zero (same rationale).
     if (!suppressContributor) {
-      await tx.user.update({
-        where: { id: grant.contributorId },
-        data: {
-          contributed: floorSub(contributor.contributed, grant.amountBytes)
-        }
-      });
+      await decrementFloored(
+        tx,
+        grant.contributorId,
+        'contributed',
+        grant.amountBytes
+      );
     }
 
     // Reversal ledger entries — zero on a side whose grant accrual was suppressed,
@@ -296,16 +283,6 @@ export const reverseDownloadAccess = async (
       }
     });
 
-    const updated = await tx.downloadAccessGrant.update({
-      where: { id: grantId },
-      data: {
-        status: DownloadGrantStatus.REVERSED,
-        reversedAt: new Date(),
-        reversalReason: reason ?? null,
-        reversedById: staffId
-      }
-    });
-
-    return { grantId: updated.id, status: updated.status };
+    return { grantId, status: DownloadGrantStatus.REVERSED };
   });
 };

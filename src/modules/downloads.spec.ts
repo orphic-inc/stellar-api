@@ -23,7 +23,8 @@ const mockTx = {
     findFirst: jest.fn(),
     findUnique: jest.fn(),
     create: jest.fn(),
-    update: jest.fn()
+    update: jest.fn(),
+    updateMany: jest.fn()
   },
   economyTransaction: { create: jest.fn() },
   consumer: { upsert: jest.fn(), update: jest.fn() }
@@ -231,10 +232,13 @@ describe('grantDownloadAccess', () => {
 
     expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        // Snapshot CAS (#760): both columns as read, so a concurrent
+        // claw-back of `contributed` also fails the debit.
+        where: {
           id: 7,
-          consumed: { lte: expect.anything() }
-        }),
+          consumed: makeUser().consumed,
+          contributed: makeUser().contributed
+        },
         data: { consumed: { increment: cost } }
       })
     );
@@ -281,90 +285,102 @@ describe('reverseDownloadAccess', () => {
     });
   });
 
-  it('reverses ledger, clamps balances to the clawed-back value, marks grant REVERSED', async () => {
-    const grant = makeGrant();
-    const twice = grant.amountBytes * 2n;
-    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
-    // findUniqueOrThrow called for consumer then contributor
-    mockTx.user.findUniqueOrThrow
-      .mockResolvedValueOnce({
-        consumed: twice,
-        contributed: BigInt('2000000000')
-      }) // consumer
-      .mockResolvedValueOnce({
-        consumed: 0n,
-        contributed: twice
-      }); // contributor
-    mockTx.user.update.mockResolvedValue(undefined);
-    mockTx.economyTransaction.create.mockResolvedValue(undefined);
-    mockTx.downloadAccessGrant.update.mockResolvedValue({
-      ...grant,
-      status: DownloadGrantStatus.REVERSED,
-      reversedById: 99
+  // #760: the claim is the first write. A concurrent reversal that passed the
+  // pre-check loses here and writes nothing: no balances, no ledger rows.
+  it('throws 409 and writes nothing when a concurrent reversal claimed the grant', async () => {
+    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(makeGrant());
+    mockTx.downloadAccessGrant.updateMany.mockResolvedValue({ count: 0 });
+    await expect(reverseDownloadAccess(99, 1, 'reason')).rejects.toMatchObject({
+      statusCode: 409
     });
+    expect(mockTx.user.updateMany).not.toHaveBeenCalled();
+    expect(mockTx.economyTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('claims the grant before moving any money', async () => {
+    const grant = makeGrant();
+    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
+    mockTx.downloadAccessGrant.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.user.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
+
+    await reverseDownloadAccess(99, 1, 'Dead link');
+
+    expect(mockTx.downloadAccessGrant.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, status: DownloadGrantStatus.COMPLETED },
+      data: {
+        status: DownloadGrantStatus.REVERSED,
+        reversedAt: expect.any(Date),
+        reversalReason: 'Dead link',
+        reversedById: 99
+      }
+    });
+    const claimOrder =
+      mockTx.downloadAccessGrant.updateMany.mock.invocationCallOrder[0];
+    const moneyOrders = [
+      ...mockTx.user.updateMany.mock.invocationCallOrder,
+      ...mockTx.economyTransaction.create.mock.invocationCallOrder
+    ];
+    expect(moneyOrders.every((o) => o > claimOrder)).toBe(true);
+  });
+
+  it('decrements both balances rather than writing values it read, and posts the ledger pair', async () => {
+    const grant = makeGrant();
+    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
+    mockTx.downloadAccessGrant.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.user.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
 
     const result = await reverseDownloadAccess(99, 1, 'Dead link');
 
-    expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // contributor clawed back (contributed set to twice - amount = amount)
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: grant.contributorId },
-        data: { contributed: grant.amountBytes }
-      })
-    );
-    // consumer refunded (consumed set to twice - amount = amount; contributed unchanged)
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: grant.consumerId },
-        data: { consumed: grant.amountBytes }
-      })
-    );
-    expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
+    // No balance read: a read-then-write would overwrite a concurrent grant.
+    expect(mockTx.user.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(mockTx.user.update).not.toHaveBeenCalled();
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith({
+      where: { id: grant.consumerId, consumed: { gte: grant.amountBytes } },
+      data: { consumed: { decrement: grant.amountBytes } }
+    });
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: grant.contributorId,
+        contributed: { gte: grant.amountBytes }
+      },
+      data: { contributed: { decrement: grant.amountBytes } }
+    });
     type TxCall = [{ data: Record<string, unknown> }];
     const ledgerCalls = (
       mockTx.economyTransaction.create.mock.calls as TxCall[]
     ).map(([arg]) => arg.data);
-    expect(ledgerCalls.every((r) => r.reason === 'STAFF_REVERSAL')).toBe(true);
-    expect(ledgerCalls.every((r) => r.actorUserId === 99)).toBe(true);
-    expect(result.status).toBe(DownloadGrantStatus.REVERSED);
-  });
-
-  it('clamps oversized reversal to zero rather than driving balances negative', async () => {
-    // Balances set out-of-band (e.g. seed-e2e-users or a staff adjustment) can be
-    // smaller than the grant being reversed. The claw-back must floor at zero, not
-    // subtract past it into negative territory.
-    const grant = makeGrant();
-    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(grant);
-    mockTx.user.findUniqueOrThrow
-      .mockResolvedValueOnce({
-        consumed: BigInt(1000), // < amountBytes
-        contributed: BigInt('2000000000')
-      }) // consumer
-      .mockResolvedValueOnce({
-        consumed: 0n,
-        contributed: BigInt(1000) // < amountBytes
-      }); // contributor
-    mockTx.user.update.mockResolvedValue(undefined);
-    mockTx.economyTransaction.create.mockResolvedValue(undefined);
-    mockTx.downloadAccessGrant.update.mockResolvedValue({
-      ...grant,
+    expect(ledgerCalls).toEqual([
+      expect.objectContaining({
+        userId: grant.consumerId,
+        amount: grant.amountBytes,
+        reason: EconomyTransactionReason.STAFF_REVERSAL,
+        actorUserId: 99
+      }),
+      expect.objectContaining({
+        userId: grant.contributorId,
+        amount: -grant.amountBytes,
+        reason: EconomyTransactionReason.STAFF_REVERSAL,
+        actorUserId: 99
+      })
+    ]);
+    expect(result).toEqual({
+      grantId: 1,
       status: DownloadGrantStatus.REVERSED
     });
+  });
 
-    await reverseDownloadAccess(99, 1, 'Dead link');
+  it('moves no balance on a side the grant suppressed (Neutralpass)', async () => {
+    mockTx.downloadAccessGrant.findUnique.mockResolvedValue(
+      makeGrant({ ratioExempt: RatioExempt.NEUTRALPASS })
+    );
+    mockTx.downloadAccessGrant.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.economyTransaction.create.mockResolvedValue(undefined);
 
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: grant.consumerId },
-        data: { consumed: 0n }
-      })
-    );
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: grant.contributorId },
-        data: { contributed: 0n }
-      })
-    );
+    await reverseDownloadAccess(99, 1);
+
+    expect(mockTx.user.updateMany).not.toHaveBeenCalled();
+    expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
   });
 });
