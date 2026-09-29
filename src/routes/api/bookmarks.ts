@@ -11,7 +11,11 @@ import {
   withPrimaryArtist
 } from '../../modules/releaseCredits';
 import { removeConsumedReleaseBookmarks } from '../../modules/bookmark';
-import { releaseVisibleToViewer } from '../../modules/communityAccess';
+import {
+  communityReadableWhere,
+  releaseVisibleToViewer,
+  requestVisibleTo
+} from '../../modules/communityAccess';
 
 const router = express.Router();
 
@@ -217,8 +221,13 @@ router.get(
   '/communities',
   requireAuth,
   authHandler(async (req, res) => {
+    // Filtered like the community list itself (#772): a private community's
+    // name is not echoed to a member outside it, whenever they bookmarked it.
     const bookmarks = await prisma.bookmarkCommunity.findMany({
-      where: { userId: req.user.id },
+      where: {
+        userId: req.user.id,
+        community: communityReadableWhere(req.user.id)
+      },
       include: { community: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -244,6 +253,14 @@ router.post(
       });
       return res.json({ bookmarked: false });
     }
+    // Only the create arm is gated, as for releases (ADR-0036 §5, #772): a
+    // community the caller cannot reach answers the P2003 arm's own 404.
+    const reachable = await prisma.community.findFirst({
+      where: { id: communityId, ...communityReadableWhere(req.user.id) },
+      select: { id: true }
+    });
+    if (!reachable) throw new AppError(404, 'Community not found');
+
     try {
       await prisma.bookmarkCommunity.create({
         data: { userId: req.user.id, communityId }
@@ -290,7 +307,10 @@ router.get(
     // (modules/requestLifecycle.ts), so this returned a title whose own route
     // answers 404 (#598).
     const bookmarks = await prisma.bookmarkRequest.findMany({
-      where: { userId: req.user.id, request: { deletedAt: null } },
+      where: {
+        userId: req.user.id,
+        request: { deletedAt: null, ...requestVisibleTo(req.user.id) }
+      },
       include: { request: { select: { id: true, title: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -316,6 +336,19 @@ router.post(
       });
       return res.json({ bookmarked: false });
     }
+    // Only the create arm is gated, as for releases (ADR-0036 §5, #772). A
+    // request the caller cannot reach, or a deleted one, is not found, as the
+    // request detail read answers; the P2003 arm below says the same.
+    const visible = await prisma.request.findFirst({
+      where: {
+        id: requestId,
+        deletedAt: null,
+        ...requestVisibleTo(req.user.id)
+      },
+      select: { id: true }
+    });
+    if (!visible) throw new AppError(404, 'Request not found');
+
     try {
       await prisma.bookmarkRequest.create({
         data: { userId: req.user.id, requestId }
