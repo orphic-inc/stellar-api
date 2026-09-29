@@ -48,6 +48,10 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   // Staff PM tickets are resolved, never deleted (#596).
   ['staffInboxConversation', 'staff_inbox_conversations'],
   ['staffInboxMessage', 'staff_inbox_messages'],
+  // A PM is hidden from a box (inInbox/inSentbox false), never deleted (#596).
+  ['privateConversation', 'private_conversations'],
+  ['privateConversationParticipant', 'private_conversation_participants'],
+  ['privateMessage', 'private_messages'],
   ['downloadAccessGrant', 'download_access_grants'],
   ['consumer', 'consumers']
 ];
