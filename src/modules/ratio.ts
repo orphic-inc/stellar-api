@@ -1,6 +1,9 @@
-import { LinkHealthStatus } from '@prisma/client';
+import { LinkHealthStatus, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { getLogger } from './logging';
+
+const log = getLogger('ratio');
 
 const GiB = BigInt(1024 ** 3);
 
@@ -34,6 +37,68 @@ export const computeRatio = (contributed: bigint, consumed: bigint): number => {
 // reversed, and an unclamped decrement would drive `contributed`/`consumed`
 // negative. One tested helper so every reversal/refund site clamps identically.
 export const floorSub = (a: bigint, b: bigint): bigint => (a >= b ? a - b : 0n);
+
+/**
+ * Debit `amount` from a member's balance: `consumed` grows by it (#766).
+ * `balance` is the member as the caller read it. The write is a snapshot
+ * compare-and-swap on both columns, so it fails if either moved since that
+ * read, whether through a concurrent debit or a claw-back of `contributed`.
+ */
+export const debitBalance = async (
+  tx: Prisma.TransactionClient,
+  userId: number,
+  balance: { contributed: bigint; consumed: bigint },
+  amount: bigint
+): Promise<void> => {
+  if (balance.contributed - balance.consumed < amount)
+    throw new AppError(400, 'Insufficient contributed balance');
+  const debited = await tx.user.updateMany({
+    where: {
+      id: userId,
+      consumed: balance.consumed,
+      contributed: balance.contributed
+    },
+    data: { consumed: { increment: amount } }
+  });
+  if (debited.count === 0)
+    throw new AppError(409, 'Balance changed concurrently, please retry');
+};
+
+/**
+ * Take `amount` off one balance column as a decrement, floored at zero (#766).
+ * Decrementing rather than writing a value read earlier keeps a concurrent
+ * increment; a read-then-write would overwrite it. The floor binds only when
+ * the balance was set out-of-band below the amount, so it is logged. Callers
+ * record the nominal amount in the ledger either way.
+ */
+export const decrementFloored = async (
+  tx: Prisma.TransactionClient,
+  userId: number,
+  column: 'contributed' | 'consumed',
+  amount: bigint
+): Promise<void> => {
+  // A credit committing between the two statements makes neither match, so
+  // retry until one does; each miss needs another concurrent commit.
+  for (;;) {
+    const decremented = await tx.user.updateMany({
+      where: { id: userId, [column]: { gte: amount } },
+      data: { [column]: { decrement: amount } }
+    });
+    if (decremented.count === 1) return;
+    const floored = await tx.user.updateMany({
+      where: { id: userId, [column]: { lt: amount } },
+      data: { [column]: 0n }
+    });
+    if (floored.count === 1) {
+      log.warn('Balance floored at zero', {
+        userId,
+        column,
+        amount: `${amount}`
+      });
+      return;
+    }
+  }
+};
 
 export const getConsumptionBracket = (
   consumedBytes: bigint

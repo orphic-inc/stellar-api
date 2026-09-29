@@ -25,6 +25,12 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A download reversal can no longer pay out twice or erase a concurrent download's debit** (#760, the first instance of #766).
+  - Two concurrent reversals of one grant both passed the `COMPLETED` check. Each refunded the consumer, clawed back from the contributor, and posted a `STAFF_REVERSAL` pair. The reversal now claims the grant as its first write, and the loser answers the existing `409` without writing anything.
+  - Reversals wrote balances as values read earlier, so a download or credit committed in between was overwritten. They now decrement, floored at zero by a shared `decrementFloored`, and log when the floor binds, which only a balance set out-of-band can cause.
+  - A download's debit now pins both balance columns it read, through a shared `debitBalance` that #767 reuses. The old bound read `contributed` stale, so a concurrent claw-back let the member overdraw. A lost race answers the existing `409`.
+  - The contract is unchanged.
+
 - **Three account races no longer answer `500`** (#596, the fifth guard-coverage burn-down under ADR-0048: `modules/auth.ts`, a high-risk file, so error translation only).
   - Two registrations for one address, both past the duplicate pre-check, now answer `user_exists` like the pre-check. The losing registration's invite claim rolls back rather than being spent.
   - Changing to an address another account just took answers `400 Email already in use`.
