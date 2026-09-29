@@ -9,7 +9,7 @@
  * response without being asked, so the contract should too. Only schemas a 2xx
  * response reaches are touched, so a request body never gains one.
  */
-import { IMAGE_FIELDS, srcKey } from '../modules/imageSrc';
+import { IMAGE_FIELDS, IMAGE_LIST_FIELDS, srcKey } from '../modules/imageSrc';
 
 type Node = Record<string, unknown>;
 
@@ -23,6 +23,13 @@ const SRC_SCHEMA = {
     'What a browser may load for the image field beside it: a path on this origin (an imported or uploaded image is /api/asset/<hash>), or null while a remote image is not imported. Never a remote URL (ADR-0051).'
 };
 
+const SRC_LIST_SCHEMA = {
+  type: 'array',
+  items: { type: 'string' },
+  description:
+    'What a browser may load for the image list beside it: each image as a path on this origin, with any remote image not yet imported left out. Never a remote URL (ADR-0051).'
+};
+
 /** Add the siblings to one object schema's own properties. */
 function declareSiblings(schema: Node): void {
   const props = schema.properties;
@@ -30,11 +37,13 @@ function declareSiblings(schema: Node): void {
   const required = Array.isArray(schema.required)
     ? (schema.required as string[])
     : null;
-  for (const field of IMAGE_FIELDS) {
-    if (!(field in props) || srcKey(field) in props) continue;
-    props[srcKey(field)] = { ...SRC_SCHEMA };
+  const declare = (field: string, sibling: object) => {
+    if (!(field in props) || srcKey(field) in props) return;
+    props[srcKey(field)] = sibling;
     if (required?.includes(field)) required.push(srcKey(field));
-  }
+  };
+  for (const field of IMAGE_FIELDS) declare(field, { ...SRC_SCHEMA });
+  for (const field of IMAGE_LIST_FIELDS) declare(field, { ...SRC_LIST_SCHEMA });
 }
 
 /**

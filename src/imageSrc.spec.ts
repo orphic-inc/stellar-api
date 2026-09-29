@@ -82,6 +82,20 @@ describe('addImageSrcs', () => {
     expect(prismaMock.remoteImage.findMany).toHaveBeenCalledTimes(1);
   });
 
+  it('resolves an image list, dropping what is not imported', async () => {
+    expect(
+      await resolved({ coverImages: [IMPORTED, PENDING, UPLOAD] })
+    ).toEqual({
+      coverImages: [IMPORTED, PENDING, UPLOAD],
+      coverImagesSrc: [IMPORTED_ASSET, UPLOAD]
+    });
+  });
+
+  it('leaves a list that does not hold strings alone', async () => {
+    const body = await resolved({ coverImages: [{ image: 1 }] });
+    expect(body).toEqual({ coverImages: [{ image: 1 }] });
+  });
+
   it('leaves a key that does not hold a string alone', async () => {
     const body = await resolved({ image: { type: 'string' }, avatar: 3 });
     expect(body).toEqual({ image: { type: 'string' }, avatar: 3 });

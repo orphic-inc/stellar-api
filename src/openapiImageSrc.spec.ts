@@ -48,7 +48,11 @@ const buildDoc = () => ({
     schemas: {
       Returned: {
         type: 'object',
-        properties: { author: withImage(), image: { type: 'string' } }
+        properties: {
+          author: withImage(),
+          image: { type: 'string' },
+          coverImages: { type: 'array', items: { type: 'string' } }
+        }
       },
       ErrorOnly: withImage(),
       Sent: withImage()
@@ -68,6 +72,10 @@ it('declares a sibling on what a 2xx response returns, nested or not', () => {
     nullable: true
   });
   expect(returned.properties.author.properties).toHaveProperty('avatarSrc');
+  expect(returned.properties.coverImagesSrc).toMatchObject({
+    type: 'array',
+    items: { type: 'string' }
+  });
   // Required exactly where the raw field is, since the hook always adds it.
   expect(returned.properties.author.required).toEqual([
     'id',

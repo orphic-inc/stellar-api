@@ -891,6 +891,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "coverImagesSrc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What a browser may load for the image list beside it: each image as a path on this origin, with any remote image not yet imported left out. Never a remote URL (ADR-0051)."
           }
         },
         "required": [
@@ -901,7 +908,8 @@
           "numEntries",
           "createdAt",
           "updatedAt",
-          "coverImages"
+          "coverImages",
+          "coverImagesSrc"
         ]
       },
       "ProfileCollageShelves": {
