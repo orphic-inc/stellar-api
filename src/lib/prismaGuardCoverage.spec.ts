@@ -7,6 +7,7 @@
  */
 import {
   checkPrismaGuardCoverage,
+  isGatedSite,
   type Baseline,
   type MutationSite
 } from './prismaGuardCoverage';
@@ -94,9 +95,8 @@ describe('guard-coverage ratchet', () => {
   });
 
   it('counts an ungated area without failing on it', () => {
-    // src/modules is measured, not enforced: a module takes its ids as
-    // arguments, so request-supplied cannot be told from internally-read
-    // without inter-procedural analysis.
+    // The mechanism an ungated area uses. Since ADR-0048 the real gate covers
+    // every area, so this pins the comparator, not the policy.
     const r = run(
       [site({ area: 'modules', key: 'm::f::thing.create' })],
       baseline()
@@ -113,5 +113,66 @@ describe('guard-coverage ratchet', () => {
     );
     expect(r.ok).toBe(false);
     expect(r.newlyUnguarded).toEqual(['POST /things::thing.create']);
+  });
+
+  // ── ADR-0048 (#596): modules and lib are gated; devTools is not ─────────────
+  const everyArea = (sites: MutationSite[], b: Baseline) =>
+    checkPrismaGuardCoverage({
+      sites,
+      baseline: b,
+      gated: ['routes', 'modules', 'lib']
+    });
+
+  it('fails on an unguarded module site once modules are gated', () => {
+    const key = 'src/modules/forum.ts::updateTopic::forumTopic.update';
+    const r = everyArea([site({ area: 'modules', key, arm: 'B' })], baseline());
+    expect(r.ok).toBe(false);
+    expect(r.newlyUnguarded).toEqual([key]);
+  });
+
+  // Narrowing the gate must not pass silently: the backlog's entries would all
+  // still match live, unguarded sites, so rules 2 and 3 alone never fire.
+  it('fails an entry whose site the gate no longer covers', () => {
+    const key = 'src/modules/forum.ts::updateTopic::forumTopic.update';
+    const r = run(
+      [site({ area: 'modules', key, arm: 'B' })],
+      baseline({ unreviewed: [key] })
+    );
+    expect(r.ok).toBe(false);
+    expect(r.staleBaseline).toEqual([key]);
+  });
+
+  it('never fails on a dev-only path, and counts it apart', () => {
+    const key =
+      'src/modules/devTools/generators/releases.ts::f::release.create';
+    const r = everyArea([site({ area: 'modules', key })], baseline());
+    expect(r.ok).toBe(true);
+    expect(r.newlyUnguarded).toEqual([]);
+    expect(r.totals.devOnly).toBe(1);
+    expect(r.totals.countedOnly).toBe(0);
+  });
+
+  it('matches the dev-only prefix by path, not by a name containing it', () => {
+    const key = 'src/modules/devToolsAudit.ts::f::thing.create';
+    const r = everyArea([site({ area: 'modules', key })], baseline());
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe('isGatedSite', () => {
+  it('gates a site in a gated area', () => {
+    expect(
+      isGatedSite(site({ area: 'lib', key: 'src/lib/x.ts::f::t.create' }), [
+        'lib'
+      ])
+    ).toBe(true);
+  });
+
+  it('never gates a dev-only site, whatever the areas', () => {
+    const dev = site({
+      area: 'modules',
+      key: 'src/modules/devTools/cleanup.ts::f::t.delete'
+    });
+    expect(isGatedSite(dev, ['routes', 'modules', 'lib'])).toBe(false);
   });
 });

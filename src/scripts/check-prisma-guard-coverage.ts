@@ -10,6 +10,7 @@ import * as ts from 'typescript';
 import { Prisma } from '@prisma/client';
 import {
   checkPrismaGuardCoverage,
+  isGatedSite,
   type Baseline,
   type MutationSite
 } from '../lib/prismaGuardCoverage';
@@ -20,7 +21,9 @@ import {
 
 const ROOT = resolve(__dirname, '../..');
 const BASELINE = join(ROOT, 'prisma-guard-coverage-baseline.json');
-const GATED = ['routes'] as const;
+// Every area, since ADR-0048 (#596). src/modules/devTools/ stays outside the
+// gate by path: see DEV_ONLY_PREFIXES.
+const GATED = ['routes', 'modules', 'lib'] as const;
 
 /** Per-model constraint facts — the authority for arm A's precondition. */
 const modelFacts = (): ModelFacts => {
@@ -159,9 +162,7 @@ const loadBaseline = (): Baseline => {
 
 const writeBaseline = (sites: MutationSite[]): void => {
   const unreviewed = sites
-    .filter(
-      (s) => s.arm !== null && !s.guarded && GATED.includes(s.area as 'routes')
-    )
+    .filter((s) => s.arm !== null && !s.guarded && isGatedSite(s, GATED))
     .map((s) => s.key)
     .sort();
   const existing = loadBaseline();
@@ -204,7 +205,7 @@ const main = (): void => {
   console.log(
     `${t.sites} prisma mutation sites, ${t.candidates} need a guard ` +
       `(${t.guarded} guarded, ${t.internallyDerived} internally derived, ` +
-      `${t.unreviewed} unreviewed, ${t.countedOnly} counted in src/modules + src/lib but not gated).`
+      `${t.unreviewed} unreviewed, ${t.devOnly} in dev-only paths and not gated).`
   );
   for (const k of r.newlyUnguarded) {
     console.error(`UNGUARDED, not baselined: ${k}`);

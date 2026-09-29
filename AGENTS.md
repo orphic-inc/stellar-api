@@ -516,7 +516,9 @@ Throw `new AppError(statusCode, 'message')` from modules; the global handler in 
 
 The global handler is `err.statusCode ?? 500` and maps no Prisma error code.
 An unhandled constraint violation therefore reports a client mistake as a
-server error. `npm run prisma:guard-coverage` gates `src/routes/`.
+server error. `npm run prisma:guard-coverage` gates routes, modules and lib,
+except `src/modules/devTools/`. The rule and its boundary are in
+[decision record 0048](docs/adr/0048-module-writes-meet-the-same-guard-rule.md).
 
 Two arms, and the second is the one that gets missed:
 
@@ -542,11 +544,14 @@ Notes on the helper — why the return type is `never`, what happens to codes th
 map omits, and why it is a function declaration — are in its doc comment in
 `lib/prismaErrors.ts`, next to the code they describe.
 
-Two things to know at the call site:
+Three things to know at the call site:
 
-- The `try` belongs in the handler. `prisma:guard-coverage` finds guards
-  structurally, so a catch behind a call is invisible to it. Where that makes a
-  handler too large, extract other logic instead — `collages.ts` does.
+- The `try` belongs in the function that makes the write, route or module.
+  `prisma:guard-coverage` finds guards structurally, so a catch in a caller is
+  invisible to it. Where that makes a function too large, extract other logic
+  instead — `collages.ts` does.
+- A module called from a background job also needs that job's own policy for a
+  failed item, pinned by the job's spec. The translated error suits only a route.
 - Prefer the longhand form when an arm returns a response rather than throwing,
   such as a toggle answering `200` with the resulting state. Only a throwing arm
   can be a map entry, and the mixed case measured longer through the helper than

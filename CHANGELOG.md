@@ -15,6 +15,12 @@ All notable changes to stellar-api are documented here.
 
 ### Changed
 
+- **`prisma:guard-coverage` now gates `src/modules/` and `src/lib/`, not only routes** (#596, [ADR-0048](docs/adr/0048-module-writes-meet-the-same-guard-rule.md)). A new unguarded Prisma write anywhere in them now fails CI.
+  - Both arms apply as they do for routes. Arm B (update or delete by id) needs no knowledge of where the id came from.
+  - `src/modules/devTools/` is excluded by path, in one place, because it never serves a production request.
+  - The 205 existing sites start in `unreviewed`, to reach zero by the v0.11.0 cut, one file per pull request. `lib/audit.ts` is the first `internallyDerived` module entry.
+  - Each release cut now records the count (`docs/runbooks/release.md`).
+
 - **`requireAdminOnly` and `requireStrictAdmin` are gone** (#515). Both reduced to the same test as `requirePermission('admin')`, whose `admin` check runs first, and their comments promised a staff exclusion that never existed. Their five routes (`GET /stylesheet/admin/stats`, stylesheet create, update and delete, and `GET /stats/site-info`) now use `requirePermission('admin')`: same answers, same contract. The four stylesheet routes also log their denials, as every other permission gate does.
 
 ### Fixed
