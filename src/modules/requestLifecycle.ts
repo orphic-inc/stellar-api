@@ -4,7 +4,7 @@ import { translatePrismaError } from '../lib/prismaErrors';
 import { requestVisibleTo } from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
-import { floorSub } from './ratio';
+import { debitBalance, decrementFloored } from './ratio';
 import { CreateRequestInput, UpdateRequestInput } from '../schemas/requests';
 import { emitNotifications } from '../lib/notifications';
 import { registerWriteImages } from './remoteImage';
@@ -285,16 +285,7 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'User not found');
-    if (user.contributed - user.consumed < input.bounty) {
-      throw new AppError(400, 'Insufficient contributed balance');
-    }
-
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        consumed: { increment: input.bounty }
-      }
-    });
+    await debitBalance(tx, userId, user, input.bounty);
 
     // A repeated artist id means the same artist; de-duplicated rather than
     // refused, since RequestArtist is unique per request (#756).
@@ -390,22 +381,19 @@ export async function addBounty(
   }
 
   return await prisma.$transaction(async (tx) => {
-    const request = await tx.request.findUnique({
-      where: { id: requestId, status: 'open', deletedAt: null }
+    // Claim the request row first (#767). A fill, unfill or delete claims the
+    // same row, so this bounty either commits before theirs, and they read it
+    // after their claim, or waits and then finds the request no longer open.
+    const claimed = await tx.request.updateMany({
+      where: { id: requestId, status: 'open', deletedAt: null },
+      data: { updatedAt: new Date() }
     });
-    if (!request) throw new AppError(404, 'Request not found or not open');
+    if (claimed.count === 0)
+      throw new AppError(404, 'Request not found or not open');
 
     const user = await tx.user.findUnique({ where: { id: userId } });
-    if (!user || user.contributed - user.consumed < amount) {
-      throw new AppError(400, 'Insufficient contributed balance');
-    }
-
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        consumed: { increment: amount }
-      }
-    });
+    if (!user) throw new AppError(400, 'Insufficient contributed balance');
+    await debitBalance(tx, userId, user, amount);
 
     await tx.economyTransaction.create({
       data: {
@@ -466,8 +454,7 @@ export async function fillRequest(
 
     // Pre-validate against the request before the atomic step
     const request = await tx.request.findUnique({
-      where: { id: requestId, status: 'open', deletedAt: null },
-      include: { bounties: true }
+      where: { id: requestId, status: 'open', deletedAt: null }
     });
     if (!request) throw new AppError(404, 'Request not found or not open');
 
@@ -499,11 +486,6 @@ export async function fillRequest(
       );
     }
 
-    const totalBounty = request.bounties.reduce(
-      (sum, b) => sum + b.amount,
-      BigInt(0)
-    );
-
     // Atomic open → filled transition: only succeeds if still open
     const result = await tx.request.updateMany({
       where: { id: requestId, status: 'open', deletedAt: null },
@@ -522,6 +504,11 @@ export async function fillRequest(
         'Request was already filled by another submission'
       );
     }
+
+    // Total the bounties after the claim (#767): a bounty committed after the
+    // pre-read is paid too, and none can be added while the claim is held.
+    const bounties = await tx.requestBounty.findMany({ where: { requestId } });
+    const totalBounty = bounties.reduce((sum, b) => sum + b.amount, BigInt(0));
 
     if (totalBounty > BigInt(0)) {
       await tx.user.update({
@@ -566,7 +553,7 @@ export async function fillRequest(
     // Notify requester + all bounty contributors (excluding the filler)
     const interestedUserIds = [
       request.userId,
-      ...request.bounties.map((b) => b.userId)
+      ...bounties.map((b) => b.userId)
     ];
     const uniqueIds = [...new Set(interestedUserIds)];
     await emitNotifications(tx, {
@@ -589,6 +576,63 @@ export async function fillRequest(
   });
 }
 
+/**
+ * Claw back from the filler exactly what their fill was paid: the latest
+ * RequestFill's `awardedAmount` (#767). Call after the unfill's claim.
+ */
+async function clawBackFill(
+  tx: Prisma.TransactionClient,
+  requestId: number,
+  fillerId: number,
+  actorId: number
+) {
+  const fill = await tx.requestFill.findFirst({
+    where: { requestId, fillerId },
+    orderBy: { id: 'desc' }
+  });
+  if (!fill) throw new AppError(500, 'Filled request has no fill record');
+  if (fill.awardedAmount <= BigInt(0)) return;
+
+  await decrementFloored(tx, fillerId, 'contributed', fill.awardedAmount);
+  await tx.economyTransaction.create({
+    data: {
+      userId: fillerId,
+      amount: -fill.awardedAmount,
+      reason: 'REQUEST_UNFILL',
+      contextId: requestId,
+      contextType: 'request',
+      actorUserId: actorId
+    }
+  });
+}
+
+/**
+ * Refund every bounty on a deleted open request (#767), read after the
+ * delete's claim so a bounty committed before it is refunded too.
+ * Returns how many were refunded.
+ */
+async function refundBounties(
+  tx: Prisma.TransactionClient,
+  requestId: number,
+  actorId: number
+): Promise<number> {
+  const bounties = await tx.requestBounty.findMany({ where: { requestId } });
+  for (const bounty of bounties) {
+    await decrementFloored(tx, bounty.userId, 'consumed', bounty.amount);
+    await tx.economyTransaction.create({
+      data: {
+        userId: bounty.userId,
+        amount: bounty.amount,
+        reason: 'REQUEST_REFUND',
+        contextId: requestId,
+        contextType: 'request',
+        actorUserId: actorId
+      }
+    });
+  }
+  return bounties.length;
+}
+
 // ─── unfillRequest ────────────────────────────────────────────────────────────
 // Now owns authorization: owner, filler, or moderator may unfill.
 // Claws back bounty from the filler and re-opens the request.
@@ -606,8 +650,7 @@ export async function unfillRequest({
 }): Promise<SerializedRequest> {
   return await prisma.$transaction(async (tx) => {
     const request = await tx.request.findUnique({
-      where: { id: requestId, deletedAt: null },
-      include: { bounties: true }
+      where: { id: requestId, deletedAt: null }
     });
     if (!request) throw new AppError(404, 'Request not found');
     if (request.status !== 'filled')
@@ -621,37 +664,17 @@ export async function unfillRequest({
     if (!request.fillerId)
       throw new AppError(500, 'Filled request has no fillerId');
 
-    const totalBounty = request.bounties.reduce(
-      (sum, b) => sum + b.amount,
-      BigInt(0)
-    );
-
-    if (totalBounty > BigInt(0)) {
-      const filler = await tx.user.findUniqueOrThrow({
-        where: { id: request.fillerId },
-        select: { consumed: true, contributed: true }
-      });
-      await tx.user.update({
-        where: { id: request.fillerId },
-        data: {
-          contributed: floorSub(filler.contributed, totalBounty)
-        }
-      });
-
-      await tx.economyTransaction.create({
-        data: {
-          userId: request.fillerId,
-          amount: -totalBounty,
-          reason: 'REQUEST_UNFILL',
-          contextId: requestId,
-          contextType: 'request',
-          actorUserId: actorId
-        }
-      });
-    }
-
-    await tx.request.update({
-      where: { id: requestId },
+    // Claim before any money moves (#767): of two concurrent unfills only one
+    // matches. Pinning the filler read above means an unfill that raced an
+    // unfill-and-refill cannot clear the new fill while clawing back from the
+    // old filler.
+    const claimed = await tx.request.updateMany({
+      where: {
+        id: requestId,
+        status: 'filled',
+        deletedAt: null,
+        fillerId: request.fillerId
+      },
       data: {
         status: 'open',
         fillerId: null,
@@ -659,6 +682,9 @@ export async function unfillRequest({
         filledContributionId: null
       }
     });
+    if (claimed.count === 0) throw new AppError(422, 'Request is not filled');
+
+    await clawBackFill(tx, requestId, request.fillerId, actorId);
 
     await tx.requestAction.create({
       data: {
@@ -696,8 +722,7 @@ export async function deleteRequest({
 }) {
   return await prisma.$transaction(async (tx) => {
     const request = await tx.request.findUnique({
-      where: { id: requestId, deletedAt: null },
-      include: { bounties: true }
+      where: { id: requestId, deletedAt: null }
     });
     if (!request) throw new AppError(404, 'Request not found');
 
@@ -709,36 +734,20 @@ export async function deleteRequest({
       throw new AppError(403, 'Only staff can delete a filled request');
     }
 
-    // Refund bounties only for open requests (bounty not yet disbursed)
-    if (request.status === 'open') {
-      for (const bounty of request.bounties) {
-        const user = await tx.user.findUniqueOrThrow({
-          where: { id: bounty.userId },
-          select: { consumed: true, contributed: true }
-        });
-        await tx.user.update({
-          where: { id: bounty.userId },
-          data: {
-            consumed: floorSub(user.consumed, bounty.amount)
-          }
-        });
-        await tx.economyTransaction.create({
-          data: {
-            userId: bounty.userId,
-            amount: bounty.amount,
-            reason: 'REQUEST_REFUND',
-            contextId: requestId,
-            contextType: 'request',
-            actorUserId: actorId
-          }
-        });
-      }
-    }
-
-    await tx.request.update({
-      where: { id: requestId },
+    // Claim before any money moves (#767), pinning the status read above: of
+    // two concurrent deletes only one refunds, and a delete that raced a fill
+    // cannot refund bounties the fill has just paid out.
+    const claimed = await tx.request.updateMany({
+      where: { id: requestId, deletedAt: null, status: request.status },
       data: { deletedAt: new Date() }
     });
+    if (claimed.count === 0) throw new AppError(404, 'Request not found');
+
+    // Refund bounties only for open requests (bounty not yet disbursed)
+    const refundedCount =
+      request.status === 'open'
+        ? await refundBounties(tx, requestId, actorId)
+        : 0;
 
     await tx.requestAction.create({
       data: {
@@ -747,7 +756,7 @@ export async function deleteRequest({
         action: 'DELETE',
         metadata: {
           wasStatus: request.status,
-          refundedCount: request.status === 'open' ? request.bounties.length : 0
+          refundedCount
         }
       }
     });

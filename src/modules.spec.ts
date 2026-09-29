@@ -925,7 +925,7 @@ describe('requests.createRequest', () => {
       contributed: BigInt(2e9),
       consumed: BigInt(0)
     } as never);
-    prismaMock.user.update.mockResolvedValueOnce({} as never);
+    prismaMock.user.updateMany.mockResolvedValueOnce({ count: 1 } as never);
     prismaMock.request.create.mockResolvedValueOnce({
       id: 1,
       status: 'open',
@@ -994,13 +994,12 @@ describe('requests.unfillRequest', () => {
         fillerId: null,
         bounties: [{ amount: BigInt(110_000_000) }]
       } as never);
-    prismaMock.user.findUniqueOrThrow.mockResolvedValueOnce({
-      consumed: BigInt(0),
-      contributed: BigInt(110_000_000)
+    prismaMock.request.updateMany.mockResolvedValueOnce({ count: 1 } as never);
+    prismaMock.requestFill.findFirst.mockResolvedValueOnce({
+      awardedAmount: BigInt(110_000_000)
     } as never);
-    prismaMock.user.update.mockResolvedValueOnce({} as never);
+    prismaMock.user.updateMany.mockResolvedValueOnce({ count: 1 } as never);
     prismaMock.economyTransaction.create.mockResolvedValueOnce({} as never);
-    prismaMock.request.update.mockResolvedValueOnce({} as never);
     prismaMock.requestAction.create.mockResolvedValueOnce({} as never);
 
     await unfillRequest({
@@ -1009,13 +1008,11 @@ describe('requests.unfillRequest', () => {
       canModerateRequests: true
     });
 
-    // Claw-back clamps to the floored value (110000000 - 110000000 = 0).
-    expect(prismaMock.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 42 },
-        data: { contributed: 0n }
-      })
-    );
+    // Claws back the fill's awarded amount as a decrement (#767).
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 42, contributed: { gte: BigInt(110_000_000) } },
+      data: { contributed: { decrement: BigInt(110_000_000) } }
+    });
   });
 });
 

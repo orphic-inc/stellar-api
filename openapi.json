@@ -31376,6 +31376,16 @@
               }
             }
           },
+          "409": {
+            "description": "The caller's balance changed while the bounty was debited; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited, or the body adds more new remote images than the daily ceiling allows",
             "content": {
@@ -31471,7 +31481,7 @@
             }
           },
           "409": {
-            "description": "A racing first bounty by the same member was recorded first; retry",
+            "description": "The caller's balance changed while the bounty was debited, or a racing first bounty by the same member was recorded first; retry",
             "content": {
               "application/json": {
                 "schema": {

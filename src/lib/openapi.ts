@@ -7499,6 +7499,9 @@ registry.registerPath({
       content: { 'application/json': { schema: Request } }
     },
     403: msgResponse('Missing requests_create'),
+    409: msgResponse(
+      "The caller's balance changed while the bounty was debited; retry"
+    ),
     429: imageCeilingResponse
   }
 });
@@ -7548,7 +7551,8 @@ registry.registerPath({
     ),
     404: msgResponse('Request not found, or not open'),
     409: msgResponse(
-      'A racing first bounty by the same member was recorded first; retry'
+      "The caller's balance changed while the bounty was debited, or a " +
+        'racing first bounty by the same member was recorded first; retry'
     )
   }
 });
