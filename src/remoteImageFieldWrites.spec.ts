@@ -178,13 +178,20 @@ const MODULES: ModuleCase[] = [
   },
   {
     name: 'createCommunityRelease',
-    setup: () =>
-      prismaMock.community.findUnique.mockResolvedValue({ id: 1 } as never),
+    setup: () => {
+      prismaMock.community.findUnique.mockResolvedValue({ id: 1 } as never);
+      prismaMock.artist.count.mockResolvedValue(0);
+    },
     run: () =>
       createCommunityRelease({
         actorId: 7,
         communityId: 1,
-        data: { title: 'R', description: 'plain', image: IMG } as never
+        data: {
+          title: 'R',
+          description: 'plain',
+          image: IMG,
+          credits: []
+        } as never
       }),
     write: () => prismaMock.release.create
   },

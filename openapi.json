@@ -22502,7 +22502,7 @@
           "Communities"
         ],
         "summary": "Create a release in a community",
-        "description": "Requires `communities_manage`. At least one artist credit is required.",
+        "description": "Requires `communities_manage`. At least one artist credit is required. A credited artist id that names nothing, or an artist credited twice in the same role, also answers `400` (#596).",
         "parameters": [
           {
             "schema": {
@@ -23213,7 +23213,7 @@
           "Communities"
         ],
         "summary": "Delete a release",
-        "description": "Requires `communities_manage`.",
+        "description": "Requires `communities_manage`. A release with editions or contributions is refused with `409`; every release keeps an edition, so this is every release until #793 decides what the verb should do.",
         "parameters": [
           {
             "schema": {
@@ -23268,6 +23268,16 @@
           },
           "404": {
             "description": "Release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A release with editions or contributions cannot be deleted",
             "content": {
               "application/json": {
                 "schema": {

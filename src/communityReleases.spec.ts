@@ -341,6 +341,7 @@ describe('POST /api/communities/:communityId/releases', () => {
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
     prismaMock.release.create.mockResolvedValue(makeRelease() as never);
+    prismaMock.artist.count.mockResolvedValue(1);
     prismaMock.tag.findMany.mockResolvedValue([
       { id: 7, name: 'jazz' },
       { id: 9, name: 'fusion' }

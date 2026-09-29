@@ -38,6 +38,13 @@ All notable changes to stellar-api are documented here.
   - **Resolved:** all 12 sites. 11 are guarded, and 1 is recorded as internally derived.
   - The cover verbs move to `modules/releaseGroupCovers.ts`, unchanged. The contract is unchanged.
 
+- **Creating and deleting a community release no longer answer `500`** (#794, the eleventh guard-coverage burn-down under ADR-0048: `releaseLifecycle.ts`).
+  - **Create:** a credited artist id that names nothing now answers `400` before anything is written or counted against the image ceiling. So does an artist credited twice in the same role. A community deleted mid-request answers `404`.
+  - **Delete:** a racing delete answers `404`.
+    - **Every other delete answered `500`:** each release keeps an edition, and the database refuses to delete a release that has one. That now answers **`409`** (new) and says why.
+    - What deleting a release should do is #793. No ui surface calls this route.
+  - **Resolved:** all 5 sites. 2 are guarded, and 3 are recorded as internally derived. `noHardDelete.spec.ts` gains tags.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

@@ -5280,7 +5280,9 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Create a release in a community',
   description:
-    'Requires `communities_manage`. At least one artist credit is required.',
+    'Requires `communities_manage`. At least one artist credit is required. ' +
+    'A credited artist id that names nothing, or an artist credited twice in ' +
+    'the same role, also answers `400` (#596).',
   request: {
     params: z.object({ communityId: z.string() }),
     body: { content: { 'application/json': { schema: createReleaseSchema } } }
@@ -5328,7 +5330,10 @@ registry.registerPath({
   path: '/communities/{communityId}/releases/{releaseId}',
   tags: ['Communities'],
   summary: 'Delete a release',
-  description: 'Requires `communities_manage`.',
+  description:
+    'Requires `communities_manage`. A release with editions or ' +
+    'contributions is refused with `409`; every release keeps an edition, ' +
+    'so this is every release until #793 decides what the verb should do.',
   request: {
     params: z.object({
       communityId: z.string(),
@@ -5339,7 +5344,10 @@ registry.registerPath({
     204: {
       description: 'Release deleted'
     },
-    404: msgResponse('Release not found')
+    404: msgResponse('Release not found'),
+    409: msgResponse(
+      'A release with editions or contributions cannot be deleted'
+    )
   }
 });
 
