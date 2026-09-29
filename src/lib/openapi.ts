@@ -6014,7 +6014,11 @@ registry.registerPath({
       description: 'Contribution created',
       content: { 'application/json': { schema: Contribution } }
     },
-    404: msgResponse('Release not found, or in a community you cannot see')
+    404: msgResponse('Release not found, or in a community you cannot see'),
+    409: msgResponse(
+      'A contribution of this format already exists for the release, or ' +
+        'another upload is recording your contributor role (retry)'
+    )
   }
 });
 
@@ -6063,6 +6067,9 @@ registry.registerPath({
       }
     },
     404: msgResponse('Community not found, or one you cannot see'),
+    409: msgResponse(
+      'Another upload is recording your contributor role; retry'
+    ),
     429: imageCeilingResponse
   }
 });

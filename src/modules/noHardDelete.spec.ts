@@ -42,6 +42,9 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['request', 'requests'],
   ['requestBounty', 'request_bounties'],
   ['contribution', 'contributions'],
+  // Withdrawn by `deletedAt` (DELETE /artists/:id); editions have no delete.
+  ['artist', 'artists'],
+  ['edition', 'editions'],
   ['downloadAccessGrant', 'download_access_grants'],
   ['consumer', 'consumers']
 ];
@@ -64,13 +67,19 @@ const hardDeleteOf = ([delegate, table]: [string, string]) =>
     'i'
   );
 
+// A comment naming a delete is prose, not a call: artist.ts explains why it
+// does not call `prisma.artist.delete()`.
+const isCommentLine = (line: string) => /^\s*(\/\/|\*|\/\*)/.test(line);
+
 const offendersFor = (model: [string, string]) => {
   const pattern = hardDeleteOf(model);
   return production.flatMap((file) =>
     readFileSync(file, 'utf8')
       .split('\n')
       .flatMap((line, i) =>
-        pattern.test(line) ? [`${relative(ROOT, file)}:${i + 1}`] : []
+        pattern.test(line) && !isCommentLine(line)
+          ? [`${relative(ROOT, file)}:${i + 1}`]
+          : []
       )
   );
 };
@@ -86,6 +95,16 @@ describe('rows no production code hard-deletes', () => {
   });
 
   // Checks the matcher itself, so a regex typo cannot pass every model above.
+  it('skips comment lines, and only comment lines', () => {
+    expect(isCommentLine('// so `prisma.artist.delete()` could only')).toBe(
+      true
+    );
+    expect(isCommentLine(' * so `prisma.artist.delete()`')).toBe(true);
+    expect(isCommentLine('  await prisma.artist.delete({ where });')).toBe(
+      false
+    );
+  });
+
   it('would catch a delete of a listed model', () => {
     expect(
       hardDeleteOf(['forumTopic', 'forum_topics']).test(
@@ -108,6 +127,19 @@ describe('rows no production code hard-deletes', () => {
     expect(modelBlock('ForumTopic')).toMatch(
       /forum\s+Forum\s+@relation\("ForumTopics",[^)]*onDelete: Restrict\)/
     );
+  });
+
+  // An edition or a contribution pins its release (#596): a release delete
+  // fails while either exists, rather than taking them with it.
+  it.each([
+    ['Edition', 'release'],
+    ['Contribution', 'release']
+  ])('keeps Release → %s from cascading', (model, field) => {
+    const line = modelBlock(model)
+      .split('\n')
+      .find((l) => new RegExp(`^\\s*${field}\\s+Release\\s+@relation`).test(l));
+    expect(line).toBeDefined();
+    expect(line).not.toMatch(/onDelete:\s*Cascade/);
   });
 
   it('keeps Community → Request from cascading', () => {
