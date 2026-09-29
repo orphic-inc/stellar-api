@@ -2296,16 +2296,14 @@ registry.registerPath({
 // ─── Member Feed (ADR-0014, #262) ─────────────────────────────────────────────
 // No session and no `security` block: a feed reader cannot hold a cookie, so the
 // owner is authenticated by `user` + `token` in the query string. Every failure
-// to authenticate is the same 404, so the contract cannot promise a 401.
+// to authenticate is the same 404, so the contract cannot promise a 401. That
+// 404 is derived from the `feedToken` gate `requireFeedOwner` carries (#558).
 
 const memberFeedResponses = (what: string) => ({
   200: {
     description: `RSS 2.0: ${what}`,
     content: { 'application/rss+xml': { schema: z.string() } }
-  },
-  404: msgResponse(
-    'Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.'
-  )
+  }
 });
 
 const memberFeedDescription = (what: string) =>
@@ -11692,7 +11690,16 @@ export const securityForGates = (
   // `POST /auth/register` validates its body and needs no session, so an
   // unfiltered list would have reintroduced the identical bug on a far wider
   // blast radius — 269 routes run a validator, and 95 of them are public.
-  const NOT_CREDENTIALS: readonly GateKind[] = ['rateLimit', 'validation'];
+  //
+  // `bodyLimit` is plainly not a credential. `feedToken` IS one, but not a
+  // cookie: the Member Feed authenticates by query parameters, which its
+  // registrations describe, and it has never carried a `security` block (#558).
+  const NOT_CREDENTIALS: readonly GateKind[] = [
+    'rateLimit',
+    'validation',
+    'bodyLimit',
+    'feedToken'
+  ];
   const credentials = (gates ?? []).filter(
     (gate) => !NOT_CREDENTIALS.includes(gate.kind)
   );
@@ -11752,13 +11759,18 @@ const validationFailureDescription = (gates: readonly Gate[]): string => {
  * nothing is exactly what `requireOwnerOrPermission` means: an owner passes
  * without any permission at all.
  */
+/** Every code `expectedCodes` can derive. */
+type GateFailureCode = 400 | 401 | 403 | 404 | 413 | 429;
+
 const gateFailureDescription = (
   gates: readonly Gate[],
-  code: 400 | 401 | 403 | 429
+  code: GateFailureCode
 ): string => {
   // The limiter's own body is `{ msg: 'Too many requests, …' }`; this describes
   // the condition, as every other entry here does.
   if (code === 429) return 'Rate limited';
+  if (code === 413) return 'Request body exceeds the size limit';
+  if (code === 404) return FEED_TOKEN_FAILURE;
   // Which part of the request failed to parse. A caller sent a bad path
   // segment and a caller sent a bad payload have different problems, and the
   // 79 hand-written blocks this replaces called both `Validation error`.
@@ -11774,6 +11786,13 @@ const gateFailureDescription = (
     ? `Missing ${permissions.join(' or ')}`
     : 'Permission denied';
 };
+
+/**
+ * The one 404 every Member Feed failure answers (ADR-0014). Only the
+ * `feedToken` gate implies a 404, so this is the whole of that code's wording.
+ */
+const FEED_TOKEN_FAILURE =
+  'Feeds are not enabled, or the user/token pair does not authenticate a live member. Deliberately one answer for every case, so an id is never confirmed.';
 
 /**
  * The `responses` entries a route's gates imply, keyed by status code.
@@ -11805,9 +11824,7 @@ export const responsesForGates = (
   return Object.fromEntries(
     expectedCodes(gates, method).map((code) => [
       String(code),
-      bodyFor(code)(
-        gateFailureDescription(gates, code as 400 | 401 | 403 | 429)
-      )
+      bodyFor(code)(gateFailureDescription(gates, code as GateFailureCode))
     ])
   );
 };
@@ -11896,7 +11913,8 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
       // would be accurate in a literal sense and would drown the
       // per-operation distinctions the derived 401/403 exist to draw. OpenAPI
       // has no top-level `responses` to say it in, so prose is the only place
-      // it can go (#517).
+      // it can go (#517). The install check's 503 and the site-wide body
+      // parsers' 400/413 are the same case, and join it here (#558).
       description:
         'REST API for the Stellar community tracker. All routes under `/api/*`. ' +
         'Authentication uses JWT cookies (`token` cookie set on login). ' +
@@ -11904,7 +11922,10 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
         'endpoint can answer `403` with ' +
         '`{ msg: "Access from this network is not permitted" }` when the ' +
         "caller's IP is banned: that check runs before routing and applies " +
-        'even to endpoints needing no session.'
+        'even to endpoints needing no session. Likewise, every endpoint except ' +
+        '`/install`, `/version` and `/docs` answers `503` until the site is ' +
+        'installed. A malformed JSON or form body is refused with `400`, and ' +
+        'one over 100 kB with `413`, before any endpoint sees it.'
     },
     servers: [{ url: '/api', description: 'API server' }]
   });

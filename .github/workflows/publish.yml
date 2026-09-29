@@ -112,6 +112,13 @@ jobs:
         # (the shrinking burn-down) or as verified-silent. A new route is in
         # neither list and fails on its first CI run.
         run: npm run openapi:failure-coverage
+      - name: OpenAPI gate marks
+        if: ${{ !cancelled() }}
+        # #558 — the contract derives 401/403/429 from gate stamps, so a real
+        # gate nobody stamped goes undescribed, quietly (#509 F7). Every layer
+        # ahead of a contract route's handler must carry markGate or
+        # markNotGate; reads the real app, not the test harness.
+        run: npm run openapi:gate-marks
       - name: Prisma guard coverage
         if: ${{ !cancelled() }}
         # #564 — the global handler is `err.statusCode ?? 500` with FieldError

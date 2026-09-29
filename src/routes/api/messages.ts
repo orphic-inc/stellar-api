@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
+import { markGate } from '../../lib/routeGate';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import {
@@ -54,6 +55,7 @@ const sendLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+markGate(sendLimiter, 'rateLimit');
 
 const conversationIdSchema = z.object({
   id: z.coerce.number().int().positive()

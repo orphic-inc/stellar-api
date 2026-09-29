@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { isIpBanned } from '../modules/ipBan';
 import { getLogger } from '../modules/logging';
+import { markNotGate } from '../lib/routeGate';
 
 const log = getLogger('ipBan');
 
@@ -43,3 +44,11 @@ export const rejectBannedIps = async (
   }
   next();
 };
+
+// Its 403 is real, but every endpoint can answer it and none owns it, so the
+// document states it once rather than on each operation (#517, #558). Stamped
+// in place, as the limiters are, so the declaration above stays as it was.
+markNotGate(
+  rejectBannedIps,
+  'site-wide 403 for a banned address, stated once in the document description'
+);

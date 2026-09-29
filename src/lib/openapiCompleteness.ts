@@ -31,6 +31,10 @@ export interface Operation {
    *  the parameters that describe it (#517). Optional: the registered side of
    *  a comparison has no middleware to read. */
   gates?: Gate[];
+  /** The layers ahead of the handler that carry neither a gate stamp nor a
+   *  `markNotGate` mark (#558), each named for a failure message. Optional
+   *  for the same reason `gates` is. */
+  unmarked?: string[];
 }
 
 /**

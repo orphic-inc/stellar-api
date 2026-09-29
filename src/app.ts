@@ -16,6 +16,7 @@ import { FieldError } from './lib/errors';
 import { appVersion } from './lib/version';
 import { sentryBeforeSend } from './lib/sentry';
 import { asyncHandler } from './modules/asyncHandler';
+import { markNotGate } from './lib/routeGate';
 
 if (sentry.dsn) {
   Sentry.init({
@@ -120,10 +121,29 @@ export const createApp = () => {
   // future IP ban (#540).
   app.set('trust proxy', http.trustProxyHops);
 
-  app.use(cors({ origin: http.corsOrigin, credentials: true }));
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: false }));
-  app.use(cookieParser());
+  // Every layer ahead of a contract route's handler says whether it is a gate
+  // (#558). None of these four is: CORS only sets headers, and the parsers'
+  // 400 on a malformed body and 413 over 100 kB apply to every endpoint alike,
+  // so the document states them once instead of each operation.
+  app.use(
+    markNotGate(
+      cors({ origin: http.corsOrigin, credentials: true }),
+      'sets CORS headers; refuses nothing'
+    )
+  );
+  app.use(
+    markNotGate(
+      express.json(),
+      'site-wide 400/413 on a malformed or oversized body, stated once in the document description'
+    )
+  );
+  app.use(
+    markNotGate(
+      express.urlencoded({ extended: false }),
+      'site-wide 400/413 on a malformed or oversized body, stated once in the document description'
+    )
+  );
+  app.use(markNotGate(cookieParser(), 'parses cookies; refuses nothing'));
 
   // Before routing, so a banned network is refused everywhere — including on
   // routes that need no session, and including a caller who already holds a
@@ -131,23 +151,25 @@ export const createApp = () => {
   // the address nginx observed rather than one the client chose (#542).
   app.use(rejectBannedIps);
 
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
-    res.setHeader('x-request-id', requestId);
-    req.requestId = requestId;
-    const start = Date.now();
-    res.on('finish', () => {
-      log.info('request', {
-        method: req.method,
-        path: req.path,
-        status: res.statusCode,
-        ms: Date.now() - start,
-        requestId,
-        userId: req.user?.id
+  app.use(
+    markNotGate((req: Request, res: Response, next: NextFunction) => {
+      const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+      res.setHeader('x-request-id', requestId);
+      req.requestId = requestId;
+      const start = Date.now();
+      res.on('finish', () => {
+        log.info('request', {
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          ms: Date.now() - start,
+          requestId,
+          userId: req.user?.id
+        });
       });
-    });
-    next();
-  });
+      next();
+    }, 'assigns a request id and logs the response; refuses nothing')
+  );
 
   app.get('/', (_req: Request, res: Response) => res.send('API Running'));
 
@@ -184,13 +206,16 @@ export const createApp = () => {
   app.use('/api/docs/json', specRouter);
   app.use('/api/docs', uiRouter);
 
-  app.use('/api', async (_req: Request, res: Response, next: NextFunction) => {
-    if (await isInstalled()) return next();
-    res.status(503).json({
-      installed: false,
-      msg: 'Application not installed. Please complete setup at /install.'
-    });
-  });
+  app.use(
+    '/api',
+    markNotGate(async (_req: Request, res: Response, next: NextFunction) => {
+      if (await isInstalled()) return next();
+      res.status(503).json({
+        installed: false,
+        msg: 'Application not installed. Please complete setup at /install.'
+      });
+    }, 'site-wide 503 before install, stated once in the document description')
+  );
 
   app.use('/api/tools', toolsRouter);
   app.use('/api/home', homeRouter);

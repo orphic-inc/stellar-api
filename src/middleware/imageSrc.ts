@@ -3,6 +3,7 @@ import { authHandler } from '../modules/asyncHandler';
 import { addImageSrcs } from '../modules/imageSrc';
 import { registerWriteImages } from '../modules/remoteImage';
 import { parsedBody } from './validate';
+import { markGate, markNotGate } from '../lib/routeGate';
 
 /**
  * Give every JSON response its image `*Src` siblings (#737, ADR-0051): the
@@ -28,6 +29,11 @@ export const resolveImageSrcs = (
   next();
 };
 
+markNotGate(
+  resolveImageSrcs,
+  'adds `*Src` siblings to JSON responses; refuses nothing'
+);
+
 /**
  * Register the remote images a validated body's image `fields` hold, before
  * the handler writes, so a write past the daily ceiling is refused with 429
@@ -38,11 +44,15 @@ export const resolveImageSrcs = (
  * otherwise register inside the handler, after its checks.
  */
 export const registerBodyImages = (...fields: string[]): RequestHandler =>
-  authHandler(async (req, res, next) => {
-    const body = parsedBody<Record<string, unknown>>(res) ?? {};
-    const values = fields.map((field) =>
-      typeof body[field] === 'string' ? (body[field] as string) : null
-    );
-    await registerWriteImages({ fields: values }, req.user.id);
-    next();
-  });
+  markGate(
+    authHandler(async (req, res, next) => {
+      const body = parsedBody<Record<string, unknown>>(res) ?? {};
+      const values = fields.map((field) =>
+        typeof body[field] === 'string' ? (body[field] as string) : null
+      );
+      await registerWriteImages({ fields: values }, req.user.id);
+      next();
+    }),
+    // The daily image ceiling's 429 (#558).
+    'rateLimit'
+  );

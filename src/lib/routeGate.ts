@@ -22,7 +22,13 @@ import type { RequestHandler } from 'express';
 
 /** What a route's middleware chain can reject with before the handler runs. */
 export type GateKind =
-  'auth' | 'permission' | 'service' | 'rateLimit' | 'validation';
+  | 'auth'
+  | 'permission'
+  | 'service'
+  | 'rateLimit'
+  | 'validation'
+  | 'feedToken'
+  | 'bodyLimit';
 
 /**
  * A gate, and whatever parameters it needs to describe itself.
@@ -122,6 +128,43 @@ export const readGate = (fn: unknown): Gate | undefined =>
     ? ((fn as unknown as Record<symbol, Gate>)[GATE] ?? undefined)
     : undefined;
 
+const NOT_GATE = Symbol.for('stellar.routeNotGate');
+
+/**
+ * Stamp a middleware as NOT a gate, and say why. Returns the same function.
+ *
+ * An unstamped middleware is invisible to the contract, so a real gate nobody
+ * stamped used to go quietly undescribed: #509 F7's `requireModerator` answered
+ * 403 and the contract said the route could not (#558). `openapi:gate-marks`
+ * now fails on any layer before a contract route's handler that carries
+ * neither mark, so every middleware has to say what it is.
+ *
+ * The reason is REQUIRED so that calling a gate inert takes a sentence a
+ * reviewer can dispute. A middleware that refuses a request on every route,
+ * like the IP ban, is marked here too: its code is stated once in the
+ * document's description rather than derived onto every operation.
+ */
+export const markNotGate = <T extends RequestHandler>(
+  fn: T,
+  reason: string
+): T => {
+  if (reason.trim() === '') {
+    throw new Error('markNotGate needs a reason: say why this is not a gate');
+  }
+  Object.defineProperty(fn, NOT_GATE, {
+    value: reason,
+    enumerable: false,
+    configurable: true
+  });
+  return fn;
+};
+
+/** Why a middleware is not a gate, or undefined if it was never marked so. */
+export const readNotGate = (fn: unknown): string | undefined =>
+  typeof fn === 'function'
+    ? ((fn as unknown as Record<symbol, string>)[NOT_GATE] ?? undefined)
+    : undefined;
+
 /**
  * The response codes a chain carrying these gates can answer BEFORE the
  * handler runs.
@@ -152,5 +195,11 @@ export const expectedCodes = (
   // Validation runs before the handler like every other gate here, and rejects
   // with a 400 the contract was silent about on 170 of 269 routes (#567).
   if (set.has('validation')) codes.add(400);
+  // The Member Feed refuses every failed token with one identical 404, so the
+  // response cannot say whether the id exists (ADR-0014). Unlike a lookup's
+  // 404, this one is always the same, which is what makes it derivable (#558).
+  if (set.has('feedToken')) codes.add(404);
+  // A route-level body parser with its own size limit (#558).
+  if (set.has('bodyLimit')) codes.add(413);
   return [...codes].sort((a, b) => a - b);
 };

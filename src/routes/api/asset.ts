@@ -17,6 +17,7 @@ import {
   assetUrl
 } from '../../modules/assetStore';
 import { ALLOWED_MIMES } from '../../lib/assetValidate';
+import { markGate, markNotGate } from '../../lib/routeGate';
 
 const router = express.Router();
 
@@ -54,7 +55,11 @@ router.post(
   '/',
   requireAuth,
   validateQuery(assetUploadQuerySchema),
-  express.raw({ type: ALLOWED_MIMES as string[], limit: assets.maxBytes }),
+  // Its size limit answers 413 before the handler runs (#558).
+  markGate(
+    express.raw({ type: ALLOWED_MIMES as string[], limit: assets.maxBytes }),
+    'bodyLimit'
+  ),
   asyncHandler(async (req, res) => {
     const { kind } = parsedQuery<AssetUploadQuery>(res);
 
@@ -134,20 +139,23 @@ const deliver = (res: express.Response, asset: ResolvedAsset): void => {
 router.get(
   '/:hash',
   validateParams(assetHashParamsSchema),
-  asyncHandler(async (_req, res, next) => {
-    const { hash } = parsedParams<{ hash: string }>(res);
-    const asset = await getAssetByHash(hash);
-    if (!asset) {
-      res.status(404).json({ msg: 'Asset not found' });
-      return;
-    }
-    res.locals.asset = asset;
-    if (asset.ownerId === null) {
-      deliver(res, asset);
-      return;
-    }
-    next();
-  }),
+  markNotGate(
+    asyncHandler(async (_req, res, next) => {
+      const { hash } = parsedParams<{ hash: string }>(res);
+      const asset = await getAssetByHash(hash);
+      if (!asset) {
+        res.status(404).json({ msg: 'Asset not found' });
+        return;
+      }
+      res.locals.asset = asset;
+      if (asset.ownerId === null) {
+        deliver(res, asset);
+        return;
+      }
+      next();
+    }),
+    'the asset lookup; its 404 is a lookup result, declared on the registration'
+  ),
   requireAuth,
   asyncHandler(async (_req, res) => {
     deliver(res, res.locals.asset as ResolvedAsset);

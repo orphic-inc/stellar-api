@@ -81,6 +81,7 @@ npm run test:watch       # jest --watch
 npm run test:integration # integration tests (requires .env.test)
 npm run openapi:export   # generate openapi spec via ts-node src/scripts/export-openapi.ts
 npm run openapi:completeness # are all mounted routes registered in lib/openapi.ts? (#474; CI gates it)
+npm run openapi:gate-marks   # does every layer ahead of a handler carry markGate or markNotGate? (#558; gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
@@ -322,6 +323,7 @@ src/
     openapiCompleteness.ts  # Pure checker (#474): mounted routes vs registered operations, with a shrink-only baseline. CLI wrapper in scripts/
     openapiImageSrc.ts      # applyImageSrcDerivations: declares the `*Src` siblings on 2xx response schemas, by the hook's rule
     expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
+    gateMarkCoverage.ts     # Pure checker (#558): every layer ahead of a handler is a stamped gate or says why not. CLI wrapper in scripts/
     pagination.ts           # paginationBase (Zod) + parsedPage(res) → { page, limit, skip }
                             # paginatedResponse(res, data, total, pg)
     rss.ts                  # Feed document rendering shared by the announce push and the Member Feed; pure, no database
