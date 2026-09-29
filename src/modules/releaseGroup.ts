@@ -9,7 +9,6 @@ import { assertArtistLive } from './artist';
 import { releaseCreditsSelect, withPrimaryArtist } from './releaseCredits';
 import { audit } from '../lib/audit';
 import { translatePrismaError } from '../lib/prismaErrors';
-import { registerWriteImages } from './remoteImage';
 
 // ReleaseGroup — cross-community content identity (ADR-0023, #265).
 //
@@ -371,8 +370,8 @@ export const searchReleaseGroups = async (input: {
   };
 };
 
-const isUniqueViolation = (err: unknown): boolean =>
-  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+const hasPrismaCode = (err: unknown, code: string): boolean =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
 
 /** The projected group carrying this identity, or null. Used on both the
  *  first-look and the lost-race path, so they cannot answer differently. */
@@ -430,7 +429,7 @@ export const createReleaseGroup = async (input: GroupIdentityInput) => {
   } catch (err) {
     // Negative control in the spec: anything that is not the unique violation
     // must still propagate.
-    if (!isUniqueViolation(err)) throw err;
+    if (!hasPrismaCode(err, 'P2002')) throw err;
     // Lost the race; the other writer's row is the answer.
     const raced = await findGroupByIdentity(identityKey);
     if (!raced) throw err;
@@ -477,13 +476,20 @@ export const setReleaseGroup = async (input: {
     if (!group) throw new AppError(400, 'No release group with that id');
   }
 
-  const updated = await prisma.release.update({
-    where: { id: input.releaseId },
-    data: { releaseGroupId: input.releaseGroupId },
-    select: { id: true, releaseGroupId: true }
-  });
-
-  return updated;
+  // Both reads above can go stale (#596): the release deleted, or the group
+  // merged away. Each answers as its read would have.
+  try {
+    return await prisma.release.update({
+      where: { id: input.releaseId },
+      data: { releaseGroupId: input.releaseGroupId },
+      select: { id: true, releaseGroupId: true }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2025: [404, 'Release not found'],
+      P2003: [400, 'No release group with that id']
+    });
+  }
 };
 
 // ─── Curation verbs (#265 PR2) ───────────────────────────────────────────────
@@ -495,16 +501,27 @@ export const setReleaseGroup = async (input: {
 // at exactly one function — there is still no permission-aware community read
 // anywhere in this codebase.
 
-/** One log line on a group. `userId` null means the system wrote it. */
-const logGroupEvent = (
+/**
+ * One log line on a group. `userId` null means the system wrote it.
+ *
+ * Every verb that logs resolved its group before its transaction, and a merge
+ * can delete that group in between (#596): the verb then answers as the
+ * resolver would have.
+ */
+export const logGroupEvent = async (
   tx: Prisma.TransactionClient,
   releaseGroupId: number,
   actorId: number | null,
   info: string
-) =>
-  tx.groupLog.create({
-    data: { releaseGroupId, userId: actorId, info }
-  });
+) => {
+  try {
+    return await tx.groupLog.create({
+      data: { releaseGroupId, userId: actorId, info }
+    });
+  } catch (err) {
+    translatePrismaError(err, { P2003: [404, 'Release group not found'] });
+  }
+};
 
 /**
  * Move the source group's covers onto the target.
@@ -588,7 +605,12 @@ export const mergeReleaseGroups = async (input: {
         `${moved.count} release(s) moved; that group's history is preserved above.`
     );
 
-    await tx.releaseGroup.delete({ where: { id: input.sourceId } });
+    try {
+      await tx.releaseGroup.delete({ where: { id: input.sourceId } });
+    } catch (err) {
+      // A concurrent merge of the same source deleted it first (#596).
+      translatePrismaError(err, { P2025: [404, 'Release group not found'] });
+    }
 
     await audit(
       tx,
@@ -692,6 +714,34 @@ export const splitReleaseGroup = async (input: {
 };
 
 /**
+ * The identity write. The clash check above reads before it, so a concurrent
+ * rename can take the identity in between, and a merge can delete the group
+ * (#596). Each answers as the check or the resolver would have.
+ */
+const writeGroupIdentity = async (
+  tx: Prisma.TransactionClient,
+  input: GroupIdentityInput & { groupId: number },
+  identityKey: string
+) => {
+  try {
+    return await tx.releaseGroup.update({
+      where: { id: input.groupId },
+      data: { ...identityColumns(input), identityKey },
+      include: { artist: groupArtistSelect }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [
+        409,
+        'That identity already belongs to another release group. ' +
+          'Merge this group into it instead of renaming onto it.'
+      ],
+      P2025: [404, 'Release group not found']
+    });
+  }
+};
+
+/**
  * Change a group's canonical identity.
  *
  * Recomputing `identityKey` can land on an identity another group already
@@ -748,11 +798,7 @@ export const updateGroupIdentity = async (input: {
   }
 
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.releaseGroup.update({
-      where: { id: input.groupId },
-      data: { ...identityColumns(input), identityKey },
-      include: { artist: groupArtistSelect }
-    });
+    const updated = await writeGroupIdentity(tx, input, identityKey);
     await logGroupEvent(
       tx,
       input.groupId,
@@ -760,117 +806,6 @@ export const updateGroupIdentity = async (input: {
       `Identity changed from "${current.title}" to "${updated.title}".`
     );
     return toGroupIdentity(updated);
-  });
-};
-
-const coverSelect = {
-  id: true,
-  image: true,
-  summary: true,
-  userId: true,
-  addedAt: true,
-  user: { select: { id: true, username: true } }
-} as const;
-
-/**
- * Covers, like everything else here, are reachable only through the resolver:
- * seeing a group's cover art means being able to see the group.
- */
-export const listGroupCovers = async (
-  groupId: number,
-  viewerId: number,
-  page: { skip: number; limit: number }
-) => {
-  await resolveGroupForViewer(groupId, viewerId);
-  const where = { releaseGroupId: groupId };
-  const [data, total] = await Promise.all([
-    prisma.coverArt.findMany({
-      where,
-      select: coverSelect,
-      orderBy: [{ addedAt: 'asc' }, { id: 'asc' }],
-      skip: page.skip,
-      take: page.limit
-    }),
-    prisma.coverArt.count({ where })
-  ]);
-  return { data, total };
-};
-
-/** Adding a cover needs no permission beyond reaching the group — it is
- *  curation, like attaching a release. Removing someone else's does. */
-export const addGroupCover = async (input: {
-  actorId: number;
-  groupId: number;
-  image: string;
-  summary?: string | null;
-}) => {
-  await resolveGroupForViewer(input.groupId, input.actorId);
-  // After the access check and before the write, so a 429 refuses it whole.
-  await registerWriteImages({ fields: [input.image] }, input.actorId);
-
-  return prisma.$transaction(async (tx) => {
-    let cover;
-    try {
-      cover = await tx.coverArt.create({
-        data: {
-          releaseGroupId: input.groupId,
-          image: input.image,
-          summary: input.summary ?? null,
-          userId: input.actorId
-        },
-        select: coverSelect
-      });
-    } catch (err) {
-      translatePrismaError(err, {
-        P2002: [409, 'This group already carries that cover'],
-        P2003: [404, 'Release group not found']
-      });
-    }
-    await logGroupEvent(
-      tx,
-      input.groupId,
-      input.actorId,
-      `Added a cover: ${input.image}`
-    );
-    return cover;
-  });
-};
-
-/**
- * Remove a cover. The adder may remove their own; removing anyone else's needs
- * `contributions_manage`, which the route resolves and passes in — the module
- * takes the decision, not the permission map, so the rule is testable without
- * a request.
- */
-export const removeGroupCover = async (input: {
-  actorId: number;
-  groupId: number;
-  coverId: number;
-  canModerate: boolean;
-}) => {
-  await resolveGroupForViewer(input.groupId, input.actorId);
-
-  const cover = await prisma.coverArt.findFirst({
-    where: { id: input.coverId, releaseGroupId: input.groupId },
-    select: { id: true, userId: true, image: true }
-  });
-  if (!cover) throw new AppError(404, 'Cover not found');
-
-  if (cover.userId !== input.actorId && !input.canModerate) {
-    throw new AppError(
-      403,
-      'Only the member who added this cover may remove it'
-    );
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.coverArt.delete({ where: { id: cover.id } });
-    await logGroupEvent(
-      tx,
-      input.groupId,
-      input.actorId,
-      `Removed a cover: ${cover.image}`
-    );
   });
 };
 

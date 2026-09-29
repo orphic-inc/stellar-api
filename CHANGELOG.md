@@ -27,6 +27,17 @@ All notable changes to stellar-api are documented here.
   - **Resolved:** all 7 of `bootstrap.ts`'s `unreviewed` sites. 5 are guarded, and 2 are recorded as internally derived.
   - **`FORUM_STRUCTURE`** moves to `modules/forumStructure.ts`, unchanged.
 
+- **Release-group curation and tag voting no longer answer `500` when a concurrent change wins** (#791, the tenth guard-coverage burn-down under ADR-0048: `releaseGroup.ts` and `releaseWorkbench/tags.ts`).
+  - **Release groups:** each race now answers the route's existing code.
+    - An attach whose release was deleted, or whose group was merged away, mid-request.
+    - A merge racing another merge of the same source.
+    - A rename racing another rename onto the same identity (`409`).
+    - Any group verb whose group is merged away mid-request.
+    - Two removals of one cover.
+  - **Tag votes:** a double-submitted vote now answers as an already-cast one. A vote on a tag removed mid-vote answers `404`. Removing a tag from a release deleted mid-request answers `404`.
+  - **Resolved:** all 12 sites. 11 are guarded, and 1 is recorded as internally derived.
+  - The cover verbs move to `modules/releaseGroupCovers.ts`, unchanged. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

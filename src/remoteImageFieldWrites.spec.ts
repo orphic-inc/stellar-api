@@ -34,7 +34,7 @@ const contribution: typeof import('./modules/contribution') =
 import { createCommunityRelease } from './modules/releaseLifecycle';
 import { updateReleaseWorkbenchMetadata } from './modules/releaseWorkbench/metadata';
 import { revertReleaseWorkbenchHistory } from './modules/releaseWorkbench/history';
-import { addGroupCover } from './modules/releaseGroup';
+import { addGroupCover } from './modules/releaseGroupCovers';
 
 const IMG = 'https://images.example/field.png';
 const REF = { actorId: 7, communityId: 1, releaseId: 3 } as never;
