@@ -503,13 +503,17 @@ describe('API auth/profile/user flows', () => {
       userId: 7
     } as never);
     prismaMock.badPassword.findUnique.mockResolvedValueOnce(null);
+    prismaMock.accountRecovery.updateMany.mockResolvedValue({
+      count: 1
+    } as never);
     const successReset = await request(app)
       .post('/api/auth/recovery/reset')
       .send({ token: 'good-token', newPassword: 'new-password-123' });
 
     expect(successReset.status).toBe(200);
-    expect(prismaMock.accountRecovery.update).toHaveBeenCalledWith({
-      where: { id: 9 },
+    // The claim spends the token as the transaction's first write (#764).
+    expect(prismaMock.accountRecovery.updateMany).toHaveBeenCalledWith({
+      where: { id: 9, usedAt: null, expiresAt: { gt: expect.any(Date) } },
       data: { usedAt: expect.any(Date) }
     });
     expect(prismaMock.userSession.updateMany).toHaveBeenCalledWith({

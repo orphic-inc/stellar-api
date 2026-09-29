@@ -601,29 +601,42 @@ export const resetPasswordWithToken = async (
     throw new AppError(400, 'Password is not allowed');
   }
 
+  // Hashed outside the transaction so no lock is held across bcrypt.
   const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
-  // Staff can delete a recovery request between the read above and this write
-  // (#596); answered as an unknown token is.
-  try {
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: recovery.userId },
-        data: { password: hashed }
-      }),
-      prisma.accountRecovery.update({
-        where: { id: recovery.id },
-        data: { usedAt: new Date() }
-      }),
-      prisma.userSession.updateMany({
-        where: { userId: recovery.userId, revokedAt: null },
-        data: { revokedAt: new Date() }
-      })
-    ]);
-  } catch (err) {
-    translatePrismaError(err, {
-      P2025: [400, 'Invalid or expired recovery token']
+  await prisma.$transaction(async (tx) => {
+    const now = new Date();
+    // Claim the token as the first write (#764). Of two concurrent resets only
+    // one matches; so does nothing once the token expired, was superseded by a
+    // newer request, or was deleted by staff since the read above. Each loser
+    // is answered as an unknown token is.
+    const claimed = await tx.accountRecovery.updateMany({
+      where: { id: recovery.id, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now }
     });
-  }
+    if (claimed.count === 0)
+      throw new AppError(400, 'Invalid or expired recovery token');
+
+    // Spending one reset token expires the member's others, however they were
+    // issued, so none stays live after the password changed.
+    await tx.accountRecovery.updateMany({
+      where: {
+        userId: recovery.userId,
+        purpose: RecoveryPurpose.PasswordReset,
+        usedAt: null,
+        expiresAt: { gt: now },
+        id: { not: recovery.id }
+      },
+      data: { expiresAt: now }
+    });
+    await tx.user.update({
+      where: { id: recovery.userId },
+      data: { password: hashed }
+    });
+    await tx.userSession.updateMany({
+      where: { userId: recovery.userId, revokedAt: null },
+      data: { revokedAt: now }
+    });
+  });
 };
 
 export const loginUser = async (

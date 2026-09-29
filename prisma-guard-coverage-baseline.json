@@ -65,6 +65,7 @@
     "src/modules/downloads.ts::reverseDownloadAccess::economyTransaction.create": "userId is the grant's consumer, read in the same transaction, and actorUserId is the session user's; contextId carries no foreign key. Users are never hard-deleted (noHardDelete.spec.ts). #761.",
     "src/modules/downloads.ts::reverseDownloadAccess::economyTransaction.create#2": "userId is the grant's contributor, read in the same transaction, and actorUserId is the session user's; contextId carries no foreign key. Users are never hard-deleted (noHardDelete.spec.ts). #761.",
     "src/modules/downloads.ts::linkConsumer::consumer.update": "consumer_ is the row upserted just before in the same transaction; contributionId is read in the same transaction, and contributions are never hard-deleted (noHardDelete.spec.ts). #761.",
+    "src/modules/auth.ts::resetPasswordWithToken::user.update": "recovery.userId, read from the recovery row whose claim is this transaction's first write. User rows are never hard-deleted (noHardDelete.spec.ts), so this id cannot dangle. #764.",
     "src/modules/auth.ts::settings::userSettings.create": "No client value reaches a constrained column: only siteAppearance is set, from the default stylesheet. #596.",
     "src/modules/auth.ts::authUser::user.update": "The user read by email just before, in loginUser. Users are never hard-deleted (noHardDelete.spec.ts). #596.",
     "src/modules/auth.ts::changePassword::user.update": "userId is the session user's, read just before. Users are never hard-deleted (noHardDelete.spec.ts). #596.",

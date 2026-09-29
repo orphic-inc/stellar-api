@@ -20,7 +20,6 @@ const prismaErr = (code: string) =>
     code,
     clientVersion: 'test'
   });
-const status = (code: number) => expect.objectContaining({ statusCode: code });
 
 beforeEach(() => {
   resetApiTestState();
@@ -83,14 +82,77 @@ describe('changeEmail', () => {
 });
 
 describe('resetPasswordWithToken', () => {
-  it('answers 400 when staff deleted the recovery request mid-reset', async () => {
+  const token = 't'.repeat(64);
+  const reset = () => resetPasswordWithToken(token, 'a long enough password');
+
+  beforeEach(() => {
     prismaMock.accountRecovery.findFirst.mockResolvedValue({
       id: 3,
       userId: 7
     } as never);
-    prismaMock.accountRecovery.update.mockRejectedValue(prismaErr('P2025'));
-    await expect(
-      resetPasswordWithToken('t'.repeat(64), 'a long enough password')
-    ).rejects.toEqual(status(400));
+    prismaMock.accountRecovery.updateMany.mockResolvedValue({
+      count: 1
+    } as never);
+    prismaMock.user.update.mockResolvedValue({} as never);
+    prismaMock.userSession.updateMany.mockResolvedValue({ count: 0 } as never);
+  });
+
+  // #764: the claim is the transaction's first write. Of two concurrent
+  // resets, or one racing a newer request or a staff delete, the loser
+  // matches nothing and is answered as an unknown token is.
+  it('claims the token as the first write', async () => {
+    await reset();
+    expect(prismaMock.accountRecovery.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: 3, usedAt: null, expiresAt: { gt: expect.any(Date) } },
+      data: { usedAt: expect.any(Date) }
+    });
+    const [claim] =
+      prismaMock.accountRecovery.updateMany.mock.invocationCallOrder;
+    const writes = [
+      ...prismaMock.user.update.mock.invocationCallOrder,
+      ...prismaMock.userSession.updateMany.mock.invocationCallOrder
+    ];
+    expect(writes).toHaveLength(2);
+    expect(writes.every((o) => o > claim)).toBe(true);
+  });
+
+  it('answers 400 and writes no password or sessions when the claim loses', async () => {
+    prismaMock.accountRecovery.updateMany.mockResolvedValue({
+      count: 0
+    } as never);
+    await expect(reset()).rejects.toEqual(
+      expect.objectContaining({
+        statusCode: 400,
+        message: 'Invalid or expired recovery token'
+      })
+    );
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.userSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("expires the member's other pending reset tokens", async () => {
+    await reset();
+    expect(prismaMock.accountRecovery.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: 7,
+        purpose: 'PasswordReset',
+        usedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+        id: { not: 3 }
+      },
+      data: { expiresAt: expect.any(Date) }
+    });
+  });
+
+  it('checks the password and hashes it before the transaction', async () => {
+    await reset();
+    const [txStart] = prismaMock.$transaction.mock.invocationCallOrder;
+    expect(
+      prismaMock.badPassword.findUnique.mock.invocationCallOrder[0]
+    ).toBeLessThan(txStart);
+    expect(
+      (bcryptMock as unknown as { hash: jest.Mock }).hash.mock
+        .invocationCallOrder[0]
+    ).toBeLessThan(txStart);
   });
 });
