@@ -25,6 +25,11 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Filling a request and reporting a contribution no longer reveal that a hidden contribution exists** (#774, the last instance of #771).
+  - **What was open:** `POST /requests/{id}/fill` answered `404` for a missing `contributionId` but `403` for one in a community the caller cannot see. `POST /contributions/{id}/report` answered `404` for a missing id, but filed a report against a hidden one and counted it toward the link-health warning.
+  - **Now:** both look the contribution up as the caller. A hidden one answers the same `404 Contribution not found` as a missing one, and nothing is written.
+  - The ownership `403` on a fill still answers for a visible contribution the caller does not own. The contract is unchanged.
+
 - **A member can no longer download a contribution in a community they cannot see** (#778, an instance of #771).
   - **What was open:** `POST /contributions/{id}/access` looked the contribution up with no visibility rule. Any signed-in member could pass any contribution id, including one in a private community, and get its download URL, with their balance debited.
   - **Now:** a contribution the caller cannot see answers the same `404 Contribution not found` as a missing one, before any balance check, debit or grant. `GET /contributions/{id}/access/latest` takes the same gate.

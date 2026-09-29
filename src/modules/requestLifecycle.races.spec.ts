@@ -27,7 +27,7 @@ const mockTx = {
   economyTransaction: { create: jest.fn() },
   requestAction: { create: jest.fn() },
   requestFill: { create: jest.fn(), findFirst: jest.fn() },
-  contribution: { findUnique: jest.fn() },
+  contribution: { findFirst: jest.fn() },
   community: { findFirst: jest.fn() },
   notification: { createMany: jest.fn() }
 };
@@ -176,7 +176,7 @@ describe('addBounty', () => {
 describe('fillRequest', () => {
   it('pays the bounties read after its claim, not those of the pre-read', async () => {
     const late = BigInt('314572800');
-    mockTx.contribution.findUnique.mockResolvedValue({
+    mockTx.contribution.findFirst.mockResolvedValue({
       id: 5,
       userId: 1,
       release: { communityId: 1, type: 'Music' }

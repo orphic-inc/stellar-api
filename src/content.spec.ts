@@ -329,7 +329,7 @@ describe('API content and shared flows', () => {
   });
 
   it('reports a contribution and records both moderation side effects', async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue({ id: 5 } as never);
+    prismaMock.contribution.findFirst.mockResolvedValue({ id: 5 } as never);
     fileReportMock.mockResolvedValue({
       ok: true,
       report: {} as never
@@ -354,14 +354,23 @@ describe('API content and shared flows', () => {
     );
   });
 
-  it('returns 404 when reporting a missing contribution', async () => {
-    prismaMock.contribution.findUnique.mockResolvedValue(null);
+  it('answers 404 when reporting a missing or hidden contribution (#774)', async () => {
+    // One query decides both, so the answer cannot tell a prober the id
+    // exists, and a hidden contribution takes no report or link-health strike.
+    prismaMock.contribution.findFirst.mockResolvedValue(null);
 
     const res = await request(app).post('/api/contributions/999/report').send({
       reason: 'Dead link'
     });
 
     expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Contribution not found' });
+    expect(prismaMock.contribution.findFirst).toHaveBeenCalledWith({
+      where: { AND: [{ id: 999 }, contributionVisibleTo(7)] },
+      select: { id: true }
+    });
+    expect(fileReportMock).not.toHaveBeenCalled();
+    expect(recordContributionReportMock).not.toHaveBeenCalled();
   });
 
   it('subscribes to a topic with a 204 response', async () => {

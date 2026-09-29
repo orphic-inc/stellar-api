@@ -1,6 +1,6 @@
 /**
  * Community access on every id-addressed request surface (#755, an instance of
- * #771).
+ * #771), and on the contribution `fillRequest` names (#774).
  *
  * The reads have scoped by `requestVisibleTo` since #547; the writes, the
  * bounty history and `createRequest`'s community did not. Each surface now
@@ -10,7 +10,11 @@
  */
 
 import { ReleaseType } from '@prisma/client';
-import { communityReadableWhere, requestVisibleTo } from './communityAccess';
+import {
+  communityReadableWhere,
+  contributionVisibleTo,
+  requestVisibleTo
+} from './communityAccess';
 
 const mockTx = {
   user: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -23,7 +27,7 @@ const mockTx = {
   community: { findFirst: jest.fn() },
   requestBounty: { findMany: jest.fn() },
   economyTransaction: { create: jest.fn() },
-  contribution: { findUnique: jest.fn() }
+  contribution: { findFirst: jest.fn() }
 };
 
 const mockPrisma = {
@@ -126,7 +130,7 @@ describe('a request the caller cannot reach', () => {
   });
 
   it('fillRequest answers 404 before its claim', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue({
+    mockTx.contribution.findFirst.mockResolvedValue({
       id: 5,
       userId: ACTOR,
       release: { communityId: 1, type: 'Music' }
@@ -175,6 +179,40 @@ describe('a request the caller cannot reach', () => {
       expect(mockTx.user.updateMany).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('fillRequest with a contribution the caller cannot see (#774)', () => {
+  it('answers the missing-contribution 404 before any request read', async () => {
+    // The lookup finds nothing: the contribution is hidden (or missing), so
+    // the ownership 403 cannot fire and the answer cannot tell them apart.
+    mockTx.contribution.findFirst.mockResolvedValue(null);
+
+    await expect(fillRequest(ACTOR, 10, 5)).rejects.toEqual(
+      expect.objectContaining({
+        statusCode: 404,
+        message: 'Contribution not found'
+      })
+    );
+    expect(mockTx.contribution.findFirst).toHaveBeenCalledWith({
+      where: { id: 5, ...contributionVisibleTo(ACTOR) },
+      include: { release: true }
+    });
+    expect(mockTx.request.findFirst).not.toHaveBeenCalled();
+    expect(mockTx.request.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps the ownership 403 for a visible contribution of another member', async () => {
+    mockTx.contribution.findFirst.mockResolvedValue({
+      id: 5,
+      userId: ACTOR + 1,
+      release: { communityId: 1, type: 'Music' }
+    });
+
+    await expect(fillRequest(ACTOR, 10, 5)).rejects.toEqual(
+      expect.objectContaining({ statusCode: 403 })
+    );
+    expect(mockTx.request.updateMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('createRequest in a community the caller cannot reach', () => {
