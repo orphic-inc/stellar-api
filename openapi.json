@@ -30849,6 +30849,16 @@
               }
             }
           },
+          "409": {
+            "description": "A racing toggle by the same member changed the vote first; reload and retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -31239,6 +31249,7 @@
         "tags": [
           "Requests"
         ],
+        "description": "Also answers `400` with `{ msg }` below the minimum bounty, on an insufficient contributed balance, or when `communityId` or an artist id names nothing. A repeated artist id is treated as one.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -31441,6 +31452,16 @@
           },
           "404": {
             "description": "Request not found, or not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A racing first bounty by the same member was recorded first; retry",
             "content": {
               "application/json": {
                 "schema": {

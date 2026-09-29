@@ -25,11 +25,18 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Creating a request no longer answers `500` for a bad id or a repeated artist** (#756, the second guard-coverage burn-down under ADR-0048).
+  - `POST /requests` with a `communityId` or artist id naming nothing now answers `400`.
+  - A repeated artist id is now treated as one; it used to hit the per-request unique key.
+  - Two races now answer `409` instead of `500`: a double toggle on `POST /requests/{id}/vote`, and two concurrent first bounties by one member on `POST /requests/{id}/bounty`.
+  - All 26 of `requestLifecycle.ts`'s `unreviewed` sites are resolved: 6 guarded, 20 recorded as internally derived.
+  - `noHardDelete.spec.ts` replaces `forumNoHardDelete.spec.ts` and now also covers users, requests, bounties and contributions.
+
 - **Two forum writes that answered `500` to a well-formed request now answer the client error** (#752, the first guard-coverage burn-down under ADR-0048).
   - `POST /forums/polls` on a topic that already has a poll: `409`.
   - `POST /forums/topic-notes` with a `forumTopicId` naming no topic: `400`.
   - Three rarer races now answer too, instead of `500`: two concurrent votes by one member on `POST /forums/poll-votes` (`409`); a forum deleted between a route's check and its write (`404 Forum not found`); two concurrent deletes of one forum (`404`).
-  - All 34 of `forum.ts`'s `unreviewed` sites are resolved: 11 guarded, 23 recorded as internally derived. Eleven of those rest on topics, posts and polls never being hard-deleted, which `forumNoHardDelete.spec.ts` now asserts.
+  - All 34 of `forum.ts`'s `unreviewed` sites are resolved: 11 guarded, 23 recorded as internally derived. Eleven of those rest on topics, posts and polls never being hard-deleted, which `noHardDelete.spec.ts` now asserts.
 
 - **One member's failed reputation read no longer loses everyone's reputation snapshot** (#596). `captureCrsSnapshots` read every active user through one `Promise.all` and wrote once at the end, so one failure dropped the period's snapshot for all of them and skipped the retention prune. It now skips only that member, and logs and counts the failure. Every background job's per-item failure policy is now pinned by a spec, under [ADR-0048](docs/adr/0048-module-writes-meet-the-same-guard-rule.md)'s four policies.
 

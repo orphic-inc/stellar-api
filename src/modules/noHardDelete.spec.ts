@@ -1,0 +1,117 @@
+/**
+ * Models no production code hard-deletes (#752, #756).
+ *
+ * `prisma-guard-coverage-baseline.json` records module writes as internally
+ * derived on exactly this fact: each write is checked, or read in the same
+ * transaction, before it runs, and a row of these models cannot vanish in
+ * between because nothing removes one. The reasons are text, and text cannot
+ * notice when that stops being true. This spec can.
+ *
+ * If it fails, a hard delete has been added. Before changing a list below, give
+ * every `internallyDerived` entry whose reason names this spec and that model a
+ * real guard (`translatePrismaError`, ADR-0048), then delete its baseline
+ * entry.
+ */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+
+const ROOT = resolve(__dirname, '..', '..');
+const SRC = join(ROOT, 'src');
+
+// Dev-only and test code never serves a production request (ADR-0048).
+const EXCLUDED = [
+  'src/modules/devTools/',
+  'src/test/',
+  'src/integration/',
+  'src/scripts/'
+];
+
+/**
+ * Each model, as its Prisma delegate and its table. A model reached only by a
+ * cascade is listed with its parent: posts and polls cascade only from a
+ * topic, and bounties only from a request.
+ */
+const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
+  ['forumTopic', 'forum_topics'],
+  ['forumPost', 'forum_posts'],
+  ['forumPoll', 'forum_polls'],
+  ['forumPostEdit', 'forum_post_edits'],
+  // Users are disabled, never deleted (AGENTS.md, "Soft delete").
+  ['user', 'users'],
+  ['request', 'requests'],
+  ['requestBounty', 'request_bounties'],
+  ['contribution', 'contributions']
+];
+
+const sourceFiles = (dir: string): string[] =>
+  readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return path.endsWith('.ts') && !path.endsWith('.spec.ts') ? [path] : [];
+  });
+
+const production = sourceFiles(SRC).filter((file) => {
+  const rel = relative(ROOT, file);
+  return !EXCLUDED.some((prefix) => rel.startsWith(prefix));
+});
+
+const hardDeleteOf = ([delegate, table]: [string, string]) =>
+  new RegExp(
+    `\\b${delegate}\\.delete(?:Many)?\\(|DELETE\\s+FROM\\s+"?${table}\\b`,
+    'i'
+  );
+
+const offendersFor = (model: [string, string]) => {
+  const pattern = hardDeleteOf(model);
+  return production.flatMap((file) =>
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .flatMap((line, i) =>
+        pattern.test(line) ? [`${relative(ROOT, file)}:${i + 1}`] : []
+      )
+  );
+};
+
+describe('rows no production code hard-deletes', () => {
+  it('finds production files to scan', () => {
+    // Guards against a path mistake that would make the checks below vacuous.
+    expect(production.some((f) => f.endsWith('modules/forum.ts'))).toBe(true);
+  });
+
+  it.each(NEVER_HARD_DELETED)('holds for %s', (delegate, table) => {
+    expect(offendersFor([delegate, table])).toEqual([]);
+  });
+
+  // Checks the matcher itself, so a regex typo cannot pass every model above.
+  it('would catch a delete of a listed model', () => {
+    expect(
+      hardDeleteOf(['forumTopic', 'forum_topics']).test(
+        'await tx.forumTopic.delete({ where: { id } });'
+      )
+    ).toBe(true);
+    expect(
+      hardDeleteOf(['request', 'requests']).test(
+        'await prisma.$executeRaw`DELETE FROM "requests" WHERE id = 1`'
+      )
+    ).toBe(true);
+  });
+
+  // The relations that keep a parent's delete from cascading into these rows.
+  const schema = readFileSync(join(ROOT, 'prisma/schema.prisma'), 'utf8');
+  const modelBlock = (name: string): string =>
+    schema.match(new RegExp(`\\nmodel ${name} \\{[\\s\\S]*?\\n\\}`))?.[0] ?? '';
+
+  it('keeps Forum → ForumTopic as Restrict', () => {
+    expect(modelBlock('ForumTopic')).toMatch(
+      /forum\s+Forum\s+@relation\("ForumTopics",[^)]*onDelete: Restrict\)/
+    );
+  });
+
+  it('keeps Community → Request from cascading', () => {
+    const line = modelBlock('Request')
+      .split('\n')
+      .find((l) => /^\s*community\s+Community\s+@relation/.test(l));
+    expect(line).toBeDefined();
+    expect(line).not.toMatch(/onDelete:\s*Cascade/);
+  });
+});

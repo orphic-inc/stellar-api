@@ -1,5 +1,6 @@
-import { ReleaseType, RequestStatus } from '@prisma/client';
+import { Prisma, ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { requestVisibleTo } from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
@@ -172,6 +173,11 @@ export async function getBountyHistory(requestId: number) {
 
 // ─── toggleVote ───────────────────────────────────────────────────────────────
 
+const VOTE_RACED: [number, string] = [
+  409,
+  'Your vote changed in another request; reload and try again'
+];
+
 export async function toggleVote(
   requestId: number,
   userId: number
@@ -186,28 +192,40 @@ export async function toggleVote(
     where: { requestId_userId: { requestId, userId } }
   });
 
+  // A second toggle racing this one can remove the vote this read found, or
+  // insert the one it did not (#756). Either way the caller's view is stale.
+  const raced = { P2002: VOTE_RACED, P2025: VOTE_RACED };
+
   if (existing) {
-    await prisma.$transaction([
-      prisma.requestVote.delete({
-        where: { requestId_userId: { requestId, userId } }
-      }),
-      prisma.request.update({
-        where: { id: requestId },
-        data: { voteCount: { decrement: 1 } }
-      })
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.requestVote.delete({
+          where: { requestId_userId: { requestId, userId } }
+        }),
+        prisma.request.update({
+          where: { id: requestId },
+          data: { voteCount: { decrement: 1 } }
+        })
+      ]);
+    } catch (err) {
+      translatePrismaError(err, raced);
+    }
     return { voted: false };
   }
 
-  await prisma.$transaction([
-    prisma.requestVote.create({
-      data: { requestId, userId }
-    }),
-    prisma.request.update({
-      where: { id: requestId },
-      data: { voteCount: { increment: 1 } }
-    })
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.requestVote.create({
+        data: { requestId, userId }
+      }),
+      prisma.request.update({
+        where: { id: requestId },
+        data: { voteCount: { increment: 1 } }
+      })
+    ]);
+  } catch (err) {
+    translatePrismaError(err, raced);
+  }
   return { voted: true };
 }
 
@@ -278,22 +296,33 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
       }
     });
 
-    const request = await tx.request.create({
-      data: {
-        userId,
-        communityId: input.communityId,
-        title: input.title,
-        description: input.description,
-        type: input.type,
-        year: input.year,
-        image: input.image,
-        bounties: { create: { userId, amount: input.bounty } },
-        ...(input.artists?.length && {
-          artists: { create: input.artists.map((id) => ({ artistId: id })) }
-        })
-      },
-      include: { bounties: true, artists: true }
-    });
+    // A repeated artist id means the same artist; de-duplicated rather than
+    // refused, since RequestArtist is unique per request (#756).
+    const artistIds = [...new Set(input.artists ?? [])];
+    let request;
+    try {
+      request = await tx.request.create({
+        data: {
+          userId,
+          communityId: input.communityId,
+          title: input.title,
+          description: input.description,
+          type: input.type,
+          year: input.year,
+          image: input.image,
+          bounties: { create: { userId, amount: input.bounty } },
+          ...(artistIds.length > 0 && {
+            artists: { create: artistIds.map((id) => ({ artistId: id })) }
+          })
+        },
+        include: { bounties: true, artists: true }
+      });
+    } catch (err) {
+      // Both ids come from the body, and nothing checked either (#756).
+      translatePrismaError(err, {
+        P2003: [400, 'communityId or an artist id names nothing']
+      });
+    }
 
     // contextId is known at creation time — no null-context race possible
     await tx.economyTransaction.create({
@@ -320,6 +349,33 @@ export async function createRequest(userId: number, input: CreateRequestInput) {
 }
 
 // ─── addBounty ────────────────────────────────────────────────────────────────
+
+/** Add `amount` to the member's bounty on a request, creating it on the first. */
+async function pledgeBounty(
+  tx: Prisma.TransactionClient,
+  requestId: number,
+  userId: number,
+  amount: bigint
+) {
+  const existing = await tx.requestBounty.findUnique({
+    where: { requestId_userId: { requestId, userId } }
+  });
+  if (existing) {
+    await tx.requestBounty.update({
+      where: { id: existing.id },
+      data: { amount: { increment: amount } }
+    });
+    return;
+  }
+  // Two first bounties by one member can both miss `existing` (#756).
+  try {
+    await tx.requestBounty.create({ data: { requestId, userId, amount } });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'Your bounty changed in another request; try again']
+    });
+  }
+}
 
 export async function addBounty(
   userId: number,
@@ -361,17 +417,7 @@ export async function addBounty(
       }
     });
 
-    const existing = await tx.requestBounty.findUnique({
-      where: { requestId_userId: { requestId, userId } }
-    });
-    if (existing) {
-      await tx.requestBounty.update({
-        where: { id: existing.id },
-        data: { amount: { increment: amount } }
-      });
-    } else {
-      await tx.requestBounty.create({ data: { requestId, userId, amount } });
-    }
+    await pledgeBounty(tx, requestId, userId, amount);
 
     await tx.requestAction.create({
       data: {

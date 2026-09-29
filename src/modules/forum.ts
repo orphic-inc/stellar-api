@@ -25,7 +25,7 @@ type CastVoteResult =
  * the only forum model ever hard-deleted, by `deleteForum`, so a path
  * `forumId` checked before the transaction can name nothing by the time it is
  * written. Topics, posts and polls are never hard-deleted, and
- * forumNoHardDelete.spec.ts keeps it so.
+ * noHardDelete.spec.ts keeps it so.
  */
 const FORUM_GONE = { P2025: [404, 'Forum not found'] } as const;
 
