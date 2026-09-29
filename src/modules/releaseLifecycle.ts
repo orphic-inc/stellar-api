@@ -1,10 +1,44 @@
-import { ArtistRole, ReleaseHistoryAction } from '@prisma/client';
+import { ArtistRole, Prisma, ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 import type { CreateReleaseInput } from '../schemas/community';
 import { snapshotRelease } from './releaseWorkbench/snapshot';
 import { attachTagWithVotes, buildPlainTags } from './releaseTags';
 import { registerWriteImages } from './remoteImage';
+
+/**
+ * Every credited artist must exist (#596). Read first, so the answer can say
+ * which kind of id was wrong: a dangling artist id is the body's, so `400`.
+ */
+const assertCreditedArtistsExist = async (
+  credits: CreateReleaseInput['credits']
+) => {
+  const ids = [...new Set(credits.map((credit) => credit.artistId))];
+  const found = await prisma.artist.count({ where: { id: { in: ids } } });
+  if (found !== ids.length) {
+    throw new AppError(400, 'A credited artist id names nothing');
+  }
+};
+
+/**
+ * The release row with its credits and default edition. Its community was read
+ * before the transaction and can be deleted in between (#596), and a credit
+ * listed twice in one role violates ReleaseArtist's unique key.
+ */
+const createReleaseRow = async (
+  tx: Prisma.TransactionClient,
+  data: Prisma.ReleaseUncheckedCreateInput
+) => {
+  try {
+    return await tx.release.create({ data });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [400, 'An artist is credited twice in the same role'],
+      P2003: [404, 'Community not found']
+    });
+  }
+};
 
 export const createCommunityRelease = async (input: {
   actorId: number;
@@ -29,6 +63,7 @@ export const createCommunityRelease = async (input: {
     tagIds
   } = input.data;
   const uniqueTagIds = tagIds ? [...new Set(tagIds)] : [];
+  await assertCreditedArtistsExist(credits);
   // Before the write, so a 429 refuses the release whole (#737).
   await registerWriteImages(
     { bodies: [description], fields: [image] },
@@ -36,25 +71,23 @@ export const createCommunityRelease = async (input: {
   );
 
   return prisma.$transaction(async (tx) => {
-    const created = await tx.release.create({
-      data: {
-        communityId: input.communityId,
-        title,
-        description,
-        type,
-        releaseType,
-        year,
-        image: image ?? null,
-        credits: {
-          create: credits.map((credit) => ({
-            artistId: credit.artistId,
-            role: credit.role ?? ArtistRole.Main,
-            addedById: input.actorId
-          }))
-        },
-        editions: {
-          create: { year, isUnknownEdition: true }
-        }
+    const created = await createReleaseRow(tx, {
+      communityId: input.communityId,
+      title,
+      description,
+      type,
+      releaseType,
+      year,
+      image: image ?? null,
+      credits: {
+        create: credits.map((credit) => ({
+          artistId: credit.artistId,
+          role: credit.role ?? ArtistRole.Main,
+          addedById: input.actorId
+        }))
+      },
+      editions: {
+        create: { year, isUnknownEdition: true }
       }
     });
 
@@ -122,6 +155,19 @@ export const deleteCommunityRelease = async (input: {
         })
       )
     );
-    await tx.release.delete({ where: { id: input.releaseId } });
+    try {
+      await tx.release.delete({ where: { id: input.releaseId } });
+    } catch (err) {
+      // P2025: a concurrent delete won (#596). P2003: every release keeps an
+      // edition and Edition → Release is Restrict, so the delete is refused
+      // until #793 decides what deleting a release should mean.
+      translatePrismaError(err, {
+        P2025: [404, 'Release not found'],
+        P2003: [
+          409,
+          'A release with editions or contributions cannot be deleted'
+        ]
+      });
+    }
   });
 };

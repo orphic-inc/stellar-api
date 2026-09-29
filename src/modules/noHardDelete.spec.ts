@@ -45,6 +45,8 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   // Withdrawn by `deletedAt` (DELETE /artists/:id); editions have no delete.
   ['artist', 'artists'],
   ['edition', 'editions'],
+  // Tags only count down (occurrences); a tag row is never removed (#596).
+  ['tag', 'tags'],
   // Staff PM tickets are resolved, never deleted (#596).
   ['staffInboxConversation', 'staff_inbox_conversations'],
   ['staffInboxMessage', 'staff_inbox_messages'],
