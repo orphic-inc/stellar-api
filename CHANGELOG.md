@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.10] — 2026-09-29
+
 ### Added
 
 - **Every middleware now says whether it is a gate** (#558). The contract derives a route's `401`/`403`/`429` from gate stamps, so a real gate nobody stamped went quietly undescribed; #509 F7's `requireModerator` was one. `npm run openapi:gate-marks`, gated in CI, fails on any layer ahead of a contract route's handler that carries neither `markGate` nor the new `markNotGate(fn, reason)`. The reason is required.
@@ -70,7 +72,7 @@ All notable changes to stellar-api are documented here.
 - **Request bounties can no longer be paid out twice, lost, or overdrawn** (#767, the second instance of #766).
   - **Double unfills and deletes are claimed.**
     - Two concurrent unfills both clawed the bounty back from the filler. Two concurrent deletes both refunded every bounty.
-    - Each now claims the request as its first write, and the loser answers the existing `422` or `404` without moving money.
+    - Each now claims the request as its first write, and the loser answers the existing `422` or `404` without moving any bytes.
     - The unfill's claim pins the filler it read, and the delete's pins the status it read. So an unfill cannot charge a previous filler for a new fill, and a delete that races a fill cannot refund bounties the fill paid out.
   - **Bounties no longer slip between a read and a claim.**
     - A bounty added while a fill was in flight was debited from its member but never paid to the filler. One added while a delete was in flight was never refunded.
@@ -3613,7 +3615,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...HEAD
+[0.9.10]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...v0.9.7
