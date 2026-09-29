@@ -164,3 +164,34 @@ describe('validation gates are not credentials (#567)', () => {
     );
   });
 });
+
+/**
+ * #558 — the two gate kinds that are not cookie credentials.
+ *
+ * `securityForGates` puts `cookieAuth` on any gate it does not recognise, which
+ * is the mistake #553 and #567 each had to guard against. The Member Feed
+ * authenticates by query parameters and has never carried a `security` block;
+ * a body limit is no credential at all.
+ */
+describe('feedToken and bodyLimit gates are not cookie credentials (#558)', () => {
+  const doc = buildOpenApiDocument(
+    collectRoutes(createApp()).filter(isContractRoute).map(stripApi)
+  ) as unknown as {
+    paths: Record<
+      string,
+      Record<string, { security?: unknown; responses: Record<string, unknown> }>
+    >;
+  };
+
+  it('leaves the Member Feed with no security requirement', () => {
+    expect(doc.paths['/feeds/mine.xml'].get.security).toBeUndefined();
+  });
+
+  it('derives the feed 404 from its gate', () => {
+    expect(doc.paths['/feeds/mine.xml'].get.responses['404']).toBeDefined();
+  });
+
+  it('derives the asset upload 413 from its body limit', () => {
+    expect(doc.paths['/asset'].post.responses['413']).toBeDefined();
+  });
+});

@@ -1,7 +1,7 @@
 import express, { Router, type Express } from 'express';
 
 import { collectRoutes } from './expressRoutes';
-import { markGate } from './routeGate';
+import { markGate, markNotGate } from './routeGate';
 
 // These tests exist because collectRoutes reads Express 4 internals (`_router`,
 // `layer.regexp`, `layer.keys`), which are not public API. An Express upgrade
@@ -187,6 +187,88 @@ describe('collectRoutes', () => {
 
     expect(kindsFor(app, 'GET /api/early')).toEqual([]);
     expect(kindsFor(app, 'GET /api/late')).toEqual(['auth']);
+  });
+
+  // ── unmarked layers (#558) ────────────────────────────────────────────────
+  // Every layer ahead of a handler must carry a gate stamp or a markNotGate
+  // mark. #509 F7 was a real 403 gate nobody stamped, which the contract could
+  // not see; these pin that the walk reports exactly that shape.
+
+  const unmarkedFor = (app: Express, key: string) =>
+    collectRoutes(app).find((r) => `${r.method} ${r.path}` === key)?.unmarked;
+
+  it('reports an unstamped middleware on the route own chain', () => {
+    const app = express();
+    const requireModerator = (_req: unknown, _res: unknown, next: () => void) =>
+      next();
+    app.post('/x', requireModerator, (_req, res) => res.json({}));
+
+    expect(unmarkedFor(app, 'POST /x')).toEqual([
+      'route layer 1 (requireModerator)'
+    ]);
+  });
+
+  it('never reports the handler itself', () => {
+    const app = express();
+    app.get('/x', (_req, res) => res.json({}));
+
+    expect(unmarkedFor(app, 'GET /x')).toEqual([]);
+  });
+
+  it('accepts either mark', () => {
+    const app = express();
+    app.get(
+      '/x',
+      markGate((_req, _res, next) => next(), 'auth'),
+      markNotGate((_req, _res, next) => next(), 'refuses nothing'),
+      (_req, res) => res.json({})
+    );
+
+    expect(unmarkedFor(app, 'GET /x')).toEqual([]);
+  });
+
+  it('reports an unmarked `use` layer on every route after it', () => {
+    const app = express();
+    app.get('/early', (_req, res) => res.json({}));
+    app.use('/api', (_req, _res, next) => next());
+    app.get('/late', (_req, res) => res.json({}));
+
+    expect(unmarkedFor(app, 'GET /early')).toEqual([]);
+    expect(unmarkedFor(app, 'GET /late')).toEqual([
+      "use layer at '/api' (<anonymous>)"
+    ]);
+  });
+
+  it('inherits an unmarked `use` layer into mounted routers', () => {
+    const app = express();
+    const r = Router();
+    r.use(function audit(_req, _res, next) {
+      next();
+    });
+    r.get('/inner', (_req, res) => res.json({}));
+    app.use('/api', r);
+
+    expect(unmarkedFor(app, 'GET /api/inner')).toEqual([
+      "use layer at '/api' (audit)"
+    ]);
+  });
+
+  // Express inserts these two itself, so nothing can stamp them. The name is
+  // honoured only at the root, where Express puts them.
+  it('exempts the Express built-ins at the app root only', () => {
+    const app = express();
+    app.get('/root', (_req, res) => res.json({}));
+    const r = Router();
+    r.use(function query(_req, _res, next) {
+      next();
+    });
+    r.get('/inner', (_req, res) => res.json({}));
+    app.use('/api', r);
+
+    expect(unmarkedFor(app, 'GET /root')).toEqual([]);
+    expect(unmarkedFor(app, 'GET /api/inner')).toEqual([
+      "use layer at '/api' (query)"
+    ]);
   });
 
   it('throws rather than reporting nothing when the internals move', () => {

@@ -107,6 +107,20 @@ describe('responsesForGates', () => {
     expect(Object.keys(r)).toEqual(['401', '403', '429']);
   });
 
+  it('gives the feed token gate its one identical 404 (#558)', () => {
+    // ADR-0014: every failed feed token is the same 404, so an id is never
+    // confirmed. That sameness is what makes this 404 derivable at all.
+    const r = responsesForGates([{ kind: 'feedToken' }], 'GET');
+    expect(Object.keys(r)).toEqual(['404']);
+    expect(description(r, '404')).toMatch(/^Feeds are not enabled/);
+  });
+
+  it('gives a route-level body limit a 413 (#558)', () => {
+    const r = responsesForGates([{ kind: 'bodyLimit' }], 'POST');
+    expect(Object.keys(r)).toEqual(['413']);
+    expect(description(r, '413')).toBe('Request body exceeds the size limit');
+  });
+
   it('yields nothing for an ungated route', () => {
     expect(responsesForGates([], 'POST')).toEqual({});
     expect(responsesForGates(undefined, 'POST')).toEqual({});

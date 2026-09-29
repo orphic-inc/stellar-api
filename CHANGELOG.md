@@ -6,6 +6,13 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Every middleware now says whether it is a gate** (#558). The contract derives a route's `401`/`403`/`429` from gate stamps, so a real gate nobody stamped went quietly undescribed; #509 F7's `requireModerator` was one. `npm run openapi:gate-marks`, gated in CI, fails on any layer ahead of a contract route's handler that carries neither `markGate` nor the new `markNotGate(fn, reason)`. The reason is required.
+  - Two new gate kinds: `feedToken` (the Member Feed's one identical `404`) and `bodyLimit` (`413`).
+  - `POST /asset` now declares the `413` its upload size limit has always answered.
+  - The document description now also states the site-wide `503` before install, and the `400`/`413` for a malformed or oversized body, beside the IP ban's `403`.
+
 ### Changed
 
 - **`requireAdminOnly` and `requireStrictAdmin` are gone** (#515). Both reduced to the same test as `requirePermission('admin')`, whose `admin` check runs first, and their comments promised a staff exclusion that never existed. Their five routes (`GET /stylesheet/admin/stats`, stylesheet create, update and delete, and `GET /stats/site-info`) now use `requirePermission('admin')`: same answers, same contract. The four stylesheet routes also log their denials, as every other permission gate does.

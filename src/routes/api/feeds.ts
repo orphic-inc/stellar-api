@@ -18,6 +18,7 @@
  */
 import express, { NextFunction, Request, Response } from 'express';
 import { asyncHandler } from '../../modules/asyncHandler';
+import { markGate } from '../../lib/routeGate';
 import { authenticateFeedOwner } from '../../modules/feedToken';
 import {
   renderBookmarksFeed,
@@ -54,6 +55,10 @@ const requireFeedOwner = asyncHandler(
     next();
   }
 );
+
+// The feed's auth gate, and its one 404 is derived from this stamp (#558).
+// Stamped in place, as the limiters are, so the declaration stays as it was.
+markGate(requireFeedOwner, 'feedToken');
 
 const ownerOf = (res: Response): number =>
   (res.locals.feedOwner as { id: number }).id;

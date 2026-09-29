@@ -25,6 +25,7 @@
     "openapi:completeness": "ts-node -T src/scripts/check-openapi-completeness.ts",
     "prisma:guard-coverage": "ts-node -T src/scripts/check-prisma-guard-coverage.ts",
     "openapi:failure-coverage": "ts-node -T src/scripts/check-openapi-failure-coverage.ts",
+    "openapi:gate-marks": "ts-node -T src/scripts/check-gate-marks.ts",
     "version:check": "ts-node -T src/scripts/check-version-consistency.ts",
     "changelog:check": "ts-node -T src/scripts/check-changelog.ts",
     "db:generate": "prisma generate",

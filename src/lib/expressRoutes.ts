@@ -17,7 +17,7 @@
 import type { Express, Application } from 'express';
 
 import type { Operation } from './openapiCompleteness';
-import { readGate, type Gate } from './routeGate';
+import { readGate, readNotGate, type Gate } from './routeGate';
 
 interface RouteLayer {
   route?: {
@@ -81,9 +81,37 @@ const gatesOf = (layer: RouteLayer, inherited: readonly Gate[]): Gate[] => {
 };
 
 /**
+ * The layers Express itself inserts at the root of every app. Nothing here can
+ * stamp them, so they are named instead (#558). A name match is safe in this
+ * one direction: if Express renames one, it becomes unmarked and the check
+ * fails loudly, rather than passing something it should not.
+ */
+const EXPRESS_BUILTINS: readonly string[] = ['query', 'expressInit'];
+
+/** A layer's name for a failure message; anonymous arrows have none. */
+const layerName = (fn: unknown): string =>
+  (typeof fn === 'function' && fn.name) || '<anonymous>';
+
+/** Neither a gate nor marked as not one: the shape #509 F7 hid in (#558). */
+const isUnmarked = (fn: unknown): boolean =>
+  readGate(fn) === undefined && readNotGate(fn) === undefined;
+
+/** The unmarked layers of a route's own chain. The last layer is the handler. */
+const unmarkedOf = (layer: RouteLayer, inherited: readonly string[]) => {
+  const chain = (layer.route?.stack ?? []).slice(0, -1);
+  const own = chain.flatMap((h, i) =>
+    isUnmarked(h.handle)
+      ? [`route layer ${i + 1} (${layerName(h.handle)})`]
+      : []
+  );
+  return [...inherited, ...own];
+};
+
+/**
  * Every operation the app serves, as `{ method, path }` with `{param}`
- * placeholders, each carrying the auth `gates` its chain enforces (#494).
- * Methods are upper-cased; Express's internal `_all` is dropped.
+ * placeholders, each carrying the auth `gates` its chain enforces (#494) and
+ * the `unmarked` layers ahead of its handler (#558). Methods are upper-cased;
+ * Express's internal `_all` is dropped.
  */
 export const collectRoutes = (app: Express | Application): Operation[] => {
   const found: Operation[] = [];
@@ -91,10 +119,13 @@ export const collectRoutes = (app: Express | Application): Operation[] => {
   const walk = (
     stack: RouteLayer[],
     base: string,
-    inherited: readonly Gate[]
+    inherited: readonly Gate[],
+    inheritedUnmarked: readonly string[],
+    root: boolean
   ): void => {
     // Gates applied to the router itself, ahead of any route in it.
     const mounted = [...inherited];
+    const mountedUnmarked = [...inheritedUnmarked];
     for (const layer of stack) {
       if (layer.route) {
         const paths = Array.isArray(layer.route.path)
@@ -106,17 +137,30 @@ export const collectRoutes = (app: Express | Application): Operation[] => {
             found.push({
               method: method.toUpperCase(),
               path: toOpenApiPath(base + p),
-              gates: gatesOf(layer, mounted)
+              gates: gatesOf(layer, mounted),
+              unmarked: unmarkedOf(layer, mountedUnmarked)
             });
           }
         }
       } else if (layer.handle?.stack) {
-        walk(layer.handle.stack, base + mountPrefix(layer), mounted);
+        walk(
+          layer.handle.stack,
+          base + mountPrefix(layer),
+          mounted,
+          mountedUnmarked,
+          false
+        );
       } else {
         // A bare `router.use(gate)` — applies to every route registered after
         // it in this router, which is why it accumulates rather than replaces.
         const g = readGate(layer.handle);
         if (g) mounted.push(g);
+        const builtin =
+          root && EXPRESS_BUILTINS.includes(layerName(layer.handle));
+        if (!builtin && isUnmarked(layer.handle))
+          mountedUnmarked.push(
+            `use layer at '${base + mountPrefix(layer) || '/'}' (${layerName(layer.handle)})`
+          );
       }
     }
   };
@@ -130,6 +174,6 @@ export const collectRoutes = (app: Express | Application): Operation[] => {
     );
   }
 
-  walk(router.stack, '', []);
+  walk(router.stack, '', [], [], true);
   return found;
 };
