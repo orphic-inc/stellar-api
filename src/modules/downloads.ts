@@ -1,10 +1,12 @@
 import {
   DownloadGrantStatus,
   EconomyTransactionReason,
+  Prisma,
   RatioExempt
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { getLogger } from './logging';
 import { floorSub } from './ratio';
 import { evaluateRatioPolicy } from './ratioPolicy';
@@ -27,6 +29,37 @@ export interface GrantResult {
   status: DownloadGrantStatus;
   createdAt: string;
 }
+
+/**
+ * Record the member as a consumer of the contribution: the Consumer
+ * many-to-many, kept for backwards compat. Two concurrent first downloads by one
+ * member can both insert on the unique userId (#761); the caller's whole
+ * transaction, debit included, then rolls back.
+ */
+const linkConsumer = async (
+  tx: Prisma.TransactionClient,
+  consumerId: number,
+  contributionId: number
+) => {
+  let consumer;
+  try {
+    consumer = await tx.consumer.upsert({
+      where: { userId: consumerId },
+      update: {},
+      create: { userId: consumerId }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'Another download is being granted; retry']
+    });
+  }
+  await tx.consumer.update({
+    where: { id: consumer.id },
+    data: {
+      contributions: { connect: { id: contributionId } }
+    }
+  });
+};
 
 export const grantDownloadAccess = async (
   consumerId: number,
@@ -169,18 +202,7 @@ export const grantDownloadAccess = async (
       }
     });
 
-    // Upsert Consumer many-to-many for backwards compat
-    const consumer_ = await tx.consumer.upsert({
-      where: { userId: consumerId },
-      update: {},
-      create: { userId: consumerId }
-    });
-    await tx.consumer.update({
-      where: { id: consumer_.id },
-      data: {
-        contributions: { connect: { id: contributionId } }
-      }
-    });
+    await linkConsumer(tx, consumerId, contributionId);
 
     return {
       grantId: grant.id,

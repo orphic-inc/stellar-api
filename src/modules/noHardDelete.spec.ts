@@ -1,5 +1,5 @@
 /**
- * Models no production code hard-deletes (#752, #756, #758).
+ * Models no production code hard-deletes (#752, #756, #758, #761).
  *
  * `prisma-guard-coverage-baseline.json` records module writes as internally
  * derived on exactly this fact: each write is checked, or read in the same
@@ -41,7 +41,9 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['userSettings', 'user_settings'],
   ['request', 'requests'],
   ['requestBounty', 'request_bounties'],
-  ['contribution', 'contributions']
+  ['contribution', 'contributions'],
+  ['downloadAccessGrant', 'download_access_grants'],
+  ['consumer', 'consumers']
 ];
 
 const sourceFiles = (dir: string): string[] =>

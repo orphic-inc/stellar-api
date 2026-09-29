@@ -45905,7 +45905,7 @@
             }
           },
           "409": {
-            "description": "Balance changed concurrently — retry",
+            "description": "Balance changed concurrently, or another download by this member is being granted — retry",
             "content": {
               "application/json": {
                 "schema": {
