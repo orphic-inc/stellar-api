@@ -25,6 +25,8 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **One member's failed reputation read no longer loses everyone's reputation snapshot** (#596). `captureCrsSnapshots` read every active user through one `Promise.all` and wrote once at the end, so one failure dropped the period's snapshot for all of them and skipped the retention prune. It now skips only that member, and logs and counts the failure. Every background job's per-item failure policy is now pinned by a spec, under [ADR-0048](docs/adr/0048-module-writes-meet-the-same-guard-rule.md)'s four policies.
+
 - **One failing account no longer ends the dormancy sweep or the rank progression sweep** (#596). Each sweep awaited a write per user with nothing to catch a failure, so one row changing between the batch read and its write abandoned the rest of the day's run. For example, a user disabled by staff mid-sweep. Everyone later in the cursor went unevaluated until the next run. Both now contain a failure to its user: it is logged and counted in a new `failed` tally, and the sweep carries on, as the ratio policy and invite expiry sweeps already did.
 
 ## [0.9.9] — 2026-09-28

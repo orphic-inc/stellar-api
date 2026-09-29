@@ -20,7 +20,12 @@ jest.mock('./logging', () => ({
   })
 }));
 
-import { pollKorinMetrics, getIrcScore, IrcUserMetrics } from './irc';
+import {
+  pollKorinMetrics,
+  getCachedMetrics,
+  getIrcScore,
+  IrcUserMetrics
+} from './irc';
 
 const HOUR_MS = 3_600_000;
 
@@ -127,5 +132,31 @@ describe('getIrcScore', () => {
         10
       );
     });
+  });
+});
+
+// ADR-0048's fourth job policy: one unit per cycle, and a failure keeps the
+// last good state. A korin outage must not blank everyone's IRC dimension.
+describe('pollKorinMetrics — a failed poll keeps the last good metrics', () => {
+  it('keeps them when the fetch throws', async () => {
+    await seedCache([fullUser({ nick: 'kept' })]);
+    global.fetch = jest.fn().mockRejectedValue(new Error('offline')) as never;
+
+    await pollKorinMetrics();
+
+    expect(getCachedMetrics()?.users.map((u) => u.nick)).toEqual(['kept']);
+  });
+
+  it('keeps them when korin answers non-200', async () => {
+    await seedCache([fullUser({ nick: 'kept' })]);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ users: [], lastFlushAt: null })
+    }) as never;
+
+    await pollKorinMetrics();
+
+    expect(getCachedMetrics()?.users.map((u) => u.nick)).toEqual(['kept']);
   });
 });

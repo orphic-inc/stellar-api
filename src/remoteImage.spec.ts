@@ -248,6 +248,30 @@ describe('importRemoteImage', () => {
 });
 
 describe('processDueRemoteImages', () => {
+  // ADR-0048 (#596): catch, log, continue. A database error on one row is
+  // caught by its worker; that row's lease lapses and it retries later, and
+  // the rest of the batch still imports.
+  it('keeps importing past a row whose write errors', async () => {
+    const due = [1, 2].map((id) => ({
+      id,
+      url: `https://a.example/${id}.png`,
+      attempts: 0,
+      requestedById: 7,
+      nextAttemptAt: new Date(0)
+    }));
+    prismaMock.remoteImage.findMany.mockResolvedValue(due as never);
+    prismaMock.remoteImage.updateMany.mockResolvedValue({ count: 1 });
+    mockFetchResult = { ok: false, reason: 'gone', retryable: false };
+    prismaMock.remoteImage.update
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockResolvedValueOnce({} as never);
+
+    const tally = await processDueRemoteImages(undefined, { concurrency: 1 });
+
+    expect(tally).toEqual({ imported: 0, retry: 0, failed: 1 });
+    expect(prismaMock.remoteImage.update).toHaveBeenCalledTimes(2);
+  });
+
   it('imports only the rows it managed to lease', async () => {
     const due = [
       {

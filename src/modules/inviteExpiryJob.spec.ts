@@ -24,7 +24,13 @@ jest.mock('./logging', () => ({
   })
 }));
 
-import { notifyInviteExpired } from './inviteExpiryJob';
+const mockResolveSystemActorId = jest.fn();
+jest.mock('./rankProgressionJob', () => ({
+  ...jest.requireActual('./rankProgressionJob'),
+  resolveSystemActorId: () => mockResolveSystemActorId()
+}));
+
+import { notifyInviteExpired, runInviteExpiryCycle } from './inviteExpiryJob';
 
 // The harness already mocks `modules/pm`, so this reads its jest.fn rather than
 // registering a second mock of the same module — two registrations race and the
@@ -125,5 +131,26 @@ describe('notifyInviteExpired — who hears about it', () => {
     await expect(
       notifyInviteExpired({ ...INVITE, refunded: true })
     ).resolves.toBeUndefined();
+  });
+});
+
+// ADR-0048 (#596): catch, log, continue. Each invite is its own transaction,
+// so one that fails is counted and the sweep moves on to the next.
+describe('runInviteExpiryCycle — a failing invite', () => {
+  it('counts the failure and still expires the next invite', async () => {
+    mockResolveSystemActorId.mockReset().mockResolvedValue(9);
+    inviterCanInvite(true);
+    prismaMock.invite.findMany.mockResolvedValueOnce([
+      { ...INVITE, id: 7 },
+      { ...INVITE, id: 8 }
+    ] as never);
+    prismaMock.$transaction
+      .mockRejectedValueOnce(new Error('Record to update not found'))
+      .mockResolvedValueOnce({ refunded: true } as never);
+
+    const tally = await runInviteExpiryCycle(new Date());
+
+    expect(tally).toEqual({ expired: 1, failed: 1 });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
   });
 });

@@ -37,6 +37,7 @@ jest.mock('../lib/ssrfGuard', () => ({
 
 import {
   sweepStaleWarnLinks,
+  recheckStaleLinks,
   checkContributionLink,
   getCommunityHealthPulse,
   computePulse,
@@ -53,6 +54,24 @@ const allowAllUrls = () =>
   mockCheckPublicUrl.mockImplementation((raw: string) =>
     Promise.resolve({ ok: true, url: new URL(raw) })
   );
+
+// ─── recheckStaleLinks ────────────────────────────────────────────────────────
+
+// ADR-0048 (#596): catch, log, continue. Each contribution's check is caught,
+// so one that throws does not stop the rest of the recheck.
+describe('recheckStaleLinks', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('keeps checking past a contribution whose check throws', async () => {
+    mockPrismaContribution.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    mockPrismaContribution.findUnique
+      .mockRejectedValueOnce(new Error('connection lost'))
+      .mockResolvedValueOnce(null);
+
+    await expect(recheckStaleLinks()).resolves.toBeUndefined();
+    expect(mockPrismaContribution.findUnique).toHaveBeenCalledTimes(2);
+  });
+});
 
 // ─── sweepStaleWarnLinks ──────────────────────────────────────────────────────
 
