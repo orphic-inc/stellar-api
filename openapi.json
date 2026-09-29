@@ -25767,6 +25767,16 @@
               }
             }
           },
+          "409": {
+            "description": "A contribution of this format already exists for the release, or another upload is recording your contributor role (retry)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limited",
             "content": {
@@ -26092,6 +26102,16 @@
           },
           "404": {
             "description": "Community not found, or one you cannot see",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another upload is recording your contributor role; retry",
             "content": {
               "application/json": {
                 "schema": {

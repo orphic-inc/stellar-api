@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { audit } from '../lib/audit';
 import { sizeBytesToNumber } from '../lib/serialize';
 import { getLogger } from './logging';
@@ -101,17 +102,111 @@ export const mayUploadTo = async (
  * Record that `userId` contributes to `communityId` (#709, ADR-0050). One
  * `Contributor` row per user, connected to every community they contribute to:
  * a connect never moves or drops the role from another community.
+ *
+ * The nested connect makes Prisma run this upsert as a read then an insert, not
+ * `ON CONFLICT` (#596), so two first uploads by one member race on
+ * `Contributor.userId`: the loser answers `409`. A community deleted since the
+ * caller admitted the upload answers the caller's own not-found, `notFound`.
  */
-const recordContributorRole = (
+const recordContributorRole = async (
   tx: Prisma.TransactionClient,
   userId: number,
-  communityId: number
-) =>
-  tx.contributor.upsert({
-    where: { userId },
-    update: { communities: { connect: { id: communityId } } },
-    create: { userId, communities: { connect: { id: communityId } } }
+  communityId: number,
+  notFound: string
+) => {
+  try {
+    return await tx.contributor.upsert({
+      where: { userId },
+      update: { communities: { connect: { id: communityId } } },
+      create: { userId, communities: { connect: { id: communityId } } }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'Another upload is recording your contributor role; retry'],
+      P2003: [404, notFound],
+      P2025: [404, notFound]
+    });
+  }
+};
+
+/**
+ * The submission's release. Its community was admitted before the transaction,
+ * and a community can be deleted in between (#596): that answers the same `404`
+ * as a community that was never there.
+ */
+const createSubmissionRelease = async (
+  tx: Prisma.TransactionClient,
+  data: Prisma.ReleaseUncheckedCreateInput
+) => {
+  try {
+    return await tx.release.create({ data });
+  } catch (err) {
+    translatePrismaError(err, { P2003: [404, 'Community not found'] });
+  }
+};
+
+/**
+ * The release's default edition, created when it has none (#596). The release
+ * was read before the transaction; an edition-less one can be deleted in
+ * between, which answers the attach path's own `404`. Once this returns, the
+ * edition pins its release: Edition → Release is `Restrict`.
+ */
+const defaultEditionFor = async (
+  tx: Prisma.TransactionClient,
+  release: { id: number; year: number | null },
+  media: AddContributionToReleaseInput['media']
+) => {
+  const existing = await tx.edition.findFirst({
+    where: { releaseId: release.id },
+    orderBy: { id: 'asc' },
+    select: { id: true }
   });
+  if (existing) return existing;
+  try {
+    return await tx.edition.create({
+      data: {
+        releaseId: release.id,
+        year: release.year,
+        media: media ?? null,
+        isUnknownEdition: true
+      },
+      select: { id: true }
+    });
+  } catch (err) {
+    translatePrismaError(err, { P2003: [404, 'Release not found'] });
+  }
+};
+
+/** The file facts both upload paths record, with their defaults. */
+const releaseFileCreate = (
+  input: Pick<
+    AddContributionToReleaseInput,
+    'bitrate' | 'hasLog' | 'hasCue' | 'isScene'
+  >
+) => ({
+  create: {
+    bitrate: input.bitrate ?? null,
+    hasLog: input.hasLog ?? false,
+    hasCue: input.hasCue ?? false,
+    isScene: input.isScene ?? false
+  }
+});
+
+/**
+ * Find or create each tag, counting this use of it. Prisma sends each upsert as
+ * one `INSERT … ON CONFLICT ("name") DO UPDATE`, so a concurrent create of the
+ * same name cannot fail it (#596).
+ */
+const countTags = (tx: Prisma.TransactionClient, names: string[]) =>
+  Promise.all(
+    names.map((name) =>
+      tx.tag.upsert({
+        where: { name },
+        create: { name, occurrences: 1 },
+        update: { occurrences: { increment: 1 } }
+      })
+    )
+  );
 
 /**
  * Whether `userId` may submit to the input's community. If so, record the
@@ -155,7 +250,6 @@ export const createContributionSubmission = async ({
     image,
     description,
     releaseDescription,
-    bitrate,
     media,
     releaseCategory,
     recordLabel,
@@ -163,9 +257,6 @@ export const createContributionSubmission = async ({
     editionTitle,
     editionYear,
     isRemaster,
-    hasLog,
-    hasCue,
-    isScene,
     collaborators
   } = input;
 
@@ -178,7 +269,12 @@ export const createContributionSubmission = async ({
   const canonicalTags = await resolveTagNames(splitTagList(tags));
 
   const contribution = await prisma.$transaction(async (tx) => {
-    const contributor = await recordContributorRole(tx, userId, communityId);
+    const contributor = await recordContributorRole(
+      tx,
+      userId,
+      communityId,
+      'Community not found'
+    );
 
     const names = collaborators.map((c) => c.artist);
     const existing = await tx.artist.findMany({
@@ -220,35 +316,22 @@ export const createContributionSubmission = async ({
       return [{ artistId: artist.id, role, addedById: userId }];
     });
 
-    const tagRecords =
-      canonicalTags.length > 0
-        ? await Promise.all(
-            canonicalTags.map((name) =>
-              tx.tag.upsert({
-                where: { name },
-                create: { name, occurrences: 1 },
-                update: { occurrences: { increment: 1 } }
-              })
-            )
-          )
-        : [];
+    const tagRecords = await countTags(tx, canonicalTags);
 
-    const release = await tx.release.create({
-      data: {
-        communityId,
-        title,
-        year,
-        type,
-        releaseType:
-          releaseCategory ??
-          (type === ReleaseType.Music
-            ? ReleaseCategory.Album
-            : ReleaseCategory.Unknown),
-        image: image ?? null,
-        description: description ?? releaseDescription ?? title,
-        contributors: { connect: { id: contributor.id } },
-        credits: { create: creditData }
-      }
+    const release = await createSubmissionRelease(tx, {
+      communityId,
+      title,
+      year,
+      type,
+      releaseType:
+        releaseCategory ??
+        (type === ReleaseType.Music
+          ? ReleaseCategory.Album
+          : ReleaseCategory.Unknown),
+      image: image ?? null,
+      description: description ?? releaseDescription ?? title,
+      contributors: { connect: { id: contributor.id } },
+      credits: { create: creditData }
     });
 
     const hasEditionMeta = Boolean(
@@ -292,14 +375,7 @@ export const createContributionSubmission = async ({
         type: fileType as FileType,
         downloadUrl,
         sizeInBytes: sizeInBytes ?? null,
-        releaseFile: {
-          create: {
-            bitrate: bitrate ?? null,
-            hasLog: hasLog ?? false,
-            hasCue: hasCue ?? false,
-            isScene: isScene ?? false
-          }
-        },
+        releaseFile: releaseFileCreate(input),
         collaborators: {
           connect: collaboratorRecords.map((artist) => ({ id: artist.id }))
         }
@@ -348,25 +424,16 @@ export const addContributionToRelease = async ({
 
   return prisma
     .$transaction(async (tx: Prisma.TransactionClient) => {
-      const contributor = await recordContributorRole(tx, userId, communityId);
+      const contributor = await recordContributorRole(
+        tx,
+        userId,
+        communityId,
+        'Release not found'
+      );
 
       // Every contribution belongs to an edition; attach to the release's
       // default edition, creating one if the release has none yet.
-      const edition =
-        (await tx.edition.findFirst({
-          where: { releaseId },
-          orderBy: { id: 'asc' },
-          select: { id: true }
-        })) ??
-        (await tx.edition.create({
-          data: {
-            releaseId,
-            year: release.year,
-            media: input.media ?? null,
-            isUnknownEdition: true
-          },
-          select: { id: true }
-        }));
+      const edition = await defaultEditionFor(tx, release, input.media);
 
       return tx.contribution.create({
         data: {
@@ -378,14 +445,7 @@ export const addContributionToRelease = async ({
           downloadUrl: input.downloadUrl,
           sizeInBytes: input.sizeInBytes ?? null,
           releaseDescription: input.releaseDescription,
-          releaseFile: {
-            create: {
-              bitrate: input.bitrate ?? null,
-              hasLog: input.hasLog ?? false,
-              hasCue: input.hasCue ?? false,
-              isScene: input.isScene ?? false
-            }
-          }
+          releaseFile: releaseFileCreate(input)
         },
         select: contributionSelect
       });

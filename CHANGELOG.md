@@ -6,6 +6,15 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Two first uploads by one member no longer answer `500`** (#782, the sixth guard-coverage burn-down under ADR-0048: `contribution.ts`).
+  - **The race:** the upload records the member's contributor role with a read and then an insert. Two concurrent first uploads both inserted, and one lost on its unique key. It now answers **`409`** on `POST /contributions` and `POST /communities/{communityId}/releases/{releaseId}/contributions`, and nothing is written.
+  - **A community or release deleted mid-upload** answers the route's existing `404`, not `500`.
+  - **Resolved:** all 9 of `contribution.ts`'s `unreviewed` sites. 3 are guarded, and 6 are recorded as internally derived, one of them a tag upsert Prisma sends as `INSERT … ON CONFLICT`.
+  - **`noHardDelete.spec.ts`** gains artists and editions. It also checks that a release delete cannot cascade into its editions or contributions, and it now skips comment lines.
+  - The attach route's existing duplicate-format `409` is now declared too.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
