@@ -25,6 +25,8 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Two concurrent first downloads by one member no longer answer `500`** (#761, the fourth guard-coverage burn-down under ADR-0048). Both inserted the member's consumer row, and one lost on its unique key. It now answers `409`, and its transaction, balance debit included, rolls back as before. All 11 of `downloads.ts`'s `unreviewed` sites are resolved: 1 guarded, 10 recorded as internally derived. `noHardDelete.spec.ts` gains `DownloadAccessGrant` and `Consumer`. A reversal race found on the way is tracked separately as #760.
+
 - **Staff creating a user with an unknown rank no longer gets `500`** (#758, the third guard-coverage burn-down under ADR-0048).
   - `POST /users` never checked the body's `userRankId`. It now answers `400 Rank not found`.
   - Four races now answer their client errors instead of `500`:

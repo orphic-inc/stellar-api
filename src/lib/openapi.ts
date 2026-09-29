@@ -11309,7 +11309,9 @@ registry.registerPath({
       'Cannot consume your own contribution, or download access is disabled'
     ),
     404: msgResponse('Contribution not found'),
-    409: msgResponse('Balance changed concurrently — retry')
+    409: msgResponse(
+      'Balance changed concurrently, or another download by this member is being granted — retry'
+    )
   }
 });
 

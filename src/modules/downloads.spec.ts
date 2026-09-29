@@ -133,6 +133,27 @@ describe('grantDownloadAccess', () => {
     });
   });
 
+  // #761: two first downloads by one member can both insert the Consumer row.
+  // The guard answers 409; the transaction, debit included, rolls back.
+  it('throws 409 when a concurrent first download inserted the consumer row', async () => {
+    const { Prisma } = jest.requireActual('@prisma/client');
+    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.downloadAccessGrant.findFirst.mockResolvedValue(null);
+    mockTx.user.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.downloadAccessGrant.create.mockResolvedValue(makeGrant());
+    mockTx.consumer.upsert.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('boom', {
+        code: 'P2002',
+        clientVersion: 'test'
+      })
+    );
+
+    await expect(grantDownloadAccess(7, 5)).rejects.toEqual(
+      expect.objectContaining({ statusCode: 409 })
+    );
+  });
+
   it('reuses existing grant within idempotency window', async () => {
     const existing = makeGrant();
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
