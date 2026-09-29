@@ -674,7 +674,7 @@ describe('castVote', () => {
 // ─── Constraint guards (#752, ADR-0048) ─────────────────────────────────────
 // Each guard is proved by making its write fail with the code it translates.
 // The sites NOT guarded here are recorded as internally derived, and
-// forumNoHardDelete.spec.ts holds the fact most of those reasons rest on.
+// noHardDelete.spec.ts holds the fact most of those reasons rest on.
 
 describe('constraint guards (#752)', () => {
   const prismaErr = (code: string) =>

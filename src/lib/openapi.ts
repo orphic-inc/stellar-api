@@ -7400,7 +7400,10 @@ registry.registerPath({
         'application/json': { schema: z.object({ voted: z.boolean() }) }
       }
     },
-    404: msgResponse('Request not found')
+    404: msgResponse('Request not found'),
+    409: msgResponse(
+      'A racing toggle by the same member changed the vote first; reload and retry'
+    )
   }
 });
 
@@ -7478,6 +7481,12 @@ registry.registerPath({
   path: '/requests',
   summary: 'Create a new request',
   tags: ['Requests'],
+  // Described, not declared: a declared 400 would replace the derived
+  // ValidationError body on this route.
+  description:
+    'Also answers `400` with `{ msg }` below the minimum bounty, on an ' +
+    'insufficient contributed balance, or when `communityId` or an artist id ' +
+    'names nothing. A repeated artist id is treated as one.',
   request: {
     body: {
       content: { 'application/json': { schema: createRequestSchema } }
@@ -7536,7 +7545,10 @@ registry.registerPath({
     400: msgResponse(
       'Below the minimum bounty, or insufficient contributed balance'
     ),
-    404: msgResponse('Request not found, or not open')
+    404: msgResponse('Request not found, or not open'),
+    409: msgResponse(
+      'A racing first bounty by the same member was recorded first; retry'
+    )
   }
 });
 

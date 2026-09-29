@@ -1142,3 +1142,86 @@ describe('listRequests', () => {
     );
   });
 });
+
+// ─── Constraint guards (#756, ADR-0048) ─────────────────────────────────────
+// Each guard is proved by failing its write with the code it translates. The
+// sites not guarded are recorded as internally derived; noHardDelete.spec.ts
+// holds the fact most of those reasons rest on.
+
+describe('constraint guards (#756)', () => {
+  const { Prisma } = jest.requireActual('@prisma/client');
+  const prismaErr = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('boom', {
+      code,
+      clientVersion: 'test'
+    });
+  const status = (code: number) =>
+    expect.objectContaining({ statusCode: code });
+  const top = jest.requireMock('../lib/prisma').prisma as {
+    request: { findUnique: jest.Mock; update: jest.Mock };
+    requestVote: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      delete: jest.Mock;
+    };
+  };
+
+  beforeEach(() => {
+    // toggleVote uses the batch form; everything else the callback form.
+    mockTransaction.mockImplementation((arg: unknown) =>
+      typeof arg === 'function'
+        ? (arg as (tx: typeof mockTx) => Promise<unknown>)(mockTx)
+        : Promise.all(arg as Promise<unknown>[])
+    );
+  });
+
+  const input = (over = {}) => ({
+    communityId: 1,
+    title: 'T',
+    type: ReleaseType.Music,
+    bounty: MINIMUM_BOUNTY,
+    ...over
+  });
+
+  it('createRequest answers 400 when the body names no community or artist', async () => {
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.request.create.mockRejectedValue(prismaErr('P2003'));
+    await expect(createRequest(1, input() as never)).rejects.toEqual(
+      status(400)
+    );
+  });
+
+  it('createRequest de-duplicates a repeated artist id', async () => {
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.request.create.mockResolvedValue(
+      makeRequest({ artists: [], bounties: [] })
+    );
+    await createRequest(1, input({ artists: [5, 5, 6] }) as never);
+    const data = mockTx.request.create.mock.calls[0][0].data as {
+      artists: { create: Array<{ artistId: number }> };
+    };
+    expect(data.artists.create).toEqual([{ artistId: 5 }, { artistId: 6 }]);
+  });
+
+  it('toggleVote answers 409 when a racing toggle already removed the vote', async () => {
+    top.request.findUnique.mockResolvedValue({ id: 10 });
+    top.requestVote.findUnique.mockResolvedValue({ requestId: 10, userId: 1 });
+    top.requestVote.delete.mockRejectedValue(prismaErr('P2025'));
+    await expect(toggleVote(10, 1)).rejects.toEqual(status(409));
+  });
+
+  it('toggleVote answers 409 when a racing toggle already added the vote', async () => {
+    top.request.findUnique.mockResolvedValue({ id: 10 });
+    top.requestVote.findUnique.mockResolvedValue(null);
+    top.requestVote.create.mockRejectedValue(prismaErr('P2002'));
+    await expect(toggleVote(10, 1)).rejects.toEqual(status(409));
+  });
+
+  it('addBounty answers 409 when a racing first bounty won the insert', async () => {
+    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.user.findUnique.mockResolvedValue(makeUser());
+    mockTx.requestBounty.findUnique.mockResolvedValue(null);
+    mockTx.requestBounty.create.mockRejectedValue(prismaErr('P2002'));
+    await expect(addBounty(1, 10, MINIMUM_BOUNTY)).rejects.toEqual(status(409));
+  });
+});
