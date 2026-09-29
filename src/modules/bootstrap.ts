@@ -1,8 +1,14 @@
 /**
  * Idempotent bootstrap helpers shared by prisma/seed.ts and the install route.
  * Each function is a no-op when the relevant rows already exist.
+ *
+ * Including rows a concurrent seed creates mid-run (#596). The boot seed runs
+ * before the server listens, but two `POST /install` requests on a fresh site
+ * run `seedAll` side by side, so each read-then-create here can lose a unique
+ * key to the other. A P2002 means "already seeded", never an error.
  */
 import {
+  Prisma,
   PrismaClient,
   CommunityType,
   RegistrationStatus
@@ -15,6 +21,7 @@ import {
   DEFAULT_RULES
 } from './rankProgression';
 import { site } from './config';
+import { FORUM_STRUCTURE, type ForumEntry } from './forumStructure';
 
 export const DEFAULT_RANKS = [
   {
@@ -226,195 +233,6 @@ export const DEFAULT_RANKS = [
   }
 ] as const;
 
-// minClassRead/Write 200 = Power User+; 0 = everyone; 500 = Staff+
-export const FORUM_STRUCTURE = [
-  {
-    name: 'Site',
-    sort: 10,
-    forums: [
-      {
-        sort: 10,
-        name: 'Announcements',
-        description:
-          'There are a terrible lot of lies going about the world and the worst of it is that half of them are true.'
-      },
-      {
-        sort: 20,
-        name: 'Stellar',
-        description: 'News and updates about the Stellar project.'
-      },
-      {
-        sort: 30,
-        name: 'Contests & Designs',
-        description: 'Community contests and design submissions.'
-      },
-      {
-        sort: 40,
-        name: 'Projects',
-        description: 'Ongoing and upcoming projects.'
-      },
-      {
-        sort: 50,
-        name: 'The Laboratory',
-        description:
-          'I was working in the lab late one night when my eyes beheld an eerie sight.'
-      },
-      {
-        sort: 60,
-        name: 'Suggestions/Ideas',
-        description:
-          'Daring ideas are like chessmen moved forward, they may be beaten, but you may start a winning game.'
-      },
-      {
-        sort: 70,
-        name: 'Bugs',
-        description:
-          'Some days you are the bug and some days you are the windshield.'
-      }
-    ]
-  },
-  {
-    name: 'Community',
-    sort: 20,
-    forums: [
-      {
-        sort: 10,
-        name: 'The Lounge',
-        description:
-          "The only normal people you know are the ones you don't know very well."
-      },
-      {
-        sort: 20,
-        name: 'The Lounge+',
-        description: 'There are points to be scored. There are games to be won.'
-      },
-      {
-        sort: 30,
-        name: 'The Library',
-        description:
-          'The first sign of maturity is the discovery that the volume knob also turns to the left.'
-      },
-      {
-        sort: 40,
-        name: 'Concerts, Events & Meets',
-        description:
-          "No, it's just pure noise for the hell of it. The fun is in watching people's faces. That's why we light the audience up, to see their discomfort."
-      },
-      {
-        sort: 50,
-        name: 'Power User',
-        description:
-          'Destiny is not a matter of chance, it is a matter of choice. It is not a thing to be waited for, it is a thing to be achieved.',
-        minClassRead: 200,
-        minClassWrite: 200
-      },
-      {
-        sort: 60,
-        name: 'Elite',
-        description:
-          "I don't believe in elitism, I don't think the audience is this dumb person lower than me. I am the audience.",
-        minClassRead: 300,
-        minClassWrite: 300
-      },
-      {
-        sort: 70,
-        name: 'Technology',
-        description:
-          'The real danger is not that computers will begin to think like men, but men will begin to think like computers.'
-      }
-    ]
-  },
-  {
-    name: 'Music',
-    sort: 30,
-    forums: [
-      {
-        sort: 10,
-        name: 'Music',
-        description:
-          'This witty remark only works with accompanied by the sweet harmonies of acoustic guitars.'
-      },
-      {
-        sort: 20,
-        name: 'Vanity House',
-        description: 'Share your own music and productions.'
-      },
-      {
-        sort: 30,
-        name: 'The Studio',
-        description: 'Production, mixing, and recording techniques.'
-      },
-      {
-        sort: 40,
-        name: 'Offered',
-        description: 'Share and exchange music recommendations.'
-      },
-      {
-        sort: 50,
-        name: 'Vinyl',
-        description:
-          "I don't think it's real unless you put it on an LP. CDs aren't real. Anybody can do that."
-      }
-    ]
-  },
-  {
-    name: 'Help',
-    sort: 40,
-    forums: [
-      {
-        sort: 10,
-        name: 'Help',
-        description:
-          'In helping others we shall help ourselves, for whatever good we give out completes the circle and comes back to us.'
-      },
-      {
-        sort: 20,
-        name: 'Tutorials',
-        description:
-          'He that gives good advice works with one hand, he who gives counsel and example builds with both.'
-      }
-    ]
-  },
-  {
-    name: 'Staff',
-    sort: 90,
-    forums: [
-      {
-        sort: 10,
-        name: 'Staff',
-        description: 'Internal staff discussion.',
-        minClassRead: 500,
-        minClassWrite: 500
-      }
-    ]
-  },
-  {
-    name: 'Trash',
-    sort: 100,
-    forums: [
-      {
-        sort: 10,
-        name: 'Trash',
-        description: 'Moved or removed topics.',
-        isTrash: true,
-        minClassRead: 500,
-        minClassWrite: 500,
-        minClassCreate: 500
-      }
-    ]
-  }
-] as const;
-
-type ForumEntry = {
-  sort: number;
-  name: string;
-  description: string;
-  minClassRead?: number;
-  minClassWrite?: number;
-  minClassCreate?: number;
-  isTrash?: boolean;
-};
-
 export async function seedRanks(client: PrismaClient): Promise<void> {
   for (const rank of DEFAULT_RANKS) {
     const existing = await client.userRank.findUnique({
@@ -422,12 +240,16 @@ export async function seedRanks(client: PrismaClient): Promise<void> {
     });
 
     if (!existing) {
-      await client.userRank.create({
-        data: {
-          ...rank,
-          permittedForumIds: [...rank.permittedForumIds]
-        }
-      });
+      try {
+        await client.userRank.create({
+          data: {
+            ...rank,
+            permittedForumIds: [...rank.permittedForumIds]
+          }
+        });
+      } catch (err) {
+        if (!hasPrismaCode(err, 'P2002')) throw err;
+      }
       continue;
     }
 
@@ -454,6 +276,9 @@ export async function seedRanks(client: PrismaClient): Promise<void> {
 // 1–9; the DB assigns real autoincrement ids. Map fixture id → ladder level so the
 // seeded rules are exactly DEFAULT_RULES, projected onto whatever ids the DB gave
 // each level — one source of truth for the thresholds, no duplicated magnitudes.
+const hasPrismaCode = (err: unknown, code: string) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
+
 const evaluatorLevelOf = (fixtureRankId: number): number => {
   const rank = EVALUATOR_RANKS.find((r) => r.id === fixtureRankId);
   if (!rank)
@@ -482,20 +307,25 @@ export async function seedRankPromotionRules(
     const toRankId = idByLevel.get(evaluatorLevelOf(rule.toRankId));
     if (fromRankId === undefined || toRankId === undefined) continue;
 
-    await client.rankPromotionRule.upsert({
-      where: { fromRankId_toRankId: { fromRankId, toRankId } },
-      update: {},
-      create: {
-        fromRankId,
-        toRankId,
-        minContributed: rule.minContributed,
-        minRatio: rule.minRatio,
-        minContributions: rule.minContributions,
-        minAccountAgeDays: rule.minAccountAgeDays,
-        extra: rule.extra,
-        enabled: rule.enabled
-      }
-    });
+    // Prisma sends this upsert as a read then an insert, not ON CONFLICT.
+    try {
+      await client.rankPromotionRule.upsert({
+        where: { fromRankId_toRankId: { fromRankId, toRankId } },
+        update: {},
+        create: {
+          fromRankId,
+          toRankId,
+          minContributed: rule.minContributed,
+          minRatio: rule.minRatio,
+          minContributions: rule.minContributions,
+          minAccountAgeDays: rule.minAccountAgeDays,
+          extra: rule.extra,
+          enabled: rule.enabled
+        }
+      });
+    } catch (err) {
+      if (!hasPrismaCode(err, 'P2002')) throw err;
+    }
   }
 }
 
@@ -555,25 +385,48 @@ export async function seedSystemUser(client: PrismaClient): Promise<number> {
     await bcrypt.genSalt(10)
   );
 
-  const userSettings = await client.userSettings.create({ data: {} });
-  const profile = await client.profile.create({ data: {} });
-  const user = await client.user.create({
-    data: {
-      username: SYSTEM_USERNAME,
-      email: 'system@stellar.invalid',
-      password: unusablePassword,
-      userRankId: baseRank.id,
-      userSettingsId: userSettings.id,
-      profileId: profile.id,
-      disabled: true,
-      rankLocked: true,
-      // Every account has a row, the System user included (#633, ADR-0042).
-      inviteTree: { create: { inviterId: null } }
-    },
-    select: { id: true }
-  });
-  return user.id;
+  return createSystemUser(client, baseRank.id, unusablePassword);
 }
+
+/**
+ * The System user's rows, created together so a concurrent seed that wins the
+ * username (#596) leaves nothing behind: its id is read back and returned.
+ */
+const createSystemUser = async (
+  client: PrismaClient,
+  userRankId: number,
+  password: string
+): Promise<number> => {
+  try {
+    const user = await client.$transaction(async (tx) => {
+      const userSettings = await tx.userSettings.create({ data: {} });
+      const profile = await tx.profile.create({ data: {} });
+      return tx.user.create({
+        data: {
+          username: SYSTEM_USERNAME,
+          email: 'system@stellar.invalid',
+          password,
+          userRankId,
+          userSettingsId: userSettings.id,
+          profileId: profile.id,
+          disabled: true,
+          rankLocked: true,
+          // Every account has a row, the System user included (#633, ADR-0042).
+          inviteTree: { create: { inviterId: null } }
+        },
+        select: { id: true }
+      });
+    });
+    return user.id;
+  } catch (err) {
+    if (!hasPrismaCode(err, 'P2002')) throw err;
+    const winner = await client.user.findUniqueOrThrow({
+      where: { username: SYSTEM_USERNAME },
+      select: { id: true }
+    });
+    return winner.id;
+  }
+};
 
 /**
  * Seed the flagship public community named after the site, led by the first
@@ -595,15 +448,20 @@ export async function seedDefaultCommunity(
   // The SysOp becomes leader and curator, and nothing more: no Consumer is
   // written (ADR-0033 §Decision 3). Belonging is the role union, not a claim
   // that whoever installed the site downloads from it.
-  await client.community.create({
-    data: {
-      name: site.name,
-      description: `The official ${site.name} community.`,
-      type: CommunityType.Music,
-      registrationStatus: RegistrationStatus.open,
-      image: '/images/defaults/music.png',
-      leader: { connect: { id: ownerUserId } },
-      curators: { connect: { id: ownerUserId } }
-    }
-  });
+  try {
+    await client.community.create({
+      data: {
+        name: site.name,
+        description: `The official ${site.name} community.`,
+        type: CommunityType.Music,
+        registrationStatus: RegistrationStatus.open,
+        image: '/images/defaults/music.png',
+        leader: { connect: { id: ownerUserId } },
+        curators: { connect: { id: ownerUserId } }
+      }
+    });
+  } catch (err) {
+    // A concurrent install created it first (#596).
+    if (!hasPrismaCode(err, 'P2002')) throw err;
+  }
 }

@@ -20,6 +20,13 @@ All notable changes to stellar-api are documented here.
   - **`noHardDelete.spec.ts`** gains Staff PM tickets and messages.
   - The contract is unchanged.
 
+- **A second `POST /install` running alongside the first no longer answers `500` from the seed** (#787, the eighth guard-coverage burn-down under ADR-0048: `bootstrap.ts`).
+  - **The race:** each seeder reads, then creates. A concurrent install could win a rank, a promotion rule, the System user or the default community first, and the loser failed on the unique key. A seeder now treats that as already seeded, as it does a row that was there before it started.
+  - **The System user's rows** (settings, profile, user) are created in one transaction, so a lost race leaves none behind.
+  - **Not fixed here:** both installs can still commit a SysOp and create the forum structure twice. That is tracked as #786.
+  - **Resolved:** all 7 of `bootstrap.ts`'s `unreviewed` sites. 5 are guarded, and 2 are recorded as internally derived.
+  - **`FORUM_STRUCTURE`** moves to `modules/forumStructure.ts`, unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

@@ -260,6 +260,7 @@ src/
     goldenRules.ts            # The 6 immutable Golden Rules (PRD-05/09): GOLDEN_RULES table mirroring CODE_OF_CONDUCT.md verbatim + idempotent seedGoldenRules(); drift-guarded by goldenRules.spec.ts
     siteVariables.ts          # resolveSiteVariables() — read-time token→values map for GET /rules/tree (PRD-09, ADR-0020); config + Bugs-forum lookup, single-sourced for UI substitution
     bootstrap.ts              # Idempotent seed helpers shared by prisma/seed.ts and /install (ranks, promotion rules, forums, System user); each a no-op when rows exist
+    forumStructure.ts         # FORUM_STRUCTURE: the default categories and forums seedForums creates (data only)
     seedAll.ts                # The idempotent baseline seed composed from bootstrap.ts — everything /install needs before the first SysOp; creates no real users
     staff.ts                  # getStaffList() — staff roster grouped by StaffGroup (member-facing; see the two-staff-surfaces model)
     tag.ts                    # normalizeTagName — the one tag name rule (#689, ADR-0047); resolveTagName/resolveTagNames normalize then follow TagAlias bad→good
