@@ -1,7 +1,11 @@
 import { Prisma, ReleaseType, RequestStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { translatePrismaError } from '../lib/prismaErrors';
-import { communityReadableWhere, requestVisibleTo } from './communityAccess';
+import {
+  communityReadableWhere,
+  contributionVisibleTo,
+  requestVisibleTo
+} from './communityAccess';
 import { AppError } from '../lib/errors';
 import { economy } from './config';
 import { debitBalance, decrementFloored } from './ratio';
@@ -469,8 +473,10 @@ export async function fillRequest(
   contributionId: number
 ) {
   return await prisma.$transaction(async (tx) => {
-    const contribution = await tx.contribution.findUnique({
-      where: { id: contributionId },
+    // Scoped (#774): a contribution the caller cannot see answers as a missing
+    // one, so the ownership 403 below is never an existence oracle for it.
+    const contribution = await tx.contribution.findFirst({
+      where: { id: contributionId, ...contributionVisibleTo(userId) },
       include: { release: true }
     });
     if (!contribution) throw new AppError(404, 'Contribution not found');

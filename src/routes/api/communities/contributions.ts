@@ -236,8 +236,11 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { reason } = parsedBody<{ reason: string }>(res);
 
-    const contribution = await prisma.contribution.findUnique({
-      where: { id }
+    // Scoped (#774): a hidden contribution answers as a missing one, and takes
+    // no report or link-health strike from a member who cannot see it.
+    const contribution = await prisma.contribution.findFirst({
+      where: { AND: [{ id }, contributionVisibleTo(req.user.id)] },
+      select: { id: true }
     });
     if (!contribution)
       return res.status(404).json({ msg: 'Contribution not found' });

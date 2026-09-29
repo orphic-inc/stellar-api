@@ -33,7 +33,7 @@ const mockTx = {
   economyTransaction: { create: jest.fn() },
   requestAction: { create: jest.fn() },
   requestFill: { create: jest.fn(), findFirst: jest.fn() },
-  contribution: { findUnique: jest.fn() },
+  contribution: { findFirst: jest.fn() },
   community: { findFirst: jest.fn() },
   notification: { createMany: jest.fn() }
 };
@@ -389,12 +389,12 @@ describe('addBounty', () => {
 
 describe('fillRequest', () => {
   it('throws 404 when contribution not found', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(null);
+    mockTx.contribution.findFirst.mockResolvedValue(null);
     await expect(fillRequest(1, 10, 999)).rejects.toThrow(AppError);
   });
 
   it('throws 403 when caller does not own the contribution', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(
+    mockTx.contribution.findFirst.mockResolvedValue(
       makeContribution({ userId: 99 }) // different user
     );
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
@@ -403,7 +403,7 @@ describe('fillRequest', () => {
   });
 
   it('throws 404 when request not open', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(null);
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
       statusCode: 404
@@ -411,7 +411,7 @@ describe('fillRequest', () => {
   });
 
   it('throws 400 when community does not match', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(
+    mockTx.contribution.findFirst.mockResolvedValue(
       makeContribution({ release: { communityId: 99, type: 'Music' } })
     );
     mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
@@ -421,7 +421,7 @@ describe('fillRequest', () => {
   });
 
   it('throws 400 when type does not match', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(
+    mockTx.contribution.findFirst.mockResolvedValue(
       makeContribution({ release: { communityId: 1, type: 'EBooks' } })
     );
     mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
@@ -431,7 +431,7 @@ describe('fillRequest', () => {
   });
 
   it('throws 400 if contribution already fills another request', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findFirst.mockResolvedValue({ id: 20 }); // already filling req #20
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
@@ -440,7 +440,7 @@ describe('fillRequest', () => {
   });
 
   it('throws 409 when compare-and-swap finds 0 updated rows (concurrent fill)', async () => {
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 0 }); // lost the race
@@ -451,7 +451,7 @@ describe('fillRequest', () => {
 
   it('awards bounty to filler and records fill + audit on success', async () => {
     const bountyAmount = BigInt('209715200');
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findUnique.mockResolvedValueOnce(
       makeRequest({ status: 'filled', fillerId: 1 })
@@ -505,7 +505,7 @@ describe('fillRequest', () => {
         }
       ]
     });
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(requestWithBounties);
     mockTx.request.findUnique.mockResolvedValueOnce({
       ...requestWithBounties,
@@ -556,7 +556,7 @@ describe('fillRequest', () => {
         }
       ]
     });
-    mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
+    mockTx.contribution.findFirst.mockResolvedValue(makeContribution());
     mockTx.request.findFirst.mockResolvedValueOnce(selfRequest);
     mockTx.request.findUnique.mockResolvedValueOnce({
       ...selfRequest,

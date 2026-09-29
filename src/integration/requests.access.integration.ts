@@ -202,6 +202,49 @@ describe('request surfaces for a caller outside the community (#755)', () => {
     expect(hiddenFill.statusCode).toBe(404);
   });
 
+  it('refuses a fill naming a hidden contribution as for a missing one (#774)', async () => {
+    const { member, outsider, community } = await setup();
+    // The member's contribution in the closed community, invisible to the
+    // outsider: before #774 its ownership check answered 403, not 404.
+    const release = await testPrisma.release.create({
+      data: {
+        title: `RA-${randomUUID().slice(0, 8)}`,
+        description: 'd',
+        type: ReleaseType.Music,
+        releaseType: 'Album',
+        year: 2020,
+        communityId: community.id
+      }
+    });
+    const edition = await testPrisma.edition.create({
+      data: { releaseId: release.id }
+    });
+    const contributor = await testPrisma.contributor.create({
+      data: { userId: member.id }
+    });
+    const hidden = await testPrisma.contribution.create({
+      data: {
+        userId: member.id,
+        releaseId: release.id,
+        contributorId: contributor.id,
+        editionId: edition.id,
+        type: FileType.flac,
+        downloadUrl: 'https://example.com/file.torrent',
+        sizeInBytes: 1_000_000,
+        releaseDescription: 'd'
+      }
+    });
+    const fill = (contributionId: number) =>
+      fillRequest(outsider.id, MISSING, contributionId);
+
+    const refused = await refusal(() => fill(hidden.id));
+    expect(refused).toEqual(await refusal(() => fill(MISSING)));
+    expect(refused).toEqual({
+      statusCode: 404,
+      message: 'Contribution not found'
+    });
+  });
+
   it('refuses to create a request in the community as for an unknown one', async () => {
     const { outsider, community } = await setup();
     const create = (communityId: number) =>
