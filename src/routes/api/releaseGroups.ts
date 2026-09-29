@@ -20,16 +20,18 @@ import {
   parsedParams
 } from '../../middleware/validate';
 import {
-  addGroupCover,
   createReleaseGroup,
-  listGroupCovers,
   listGroupLog,
   mergeReleaseGroups,
-  removeGroupCover,
   resolveGroupForViewer,
   splitReleaseGroup,
   updateGroupIdentity
 } from '../../modules/releaseGroup';
+import {
+  addGroupCover,
+  listGroupCovers,
+  removeGroupCover
+} from '../../modules/releaseGroupCovers';
 import {
   addCoverSchema,
   createReleaseGroupSchema,

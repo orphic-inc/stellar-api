@@ -292,7 +292,8 @@ src/
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
     communityAccess.ts        # Community membership + access (#419, ADR-0030, ADR-0033): the communityRoleUnion where-fragment (consumer ∪ contributor ∪ curator) that DEFINES membership, the hasCommunityAccess gate (ex-`isCommunityMember`) and its load-then-gate assertCommunityAccess, plus listCommunityMembers projecting the same union into a roster. Never reads announceVisibility
     releaseBrowse.ts          # listCommunityReleases — the community release browse/list read
-    releaseGroup.ts           # ReleaseGroup identity node (ADR-0023, #265): access-filtered resolver, find-or-create, attach/detach, merge/split, cover art, group log. `collapseByGroup` (ADR-0037 §2) is the read-time dedup — it applies NO access rule and inherits its safety from the caller
+    releaseGroup.ts           # ReleaseGroup identity node (ADR-0023, #265): access-filtered resolver, find-or-create, attach/detach, merge/split, group log (covers are in releaseGroupCovers.ts). `collapseByGroup` (ADR-0037 §2) is the read-time dedup — it applies NO access rule and inherits its safety from the caller
+    releaseGroupCovers.ts     # A group's covers: list, add, remove — each through resolveGroupForViewer (ADR-0023)
     releaseCredits.ts         # ReleaseArtist role credits; derives the legacy release.artist display field from the Main credit
     releaseLifecycle.ts       # Community release create/delete with history + snapshotting
     requestLifecycle.ts       # Release request + bounty lifecycle: detail, bounty history, voting, fill/update

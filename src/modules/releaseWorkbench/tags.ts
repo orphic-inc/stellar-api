@@ -1,6 +1,11 @@
-import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
+import {
+  Prisma,
+  ReleaseHistoryAction,
+  ReleaseTagVoteDirection
+} from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { assertUsableTagName, resolveTagName } from '../tag';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { getReleaseWorkbenchView } from './load';
@@ -114,40 +119,24 @@ export const voteOnReleaseWorkbenchTag = async (
   ]);
 
   if (!existingVote) {
-    await prisma.$transaction(async (tx) => {
-      await tx.releaseTagVote.create({
-        data: {
-          releaseTagId: releaseTag.id,
-          userId: ref.actorId,
-          direction
-        }
-      });
-      if (oppositeVote) {
-        await tx.releaseTagVote.delete({ where: { id: oppositeVote.id } });
-      }
-      await tx.releaseTag.update({
-        where: { id: releaseTag.id },
-        data:
-          direction === ReleaseTagVoteDirection.up
-            ? {
-                positiveVotes: { increment: 2 },
-                ...(oppositeVote ? { negativeVotes: { decrement: 1 } } : {})
-              }
-            : {
-                negativeVotes: { increment: 1 },
-                ...(oppositeVote ? { positiveVotes: { decrement: 1 } } : {})
-              }
-      });
-    });
+    await castVote(releaseTag.id, ref.actorId, direction, oppositeVote?.id);
   }
 
+  return readVotedTag(releaseTag.id, ref.actorId);
+};
+
+/** The release tag as the voter now sees it, with their own votes. */
+const readVotedTag = async (
+  releaseTagId: number,
+  actorId: number
+): Promise<ReleaseTagView> => {
   const updated = await prisma.releaseTag.findUniqueOrThrow({
-    where: { id: releaseTag.id },
+    where: { id: releaseTagId },
     include: {
       tag: true,
       user: { select: { id: true, username: true } },
       votes: {
-        where: { userId: ref.actorId },
+        where: { userId: actorId },
         select: { direction: true }
       }
     }
@@ -174,6 +163,56 @@ export const voteOnReleaseWorkbenchTag = async (
     ]
   )[0];
 };
+
+/**
+ * Record a vote, replacing the member's opposite vote if they had one.
+ *
+ * The existing votes were read before this, so two concurrent identical votes
+ * both reach the create (#596). The loser's P2002 means the vote it wanted is
+ * already recorded, so it is the no-op an already-voted caller gets. A release
+ * tag removed in between cascades its votes away: that answers as a missing
+ * tag.
+ */
+const castVote = async (
+  releaseTagId: number,
+  userId: number,
+  direction: ReleaseTagVoteDirection,
+  oppositeVoteId: number | undefined
+) => {
+  const up = direction === ReleaseTagVoteDirection.up;
+  const hadOpposite = oppositeVoteId !== undefined;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.releaseTagVote.create({
+        data: { releaseTagId, userId, direction }
+      });
+      if (hadOpposite) {
+        await tx.releaseTagVote.delete({ where: { id: oppositeVoteId } });
+      }
+      await tx.releaseTag.update({
+        where: { id: releaseTagId },
+        data: up
+          ? {
+              positiveVotes: { increment: 2 },
+              ...(hadOpposite ? { negativeVotes: { decrement: 1 } } : {})
+            }
+          : {
+              negativeVotes: { increment: 1 },
+              ...(hadOpposite ? { positiveVotes: { decrement: 1 } } : {})
+            }
+      });
+    });
+  } catch (err) {
+    if (hasPrismaCode(err, 'P2002')) return;
+    translatePrismaError(err, {
+      P2003: [404, 'Release tag not found'],
+      P2025: [404, 'Release tag not found']
+    });
+  }
+};
+
+const hasPrismaCode = (err: unknown, code: string) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
 
 export const removeReleaseWorkbenchTag = async (
   ref: ReleaseWorkbenchRef,
@@ -203,43 +242,61 @@ export const removeReleaseWorkbenchTag = async (
     select: { name: true }
   });
 
-  await prisma.$transaction(async (tx) => {
-    const currentRelease = await tx.release.findUniqueOrThrow({
-      where: { id: ref.releaseId },
-      include: { releaseTags: { include: { tag: true } } }
-    });
-    const postRemovalSnapshot: ReleaseSnapshot = {
-      ...snapshotRelease(currentRelease),
-      tagIds: currentRelease.releaseTags
-        .filter((rt) => rt.tag.id !== input.tagId)
-        .map((rt) => rt.tag.id)
-        .sort((a, b) => a - b),
-      tagNames: currentRelease.releaseTags
-        .filter((rt) => rt.tag.id !== input.tagId)
-        .map((rt) => rt.tag.name)
-        .sort()
-    };
-    await tx.releaseTag.deleteMany({
-      where: { releaseId: ref.releaseId, tagId: input.tagId }
-    });
-    await tx.tag.update({
-      where: { id: input.tagId },
-      data: { occurrences: { decrement: 1 } }
-    });
-    await tx.releaseHistory.create({
-      data: {
-        releaseId: ref.releaseId,
-        actorId: ref.actorId,
-        action: ReleaseHistoryAction.tag_removed,
-        summary: `Tag "${tag?.name ?? `#${input.tagId}`}" removed`,
-        changedFields: ['tags'],
-        before: tag
-          ? ({ tagId: input.tagId, name: tag.name } as never)
-          : undefined,
-        snapshot: postRemovalSnapshot as never
-      }
-    });
-  });
+  await removeTagWithHistory(ref, input.tagId, tag);
 
   return getReleaseWorkbenchView(ref, { requireCommunityAccess: false });
+};
+
+/**
+ * Detach the tag and record it in the release's history. The release was read
+ * before this transaction and can be deleted in between (#596): that answers as
+ * the read would have.
+ */
+const removeTagWithHistory = async (
+  ref: ReleaseWorkbenchRef,
+  tagId: number,
+  tag: { name: string } | null
+) => {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const currentRelease = await tx.release.findUniqueOrThrow({
+        where: { id: ref.releaseId },
+        include: { releaseTags: { include: { tag: true } } }
+      });
+      const postRemovalSnapshot: ReleaseSnapshot = {
+        ...snapshotRelease(currentRelease),
+        tagIds: currentRelease.releaseTags
+          .filter((rt) => rt.tag.id !== tagId)
+          .map((rt) => rt.tag.id)
+          .sort((a, b) => a - b),
+        tagNames: currentRelease.releaseTags
+          .filter((rt) => rt.tag.id !== tagId)
+          .map((rt) => rt.tag.name)
+          .sort()
+      };
+      await tx.releaseTag.deleteMany({
+        where: { releaseId: ref.releaseId, tagId: tagId }
+      });
+      await tx.tag.update({
+        where: { id: tagId },
+        data: { occurrences: { decrement: 1 } }
+      });
+      await tx.releaseHistory.create({
+        data: {
+          releaseId: ref.releaseId,
+          actorId: ref.actorId,
+          action: ReleaseHistoryAction.tag_removed,
+          summary: `Tag "${tag?.name ?? `#${tagId}`}" removed`,
+          changedFields: ['tags'],
+          before: tag ? ({ tagId: tagId, name: tag.name } as never) : undefined,
+          snapshot: postRemovalSnapshot as never
+        }
+      });
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2003: [404, 'Release or tag not found'],
+      P2025: [404, 'Release or tag not found']
+    });
+  }
 };
