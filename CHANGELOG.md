@@ -25,6 +25,18 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Request bounties can no longer be paid out twice, lost, or overdrawn** (#767, the second instance of #766).
+  - **Double unfills and deletes are claimed.**
+    - Two concurrent unfills both clawed the bounty back from the filler. Two concurrent deletes both refunded every bounty.
+    - Each now claims the request as its first write, and the loser answers the existing `422` or `404` without moving money.
+    - The unfill's claim pins the filler it read, and the delete's pins the status it read. So an unfill cannot charge a previous filler for a new fill, and a delete that races a fill cannot refund bounties the fill paid out.
+  - **Bounties no longer slip between a read and a claim.**
+    - A bounty added while a fill was in flight was debited from its member but never paid to the filler. One added while a delete was in flight was never refunded.
+    - Adding a bounty now claims the request row first. Fill and delete read the bounties after their own claim.
+  - **An unfill claws back what the fill was actually paid,** its recorded `awardedAmount`, rather than re-totalling the bounties.
+  - **Unfill clawbacks and delete refunds use the same decrement as download reversals,** instead of writing balances read earlier.
+  - **Concurrent bounties can no longer overdraw a member.** `POST /requests` and `POST /requests/{id}/bounty` debit through the shared `debitBalance`, and a balance that moved since it was read answers **`409`** (new on `POST /requests`).
+
 - **A download reversal can no longer pay out twice or erase a concurrent download's debit** (#760, the first instance of #766).
   - Two concurrent reversals of one grant both passed the `COMPLETED` check. Each refunded the consumer, clawed back from the contributor, and posted a `STAFF_REVERSAL` pair. The reversal now claims the grant as its first write, and the loser answers the existing `409` without writing anything.
   - Reversals wrote balances as values read earlier, so a download or credit committed in between was overwritten. They now decrement, floored at zero by a shared `decrementFloored`, and log when the floor binds, which only a balance set out-of-band can cause.

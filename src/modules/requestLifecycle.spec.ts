@@ -14,7 +14,8 @@ const mockTx = {
   user: {
     findUnique: jest.fn(),
     findUniqueOrThrow: jest.fn(),
-    update: jest.fn()
+    update: jest.fn(),
+    updateMany: jest.fn()
   },
   request: {
     findUnique: jest.fn(),
@@ -25,12 +26,13 @@ const mockTx = {
   },
   requestBounty: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     create: jest.fn(),
     update: jest.fn()
   },
   economyTransaction: { create: jest.fn() },
   requestAction: { create: jest.fn() },
-  requestFill: { create: jest.fn() },
+  requestFill: { create: jest.fn(), findFirst: jest.fn() },
   contribution: { findUnique: jest.fn() },
   notification: { createMany: jest.fn() }
 };
@@ -150,6 +152,13 @@ beforeEach(() => {
   mockTransaction.mockImplementation(
     (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)
   );
+  // Claims and balance writes succeed unless a test says otherwise (#767).
+  mockTx.request.updateMany.mockResolvedValue({ count: 1 });
+  mockTx.user.updateMany.mockResolvedValue({ count: 1 });
+  mockTx.requestBounty.findMany.mockResolvedValue([]);
+  mockTx.requestFill.findFirst.mockResolvedValue({
+    awardedAmount: BigInt('209715200')
+  });
 });
 
 // ─── serializeRequest ─────────────────────────────────────────────────────────
@@ -246,13 +255,10 @@ describe('createRequest', () => {
       bounty: MINIMUM_BOUNTY
     });
 
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          consumed: { increment: MINIMUM_BOUNTY }
-        })
-      })
-    );
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, consumed: user.consumed, contributed: user.contributed },
+      data: { consumed: { increment: MINIMUM_BOUNTY } }
+    });
     expect(mockTx.request.create).toHaveBeenCalled();
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -279,7 +285,7 @@ describe('addBounty', () => {
   });
 
   it('throws when request is missing or not open', async () => {
-    mockTx.request.findUnique.mockResolvedValue(null);
+    mockTx.request.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(addBounty(1, 10, MINIMUM_BOUNTY)).rejects.toMatchObject({
       statusCode: 404
@@ -310,9 +316,7 @@ describe('addBounty', () => {
         }
       ]
     });
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(makeRequest())
-      .mockResolvedValueOnce(updated);
+    mockTx.request.findUnique.mockResolvedValue(updated);
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -328,11 +332,9 @@ describe('addBounty', () => {
 
     const result = await addBounty(1, 10, MINIMUM_BOUNTY);
 
-    expect(mockTx.user.update).toHaveBeenCalledWith(
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          consumed: { increment: MINIMUM_BOUNTY }
-        })
+        data: { consumed: { increment: MINIMUM_BOUNTY } }
       })
     );
     expect(mockTx.requestBounty.update).toHaveBeenCalledWith({
@@ -363,9 +365,7 @@ describe('addBounty', () => {
         }
       ]
     });
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(makeRequest())
-      .mockResolvedValueOnce(updated);
+    mockTx.request.findUnique.mockResolvedValue(updated);
     mockTx.user.findUnique.mockResolvedValue(makeUser());
     mockTx.user.update.mockResolvedValue(undefined);
     mockTx.economyTransaction.create.mockResolvedValue(undefined);
@@ -451,6 +451,7 @@ describe('fillRequest', () => {
     mockTx.request.findUnique
       .mockResolvedValueOnce(makeRequest()) // pre-validation fetch
       .mockResolvedValueOnce(makeRequest({ status: 'filled', fillerId: 1 })); // final fetch
+    mockTx.requestBounty.findMany.mockResolvedValue(makeRequest().bounties);
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
@@ -507,6 +508,9 @@ describe('fillRequest', () => {
         status: 'filled',
         fillerId: 1
       });
+    mockTx.requestBounty.findMany.mockResolvedValue(
+      requestWithBounties.bounties
+    );
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
@@ -552,6 +556,7 @@ describe('fillRequest', () => {
     mockTx.request.findUnique
       .mockResolvedValueOnce(selfRequest)
       .mockResolvedValueOnce({ ...selfRequest, status: 'filled', fillerId: 1 });
+    mockTx.requestBounty.findMany.mockResolvedValue(selfRequest.bounties);
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
@@ -708,13 +713,11 @@ describe('unfillRequest', () => {
       reason: 'Incorrect fill'
     });
 
-    // Claw-back clamps to the floored value (209715200 - 209715200 = 0).
-    expect(mockTx.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 7 },
-        data: { contributed: 0n }
-      })
-    );
+    // Claws back what the fill was awarded, as a decrement (#767).
+    expect(mockTx.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, contributed: { gte: BigInt('209715200') } },
+      data: { contributed: { decrement: BigInt('209715200') } }
+    });
     expect(mockTx.economyTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -789,6 +792,7 @@ describe('deleteRequest', () => {
       { id: 2, userId: 2, amount: BigInt('52428800'), requestId: 10 }
     ];
     mockTx.request.findUnique.mockResolvedValue(makeRequest({ bounties }));
+    mockTx.requestBounty.findMany.mockResolvedValue(bounties);
     mockTx.user.findUniqueOrThrow
       .mockResolvedValueOnce({
         consumed: BigInt('104857600'),
@@ -809,22 +813,16 @@ describe('deleteRequest', () => {
       canModerateRequests: false
     });
 
-    expect(mockTx.user.update).toHaveBeenCalledTimes(2);
-    // Refunds clamp to the floored value (each user's consumed == its bounty → 0).
-    expect(mockTx.user.update).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        where: { id: 1 },
-        data: { consumed: 0n }
-      })
-    );
-    expect(mockTx.user.update).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        where: { id: 2 },
-        data: { consumed: 0n }
-      })
-    );
+    // Each refund is a decrement of that member's bounty (#767).
+    expect(mockTx.user.updateMany).toHaveBeenCalledTimes(2);
+    expect(mockTx.user.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: 1, consumed: { gte: BigInt('104857600') } },
+      data: { consumed: { decrement: BigInt('104857600') } }
+    });
+    expect(mockTx.user.updateMany).toHaveBeenNthCalledWith(2, {
+      where: { id: 2, consumed: { gte: BigInt('52428800') } },
+      data: { consumed: { decrement: BigInt('52428800') } }
+    });
     expect(mockTx.economyTransaction.create).toHaveBeenCalledTimes(2);
     expect(
       (
