@@ -6,6 +6,18 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.9] — 2026-09-28
+
+**Upgrade note: take a database backup before deploying.** One migration runs,
+additive: `20260930120000_remote_image_import` adds the `remote_images` table
+and the `Imported` asset kind. Once an `Imported` asset exists, rolling back
+past this release needs the backup.
+
+**Then run the image backfill** (#738, below) and deploy the stellar-ui release
+that closes `img-src` (stellar-ui#402) only on a clean report. Until the
+backfill has run, every image written before this release renders as a link or
+the surface's default.
+
 ### Added
 
 - **Remote images can be imported into the asset store** (#737, [ADR-0051](docs/adr/0051-remote-images-are-imported-on-write.md)). This is the pipeline that will let the CSP close `img-src` to `'self'` (#457). The BBCode surfaces and the image fields use it (below).
@@ -3486,7 +3498,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...HEAD
+[0.9.9]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/orphic-inc/stellar-api/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/orphic-inc/stellar-api/compare/v0.9.5...v0.9.6
