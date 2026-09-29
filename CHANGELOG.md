@@ -25,6 +25,12 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A password recovery token is spent exactly once** (#764).
+  - **The single-use check is atomic.** A reset read the token, then marked it used in a later write, so two concurrent resets with one token could both change the password. It now claims the token as the first write of its transaction.
+  - **A losing reset changes nothing.** That covers a second reset, a token expired or superseded by a newer request mid-reset, and a request staff deleted mid-reset. Each answers the existing `400 Invalid or expired recovery token` and writes no password.
+  - **Spending one token expires the member's other pending reset tokens.** A second one no longer stays live for up to two hours after the password changed.
+  - The contract is unchanged.
+
 - **Request bounties can no longer be paid out twice, lost, or overdrawn** (#767, the second instance of #766).
   - **Double unfills and deletes are claimed.**
     - Two concurrent unfills both clawed the bounty back from the filler. Two concurrent deletes both refunded every bounty.

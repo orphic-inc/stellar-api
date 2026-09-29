@@ -198,7 +198,9 @@ describe('auth.resetPasswordWithToken', () => {
       return Promise.all(arg as Promise<unknown>[]);
     });
     prismaMock.user.update.mockResolvedValue({} as never);
-    prismaMock.accountRecovery.update.mockResolvedValue({} as never);
+    prismaMock.accountRecovery.updateMany.mockResolvedValue({
+      count: 1
+    } as never);
     prismaMock.userSession.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.badPassword.findUnique.mockResolvedValue(null);
   });
@@ -244,9 +246,9 @@ describe('auth.resetPasswordWithToken', () => {
         data: expect.objectContaining({ password: expect.any(String) })
       })
     );
-    expect(prismaMock.accountRecovery.update).toHaveBeenCalledWith(
+    expect(prismaMock.accountRecovery.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 1 },
+        where: expect.objectContaining({ id: 1, usedAt: null }),
         data: { usedAt: expect.any(Date) }
       })
     );
