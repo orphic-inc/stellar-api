@@ -4393,7 +4393,8 @@ registry.registerPath({
       content: { 'application/json': { schema: ForumPoll } }
     },
     403: msgResponse('Not the topic author, and missing forums_moderate'),
-    404: msgResponse('No such topic, or it is deleted')
+    404: msgResponse('No such topic, or it is deleted'),
+    409: msgResponse('The topic already has a poll')
   }
 });
 
@@ -4423,7 +4424,10 @@ registry.registerPath({
       description: 'Vote recorded',
       content: { 'application/json': { schema: ForumPollVote } }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('Not found'),
+    409: msgResponse(
+      'A concurrent vote by the same member was being recorded; retry'
+    )
   }
 });
 
@@ -7182,6 +7186,10 @@ registry.registerPath({
   method: 'post',
   path: '/forums/topic-notes',
   tags: ['Forums'],
+  // The unknown-topic 400 is described here rather than declared: a declared
+  // 400 would replace the derived ValidationError body on this route.
+  description:
+    'A `forumTopicId` naming no topic answers `400` with `{ msg: "Topic not found" }`.',
   request: {
     body: { content: { 'application/json': { schema: topicNoteSchema } } }
   },
