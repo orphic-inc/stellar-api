@@ -17,6 +17,10 @@ All notable changes to stellar-api are documented here.
 
 - **`requireAdminOnly` and `requireStrictAdmin` are gone** (#515). Both reduced to the same test as `requirePermission('admin')`, whose `admin` check runs first, and their comments promised a staff exclusion that never existed. Their five routes (`GET /stylesheet/admin/stats`, stylesheet create, update and delete, and `GET /stats/site-info`) now use `requirePermission('admin')`: same answers, same contract. The four stylesheet routes also log their denials, as every other permission gate does.
 
+### Fixed
+
+- **One failing account no longer ends the dormancy sweep or the rank progression sweep** (#596). Each sweep awaited a write per user with nothing to catch a failure, so one row changing between the batch read and its write abandoned the rest of the day's run. For example, a user disabled by staff mid-sweep. Everyone later in the cursor went unevaluated until the next run. Both now contain a failure to its user: it is logged and counted in a new `failed` tally, and the sweep carries on, as the ratio policy and invite expiry sweeps already did.
+
 ## [0.9.9] — 2026-09-28
 
 **Upgrade note: take a database backup before deploying.** One migration runs,

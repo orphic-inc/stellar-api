@@ -97,7 +97,12 @@ describe('runInactivityCycle — the mode gate', () => {
 
     const result = await runInactivityCycle(NOW);
 
-    expect(result).toEqual({ warned: 0, disabled: 0, deferred: 0 });
+    expect(result).toEqual({
+      warned: 0,
+      disabled: 0,
+      deferred: 0,
+      failed: 0
+    });
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
@@ -193,6 +198,38 @@ describe('runInactivityCycle — applying a disable', () => {
     expect(targetType).toBe('User');
     expect(targetId).toBe(2);
     expect(meta).toMatchObject({ by: 'inactivityJob' });
+  });
+});
+
+// One account's failure used to abandon the cycle, so every account later in
+// the cursor went unevaluated until the next day's run (#596). Each account is
+// independent, so the sweep contains the failure and moves on.
+describe('runInactivityCycle — a failing account', () => {
+  it('keeps going past a user whose warn write throws', async () => {
+    givenBatch(warnRow(2), warnRow(3));
+    prismaMock.user.update
+      .mockRejectedValueOnce(new Error('Record to update not found'))
+      .mockResolvedValue({} as never);
+
+    const result = await runInactivityCycle(NOW);
+
+    expect(result).toEqual({ warned: 1, disabled: 0, deferred: 0, failed: 1 });
+    expect(prismaMock.user.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { id: 3 } })
+    );
+  });
+
+  it('keeps going past a user whose disable throws', async () => {
+    givenBatch(disableRow(2), disableRow(3));
+    prismaMock.$transaction
+      .mockRejectedValueOnce(new Error('Record to update not found'))
+      .mockResolvedValue([] as never);
+
+    const result = await runInactivityCycle(NOW);
+
+    expect(result.disabled).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
   });
 });
 

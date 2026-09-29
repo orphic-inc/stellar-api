@@ -200,6 +200,71 @@ export type SweepResult = {
   scanned: number;
   promoted: number;
   demoted: number;
+  /** Users whose evaluation or write threw; each was logged and skipped. */
+  failed: number;
+};
+
+/** One page of the auto-managed cohort, after `cursor`. */
+const loadBatch = (
+  autoManagedRankIds: number[],
+  cursor: number | undefined
+): Promise<SweepUser[]> =>
+  prisma.user.findMany({
+    where: { disabled: false, userRankId: { in: autoManagedRankIds } },
+    orderBy: { id: 'asc' },
+    take: BATCH_SIZE,
+    ...(cursor !== undefined ? { skip: 1, cursor: { id: cursor } } : {}),
+    select: {
+      id: true,
+      userRankId: true,
+      consumed: true,
+      dateRegistered: true,
+      rankLocked: true
+    }
+  });
+
+/** Evaluate one user and apply any change; answers the direction taken. */
+const sweepOne = async (
+  user: SweepUser,
+  ladder: { ranks: Rank[]; rules: RankPromotionRule[] },
+  systemActorId: number
+): Promise<RankProgressionResult['direction']> => {
+  const input = await buildProgressionInput(user);
+  const result = evaluateRankChange(input, ladder.rules, ladder.ranks);
+  if (result.direction === 'none') return 'none';
+
+  await applyRankChange(user.id, result, systemActorId);
+  log.info('Auto rank change', {
+    userId: user.id,
+    direction: result.direction,
+    fromRankId: user.userRankId,
+    toRankId: result.targetRankId,
+    reason: result.reason
+  });
+  return result.direction;
+};
+
+/**
+ * `sweepOne`, contained to one user and folded into the tally (#596). Each
+ * user is independent, so a failure is logged, counted and skipped. Uncaught,
+ * it used to abandon the sweep, leaving everyone later in the cursor
+ * unevaluated until the next day's run.
+ */
+const sweepContained = async (
+  user: SweepUser,
+  ladder: { ranks: Rank[]; rules: RankPromotionRule[] },
+  systemActorId: number,
+  tally: SweepResult
+): Promise<void> => {
+  tally.scanned++;
+  try {
+    const direction = await sweepOne(user, ladder, systemActorId);
+    if (direction === 'promote') tally.promoted++;
+    else if (direction === 'demote') tally.demoted++;
+  } catch (err) {
+    tally.failed++;
+    log.error('Rank progression failed for a user', { userId: user.id, err });
+  }
 };
 
 /**
@@ -208,68 +273,36 @@ export type SweepResult = {
  * per sweep — the evaluator's one-step rule does the rest.
  */
 export const runRankProgressionSweep = async (): Promise<SweepResult> => {
-  const { ranks, rules } = await loadLadder();
-  const autoManagedRankIds = ranks
+  const tally: SweepResult = { scanned: 0, promoted: 0, demoted: 0, failed: 0 };
+  const ladder = await loadLadder();
+  const autoManagedRankIds = ladder.ranks
     .filter((r) => r.autoManaged)
     .map((r) => r.id);
-  if (autoManagedRankIds.length === 0) {
-    return { scanned: 0, promoted: 0, demoted: 0 };
-  }
+  if (autoManagedRankIds.length === 0) return tally;
 
   const systemActorId = await resolveSystemActorId();
   if (systemActorId === null) {
     log.warn('No SysOp actor — skipping rank progression sweep');
-    return { scanned: 0, promoted: 0, demoted: 0 };
+    return tally;
   }
 
   let cursor: number | undefined;
-  let scanned = 0;
-  let promoted = 0;
-  let demoted = 0;
-
   for (;;) {
-    const batch: SweepUser[] = await prisma.user.findMany({
-      where: { disabled: false, userRankId: { in: autoManagedRankIds } },
-      orderBy: { id: 'asc' },
-      take: BATCH_SIZE,
-      ...(cursor !== undefined ? { skip: 1, cursor: { id: cursor } } : {}),
-      select: {
-        id: true,
-        userRankId: true,
-        consumed: true,
-        dateRegistered: true,
-        rankLocked: true
-      }
-    });
+    const batch = await loadBatch(autoManagedRankIds, cursor);
     if (batch.length === 0) break;
 
     for (const user of batch) {
-      scanned++;
-      const input = await buildProgressionInput(user);
-      const result = evaluateRankChange(input, rules, ranks);
-      if (result.direction === 'none') continue;
-
-      await applyRankChange(user.id, result, systemActorId);
-      if (result.direction === 'promote') promoted++;
-      else demoted++;
-
-      log.info('Auto rank change', {
-        userId: user.id,
-        direction: result.direction,
-        fromRankId: user.userRankId,
-        toRankId: result.targetRankId,
-        reason: result.reason
-      });
+      await sweepContained(user, ladder, systemActorId, tally);
     }
 
     cursor = batch[batch.length - 1].id;
     if (batch.length < BATCH_SIZE) break;
   }
 
-  if (promoted > 0 || demoted > 0) {
-    log.info('Rank progression sweep complete', { scanned, promoted, demoted });
+  if (tally.promoted + tally.demoted + tally.failed > 0) {
+    log.info('Rank progression sweep complete', tally);
   }
-  return { scanned, promoted, demoted };
+  return tally;
 };
 
 export const startRankProgressionJob = (): void => {

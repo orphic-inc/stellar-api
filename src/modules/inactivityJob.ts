@@ -175,6 +175,8 @@ interface Tally {
   warned: number;
   disabled: number;
   deferred: number;
+  /** Accounts whose decision threw; each was logged and skipped. */
+  failed: number;
 }
 
 /**
@@ -215,19 +217,40 @@ const applyDecision = async (
   });
 };
 
+/**
+ * `applyDecision`, contained to one account (#596). Every account is
+ * independent, so a failure is logged, counted and skipped. Uncaught, it used
+ * to abandon the cycle, leaving everyone later in the cursor unevaluated until
+ * the next day's run.
+ */
+const decideOne = async (
+  user: Candidate,
+  now: Date,
+  mode: 'dryRun' | 'on',
+  systemActorId: number,
+  tally: Tally
+): Promise<void> => {
+  try {
+    await applyDecision(user, now, mode, systemActorId, tally);
+  } catch (err) {
+    tally.failed += 1;
+    log.error('Inactivity sweep failed for a user', { userId: user.id, err });
+  }
+};
+
 export const runInactivityCycle = async (
   now: Date = new Date()
-): Promise<{ warned: number; disabled: number; deferred: number }> => {
+): Promise<Tally> => {
+  const tally: Tally = { warned: 0, disabled: 0, deferred: 0, failed: 0 };
   const mode = inactivityConfig.mode;
-  if (mode === 'off') return { warned: 0, disabled: 0, deferred: 0 };
+  if (mode === 'off') return tally;
 
   const systemActorId = await resolveSystemActorId();
   if (systemActorId === null) {
     log.warn('No SysOp found — inactivity sweep skipped');
-    return { warned: 0, disabled: 0, deferred: 0 };
+    return tally;
   }
 
-  const tally: Tally = { warned: 0, disabled: 0, deferred: 0 };
   let cursor: number | undefined;
 
   // Paged with a cursor rather than a single `take`: a bare limit would mean the
@@ -238,7 +261,7 @@ export const runInactivityCycle = async (
     if (batch.length === 0) break;
 
     for (const user of batch) {
-      await applyDecision(user, now, mode, systemActorId, tally);
+      await decideOne(user, now, mode, systemActorId, tally);
     }
 
     cursor = batch[batch.length - 1].id;

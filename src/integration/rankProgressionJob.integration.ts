@@ -148,7 +148,7 @@ describe('runRankProgressionSweep', () => {
 
     const result = await runRankProgressionSweep();
 
-    expect(result).toEqual({ scanned: 3, promoted: 1, demoted: 1 });
+    expect(result).toEqual({ scanned: 3, promoted: 1, demoted: 1, failed: 0 });
 
     const after = async (id: number) =>
       (await testPrisma.user.findUniqueOrThrow({ where: { id } })).userRankId;
@@ -191,7 +191,7 @@ describe('runRankProgressionSweep', () => {
 
     const result = await runRankProgressionSweep();
 
-    expect(result).toEqual({ scanned: 0, promoted: 0, demoted: 0 });
+    expect(result).toEqual({ scanned: 0, promoted: 0, demoted: 0, failed: 0 });
     const userLevel = await rankIdByLevel(100);
     expect(
       (await testPrisma.user.findUniqueOrThrow({ where: { id: eligible.id } }))
