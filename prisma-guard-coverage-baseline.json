@@ -82,7 +82,9 @@
     "src/modules/staffInbox.ts::message::staffInboxConversation.update": "The ticket is read by id before the transaction, and conversations are never hard-deleted (noHardDelete.spec.ts).",
     "src/modules/staffInbox.ts::resolveTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts); resolverId is session-derived.",
     "src/modules/staffInbox.ts::unresolveTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts). The update clears resolverId and sets no foreign key.",
-    "src/modules/staffInbox.ts::assignTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts). assignedUserId is null or a user read just before, and users are never hard-deleted."
+    "src/modules/staffInbox.ts::assignTicket::staffInboxConversation.update": "The ticket is read by id just before the update, and conversations are never hard-deleted (noHardDelete.spec.ts). assignedUserId is null or a user read just before, and users are never hard-deleted.",
+    "src/modules/bootstrap.ts::seedRanks::userRank.update": "Seed code, run by the boot seed before the server listens (docker-entrypoint.sh) and by POST /install only while installedAt is null, when no user yet holds a permission. The rank is read by id just before, and deleting a rank needs rank_permissions_manage (tools.ts), so none can vanish in between. The update writes no foreign key, and name is rewritten only when it already matches (the skip above), so neither unique can be violated.",
+    "src/modules/bootstrap.ts::seedForums::forum.create": "Seed code, run by the boot seed before the server listens (docker-entrypoint.sh) and by POST /install only while installedAt is null, when no user yet holds a permission. forumCategoryId is the category created just before, and deleting one needs forums_manage (forumCategory.ts). Forum carries no unique constraint."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
@@ -93,13 +95,6 @@
     "src/modules/authorStylesheet.ts::createAuthorStylesheet::authorStylesheet.create",
     "src/modules/authorStylesheet.ts::deleteAuthorStylesheet::authorStylesheet.update",
     "src/modules/authorStylesheet.ts::updateAuthorStylesheet::authorStylesheet.update",
-    "src/modules/bootstrap.ts::seedDefaultCommunity::community.create",
-    "src/modules/bootstrap.ts::seedForums::forum.create",
-    "src/modules/bootstrap.ts::seedRankPromotionRules::rankPromotionRule.upsert",
-    "src/modules/bootstrap.ts::seedRanks::userRank.create",
-    "src/modules/bootstrap.ts::seedRanks::userRank.update",
-    "src/modules/bootstrap.ts::user::user.create",
-    "src/modules/bootstrap.ts::userSettings::userSettings.create",
     "src/modules/comment.ts::deleteComment::auditLog.create",
     "src/modules/comment.ts::deleteComment::comment.update",
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert",

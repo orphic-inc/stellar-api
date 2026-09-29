@@ -45,6 +45,11 @@ function mockSysopTransaction() {
   prismaMock.community.findFirst.mockResolvedValue(null);
   prismaMock.community.create.mockResolvedValue({ id: 1 } as never);
   prismaMock.consumer.upsert.mockResolvedValue({ id: 1 } as never);
+  // The System user's rows are created in their own transaction first (#596),
+  // against the base mocks above.
+  prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
+    (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
+  );
   prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) => {
     const tx = prismaMock;
     tx.userSettings.create.mockResolvedValueOnce({ id: 4 } as never);
