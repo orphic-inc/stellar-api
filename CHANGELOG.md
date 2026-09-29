@@ -25,6 +25,13 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **Three account races no longer answer `500`** (#596, the fifth guard-coverage burn-down under ADR-0048: `modules/auth.ts`, a high-risk file, so error translation only).
+  - Two registrations for one address, both past the duplicate pre-check, now answer `user_exists` like the pre-check. The losing registration's invite claim rolls back rather than being spent.
+  - Changing to an address another account just took answers `400 Email already in use`.
+  - A password reset whose recovery request staff deleted mid-reset answers `400 Invalid or expired recovery token`.
+  - All 9 of `auth.ts`'s `unreviewed` sites are resolved: 5 guarded, 4 recorded as internally derived. The contract is unchanged, since each answer is one the route already gives.
+  - A token double-spend race found on the way is tracked separately as #764.
+
 - **Two concurrent first downloads by one member no longer answer `500`** (#761, the fourth guard-coverage burn-down under ADR-0048). Both inserted the member's consumer row, and one lost on its unique key. It now answers `409`, and its transaction, balance debit included, rolls back as before. All 11 of `downloads.ts`'s `unreviewed` sites are resolved: 1 guarded, 10 recorded as internally derived. `noHardDelete.spec.ts` gains `DownloadAccessGrant` and `Consumer`. A reversal race found on the way is tracked separately as #760.
 
 - **Staff creating a user with an unknown rank no longer gets `500`** (#758, the third guard-coverage burn-down under ADR-0048).

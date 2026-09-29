@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { Prisma, RecoveryPurpose } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { computeRatio } from './ratio';
 import { activeWarnedUntil } from './standing';
 import { computeUserRankAccess, resolveRankQuota } from '../lib/userRankAccess';
@@ -214,6 +215,62 @@ const REGISTRATION_SEAT_LOCK_KEY = 624_001;
 /** Thrown inside the registration transaction to roll back the user it created. */
 class InviteLapsedDuringRegistration extends Error {}
 
+/**
+ * Thrown when a racing registration took the username or email after the
+ * pre-check (#596). A throw, not a returned refusal, so the invite claimed
+ * earlier in the same transaction rolls back rather than being spent.
+ */
+class UserTakenDuringRegistration extends Error {}
+
+type NewAccount = {
+  username: string;
+  email: string;
+  hashedPassword: string;
+  userRankId: number;
+  inviterId: number | null;
+};
+
+/** Create the account and its settings, profile and invite-tree rows. */
+const createRegisteredUser = async (
+  tx: Prisma.TransactionClient,
+  account: NewAccount
+) => {
+  const defaultTheme = await getDefaultStylesheetName(tx);
+  const settings = await tx.userSettings.create({
+    data: { siteAppearance: defaultTheme }
+  });
+  const profile = await tx.profile.create({ data: {} });
+  try {
+    return await tx.user.create({
+      data: {
+        username: account.username,
+        email: account.email.toLowerCase(),
+        password: account.hashedPassword,
+        // avatar left null — UI falls back to the bundled default avatar.
+        // Gravatar was removed to avoid leaking email hashes (private site).
+        userRankId: account.userRankId,
+        userSettingsId: settings.id,
+        profileId: profile.id,
+        contributed: 5_368_709_120n,
+        // Every account has an InviteTree row (#633, ADR-0042). `inviterId` is
+        // null unless the claim took an invite, so an edge can only name an
+        // inviter whose invite this registration actually consumed.
+        inviteTree: { create: { inviterId: account.inviterId } }
+      },
+      select: authUserSelect
+    });
+  } catch (err) {
+    // The duplicate pre-check runs before the transaction, so two
+    // registrations for one address can both pass it (#596).
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    )
+      throw new UserTakenDuringRegistration();
+    throw err;
+  }
+};
+
 type InviteCheck =
   | {
       ok: false;
@@ -395,36 +452,22 @@ export const registerUser = async ({
       }
     }
 
-    const defaultTheme = await getDefaultStylesheetName(tx);
-    const settings = await tx.userSettings.create({
-      data: { siteAppearance: defaultTheme }
+    const newUser = await createRegisteredUser(tx, {
+      username,
+      email,
+      hashedPassword,
+      userRankId: defaultRank.id,
+      inviterId
     });
-    const profile = await tx.profile.create({ data: {} });
-    const newUser = await tx.user.create({
-      data: {
-        username,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        // avatar left null — UI falls back to the bundled default avatar.
-        // Gravatar was removed to avoid leaking email hashes (private site).
-        userRankId: defaultRank.id,
-        userSettingsId: settings.id,
-        profileId: profile.id,
-        contributed: 5_368_709_120n,
-        // Every account has an InviteTree row (#633, ADR-0042). `inviterId` is
-        // null unless the claim above took an invite, so an edge can only name
-        // an inviter whose invite this registration actually consumed.
-        inviteTree: { create: { inviterId } }
-      },
-      select: authUserSelect
-    });
-
     return { ok: true, user: toAuthUser(newUser) };
   });
 
   return created.catch((err: unknown): RegisterResult => {
     if (err instanceof InviteLapsedDuringRegistration) {
       return { ok: false, reason: 'invite_expired' };
+    }
+    if (err instanceof UserTakenDuringRegistration) {
+      return { ok: false, reason: 'user_exists' };
     }
     throw err;
   });
@@ -488,20 +531,26 @@ export const changeEmail = async (
     throw new AppError(400, 'That email address is not available');
   }
 
-  await prisma.$transaction([
-    prisma.userEmailHistory.create({
-      data: {
-        userId,
-        oldEmail: user.email,
-        newEmail: newEmail.toLowerCase(),
-        ipAddress
-      }
-    }),
-    prisma.user.update({
-      where: { id: userId },
-      data: { email: newEmail.toLowerCase() }
-    })
-  ]);
+  // The `taken` pre-check races another account moving to, or registering
+  // with, the same address (#596); answered as the pre-check answers.
+  try {
+    await prisma.$transaction([
+      prisma.userEmailHistory.create({
+        data: {
+          userId,
+          oldEmail: user.email,
+          newEmail: newEmail.toLowerCase(),
+          ipAddress
+        }
+      }),
+      prisma.user.update({
+        where: { id: userId },
+        data: { email: newEmail.toLowerCase() }
+      })
+    ]);
+  } catch (err) {
+    translatePrismaError(err, { P2002: [400, 'Email already in use'] });
+  }
 };
 
 export const generateRecoveryToken = (): string =>
@@ -553,20 +602,28 @@ export const resetPasswordWithToken = async (
   }
 
   const hashed = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: recovery.userId },
-      data: { password: hashed }
-    }),
-    prisma.accountRecovery.update({
-      where: { id: recovery.id },
-      data: { usedAt: new Date() }
-    }),
-    prisma.userSession.updateMany({
-      where: { userId: recovery.userId, revokedAt: null },
-      data: { revokedAt: new Date() }
-    })
-  ]);
+  // Staff can delete a recovery request between the read above and this write
+  // (#596); answered as an unknown token is.
+  try {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: recovery.userId },
+        data: { password: hashed }
+      }),
+      prisma.accountRecovery.update({
+        where: { id: recovery.id },
+        data: { usedAt: new Date() }
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: recovery.userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      })
+    ]);
+  } catch (err) {
+    translatePrismaError(err, {
+      P2025: [400, 'Invalid or expired recovery token']
+    });
+  }
 };
 
 export const loginUser = async (
