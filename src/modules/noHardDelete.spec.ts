@@ -1,5 +1,5 @@
 /**
- * Models no production code hard-deletes (#752, #756).
+ * Models no production code hard-deletes (#752, #756, #758).
  *
  * `prisma-guard-coverage-baseline.json` records module writes as internally
  * derived on exactly this fact: each write is checked, or read in the same
@@ -38,6 +38,7 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['forumPostEdit', 'forum_post_edits'],
   // Users are disabled, never deleted (AGENTS.md, "Soft delete").
   ['user', 'users'],
+  ['userSettings', 'user_settings'],
   ['request', 'requests'],
   ['requestBounty', 'request_bounties'],
   ['contribution', 'contributions']

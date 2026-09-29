@@ -56,7 +56,14 @@
     "src/modules/requestLifecycle.ts::unfillRequest::request.update": "The request is read in the same transaction. Requests are never hard-deleted (noHardDelete.spec.ts), and Community → Request does not cascade. #756.",
     "src/modules/requestLifecycle.ts::deleteRequest::request.update": "The request is read in the same transaction; this write is the soft delete. Requests are never hard-deleted (noHardDelete.spec.ts), and Community → Request does not cascade. #756.",
     "src/modules/requestLifecycle.ts::fillRequest::requestFill.create": "requestId was compare-and-swapped in the same transaction (exists, locked); contributionId is read in the same transaction, and contributions are never hard-deleted (noHardDelete.spec.ts); fillerId is the session user's. RequestFill has no unique constraint. #756.",
-    "src/modules/requestLifecycle.ts::pledgeBounty::requestBounty.update": "existing.id is read in the same transaction. Bounties are never hard-deleted and cascade only from a request, which is never hard-deleted either (noHardDelete.spec.ts). #756."
+    "src/modules/requestLifecycle.ts::pledgeBounty::requestBounty.update": "existing.id is read in the same transaction. Bounties are never hard-deleted and cascade only from a request, which is never hard-deleted either (noHardDelete.spec.ts). #756.",
+    "src/modules/user.ts::updateUserSettings::user.update": "userId is the session user's (PUT /users/settings). Users are never hard-deleted (noHardDelete.spec.ts). #758.",
+    "src/modules/user.ts::updateUserSettings::userSettings.update": "userSettingsId is read from the session user's own row just before; user settings are never hard-deleted (noHardDelete.spec.ts). #758.",
+    "src/modules/user.ts::settings::userSettings.create": "No client value reaches a constrained column: only siteAppearance is set, from the default stylesheet. #758.",
+    "src/modules/user.ts::warnUser::userWarning.create": "userId is checked just before the write, and warnedById is the session user's. Users are never hard-deleted (noHardDelete.spec.ts). #758.",
+    "src/modules/user.ts::warnUser::user.update": "userId is checked just before the write. Users are never hard-deleted (noHardDelete.spec.ts). #758.",
+    "src/modules/user.ts::deleteWarning::user.update": "userId owns the warning read (and deleted) just before. Users are never hard-deleted (noHardDelete.spec.ts). #758.",
+    "src/modules/user.ts::updateStaffBio::user.update": "userId is checked just before the write. Users are never hard-deleted (noHardDelete.spec.ts). #758."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
@@ -191,18 +198,6 @@
     "src/modules/tag.ts::tag::tag.upsert",
     "src/modules/top10.ts::recomputeVoteAggregate::releaseVoteAggregate.upsert",
     "src/modules/topicSession.ts::markTopicRead::forumLastReadTopic.upsert",
-    "src/modules/user.ts::deleteWarning::user.update",
-    "src/modules/user.ts::deleteWarning::userWarning.delete",
-    "src/modules/user.ts::grantDonorStatus::user.update",
-    "src/modules/user.ts::grantDonorStatus::userDonorRank.upsert",
-    "src/modules/user.ts::setUserRank::user.update",
-    "src/modules/user.ts::settings::userSettings.create",
-    "src/modules/user.ts::updateStaffBio::user.update",
-    "src/modules/user.ts::updateUserSettings::user.update",
-    "src/modules/user.ts::updateUserSettings::userSettings.update",
-    "src/modules/user.ts::user::user.create",
-    "src/modules/user.ts::warnUser::user.update",
-    "src/modules/user.ts::warnUser::userWarning.create",
     "src/modules/wikiFixtures.ts::seedWikiFixtures::wikiPage.create"
   ]
 }
