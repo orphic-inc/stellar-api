@@ -62,10 +62,14 @@ jest.mock('../lib/prisma', () => ({
     forumTopic: {
       update: jest.fn(),
       count: jest.fn(),
-      updateMany: jest.fn()
+      updateMany: jest.fn(),
+      findFirst: jest.fn()
     },
     forumPost: {
       count: jest.fn()
+    },
+    forumTopicNote: {
+      create: jest.fn()
     },
     forumPoll: {
       findUnique: jest.fn(),
@@ -90,14 +94,18 @@ jest.mock('../lib/sanitize', () => ({
   sanitizePlain: (value: string) => `[plain]${value}`
 }));
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import {
   castVote,
+  createPoll,
   createPost,
   createTopic,
+  createTopicNote,
   deleteForum,
   deletePost,
   deleteTopic,
+  trashTopic,
   updatePost,
   updateTopic
 } from './forum';
@@ -113,9 +121,13 @@ const prismaMock = prisma as unknown as {
     update: jest.Mock;
     count: jest.Mock;
     updateMany: jest.Mock;
+    findFirst: jest.Mock;
   };
   forumPost: {
     count: jest.Mock;
+  };
+  forumTopicNote: {
+    create: jest.Mock;
   };
   forumPoll: {
     findUnique: jest.Mock;
@@ -655,6 +667,110 @@ describe('castVote', () => {
       where: { forumPollId_userId: { forumPollId: 1, userId: 7 } },
       create: { forumPollId: 1, userId: 7, vote: 1 },
       update: { vote: 1 }
+    });
+  });
+});
+
+// ─── Constraint guards (#752, ADR-0048) ─────────────────────────────────────
+// Each guard is proved by making its write fail with the code it translates.
+// The sites NOT guarded here are recorded as internally derived, and
+// forumNoHardDelete.spec.ts holds the fact most of those reasons rest on.
+
+describe('constraint guards (#752)', () => {
+  const prismaErr = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('boom', {
+      code,
+      clientVersion: 'test'
+    });
+  const status = (code: number) =>
+    expect.objectContaining({ statusCode: code });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prismaMock.$transaction.mockImplementation((arg: unknown) => {
+      if (typeof arg === 'function') return arg(mockTx);
+      return Promise.all(arg as Promise<unknown>[]);
+    });
+  });
+
+  // ── The live bugs: a well-formed request that answered 500 ────────────────
+
+  it('createPoll answers 409 when the topic already has a poll', async () => {
+    prismaMock.forumPoll.create.mockRejectedValue(prismaErr('P2002'));
+    await expect(createPoll(3, 'Q', '["a"]')).rejects.toEqual(status(409));
+  });
+
+  it('createTopicNote answers 400 when the body names no topic', async () => {
+    prismaMock.forumTopicNote.create.mockRejectedValue(prismaErr('P2003'));
+    await expect(createTopicNote(999, 7, 'note')).rejects.toEqual(status(400));
+  });
+
+  it('castVote answers 409 when a concurrent vote won the insert', async () => {
+    prismaMock.forumPoll.findUnique.mockResolvedValue({
+      answers: '["Yes","No"]',
+      closed: false,
+      forumTopic: { deletedAt: null, forum: { minClassRead: 0 } }
+    });
+    prismaMock.forumPollVote.upsert.mockRejectedValue(prismaErr('P2002'));
+    await expect(castVote(1, 7, 100, 1)).rejects.toEqual(status(409));
+  });
+
+  // ── Racing deleteForum: the path forum vanished after its check ───────────
+
+  it('createTopic answers 404 when the forum is gone', async () => {
+    mockTx.forumTopic.create.mockRejectedValue(prismaErr('P2003'));
+    await expect(createTopic(1, 7, { title: 't', body: 'b' })).rejects.toEqual(
+      status(404)
+    );
+  });
+
+  it('createPost answers 404 when the forum is gone', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: null });
+    mockTx.forumPost.create.mockResolvedValue({ id: 5 });
+    mockTx.forum.update.mockRejectedValue(prismaErr('P2025'));
+    await expect(createPost(1, 2, 7, 'b')).rejects.toEqual(status(404));
+  });
+
+  it('createPost answers 404 on the merge path when the forum is gone', async () => {
+    mockTx.forumTopic.findUnique.mockResolvedValue({ lastPostId: 5 });
+    mockTx.forumPost.findUnique.mockResolvedValue({
+      id: 5,
+      authorId: 7,
+      body: 'earlier'
+    });
+    mockTx.forumPost.update.mockResolvedValue({ id: 5 });
+    mockTx.forum.update.mockRejectedValue(prismaErr('P2025'));
+    await expect(createPost(1, 2, 7, 'b')).rejects.toEqual(status(404));
+  });
+
+  it('deleteTopic answers 404 when the forum is gone', async () => {
+    prismaMock.forumPost.count.mockResolvedValue(1);
+    mockTx.forum.update.mockRejectedValue(prismaErr('P2025'));
+    await expect(deleteTopic(2, 1, 7, false)).rejects.toEqual(status(404));
+  });
+
+  it('deletePost answers 404 when the forum is gone', async () => {
+    mockTx.forum.update.mockRejectedValue(prismaErr('P2025'));
+    await expect(deletePost(5, 2, 1, 7, false)).rejects.toEqual(status(404));
+  });
+
+  it('trashTopic answers 404 when the source forum is gone', async () => {
+    prismaMock.forumTopic.findFirst.mockResolvedValue({ id: 2, forumId: 1 });
+    prismaMock.forum.findFirst.mockResolvedValue({ id: 99, isTrash: true });
+    prismaMock.forumPost.count.mockResolvedValue(3);
+    mockTx.forum.update.mockRejectedValue(prismaErr('P2025'));
+    await expect(trashTopic(2)).rejects.toEqual(status(404));
+  });
+
+  it('deleteForum reports not_found when a racing delete won', async () => {
+    prismaMock.forum.findUnique.mockResolvedValue({ id: 9, isTrash: false });
+    prismaMock.forum.findFirst.mockResolvedValue({ id: 1, isTrash: true });
+    prismaMock.forumTopic.count.mockResolvedValue(0);
+    prismaMock.forumPost.count.mockResolvedValue(0);
+    prismaMock.forum.delete.mockRejectedValue(prismaErr('P2025'));
+    await expect(deleteForum(9)).resolves.toEqual({
+      ok: false,
+      reason: 'not_found'
     });
   });
 });

@@ -1,4 +1,6 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { sanitizeHtml, sanitizePlain } from '../lib/sanitize';
 import { canAccessForumLevel } from '../lib/userRankAccess';
 import {
@@ -17,6 +19,15 @@ type CastVoteResult =
       ok: false;
       reason: 'not_found' | 'insufficient_class' | 'closed' | 'invalid_vote';
     };
+
+/**
+ * The one guard this file's `forum.update`s need (#752, ADR-0048). `Forum` is
+ * the only forum model ever hard-deleted, by `deleteForum`, so a path
+ * `forumId` checked before the transaction can name nothing by the time it is
+ * written. Topics, posts and polls are never hard-deleted, and
+ * forumNoHardDelete.spec.ts keeps it so.
+ */
+const FORUM_GONE = { P2025: [404, 'Forum not found'] } as const;
 
 /** The interactive-transaction client the recomputes below run on. */
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -87,9 +98,14 @@ export const createTopic = async (
   // Before the write, so a 429 refuses the topic whole (#737).
   await registerBBCodeImages(body, authorId);
   return prisma.$transaction(async (tx) => {
-    const topic = await tx.forumTopic.create({
-      data: { title: data.title, forumId, authorId }
-    });
+    let topic;
+    try {
+      topic = await tx.forumTopic.create({
+        data: { title: data.title, forumId, authorId }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2003: [404, 'Forum not found'] });
+    }
     const post = await tx.forumPost.create({
       data: { forumTopicId: topic.id, authorId, body }
     });
@@ -135,13 +151,17 @@ export const deleteTopic = async (
       where: { id },
       data: { deletedAt: new Date() }
     });
-    await tx.forum.update({
-      where: { id: forumId },
-      data: {
-        numTopics: { decrement: 1 },
-        numPosts: { decrement: livePostCount }
-      }
-    });
+    try {
+      await tx.forum.update({
+        where: { id: forumId },
+        data: {
+          numTopics: { decrement: 1 },
+          numPosts: { decrement: livePostCount }
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, FORUM_GONE);
+    }
     await tx.auditLog.create({
       data: {
         actorId,
@@ -225,10 +245,14 @@ export const createPost = async (
           where: { id: forumTopicId },
           data: { lastPostId: lastPost.id }
         });
-        await tx.forum.update({
-          where: { id: forumId },
-          data: { lastTopicId: forumTopicId }
-        });
+        try {
+          await tx.forum.update({
+            where: { id: forumId },
+            data: { lastTopicId: forumTopicId }
+          });
+        } catch (err) {
+          translatePrismaError(err, FORUM_GONE);
+        }
 
         return merged;
       }
@@ -241,10 +265,14 @@ export const createPost = async (
       where: { id: forumTopicId },
       data: { lastPostId: post.id, numPosts: { increment: 1 } }
     });
-    await tx.forum.update({
-      where: { id: forumId },
-      data: { lastTopicId: forumTopicId, numPosts: { increment: 1 } }
-    });
+    try {
+      await tx.forum.update({
+        where: { id: forumId },
+        data: { lastTopicId: forumTopicId, numPosts: { increment: 1 } }
+      });
+    } catch (err) {
+      translatePrismaError(err, FORUM_GONE);
+    }
 
     await notifyNewPost(tx, { forumTopicId, authorId, postId: post.id, body });
 
@@ -312,10 +340,14 @@ export const deletePost = async (
       where: { id: forumTopicId },
       data: { numPosts: { decrement: 1 } }
     });
-    await tx.forum.update({
-      where: { id: forumId },
-      data: { numPosts: { decrement: 1 } }
-    });
+    try {
+      await tx.forum.update({
+        where: { id: forumId },
+        data: { numPosts: { decrement: 1 } }
+      });
+    } catch (err) {
+      translatePrismaError(err, FORUM_GONE);
+    }
     await tx.auditLog.create({
       data: {
         actorId,
@@ -382,13 +414,17 @@ export const trashTopic = async (id: number): Promise<TrashTopicResult> => {
   });
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.forum.update({
-      where: { id: topic.forumId },
-      data: {
-        numTopics: { decrement: 1 },
-        numPosts: { decrement: postCount }
-      }
-    });
+    try {
+      await tx.forum.update({
+        where: { id: topic.forumId },
+        data: {
+          numTopics: { decrement: 1 },
+          numPosts: { decrement: postCount }
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, FORUM_GONE);
+    }
     await tx.forum.update({
       where: { id: trash.id },
       data: { numTopics: { increment: 1 }, numPosts: { increment: postCount } }
@@ -424,20 +460,31 @@ export const deleteForum = async (id: number): Promise<DeleteForumResult> => {
     prisma.forumPost.count({ where: { forumTopic: { forumId: id } } })
   ]);
 
-  await prisma.$transaction([
-    prisma.forumTopic.updateMany({
-      where: { forumId: id },
-      data: { forumId: trash.id }
-    }),
-    prisma.forum.update({
-      where: { id: trash.id },
-      data: {
-        numTopics: { increment: topicCount },
-        numPosts: { increment: postCount }
-      }
-    }),
-    prisma.forum.delete({ where: { id } })
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.forumTopic.updateMany({
+        where: { forumId: id },
+        data: { forumId: trash.id }
+      }),
+      prisma.forum.update({
+        where: { id: trash.id },
+        data: {
+          numTopics: { increment: topicCount },
+          numPosts: { increment: postCount }
+        }
+      }),
+      prisma.forum.delete({ where: { id } })
+    ]);
+  } catch (err) {
+    // A second delete of the same forum, racing this one (#752). The trash
+    // forum is never deleted, so the update above cannot be what vanished.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2025'
+    )
+      return { ok: false, reason: 'not_found' };
+    throw err;
+  }
   return { ok: true };
 };
 
@@ -445,35 +492,31 @@ export const createPoll = async (
   forumTopicId: number,
   question: string,
   answers: string
-) => prisma.forumPoll.create({ data: { forumTopicId, question, answers } });
+) => {
+  // `forumTopicId` is unique on ForumPoll: a topic holds one poll, and nothing
+  // before this write checked for it (#752).
+  try {
+    return await prisma.forumPoll.create({
+      data: { forumTopicId, question, answers }
+    });
+  } catch (err) {
+    translatePrismaError(err, { P2002: [409, 'Topic already has a poll'] });
+  }
+};
 
 export const closePoll = async (id: number) =>
   prisma.forumPoll.update({ where: { id }, data: { closed: true } });
 
-export const castVote = async (
-  forumPollId: number,
-  userOrId:
-    | {
-        id: number;
-        userRankLevel: number;
-        permittedForumIds?: number[];
-      }
-    | number,
-  userRankLevelOrVote: number,
-  maybeVote?: number
-): Promise<CastVoteResult> => {
-  const user =
-    typeof userOrId === 'number'
-      ? {
-          id: userOrId,
-          userRankLevel: userRankLevelOrVote,
-          permittedForumIds: []
-        }
-      : userOrId;
-  const vote =
-    typeof userOrId === 'number' ? (maybeVote ?? 0) : userRankLevelOrVote;
+type Voter = {
+  id: number;
+  userRankLevel: number;
+  permittedForumIds?: number[];
+};
+type VoteRefusal = Extract<CastVoteResult, { ok: false }>['reason'];
 
-  const poll = await prisma.forumPoll.findUnique({
+/** The poll a vote reads, with what `voteRefusal` checks. */
+const loadPollForVote = (forumPollId: number) =>
+  prisma.forumPoll.findUnique({
     where: { id: forumPollId },
     include: {
       forumTopic: {
@@ -485,37 +528,87 @@ export const castVote = async (
       }
     }
   });
-  if (!poll || poll.forumTopic?.deletedAt)
-    return { ok: false, reason: 'not_found' };
-  if (
-    !canAccessForumLevel(
-      user,
-      poll.forumTopic?.forumId ?? 0,
-      poll.forumTopic?.forum.minClassRead
-    )
-  )
-    return { ok: false, reason: 'insufficient_class' };
-  if (poll.closed) return { ok: false, reason: 'closed' };
 
-  let answers: unknown;
+/** Whether `vote` indexes an answer in the poll's stored JSON array. */
+const isValidAnswer = (raw: string, vote: number): boolean => {
   try {
-    answers = JSON.parse(poll.answers);
+    const answers: unknown = JSON.parse(raw);
+    return Array.isArray(answers) && vote < answers.length;
   } catch {
-    return { ok: false, reason: 'invalid_vote' };
+    return false;
   }
-  if (!Array.isArray(answers) || vote >= answers.length)
-    return { ok: false, reason: 'invalid_vote' };
+};
 
-  const result = await prisma.forumPollVote.upsert({
-    where: { forumPollId_userId: { forumPollId, userId: user.id } },
-    create: { forumPollId, userId: user.id, vote },
-    update: { vote }
-  });
-  return { ok: true, vote: result };
+/** Why this vote is refused, or null when it may be recorded. */
+const voteRefusal = (
+  poll: Awaited<ReturnType<typeof loadPollForVote>>,
+  user: Voter,
+  vote: number
+): VoteRefusal | null => {
+  if (!poll || poll.forumTopic?.deletedAt) return 'not_found';
+  const forumId = poll.forumTopic?.forumId ?? 0;
+  if (!canAccessForumLevel(user, forumId, poll.forumTopic?.forum.minClassRead))
+    return 'insufficient_class';
+  if (poll.closed) return 'closed';
+  return isValidAnswer(poll.answers, vote) ? null : 'invalid_vote';
+};
+
+/**
+ * Record or change one member's vote. Two concurrent votes by one member can
+ * both miss the row and both insert; the second loses on the unique key (#752).
+ */
+const recordVote = async (
+  forumPollId: number,
+  userId: number,
+  vote: number
+) => {
+  try {
+    return await prisma.forumPollVote.upsert({
+      where: { forumPollId_userId: { forumPollId, userId } },
+      create: { forumPollId, userId, vote },
+      update: { vote }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'Your vote was being recorded already; try again']
+    });
+  }
+};
+
+export const castVote = async (
+  forumPollId: number,
+  userOrId: Voter | number,
+  userRankLevelOrVote: number,
+  maybeVote?: number
+): Promise<CastVoteResult> => {
+  const user: Voter =
+    typeof userOrId === 'number'
+      ? {
+          id: userOrId,
+          userRankLevel: userRankLevelOrVote,
+          permittedForumIds: []
+        }
+      : userOrId;
+  const vote =
+    typeof userOrId === 'number' ? (maybeVote ?? 0) : userRankLevelOrVote;
+
+  const refusal = voteRefusal(await loadPollForVote(forumPollId), user, vote);
+  if (refusal) return { ok: false, reason: refusal };
+  return { ok: true, vote: await recordVote(forumPollId, user.id, vote) };
 };
 
 export const createTopicNote = async (
   forumTopicId: number,
   authorId: number,
   body: string
-) => prisma.forumTopicNote.create({ data: { forumTopicId, authorId, body } });
+) => {
+  // The topic id comes from the body and nothing checked it (#752). `authorId`
+  // is the session's, so a P2003 can only mean the topic.
+  try {
+    return await prisma.forumTopicNote.create({
+      data: { forumTopicId, authorId, body }
+    });
+  } catch (err) {
+    translatePrismaError(err, { P2003: [400, 'Topic not found'] });
+  }
+};
