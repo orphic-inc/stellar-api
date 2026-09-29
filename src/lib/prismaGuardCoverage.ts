@@ -99,11 +99,33 @@ export interface GuardCoverageResult {
     unreviewed: number;
     /** Candidates outside the gated areas — measured, not enforced. */
     countedOnly: number;
+    /** Candidates under DEV_ONLY_PREFIXES — outside the gate by decision. */
+    devOnly: number;
   };
   ok: boolean;
 }
 
 const isCandidate = (s: MutationSite): boolean => s.arm !== null;
+
+/**
+ * Paths outside the gate entirely, whatever their area (ADR-0048).
+ *
+ * `src/modules/devTools/` is the dev-only content factory. Its router is
+ * mounted only when `NODE_ENV !== 'production'`, and every endpoint re-checks
+ * at runtime, so none of its writes ever serves a production request. It is
+ * excluded here, in one place with one reason, rather than by ~100 baseline
+ * entries that would each restate it.
+ */
+export const DEV_ONLY_PREFIXES: readonly string[] = ['src/modules/devTools/'];
+
+const isDevOnly = (s: MutationSite): boolean =>
+  DEV_ONLY_PREFIXES.some((prefix) => s.key.startsWith(prefix));
+
+/** Whether the gate fails on this site: a gated area, and not dev-only. */
+export const isGatedSite = (
+  s: MutationSite,
+  gated: GuardCoverageInput['gated']
+): boolean => gated.includes(s.area) && !isDevOnly(s);
 
 /**
  * Compare the mutation sites in the tree against the baseline.
@@ -118,12 +140,15 @@ const isCandidate = (s: MutationSite): boolean => s.arm !== null;
  *      as the backlog burns down and cannot silently over-suppress.
  *   3. A baseline entry matching no site FAILS the same way, so deleting or
  *      renaming a handler prunes its entry rather than leaving a stale grant.
+ *      So does one whose site is outside the gate, so the gate cannot be
+ *      narrowed without its baseline noticing.
  *
- * `gated` is separate from the site list on purpose. src/modules/ is counted
- * but not enforced: a module takes its ids as function arguments, so telling a
- * request-supplied id from an internally-read one needs inter-procedural
- * analysis this does not attempt. Reporting that remainder as a number is
- * honest; gating it on a rule that cannot discriminate would not be.
+ * `gated` is separate from the site list on purpose. Until ADR-0048 only
+ * routes were enforced: a module takes its ids as function arguments, so it
+ * cannot tell a request-supplied id from an internally-read one. ADR-0048 gates
+ * modules and lib anyway, under the same two arms. Arm B needs no origin at
+ * all, and an arm A site whose ids cannot dangle is recorded in
+ * `internallyDerived` with its reason, as a route's is.
  */
 export const checkPrismaGuardCoverage = ({
   sites,
@@ -136,7 +161,7 @@ export const checkPrismaGuardCoverage = ({
   const baselined = new Set([...derivedKeys, ...baseline.unreviewed]);
 
   const unguarded = candidates.filter((s) => !s.guarded);
-  const isGated = (s: MutationSite) => gated.includes(s.area);
+  const isGated = (s: MutationSite) => isGatedSite(s, gated);
 
   const newlyUnguarded = unguarded
     .filter((s) => isGated(s) && !baselined.has(s.key))
@@ -144,11 +169,13 @@ export const checkPrismaGuardCoverage = ({
     .sort();
 
   // Rules 2 and 3 in one pass: an entry is stale when its site is gone, or when
-  // the site is now guarded and so no longer needs the grant.
+  // the site is now guarded and so no longer needs the grant. So is an entry
+  // for a site the gate no longer covers: otherwise narrowing `gated` would
+  // pass silently, the whole backlog still matching live sites (ADR-0048).
   const staleBaseline = [...baselined]
     .filter((k) => {
       const site = byKey.get(k);
-      return site === undefined || site.guarded;
+      return site === undefined || site.guarded || !isGated(site);
     })
     .sort();
 
@@ -162,7 +189,9 @@ export const checkPrismaGuardCoverage = ({
       guarded: candidates.filter((s) => s.guarded).length,
       internallyDerived: derivedKeys.length,
       unreviewed: baseline.unreviewed.length,
-      countedOnly: candidates.filter((s) => !isGated(s)).length
+      countedOnly: candidates.filter((s) => !isGated(s) && !isDevOnly(s))
+        .length,
+      devOnly: candidates.filter(isDevOnly).length
     },
     ok: newlyUnguarded.length === 0 && staleBaseline.length === 0
   };

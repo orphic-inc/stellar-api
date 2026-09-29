@@ -36,6 +36,9 @@ If the section for the tag is missing entirely, the `release` job fails rather t
 ## Procedure
 
 1. **Review the CHANGELOG.** `git log v<last>..main --oneline`, and hand-diff against `[Unreleased]`. The #386 gate means entries should already be there — you are checking they read well and cover the work, not writing them from scratch. Verify any `docs/` links resolve — a wrong ADR filename ships as a broken link in the Release notes.
+
+   **Report the guard backlog.** Record the `unreviewed` count `npm run prisma:guard-coverage` prints, in the release pull request. It must reach zero by the v0.11.0 cut, as [decision record 0048](../adr/0048-module-writes-meet-the-same-guard-rule.md) commits. Call it out when it did not fall since the last cut.
+
 2. **Rename `[Unreleased]`** to `## [x.y.z] — YYYY-MM-DD` and open a fresh empty `[Unreleased]`. Add the compare-link footer entry.
 3. **Bump the manifest** — `npm version <x.y.z> --no-git-tag-version` (updates `package.json` and `package-lock.json`).
 4. **Regenerate `openapi.json`** — `npm run openapi:export`. Order matters; see the trap above.
