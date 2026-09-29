@@ -926,6 +926,7 @@ describe('requests.createRequest', () => {
       consumed: BigInt(0)
     } as never);
     prismaMock.user.updateMany.mockResolvedValueOnce({ count: 1 } as never);
+    prismaMock.community.findFirst.mockResolvedValueOnce({ id: 1 } as never);
     prismaMock.request.create.mockResolvedValueOnce({
       id: 1,
       status: 'open',
@@ -965,7 +966,7 @@ describe('requests.unfillRequest', () => {
     prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
-    prismaMock.request.findUnique.mockResolvedValueOnce({
+    prismaMock.request.findFirst.mockResolvedValueOnce({
       id: 1,
       status: 'filled',
       fillerId: null,
@@ -981,19 +982,18 @@ describe('requests.unfillRequest', () => {
     prismaMock.$transaction.mockImplementationOnce(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
     );
-    prismaMock.request.findUnique
-      .mockResolvedValueOnce({
-        id: 1,
-        status: 'filled',
-        fillerId: 42,
-        bounties: [{ amount: BigInt(110_000_000) }]
-      } as never)
-      .mockResolvedValueOnce({
-        id: 1,
-        status: 'open',
-        fillerId: null,
-        bounties: [{ amount: BigInt(110_000_000) }]
-      } as never);
+    prismaMock.request.findFirst.mockResolvedValueOnce({
+      id: 1,
+      status: 'filled',
+      fillerId: 42,
+      bounties: [{ amount: BigInt(110_000_000) }]
+    } as never);
+    prismaMock.request.findUnique.mockResolvedValueOnce({
+      id: 1,
+      status: 'open',
+      fillerId: null,
+      bounties: [{ amount: BigInt(110_000_000) }]
+    } as never);
     prismaMock.request.updateMany.mockResolvedValueOnce({ count: 1 } as never);
     prismaMock.requestFill.findFirst.mockResolvedValueOnce({
       awardedAmount: BigInt(110_000_000)

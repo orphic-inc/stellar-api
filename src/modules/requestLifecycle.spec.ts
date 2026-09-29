@@ -34,6 +34,7 @@ const mockTx = {
   requestAction: { create: jest.fn() },
   requestFill: { create: jest.fn(), findFirst: jest.fn() },
   contribution: { findUnique: jest.fn() },
+  community: { findFirst: jest.fn() },
   notification: { createMany: jest.fn() }
 };
 
@@ -155,6 +156,9 @@ beforeEach(() => {
   // Claims and balance writes succeed unless a test says otherwise (#767).
   mockTx.request.updateMany.mockResolvedValue({ count: 1 });
   mockTx.user.updateMany.mockResolvedValue({ count: 1 });
+  // The visibility pre-reads (#755) find the request and community by default.
+  mockTx.request.findFirst.mockResolvedValue({ id: 10 });
+  mockTx.community.findFirst.mockResolvedValue({ id: 1 });
   mockTx.requestBounty.findMany.mockResolvedValue([]);
   mockTx.requestFill.findFirst.mockResolvedValue({
     awardedAmount: BigInt('209715200')
@@ -400,7 +404,7 @@ describe('fillRequest', () => {
 
   it('throws 404 when request not open', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique.mockResolvedValue(null);
+    mockTx.request.findFirst.mockResolvedValueOnce(null);
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
       statusCode: 404
     });
@@ -410,7 +414,7 @@ describe('fillRequest', () => {
     mockTx.contribution.findUnique.mockResolvedValue(
       makeContribution({ release: { communityId: 99, type: 'Music' } })
     );
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
       statusCode: 400
     });
@@ -420,7 +424,7 @@ describe('fillRequest', () => {
     mockTx.contribution.findUnique.mockResolvedValue(
       makeContribution({ release: { communityId: 1, type: 'EBooks' } })
     );
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
       statusCode: 400
     });
@@ -428,7 +432,7 @@ describe('fillRequest', () => {
 
   it('throws 400 if contribution already fills another request', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findFirst.mockResolvedValue({ id: 20 }); // already filling req #20
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
       statusCode: 400
@@ -437,7 +441,7 @@ describe('fillRequest', () => {
 
   it('throws 409 when compare-and-swap finds 0 updated rows (concurrent fill)', async () => {
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique.mockResolvedValue(makeRequest());
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 0 }); // lost the race
     await expect(fillRequest(1, 10, 5)).rejects.toMatchObject({
@@ -448,9 +452,10 @@ describe('fillRequest', () => {
   it('awards bounty to filler and records fill + audit on success', async () => {
     const bountyAmount = BigInt('209715200');
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(makeRequest()) // pre-validation fetch
-      .mockResolvedValueOnce(makeRequest({ status: 'filled', fillerId: 1 })); // final fetch
+    mockTx.request.findFirst.mockResolvedValueOnce(makeRequest());
+    mockTx.request.findUnique.mockResolvedValueOnce(
+      makeRequest({ status: 'filled', fillerId: 1 })
+    );
     mockTx.requestBounty.findMany.mockResolvedValue(makeRequest().bounties);
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
@@ -501,13 +506,12 @@ describe('fillRequest', () => {
       ]
     });
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(requestWithBounties)
-      .mockResolvedValueOnce({
-        ...requestWithBounties,
-        status: 'filled',
-        fillerId: 1
-      });
+    mockTx.request.findFirst.mockResolvedValueOnce(requestWithBounties);
+    mockTx.request.findUnique.mockResolvedValueOnce({
+      ...requestWithBounties,
+      status: 'filled',
+      fillerId: 1
+    });
     mockTx.requestBounty.findMany.mockResolvedValue(
       requestWithBounties.bounties
     );
@@ -553,9 +557,12 @@ describe('fillRequest', () => {
       ]
     });
     mockTx.contribution.findUnique.mockResolvedValue(makeContribution());
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(selfRequest)
-      .mockResolvedValueOnce({ ...selfRequest, status: 'filled', fillerId: 1 });
+    mockTx.request.findFirst.mockResolvedValueOnce(selfRequest);
+    mockTx.request.findUnique.mockResolvedValueOnce({
+      ...selfRequest,
+      status: 'filled',
+      fillerId: 1
+    });
     mockTx.requestBounty.findMany.mockResolvedValue(selfRequest.bounties);
     mockTx.request.findFirst.mockResolvedValue(null);
     mockTx.request.updateMany.mockResolvedValue({ count: 1 });
@@ -578,7 +585,7 @@ describe('fillRequest', () => {
 
 describe('unfillRequest', () => {
   it('throws 404 if request is not found', async () => {
-    mockTx.request.findUnique.mockResolvedValue(null);
+    mockTx.request.findFirst.mockResolvedValue(null);
     await expect(
       unfillRequest({
         requestId: 10,
@@ -590,7 +597,7 @@ describe('unfillRequest', () => {
   });
 
   it('throws 422 if request is not filled', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ status: 'open', userId: 99, fillerId: null })
     );
     await expect(
@@ -599,7 +606,7 @@ describe('unfillRequest', () => {
   });
 
   it('throws 403 when caller is not owner, filler, or moderator', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ status: 'filled', userId: 88, fillerId: 77 })
     );
     await expect(
@@ -614,9 +621,8 @@ describe('unfillRequest', () => {
       fillerId: 77
     });
     const openReq = { ...filledReq, status: 'open', fillerId: null };
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(filledReq)
-      .mockResolvedValueOnce(openReq);
+    mockTx.request.findFirst.mockResolvedValueOnce(filledReq);
+    mockTx.request.findUnique.mockResolvedValueOnce(openReq);
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
       contributed: BigInt('209715200')
@@ -638,9 +644,8 @@ describe('unfillRequest', () => {
       fillerId: 1
     });
     const openReq = { ...filledReq, status: 'open', fillerId: null };
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(filledReq)
-      .mockResolvedValueOnce(openReq);
+    mockTx.request.findFirst.mockResolvedValueOnce(filledReq);
+    mockTx.request.findUnique.mockResolvedValueOnce(openReq);
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
       contributed: BigInt('209715200')
@@ -662,9 +667,8 @@ describe('unfillRequest', () => {
       fillerId: 77
     });
     const openReq = { ...filledReq, status: 'open', fillerId: null };
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(filledReq)
-      .mockResolvedValueOnce(openReq);
+    mockTx.request.findFirst.mockResolvedValueOnce(filledReq);
+    mockTx.request.findUnique.mockResolvedValueOnce(openReq);
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
       contributed: BigInt('209715200')
@@ -694,9 +698,12 @@ describe('unfillRequest', () => {
         }
       ]
     });
-    mockTx.request.findUnique
-      .mockResolvedValueOnce(filledReq)
-      .mockResolvedValueOnce({ ...filledReq, status: 'open', fillerId: null });
+    mockTx.request.findFirst.mockResolvedValueOnce(filledReq);
+    mockTx.request.findUnique.mockResolvedValueOnce({
+      ...filledReq,
+      status: 'open',
+      fillerId: null
+    });
     mockTx.user.findUniqueOrThrow.mockResolvedValue({
       consumed: BigInt(0),
       contributed: BigInt('209715200')
@@ -742,21 +749,21 @@ describe('unfillRequest', () => {
 
 describe('deleteRequest', () => {
   it('throws 404 when request not found', async () => {
-    mockTx.request.findUnique.mockResolvedValue(null);
+    mockTx.request.findFirst.mockResolvedValue(null);
     await expect(
       deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('throws 403 when non-owner non-moderator tries to delete', async () => {
-    mockTx.request.findUnique.mockResolvedValue(makeRequest({ userId: 99 }));
+    mockTx.request.findFirst.mockResolvedValue(makeRequest({ userId: 99 }));
     await expect(
       deleteRequest({ requestId: 10, actorId: 1, canModerateRequests: false })
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it('throws 403 when owner tries to delete a filled request without moderation', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ userId: 1, status: 'filled' })
     );
     await expect(
@@ -765,7 +772,7 @@ describe('deleteRequest', () => {
   });
 
   it('allows moderator to delete a filled request without refunding', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ userId: 99, status: 'filled', bounties: [] })
     );
     mockTx.request.update.mockResolvedValue(undefined);
@@ -791,7 +798,7 @@ describe('deleteRequest', () => {
       { id: 1, userId: 1, amount: BigInt('104857600'), requestId: 10 },
       { id: 2, userId: 2, amount: BigInt('52428800'), requestId: 10 }
     ];
-    mockTx.request.findUnique.mockResolvedValue(makeRequest({ bounties }));
+    mockTx.request.findFirst.mockResolvedValue(makeRequest({ bounties }));
     mockTx.requestBounty.findMany.mockResolvedValue(bounties);
     mockTx.user.findUniqueOrThrow
       .mockResolvedValueOnce({
@@ -834,7 +841,7 @@ describe('deleteRequest', () => {
   });
 
   it('does not refund bounties when moderator deletes a filled request', async () => {
-    mockTx.request.findUnique.mockResolvedValue(
+    mockTx.request.findFirst.mockResolvedValue(
       makeRequest({ status: 'filled', bounties: [] })
     );
     mockTx.request.update.mockResolvedValue(undefined);
@@ -906,16 +913,16 @@ describe('getRequestDetail', () => {
 describe('getBountyHistory', () => {
   it('throws 404 when request is not found', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
-    await expect(getBountyHistory(999)).rejects.toMatchObject({
+    await expect(getBountyHistory(999, 1)).rejects.toMatchObject({
       statusCode: 404
     });
   });
 
   it('returns bounties and actions for the request', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({ id: 10 });
     (prisma.requestBounty.findMany as jest.Mock).mockResolvedValueOnce([
       {
         id: 1,
@@ -928,7 +935,7 @@ describe('getBountyHistory', () => {
     ]);
     (prisma.requestAction.findMany as jest.Mock).mockResolvedValueOnce([]);
 
-    const result = await getBountyHistory(10);
+    const result = await getBountyHistory(10, 1);
 
     expect(result.bounties).toHaveLength(1);
     expect(result.actions).toHaveLength(0);
@@ -940,14 +947,14 @@ describe('getBountyHistory', () => {
 describe('toggleVote', () => {
   it('throws 404 when request is not found', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
     await expect(toggleVote(999, 1)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('adds a vote and returns { voted: true } when no existing vote', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({ id: 10 });
     (prisma.requestVote.findUnique as jest.Mock).mockResolvedValueOnce(null);
     (prisma.requestVote.create as jest.Mock).mockReturnValue({} as never);
     (prisma.request.update as jest.Mock).mockReturnValue({} as never);
@@ -960,7 +967,7 @@ describe('toggleVote', () => {
 
   it('removes a vote and returns { voted: false } when vote exists', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({ id: 10 });
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({ id: 10 });
     (prisma.requestVote.findUnique as jest.Mock).mockResolvedValueOnce({
       requestId: 10,
       userId: 1
@@ -980,7 +987,7 @@ describe('toggleVote', () => {
 describe('updateRequest', () => {
   it('throws 404 when request is not found', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
     await expect(
       updateRequest({
@@ -994,7 +1001,7 @@ describe('updateRequest', () => {
 
   it('throws 422 when request is not open', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({
       userId: 1,
       status: 'filled'
     });
@@ -1011,7 +1018,7 @@ describe('updateRequest', () => {
 
   it('throws 403 when non-owner non-moderator edits', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({
       userId: 99,
       status: 'open'
     });
@@ -1028,7 +1035,7 @@ describe('updateRequest', () => {
 
   it('allows owner to update an open request', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({
       userId: 1,
       status: 'open'
     });
@@ -1050,7 +1057,7 @@ describe('updateRequest', () => {
 
   it('allows moderator to update any open request', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({
       userId: 99,
       status: 'open'
     });
@@ -1072,7 +1079,7 @@ describe('updateRequest', () => {
 
   it('shapes update data correctly, excluding undefined fields', async () => {
     const { prisma } = await import('../lib/prisma');
-    (prisma.request.findUnique as jest.Mock).mockResolvedValueOnce({
+    (prisma.request.findFirst as jest.Mock).mockResolvedValueOnce({
       userId: 1,
       status: 'open'
     });
@@ -1156,7 +1163,7 @@ describe('constraint guards (#756)', () => {
   const status = (code: number) =>
     expect.objectContaining({ statusCode: code });
   const top = jest.requireMock('../lib/prisma').prisma as {
-    request: { findUnique: jest.Mock; update: jest.Mock };
+    request: { findFirst: jest.Mock; update: jest.Mock };
     requestVote: {
       findUnique: jest.Mock;
       create: jest.Mock;
@@ -1202,14 +1209,14 @@ describe('constraint guards (#756)', () => {
   });
 
   it('toggleVote answers 409 when a racing toggle already removed the vote', async () => {
-    top.request.findUnique.mockResolvedValue({ id: 10 });
+    top.request.findFirst.mockResolvedValue({ id: 10 });
     top.requestVote.findUnique.mockResolvedValue({ requestId: 10, userId: 1 });
     top.requestVote.delete.mockRejectedValue(prismaErr('P2025'));
     await expect(toggleVote(10, 1)).rejects.toEqual(status(409));
   });
 
   it('toggleVote answers 409 when a racing toggle already added the vote', async () => {
-    top.request.findUnique.mockResolvedValue({ id: 10 });
+    top.request.findFirst.mockResolvedValue({ id: 10 });
     top.requestVote.findUnique.mockResolvedValue(null);
     top.requestVote.create.mockRejectedValue(prismaErr('P2002'));
     await expect(toggleVote(10, 1)).rejects.toEqual(status(409));

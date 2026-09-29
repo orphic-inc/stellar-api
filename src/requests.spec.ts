@@ -513,7 +513,7 @@ describe('GET /api/requests/:id/bounty-history', () => {
     expect(res.body).toHaveProperty('bounties');
     expect(res.body).toHaveProperty('actions');
     expect(res.body.bounties).toHaveLength(1);
-    expect(mod.getBountyHistory).toHaveBeenCalledWith(1);
+    expect(mod.getBountyHistory).toHaveBeenCalledWith(1, 7);
   });
 
   it('returns 404 when module throws not found', async () => {

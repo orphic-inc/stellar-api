@@ -7487,7 +7487,9 @@ registry.registerPath({
   description:
     'Also answers `400` with `{ msg }` below the minimum bounty, on an ' +
     'insufficient contributed balance, or when `communityId` or an artist id ' +
-    'names nothing. A repeated artist id is treated as one.',
+    'names nothing. A community the caller cannot reach answers the same, so ' +
+    'the answer does not reveal it exists. A repeated artist id is treated ' +
+    'as one.',
   request: {
     body: {
       content: { 'application/json': { schema: createRequestSchema } }
