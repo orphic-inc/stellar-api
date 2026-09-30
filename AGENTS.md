@@ -192,9 +192,8 @@ Copy `.env.default` → `.env`.
 | `KORIN_POLL_INTERVAL_MS`            | IRC metrics poll + announce push interval (default 300000 = 5 min)                                                                            |
 | `STELLAR_SERVICE_KEY`               | Bearer korin presents on inbound calls (by-irc-nick, link, reputation); fails closed                                                          |
 | `STELLAR_SITE_NAME`                 | Site name resolved into Golden Rules `${site_name}` (PRD-09; default `Stellar`)                                                               |
-| `STELLAR_IRC_URL`                   | UI route `${irc}` resolves to (PRD-09; default `/irc`)                                                                                        |
 | `STELLAR_DISABLED_CHANNEL`          | IRC channel `${disabled_channel}` resolves to (PRD-09; default `#disabled`)                                                                   |
-| `STELLAR_IRC_GUIDE_URL`             | Public page on reaching IRC, named to disabled members at login and in the deactivation email (#622; default `${STELLAR_PUBLIC_KB_BASE}/irc`) |
+| `STELLAR_IRC_GUIDE_URL`             | `${irc}` target: public page on reaching IRC; also named at disabled login and in the deactivation email (#622, #630). Once `STELLAR_IRC_URL` |
 | `STELLAR_STAFFPM_PATH`              | UI route `${staffpm}` resolves to (PRD-09; default `/inbox/staff`)                                                                            |
 | `STELLAR_PUBLIC_KB_BASE`            | Public wiki root for `${*_article}` guidance links — korin.pink, readable pre-account (PRD-09, #126; default `https://korin.pink/wiki`)       |
 | `STELLAR_ASSET_MAX_BYTES`           | Max size of a single stored binary asset (ADR-0026; default 2000000 = 2 MB)                                                                   |

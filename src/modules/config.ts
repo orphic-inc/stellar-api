@@ -143,14 +143,13 @@ const publicKbBase =
 
 export const site = {
   name: process.env.STELLAR_SITE_NAME || 'Stellar',
-  ircUrl: process.env.STELLAR_IRC_URL || '/irc',
   disabledChannel: process.env.STELLAR_DISABLED_CHANNEL || '#disabled',
   staffPmPath: process.env.STELLAR_STAFFPM_PATH || '/inbox/staff',
   publicKbBase,
-  // Where a disabled member learns to reach `disabledChannel` (#622). On the
-  // PUBLIC KB, for the same reason as the Interview: a disabled member has no
-  // session, so nothing in-app can reach them. Not `ircUrl` — that is a UI
-  // route, and every UI route but the public five requires a session (#630).
+  // The public page about IRC: what `${irc}` resolves to, and where the disabled
+  // login and the deactivation email send a member to reach `disabledChannel`
+  // (#622, #630). On the PUBLIC KB, for the same reason as the Interview: a
+  // disabled member has no session, so nothing in-app can reach them.
   ircGuideUrl:
     process.env.STELLAR_IRC_GUIDE_URL ||
     `${publicKbBase.replace(/\/+$/, '')}/irc`

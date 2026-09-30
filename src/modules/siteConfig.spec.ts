@@ -43,8 +43,9 @@ describe('site.ircGuideUrl', () => {
     ).toBe('https://korin.pink/wiki/connect');
   });
 
-  it('is never the in-app ircUrl route', async () => {
-    const site = await loadSite({});
-    expect(site.ircGuideUrl).not.toBe(site.ircUrl);
+  it('ignores the retired STELLAR_IRC_URL (#630)', async () => {
+    const site = await loadSite({ STELLAR_IRC_URL: '/irc' });
+    expect(site.ircGuideUrl).toBe('https://korin.pink/wiki/irc');
+    expect(site).not.toHaveProperty('ircUrl');
   });
 });

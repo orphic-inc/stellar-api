@@ -6,6 +6,11 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Golden Rule 1's IRC link now reaches a page** (#630). `${irc}` resolved to `/irc`, a route stellar-ui never had, so the link was dead on `/rules`. It could not have served its reader anyway: the rule addresses a disabled member, who has no session. `${irc}` now resolves to the public page about IRC, the same destination the disabled login and the deactivation email already name (#622). The `irc_guide_article` entry in `GET /rules/tree`'s `variables` map, which duplicated it, is removed; the map's schema is unchanged.
+  - **Operators:** `STELLAR_IRC_URL` is retired and ignored, and the api logs a warning at boot while it is still set. Set `STELLAR_IRC_GUIDE_URL` instead if the default, `${STELLAR_PUBLIC_KB_BASE}/irc`, is not your IRC page. ADR-0020 is amended.
+
 ## [0.9.11] — 2026-09-30
 
 ### Fixed
