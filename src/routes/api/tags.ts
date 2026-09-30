@@ -2,7 +2,6 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { audit } from '../../lib/audit';
-import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
@@ -98,13 +97,8 @@ router.delete(
   validateParams(officialParamsSchema),
   authHandler(async (req, res) => {
     const { id } = parsedParams<{ id: number }>(res);
-    let tag;
-    try {
-      tag = await demoteTag(id);
-    } catch (err) {
-      // `update` addressed by id — P2025 on a model with no FK of its own (#564).
-      translatePrismaError(err, { P2025: [404, 'Tag not found'] });
-    }
+    // An id that names no tag answers 404 from demoteTag.
+    const tag = await demoteTag(id);
     await audit(prisma, req.user.id, 'tag.demote', 'Tag', tag.id, {
       name: tag.name
     });

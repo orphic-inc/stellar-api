@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 
 /**
  * The one form a tag name takes (#689, ADR-0047).
@@ -105,12 +106,18 @@ export const promoteTag = async (name: string) => {
 };
 
 /** Demote a tag out of the curated vocabulary. The row itself is never deleted. */
-export const demoteTag = (id: number) =>
-  prisma.tag.update({
-    where: { id },
-    data: { isOfficial: false },
-    select: { id: true, name: true, occurrences: true, isOfficial: true }
-  });
+export const demoteTag = async (id: number) => {
+  try {
+    return await prisma.tag.update({
+      where: { id },
+      data: { isOfficial: false },
+      select: { id: true, name: true, occurrences: true, isOfficial: true }
+    });
+  } catch (err) {
+    // Addressed by a path id, which may name no tag (#564, #841).
+    translatePrismaError(err, { P2025: [404, 'Tag not found'] });
+  }
+};
 
 /**
  * The whole curated set, name-sorted and unpaginated.
