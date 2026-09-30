@@ -8,7 +8,12 @@
  * demotion-wins precedence, Staff/SysOp & rankLocked & active-warning freezes);
  * this module only supplies inputs and persists the outcome.
  */
-import { Bitrate, NotificationType, SubscriptionPage } from '@prisma/client';
+import {
+  Bitrate,
+  NotificationType,
+  Prisma,
+  SubscriptionPage
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { getLogger } from './logging';
@@ -156,23 +161,51 @@ export const resolveSystemActorId = async (): Promise<number | null> => {
 };
 
 /**
- * Persist one auto rank change. Deliberately a primary-rank-only update — NOT a
- * call to setUserRank, which replaces the user's whole secondary-rank set and
- * would silently strip a Donor/VIP secondary on every auto-promotion. We reuse
- * the same `user.rank_changed` audit action so the trail stays uniform, and the
- * meta records that the engine (not a human) made the move.
+ * Persist one auto rank change, answering whether it was made. Deliberately a
+ * primary-rank-only update — NOT a call to setUserRank, which replaces the
+ * user's whole secondary-rank set and would silently strip a Donor/VIP
+ * secondary on every auto-promotion. We reuse the same `user.rank_changed`
+ * audit action so the trail stays uniform, and the meta records that the
+ * engine (not a human) made the move.
+ *
+ * The write is a claim on the user as the evaluator read them (#826): still
+ * active, still on the rank the step starts from, and neither locked nor under
+ * an active warning. A batch is read up to 500 users before it is written, so
+ * without the claim a staff rank change, lock or warning made in between was
+ * overwritten by a decision taken before it. A rank deleted in between answers
+ * P2003, and is left for the next sweep's ladder to settle.
  */
 const applyRankChange = async (
-  userId: number,
+  user: SweepUser,
   result: RankProgressionResult,
   systemActorId: number
-): Promise<void> => {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { userRankId: result.targetRankId }
-  });
+): Promise<boolean> => {
+  const now = new Date();
+  let count: number;
+  try {
+    ({ count } = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        userRankId: user.userRankId,
+        disabled: false,
+        rankLocked: false,
+        warnings: {
+          none: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }
+        }
+      },
+      data: { userRankId: result.targetRankId }
+    }));
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2003'
+    )
+      return false;
+    throw err;
+  }
+  if (count === 0) return false;
 
-  await audit(prisma, systemActorId, 'user.rank_changed', 'User', userId, {
+  await audit(prisma, systemActorId, 'user.rank_changed', 'User', user.id, {
     userRankId: result.targetRankId,
     auto: true,
     direction: result.direction,
@@ -181,7 +214,7 @@ const applyRankChange = async (
 
   await prisma.notification.create({
     data: {
-      userId,
+      userId: user.id,
       type:
         result.direction === 'promote'
           ? NotificationType.rank_promoted
@@ -194,6 +227,7 @@ const applyRankChange = async (
       pageId: result.targetRankId
     }
   });
+  return true;
 };
 
 export type SweepResult = {
@@ -233,7 +267,13 @@ const sweepOne = async (
   const result = evaluateRankChange(input, ladder.rules, ladder.ranks);
   if (result.direction === 'none') return 'none';
 
-  await applyRankChange(user.id, result, systemActorId);
+  if (!(await applyRankChange(user, result, systemActorId))) {
+    log.info('Auto rank change skipped: the user changed since it was read', {
+      userId: user.id,
+      direction: result.direction
+    });
+    return 'none';
+  }
   log.info('Auto rank change', {
     userId: user.id,
     direction: result.direction,

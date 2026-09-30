@@ -18,6 +18,7 @@
  *    non-null actorId, and nothing in this tree prunes auditLog, so the marker
  *    is both exclusive and durable.
  */
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { getLogger } from './logging';
@@ -114,17 +115,46 @@ const loadBatch = async (cursor: number | undefined): Promise<Candidate[]> => {
 };
 
 /**
- * Send the warning and stamp it.
+ * The account exactly as `decision` read it (#825). A batch is read up to 500
+ * accounts before it is written, and every write waits on mail, so the member
+ * can sign in — or staff can make them a donor, lock their rank or promote them
+ * — in between. Each write therefore claims the row with this filter and acts
+ * only when the claim lands. `dateRegistered` never changes, and the
+ * admin-created marker is an audit row nothing prunes, so neither is re-checked.
+ */
+const asRead = (user: Candidate): Prisma.UserWhereInput => ({
+  id: user.id,
+  disabled: false,
+  isDonor: false,
+  rankLocked: false,
+  userRank: { level: { lt: STAFF_LEVEL } },
+  lastLogin: user.lastLogin,
+  reactivatedAt: user.reactivatedAt,
+  inactivityWarnedAt: user.inactivityWarnedAt
+});
+
+/**
+ * Stamp the warning, then send it. Answers whether it was sent.
  *
- * The stamp is written whether or not the email left the building. That is a
+ * The stamp is claimed FIRST (#825). Stamped after the notices, it could land
+ * just after a sign-in had cleared it: the member was then warned while active,
+ * and a later dormancy disabled them off that stale stamp with no fresh warning.
+ *
+ * The stamp stands whether or not the email left the building. That is a
  * deliberate call (#279): the System PM is the notice of record, and it is
  * delivered here because the account is not disabled yet — `sendSystemMessage`
- * refuses disabled recipients, so this ordering is the only one that works.
- * On a deployment with no SMTP configured the email is a no-op and the member
+ * refuses disabled recipients, so the PM has to precede any disable. On a
+ * deployment with no SMTP configured the email is a no-op and the member
  * is told only through a channel they must sign in to read; `dryRun` plus the
  * per-cycle cap are what bound that.
  */
-const applyWarn = async (user: Candidate): Promise<void> => {
+const applyWarn = async (user: Candidate): Promise<boolean> => {
+  const { count } = await prisma.user.updateMany({
+    where: asRead(user),
+    data: { inactivityWarnedAt: new Date() }
+  });
+  if (count === 0) return false;
+
   const grace = DISABLE_AFTER_DAYS - WARN_AFTER_DAYS;
   await sendSystemMessage(user.id, WARN_SUBJECT, warnBody(grace)).catch((err) =>
     log.error('Inactivity warning PM failed', { userId: user.id, err })
@@ -132,36 +162,42 @@ const applyWarn = async (user: Candidate): Promise<void> => {
   await sendInactivityWarningEmail(user.email, grace).catch((err) =>
     log.error('Inactivity warning email failed', { userId: user.id, err })
   );
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { inactivityWarnedAt: new Date() }
-  });
+  return true;
 };
 
 /**
- * Disable the account and tell them how to get it back.
+ * Disable the account, then tell them how to get it back. Answers whether it
+ * was disabled.
  *
- * Order is load-bearing: the final email goes out BEFORE the update, because
- * once `disabled` is true the member has no readable channel left. Sessions are
- * revoked because a live cookie would otherwise keep working until it expires,
- * even though the auth middleware also rejects disabled users.
+ * The disable is claimed FIRST (#825), so only a member it actually disabled is
+ * told it did. The email can follow the write because the mailer never reads
+ * `disabled`. Sessions are revoked because a live cookie would otherwise keep
+ * working until it expires, even though the auth middleware also rejects
+ * disabled users; they are revoked only when the claim lands, since a member
+ * who signed in meanwhile must keep the session they just made.
  */
 const applyDisable = async (
   user: Candidate,
   reason: string,
   systemActorId: number
-): Promise<void> => {
+): Promise<boolean> => {
+  const claimed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.user.updateMany({
+      where: asRead(user),
+      data: { disabled: true }
+    });
+    if (count === 0) return false;
+    await tx.userSession.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+    return true;
+  });
+  if (!claimed) return false;
+
   await sendInactivityDisabledEmail(user.email).catch((err) =>
     log.error('Deactivation email failed', { userId: user.id, err })
   );
-
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { disabled: true } }),
-    prisma.userSession.updateMany({
-      where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() }
-    })
-  ]);
 
   // Same `user.disabled` action a staff disable writes, so the trail stays
   // uniform; the metadata is what says the engine did it and why.
@@ -169,6 +205,7 @@ const applyDisable = async (
     by: 'inactivityJob',
     reason
   });
+  return true;
 };
 
 interface Tally {
@@ -177,6 +214,8 @@ interface Tally {
   deferred: number;
   /** Accounts whose decision threw; each was logged and skipped. */
   failed: number;
+  /** Accounts that changed after they were read, so were left alone (#825). */
+  stale: number;
 }
 
 /**
@@ -202,10 +241,19 @@ const applyDecision = async (
       tally.deferred += 1;
       return;
     }
-    if (mode === 'on') await applyDisable(user, decision.reason, systemActorId);
+    if (
+      mode === 'on' &&
+      !(await applyDisable(user, decision.reason, systemActorId))
+    ) {
+      tally.stale += 1;
+      return;
+    }
     tally.disabled += 1;
   } else {
-    if (mode === 'on') await applyWarn(user);
+    if (mode === 'on' && !(await applyWarn(user))) {
+      tally.stale += 1;
+      return;
+    }
     tally.warned += 1;
   }
 
@@ -241,7 +289,13 @@ const decideOne = async (
 export const runInactivityCycle = async (
   now: Date = new Date()
 ): Promise<Tally> => {
-  const tally: Tally = { warned: 0, disabled: 0, deferred: 0, failed: 0 };
+  const tally: Tally = {
+    warned: 0,
+    disabled: 0,
+    deferred: 0,
+    failed: 0,
+    stale: 0
+  };
   const mode = inactivityConfig.mode;
   if (mode === 'off') return tally;
 

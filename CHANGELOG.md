@@ -98,6 +98,12 @@ All notable changes to stellar-api are documented here.
   - **`recomputeVoteAggregate` moves** from `top10.ts` into `releaseWorkbench/votes.ts`, beside the vote write that is its only caller.
   - **Resolved:** both sites are guarded. The contract is unchanged.
 
+- **The dormancy and rank sweeps no longer act on a member who changed after they were read** (#825, #826, the thirtieth and thirty-first guard-coverage burn-downs under ADR-0048: `inactivityJob.ts` and `rankProgressionJob.ts`). Each sweep reads up to 500 members, then writes each in turn, so a member can change in between.
+  - **A member who signed in meanwhile** could be disabled, losing the session they had just made. Or their warning stamp, which the sign-in had cleared, came back, and a later dormancy disabled them with no fresh warning. Each inactivity write is now a claim on the account exactly as it was read, and a missed claim is counted as `stale`. The same holds for a member staff made a donor, rank-locked, promoted to staff or reinstated.
+  - **The deactivation email now follows the disable,** so only a member who was actually disabled is told so ([ADR-0038](docs/adr/0038-inactivity-is-a-clock-not-a-timestamp.md), amended). The warning stamp is likewise claimed before its notices go out.
+  - **A rank change, rank lock, warning or disable** that staff made meanwhile was overwritten by the rank sweep's older decision. That write is now a claim too. A rank deleted meanwhile no longer logs an error; the next sweep settles it.
+  - **Resolved:** all 4 sites. 3 become conditional claims, and the rank-change notification is recorded as internally derived. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

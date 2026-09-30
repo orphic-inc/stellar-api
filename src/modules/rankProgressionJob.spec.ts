@@ -5,6 +5,7 @@
  * ladder mapping, the system-actor gate, and — most importantly — that an auto
  * change is a primary-rank-only update that never touches secondary ranks.
  */
+import { Prisma } from '@prisma/client';
 import { prismaMock, resetApiTestState } from '../test/apiTestHarness';
 
 jest.mock('./ratio', () => ({
@@ -23,6 +24,21 @@ const mockedEligibleBytes = getEligibleContributionBytes as jest.Mock;
 beforeEach(() => {
   resetApiTestState();
   mockedEligibleBytes.mockReset();
+  // Every claim lands unless a test says otherwise (#826).
+  prismaMock.user.updateMany.mockResolvedValue({ count: 1 } as never);
+});
+
+/** The claim on a user as the sweep read them (#826). */
+const claimOn = (id: number, userRankId: number) => ({
+  id,
+  userRankId,
+  disabled: false,
+  rankLocked: false,
+  warnings: {
+    none: {
+      OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }]
+    }
+  }
 });
 
 // A four-rung ladder: User(1)→Member(2), plus assigned Staff(8)/SysOp(9).
@@ -138,8 +154,8 @@ describe('runRankProgressionSweep', () => {
 
     expect(result).toEqual({ scanned: 1, promoted: 1, demoted: 0, failed: 0 });
     // Primary rank moved to Member (id 2)…
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: 5 },
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: claimOn(5, 1),
       data: { userRankId: 2 }
     });
     // …and the secondary-rank set was left untouched (the setUserRank trap).
@@ -190,7 +206,7 @@ describe('runRankProgressionSweep', () => {
     const result = await runRankProgressionSweep();
 
     expect(result).toEqual({ scanned: 1, promoted: 0, demoted: 0, failed: 0 });
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
 
@@ -209,7 +225,7 @@ describe('runRankProgressionSweep', () => {
     const result = await runRankProgressionSweep();
 
     expect(result.promoted).toBe(0);
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
   });
 
   // One user's failure used to abandon the sweep, so everyone later in the
@@ -225,17 +241,56 @@ describe('runRankProgressionSweep', () => {
     prismaMock.contribution.count.mockResolvedValue(0 as never);
     prismaMock.contribution.findMany.mockResolvedValue([] as never);
     prismaMock.userWarning.count.mockResolvedValue(0 as never);
-    prismaMock.user.update.mockRejectedValueOnce(
-      new Error('Record to update not found')
+    prismaMock.user.updateMany.mockRejectedValueOnce(
+      new Error('connection lost')
     );
 
     const result = await runRankProgressionSweep();
 
     expect(result).toEqual({ scanned: 2, promoted: 1, demoted: 0, failed: 1 });
-    expect(prismaMock.user.update).toHaveBeenLastCalledWith({
-      where: { id: 6 },
+    expect(prismaMock.user.updateMany).toHaveBeenLastCalledWith({
+      where: claimOn(6, 1),
       data: { userRankId: 2 }
     });
+  });
+
+  it('leaves a user who changed after the read, and says nothing', async () => {
+    // Staff changed their rank, locked it or warned them meanwhile (#826).
+    mockSweepFor(promotingUser, {
+      eligibleBytes: 20n * GiB,
+      contributionCount: 0,
+      qualityCount: 0,
+      distinctReleases: 0,
+      activeWarnings: 0
+    });
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 } as never);
+
+    const result = await runRankProgressionSweep();
+
+    expect(result).toEqual({ scanned: 1, promoted: 0, demoted: 0, failed: 0 });
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    expect(prismaMock.notification.create).not.toHaveBeenCalled();
+  });
+
+  it('leaves the user for the next sweep when the target rank was deleted', async () => {
+    mockSweepFor(promotingUser, {
+      eligibleBytes: 20n * GiB,
+      contributionCount: 0,
+      qualityCount: 0,
+      distinctReleases: 0,
+      activeWarnings: 0
+    });
+    prismaMock.user.updateMany.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('FK', {
+        code: 'P2003',
+        clientVersion: 'test'
+      })
+    );
+
+    const result = await runRankProgressionSweep();
+
+    expect(result).toEqual({ scanned: 1, promoted: 0, demoted: 0, failed: 0 });
+    expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
 
   it('no-ops when there is no SysOp actor to attribute changes to', async () => {

@@ -1,8 +1,8 @@
 /**
  * Unit tests for the inactivity sweep wiring. The decision logic belongs to the
  * pure evaluator (inactivity.spec.ts); this pins the DB-bound shell — the mode
- * gate, the per-cycle cap, the ordering that makes the notices deliverable, and
- * the admin-created lookup.
+ * gate, the per-cycle cap, the claims that keep a stale read from acting (#825),
+ * the ordering that makes the notices deliverable, and the admin-created lookup.
  *
  * Mode is re-read from the config module per test rather than set once, because
  * the whole point of `off` being the default is that it is load-bearing.
@@ -77,8 +77,12 @@ beforeEach(() => {
   // resolveSystemActorId's lookup, then the candidate batches.
   prismaMock.user.findFirst.mockResolvedValue({ id: 1 } as never);
   prismaMock.auditLog.findMany.mockResolvedValue([] as never);
-  prismaMock.user.update.mockResolvedValue({} as never);
-  prismaMock.$transaction.mockResolvedValue([] as never);
+  // Every claim lands unless a test says otherwise; the disable's interactive
+  // transaction runs its callback against the same mock.
+  prismaMock.user.updateMany.mockResolvedValue({ count: 1 } as never);
+  prismaMock.userSession.updateMany.mockResolvedValue({ count: 1 } as never);
+  prismaMock.$transaction.mockImplementation(((fn: (tx: unknown) => unknown) =>
+    fn(prismaMock)) as never);
 });
 
 const givenBatch = (...rows: unknown[]) => {
@@ -101,10 +105,11 @@ describe('runInactivityCycle — the mode gate', () => {
       warned: 0,
       disabled: 0,
       deferred: 0,
-      failed: 0
+      failed: 0,
+      stale: 0
     });
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
   });
 
   it('counts but writes nothing in dryRun', async () => {
@@ -119,7 +124,7 @@ describe('runInactivityCycle — the mode gate', () => {
     expect(result.warned).toBe(1);
     // THE ASSERTION THAT CARRIES THE MODE. Without it the test passes whether
     // or not dryRun wrote to the database.
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
     expect(sendInactivityDisabledEmail).not.toHaveBeenCalled();
     expect(sendSystemMessage).not.toHaveBeenCalled();
@@ -136,13 +141,33 @@ describe('runInactivityCycle — the mode gate', () => {
   });
 });
 
+/** The claim filter for a row as loadBatch read it (#825). */
+const claimOn = (
+  row: Omit<ReturnType<typeof disableRow>, 'inactivityWarnedAt'> & {
+    inactivityWarnedAt: Date | null;
+  }
+) => ({
+  id: row.id,
+  disabled: false,
+  isDonor: false,
+  rankLocked: false,
+  userRank: { level: { lt: 500 } },
+  lastLogin: row.lastLogin,
+  reactivatedAt: row.reactivatedAt,
+  inactivityWarnedAt: row.inactivityWarnedAt
+});
+
 describe('runInactivityCycle — applying a warn', () => {
-  it('sends the PM and the email, then stamps', async () => {
+  it('claims the stamp, then sends the PM and the email', async () => {
     givenBatch(warnRow(3));
 
     const result = await runInactivityCycle(NOW);
 
     expect(result.warned).toBe(1);
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: claimOn(warnRow(3)),
+      data: { inactivityWarnedAt: expect.any(Date) }
+    });
     expect(sendSystemMessage).toHaveBeenCalledWith(
       3,
       expect.any(String),
@@ -152,10 +177,12 @@ describe('runInactivityCycle — applying a warn', () => {
       'u3@example.com',
       10
     );
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: 3 },
-      data: { inactivityWarnedAt: expect.any(Date) }
-    });
+    // Stamped first, so a stamp can never land on a member whose sign-in
+    // cleared it after the notices went out (#825).
+    const stampOrder = prismaMock.user.updateMany.mock.invocationCallOrder[0];
+    const pmOrder = (sendSystemMessage as jest.Mock).mock
+      .invocationCallOrder[0];
+    expect(stampOrder).toBeLessThan(pmOrder);
   });
 
   it('stamps even when the email could not be sent', async () => {
@@ -164,28 +191,46 @@ describe('runInactivityCycle — applying a warn', () => {
     (sendInactivityWarningEmail as jest.Mock).mockResolvedValue(false);
     givenBatch(warnRow(3));
 
-    await runInactivityCycle(NOW);
+    const result = await runInactivityCycle(NOW);
 
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: 3 },
-      data: { inactivityWarnedAt: expect.any(Date) }
-    });
+    expect(result.warned).toBe(1);
+    expect(prismaMock.user.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing when the member changed after the read', async () => {
+    // The claim missed: they signed in, or staff exempted them, meanwhile.
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 } as never);
+    givenBatch(warnRow(3));
+
+    const result = await runInactivityCycle(NOW);
+
+    expect(result).toMatchObject({ warned: 0, stale: 1, failed: 0 });
+    expect(sendSystemMessage).not.toHaveBeenCalled();
+    expect(sendInactivityWarningEmail).not.toHaveBeenCalled();
   });
 });
 
 describe('runInactivityCycle — applying a disable', () => {
-  it('emails BEFORE disabling, and audits as the engine', async () => {
+  it('disables and revokes sessions BEFORE emailing, and audits as the engine', async () => {
     givenBatch(disableRow(2));
 
     const result = await runInactivityCycle(NOW);
 
     expect(result.disabled).toBe(1);
-    // Ordering is load-bearing: once `disabled` is true the member has no
-    // readable channel left, so the notice has to precede the write.
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: claimOn(disableRow(2)),
+      data: { disabled: true }
+    });
+    expect(prismaMock.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 2, revokedAt: null },
+      data: { revokedAt: expect.any(Date) }
+    });
+    // Claimed first, so only a member the sweep actually disabled is told it
+    // did (#825). The mailer never reads `disabled`, so the email still arrives.
+    const writeOrder = prismaMock.user.updateMany.mock.invocationCallOrder[0];
     const emailOrder = (sendInactivityDisabledEmail as jest.Mock).mock
       .invocationCallOrder[0];
-    const writeOrder = prismaMock.$transaction.mock.invocationCallOrder[0];
-    expect(emailOrder).toBeLessThan(writeOrder);
+    expect(writeOrder).toBeLessThan(emailOrder);
 
     // Asserted positionally past the client argument: the deep Prisma mock is a
     // proxy, and matching it is not what this test is about. The actor is the
@@ -199,6 +244,31 @@ describe('runInactivityCycle — applying a disable', () => {
     expect(targetId).toBe(2);
     expect(meta).toMatchObject({ by: 'inactivityJob' });
   });
+
+  it('leaves the member alone when they changed after the read', async () => {
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 } as never);
+    givenBatch(disableRow(2));
+
+    const result = await runInactivityCycle(NOW);
+
+    expect(result).toMatchObject({ disabled: 0, stale: 1, failed: 0 });
+    // A member who signed in meanwhile keeps the session they just made.
+    expect(prismaMock.userSession.updateMany).not.toHaveBeenCalled();
+    expect(sendInactivityDisabledEmail).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it('does not spend the cap on a claim that missed', async () => {
+    mutableConfig.maxDisablesPerCycle = 1;
+    prismaMock.user.updateMany
+      .mockResolvedValueOnce({ count: 0 } as never)
+      .mockResolvedValue({ count: 1 } as never);
+    givenBatch(disableRow(2), disableRow(3));
+
+    const result = await runInactivityCycle(NOW);
+
+    expect(result).toMatchObject({ disabled: 1, stale: 1, deferred: 0 });
+  });
 });
 
 // One account's failure used to abandon the cycle, so every account later in
@@ -207,23 +277,30 @@ describe('runInactivityCycle — applying a disable', () => {
 describe('runInactivityCycle — a failing account', () => {
   it('keeps going past a user whose warn write throws', async () => {
     givenBatch(warnRow(2), warnRow(3));
-    prismaMock.user.update
-      .mockRejectedValueOnce(new Error('Record to update not found'))
-      .mockResolvedValue({} as never);
+    prismaMock.user.updateMany
+      .mockRejectedValueOnce(new Error('connection lost'))
+      .mockResolvedValue({ count: 1 } as never);
 
     const result = await runInactivityCycle(NOW);
 
-    expect(result).toEqual({ warned: 1, disabled: 0, deferred: 0, failed: 1 });
-    expect(prismaMock.user.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({ where: { id: 3 } })
+    expect(result).toEqual({
+      warned: 1,
+      disabled: 0,
+      deferred: 0,
+      failed: 1,
+      stale: 0
+    });
+    expect(prismaMock.user.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: claimOn(warnRow(3)) })
     );
   });
 
   it('keeps going past a user whose disable throws', async () => {
     givenBatch(disableRow(2), disableRow(3));
     prismaMock.$transaction
-      .mockRejectedValueOnce(new Error('Record to update not found'))
-      .mockResolvedValue([] as never);
+      .mockRejectedValueOnce(new Error('connection lost'))
+      .mockImplementation(((fn: (tx: unknown) => unknown) =>
+        fn(prismaMock)) as never);
 
     const result = await runInactivityCycle(NOW);
 

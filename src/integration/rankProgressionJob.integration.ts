@@ -5,6 +5,7 @@ import {
   RegistrationStatus
 } from '@prisma/client';
 import { truncateAll, testPrisma } from '../test/dbHelpers';
+import { prisma } from '../lib/prisma';
 import { seedRanks, seedRankPromotionRules } from '../modules/bootstrap';
 import { createContributionSubmission } from '../modules/contribution';
 import { runRankProgressionSweep } from '../modules/rankProgressionJob';
@@ -24,6 +25,8 @@ beforeEach(async () => {
   await seedRanks(testPrisma);
   await seedRankPromotionRules(testPrisma);
 });
+
+afterEach(() => jest.restoreAllMocks());
 
 afterAll(async () => {
   await testPrisma.$disconnect();
@@ -197,5 +200,117 @@ describe('runRankProgressionSweep', () => {
       (await testPrisma.user.findUniqueOrThrow({ where: { id: eligible.id } }))
         .userRankId
     ).toBe(userLevel);
+  });
+
+  // #826: the sweep reads a batch, then writes each user in turn, so staff can
+  // act on a user in between. Each case plants that staff action in the
+  // database and hands the sweep the row as it was before it.
+  describe('a user staff changed after the sweep read them', () => {
+    const staleDemotion = async () => {
+      const sysop = await createUserAt(1000);
+      const member = await createUserAt(150, { ageDays: 60 });
+      const asRead = {
+        id: member.id,
+        userRankId: member.userRankId,
+        consumed: member.consumed,
+        dateRegistered: member.dateRegistered,
+        rankLocked: false
+      };
+      jest
+        .spyOn(prisma.user, 'findMany')
+        .mockImplementationOnce((() => Promise.resolve([asRead])) as never);
+      return { sysop, member };
+    };
+
+    const expectUntouched = async (memberId: number, rankId: number) => {
+      const result = await runRankProgressionSweep();
+      expect(result).toEqual({
+        scanned: 1,
+        promoted: 0,
+        demoted: 0,
+        failed: 0
+      });
+      expect(
+        (await testPrisma.user.findUniqueOrThrow({ where: { id: memberId } }))
+          .userRankId
+      ).toBe(rankId);
+      expect(
+        await testPrisma.notification.count({ where: { userId: memberId } })
+      ).toBe(0);
+      expect(
+        await testPrisma.auditLog.count({
+          where: { action: 'user.rank_changed' }
+        })
+      ).toBe(0);
+    };
+
+    it('keeps a rank staff set meanwhile', async () => {
+      const { member } = await staleDemotion();
+      const staffRank = await rankIdByLevel(500);
+      await testPrisma.user.update({
+        where: { id: member.id },
+        data: { userRankId: staffRank }
+      });
+
+      await expectUntouched(member.id, staffRank);
+    });
+
+    it('keeps a rank staff locked meanwhile', async () => {
+      const { member } = await staleDemotion();
+      await testPrisma.user.update({
+        where: { id: member.id },
+        data: { rankLocked: true }
+      });
+
+      await expectUntouched(member.id, member.userRankId);
+    });
+
+    it('keeps the rank of a user staff disabled meanwhile', async () => {
+      const { member } = await staleDemotion();
+      await testPrisma.user.update({
+        where: { id: member.id },
+        data: { disabled: true }
+      });
+
+      await expectUntouched(member.id, member.userRankId);
+    });
+
+    it('keeps the rank of a user staff warned meanwhile', async () => {
+      const { sysop, member } = await staleDemotion();
+      // The sweep's own warning count ran before the warning existed.
+      jest
+        .spyOn(prisma.userWarning, 'count')
+        .mockImplementationOnce((() => Promise.resolve(0)) as never);
+      await testPrisma.userWarning.create({
+        data: {
+          userId: member.id,
+          warnedById: sysop.id,
+          reason: 'x',
+          expiresAt: new Date(Date.now() + 86_400_000)
+        }
+      });
+
+      await expectUntouched(member.id, member.userRankId);
+    });
+
+    it('still demotes when the only warning has expired', async () => {
+      const { sysop, member } = await staleDemotion();
+      await testPrisma.userWarning.create({
+        data: {
+          userId: member.id,
+          warnedById: sysop.id,
+          reason: 'x',
+          expiresAt: new Date(Date.now() - 86_400_000)
+        }
+      });
+
+      const result = await runRankProgressionSweep();
+
+      expect(result.demoted).toBe(1);
+      expect(
+        (await testPrisma.user.findUniqueOrThrow({ where: { id: member.id } }))
+          .userRankId
+      ).toBe(await rankIdByLevel(100));
+    });
   });
 });
