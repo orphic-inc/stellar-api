@@ -41,8 +41,7 @@ import {
   getTopReleases,
   getTopTags,
   getTopUsers,
-  getTopVotedReleases,
-  recomputeVoteAggregate
+  getTopVotedReleases
 } from './top10';
 
 describe('getTopReleases', () => {
@@ -334,34 +333,6 @@ describe('getTopVotedReleases', () => {
       total: 100,
       score: 0.91,
       positivePercent: 95
-    });
-  });
-});
-
-describe('recomputeVoteAggregate', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  it('recomputes ups, totals, and binomial score before upserting', async () => {
-    prismaMock.releaseVote.count
-      .mockResolvedValueOnce(10) // total
-      .mockResolvedValueOnce(7); // ups
-    prismaMock.releaseVoteAggregate.upsert.mockResolvedValue(undefined);
-
-    await recomputeVoteAggregate(5);
-
-    expect(prismaMock.releaseVoteAggregate.upsert).toHaveBeenCalledWith({
-      where: { releaseId: 5 },
-      create: expect.objectContaining({
-        releaseId: 5,
-        ups: 7,
-        total: 10,
-        score: expect.any(Number)
-      }),
-      update: expect.objectContaining({
-        ups: 7,
-        total: 10,
-        score: expect.any(Number)
-      })
     });
   });
 });

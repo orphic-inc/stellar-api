@@ -11,9 +11,10 @@ const prismaMock = {
   releaseVote: {
     findUnique: jest.fn(),
     upsert: jest.fn(),
-    deleteMany: jest.fn()
+    deleteMany: jest.fn(),
+    count: jest.fn()
   },
-  releaseVoteAggregate: { findUnique: jest.fn() },
+  releaseVoteAggregate: { findUnique: jest.fn(), upsert: jest.fn() },
   releaseTag: {
     create: jest.fn(),
     findFirst: jest.fn(),
@@ -63,8 +64,10 @@ jest.mock('./settings', () => ({
   getSettings: jest.fn()
 }));
 
+// A plain function: resetMocks would strip a factory jest.fn. The aggregate
+// recount itself lives in releaseWorkbench/votes.ts (#819).
 jest.mock('./top10', () => ({
-  recomputeVoteAggregate: jest.fn()
+  binomialScore: () => 0.5
 }));
 
 import { Prisma, RegistrationStatus, FileType } from '@prisma/client';
@@ -72,7 +75,6 @@ import { releaseWorkbench } from './releaseWorkbench';
 import { getUserRankAccess } from '../lib/userRankAccess';
 import { addContributionToRelease } from './contribution';
 import { getSettings } from './settings';
-import { recomputeVoteAggregate } from './top10';
 
 const getUserRankAccessMock = getUserRankAccess as jest.MockedFunction<
   typeof getUserRankAccess
@@ -82,8 +84,6 @@ const addContributionToReleaseMock =
     typeof addContributionToRelease
   >;
 const getSettingsMock = getSettings as jest.MockedFunction<typeof getSettings>;
-const recomputeVoteAggregateMock =
-  recomputeVoteAggregate as jest.MockedFunction<typeof recomputeVoteAggregate>;
 
 const makeRelease = (overrides: Record<string, unknown> = {}) => ({
   id: 3,
@@ -222,6 +222,9 @@ describe('releaseWorkbench session', () => {
       .mockResolvedValueOnce({ id: 3 } as never)
       .mockResolvedValueOnce(makeRelease() as never);
     prismaMock.releaseVote.upsert.mockResolvedValue({} as never);
+    prismaMock.releaseVote.count
+      .mockResolvedValueOnce(10 as never) // total
+      .mockResolvedValueOnce(7 as never); // ups
     prismaMock.releaseVote.findUnique.mockResolvedValue({
       positive: true
     } as never);
@@ -239,13 +242,61 @@ describe('releaseWorkbench session', () => {
     });
     const view = await session.vote({ direction: 'up' });
 
-    expect(recomputeVoteAggregateMock).toHaveBeenCalledWith(3);
+    // The aggregate is recounted from the votes and upserted (#819).
+    expect(prismaMock.releaseVoteAggregate.upsert).toHaveBeenCalledWith({
+      where: { releaseId: 3 },
+      create: { releaseId: 3, ups: 7, total: 10, score: 0.5 },
+      update: { ups: 7, total: 10, score: 0.5 }
+    });
     expect(view.myVote).toBe('up');
     expect(view.release.voteAggregate).toEqual({
       releaseId: 3,
       ups: 2,
       total: 3,
       score: 0.5
+    });
+  });
+
+  const releaseVanished = () =>
+    new Prisma.PrismaClientKnownRequestError('fk', {
+      code: 'P2003',
+      clientVersion: 'test'
+    });
+
+  it('answers 404 when the release vanished before a vote (#818)', async () => {
+    prismaMock.contribution.findFirst.mockResolvedValue(null as never);
+    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.releaseVote.upsert.mockRejectedValue(releaseVanished());
+
+    const session = await releaseWorkbench.open({
+      actorId: 7,
+      communityId: 1,
+      releaseId: 3
+    });
+
+    await expect(session.vote({ direction: 'up' })).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Release not found'
+    });
+    expect(prismaMock.releaseVoteAggregate.upsert).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 when the release vanished before a cleared vote was recounted (#819)', async () => {
+    prismaMock.contribution.findFirst.mockResolvedValue(null as never);
+    prismaMock.release.findFirst.mockResolvedValue({ id: 3 } as never);
+    prismaMock.releaseVote.deleteMany.mockResolvedValue({ count: 1 } as never);
+    prismaMock.releaseVote.count.mockResolvedValue(0 as never);
+    prismaMock.releaseVoteAggregate.upsert.mockRejectedValue(releaseVanished());
+
+    const session = await releaseWorkbench.open({
+      actorId: 7,
+      communityId: 1,
+      releaseId: 3
+    });
+
+    await expect(session.vote({ direction: 'clear' })).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Release not found'
     });
   });
 

@@ -641,23 +641,6 @@ export async function getTopVotedReleases(
   });
 }
 
-// ─── Vote mutations ───────────────────────────────────────────────────────────
-
-export async function recomputeVoteAggregate(releaseId: number): Promise<void> {
-  const [total, ups] = await Promise.all([
-    prisma.releaseVote.count({ where: { releaseId } }),
-    prisma.releaseVote.count({ where: { releaseId, positive: true } })
-  ]);
-
-  const score = binomialScore(ups, total);
-
-  await prisma.releaseVoteAggregate.upsert({
-    where: { releaseId },
-    create: { releaseId, ups, total, score },
-    update: { ups, total, score }
-  });
-}
-
 // ─── History ──────────────────────────────────────────────────────────────────
 
 export async function getHistorySnapshot(
