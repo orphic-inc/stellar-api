@@ -211,41 +211,20 @@ describe('getReport', () => {
 describe('claimReport', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('returns reason variants and claims open reports', async () => {
-    prismaMock.report.findUnique.mockResolvedValueOnce(null);
-    await expect(claimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'not_found'
-    });
+  it('claims with a compare-and-swap: not resolved, and unclaimed or mine', async () => {
+    prismaMock.report.updateMany.mockResolvedValueOnce({ count: 1 });
 
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Resolved',
-      claimedById: null
-    });
-    await expect(claimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'resolved'
-    });
-
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Open',
-      claimedById: 9
-    });
-    await expect(claimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'already_claimed'
-    });
-
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Open',
-      claimedById: null
-    });
-    prismaMock.report.update.mockResolvedValue(undefined);
     await expect(claimReport(1, 7)).resolves.toEqual({ ok: true });
-    expect(prismaMock.report.update).toHaveBeenCalledWith({
-      where: { id: 1 },
+
+    expect(prismaMock.report.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 1,
+        status: { not: 'Resolved' },
+        OR: [{ claimedById: null }, { claimedById: 7 }]
+      },
       data: { status: 'Claimed', claimedById: 7, claimedAt: expect.any(Date) }
     });
+    expect(prismaMock.report.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -256,44 +235,37 @@ describe('claimReport', () => {
       })
     );
   });
+
+  it.each([
+    ['not_found', null],
+    // A report resolved after the caller loaded it stays resolved (#802).
+    ['resolved', { status: 'Resolved', claimedById: null }],
+    // Another staff member claimed it first.
+    ['already_claimed', { status: 'Claimed', claimedById: 9 }],
+    // It changed back meanwhile; the caller's claim still did not land.
+    ['already_claimed', { status: 'Open', claimedById: null }]
+  ])(
+    'answers %s when the swap misses, writing no audit',
+    async (reason, now) => {
+      prismaMock.report.updateMany.mockResolvedValueOnce({ count: 0 });
+      prismaMock.report.findUnique.mockResolvedValueOnce(now);
+
+      await expect(claimReport(1, 7)).resolves.toEqual({ ok: false, reason });
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('unclaimReport', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('returns reason variants and unclaims owned reports', async () => {
-    prismaMock.report.findUnique.mockResolvedValueOnce(null);
-    await expect(unclaimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'not_found'
-    });
+  it('unclaims with a compare-and-swap on claimed by me', async () => {
+    prismaMock.report.updateMany.mockResolvedValueOnce({ count: 1 });
 
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Open',
-      claimedById: 7
-    });
-    await expect(unclaimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'not_claimed'
-    });
-
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Claimed',
-      claimedById: 9
-    });
-    await expect(unclaimReport(1, 7)).resolves.toEqual({
-      ok: false,
-      reason: 'forbidden'
-    });
-
-    prismaMock.report.findUnique.mockResolvedValueOnce({
-      status: 'Claimed',
-      claimedById: 7
-    });
-    prismaMock.report.update.mockResolvedValue(undefined);
     await expect(unclaimReport(1, 7)).resolves.toEqual({ ok: true });
-    expect(prismaMock.report.update).toHaveBeenCalledWith({
-      where: { id: 1 },
+
+    expect(prismaMock.report.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, status: 'Claimed', claimedById: 7 },
       data: { status: 'Open', claimedById: null, claimedAt: null }
     });
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
@@ -302,6 +274,23 @@ describe('unclaimReport', () => {
       })
     );
   });
+
+  it.each([
+    ['not_found', null],
+    ['not_claimed', { status: 'Open', claimedById: null }],
+    // A report resolved after the caller loaded it stays resolved (#802).
+    ['not_claimed', { status: 'Resolved', claimedById: null }],
+    ['forbidden', { status: 'Claimed', claimedById: 9 }]
+  ])(
+    'answers %s when the swap misses, writing no audit',
+    async (reason, now) => {
+      prismaMock.report.updateMany.mockResolvedValueOnce({ count: 0 });
+      prismaMock.report.findUnique.mockResolvedValueOnce(now);
+
+      await expect(unclaimReport(1, 7)).resolves.toEqual({ ok: false, reason });
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('resolveReport', () => {

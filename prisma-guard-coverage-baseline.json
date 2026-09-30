@@ -99,7 +99,9 @@
     "src/modules/authorStylesheet.ts::adoptAuthorStylesheet::user.update": "adopterId is the session user's (POST /stylesheet/author-stylesheet/:id/adopt). User.userSettingsId is required, so the nested settings update always finds its row, and the adopted sheet was read just before. Users, user settings and author stylesheets are never hard-deleted (noHardDelete.spec.ts). #798.",
     "src/modules/ratioPolicy.ts::claimTransition::user.update": "userId is the member applyRatioRules read with findUniqueOrThrow just before. Users are never hard-deleted (noHardDelete.spec.ts). #800.",
     "src/modules/ratioPolicy.ts::state::user.update": "userId is the user read in the same transaction, which answers 404 when absent (POST /ratio-policy/:userId/override, ratio_policy_manage). Users are never hard-deleted (noHardDelete.spec.ts). #800.",
-    "src/modules/ratioPolicy.ts::written::ratioPolicyState.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"userId\") (verified on the test database, #800), so it cannot race to P2002. Its only FK is the user read in the same transaction, and users are never hard-deleted (noHardDelete.spec.ts)."
+    "src/modules/ratioPolicy.ts::written::ratioPolicyState.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"userId\") (verified on the test database, #800), so it cannot race to P2002. Its only FK is the user read in the same transaction, and users are never hard-deleted (noHardDelete.spec.ts).",
+    "src/modules/reports.ts::report::report.create": "reporterId is the session user's (POST /reports). targetId is polymorphic, not a foreign key, and Report has no unique constraint. Users are never hard-deleted (noHardDelete.spec.ts). #802.",
+    "src/modules/reports.ts::note::reportNote.create": "reportId is the report read just before, and authorId is the session user's (POST /reports/:id/notes, reports_manage). Reports and users are never hard-deleted (noHardDelete.spec.ts), and ReportNote has no unique constraint. #802."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
@@ -141,10 +143,6 @@
     "src/modules/remoteImage.ts::fail::remoteImage.update",
     "src/modules/remoteImage.ts::importRemoteImage::remoteImage.update",
     "src/modules/remoteImage.ts::recordFetchFailure::remoteImage.update",
-    "src/modules/reports.ts::claimReport::report.update",
-    "src/modules/reports.ts::note::reportNote.create",
-    "src/modules/reports.ts::report::report.create",
-    "src/modules/reports.ts::unclaimReport::report.update",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
     "src/modules/stylesheetFixtures.ts::created::authorStylesheet.create",
     "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::authorStylesheet.update",

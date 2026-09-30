@@ -59,6 +59,11 @@ All notable changes to stellar-api are documented here.
   - **The race:** the first evaluation creates the member's policy row by reading and then inserting. Two at once both inserted, and the loser failed on the key, so its evaluation was logged as failed and skipped. The loser now reads the row the winner created and evaluates as normal.
   - **Resolved:** all 4 sites. 1 is guarded, and 3 are recorded as internally derived, including the staff override's upsert, which Prisma sends as a single `INSERT … ON CONFLICT`. The contract is unchanged.
 
+- **Claiming or unclaiming a report can no longer reopen one another staff member just resolved** (#802, the fifteenth guard-coverage burn-down under ADR-0048: `reports.ts`).
+  - **The race:** claim and unclaim read the report, then wrote it without checking again. A claim that read the report before it was resolved set it back to `Claimed`, and an unclaim set it back to `Open`. Two staff claiming at once both succeeded, and the second silently took the claim.
+  - **Both are now compare-and-swaps,** as resolving already was. A claim moves only a report that is not resolved and is unclaimed or already yours, and an unclaim only one you hold. A miss answers the existing refusal: `404`, `422`, `409` for claim, or `403` for unclaim.
+  - **Resolved:** all 4 sites. 2 are closed by the compare-and-swaps, and 2 are recorded as internally derived. `noHardDelete.spec.ts` gains reports. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

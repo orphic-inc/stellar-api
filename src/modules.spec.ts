@@ -418,16 +418,12 @@ describe('reports.getReport', () => {
 
 describe('reports.claimReport', () => {
   it('claims an open report and sets status to Claimed', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({
-      status: 'Open',
-      claimedById: null
-    } as never);
-    prismaMock.report.update.mockResolvedValue({} as never);
+    prismaMock.report.updateMany.mockResolvedValue({ count: 1 } as never);
 
     const result = await claimReport(1, 7);
 
     expect(result.ok).toBe(true);
-    expect(prismaMock.report.update).toHaveBeenCalledWith(
+    expect(prismaMock.report.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'Claimed', claimedById: 7 })
       })
@@ -435,6 +431,7 @@ describe('reports.claimReport', () => {
   });
 
   it('returns not_found when report does not exist', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue(null);
     const result = await claimReport(1, 7);
     expect(result.ok).toBe(false);
@@ -442,6 +439,7 @@ describe('reports.claimReport', () => {
   });
 
   it('returns resolved when report is already resolved', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue({
       status: 'Resolved',
       claimedById: null
@@ -452,6 +450,7 @@ describe('reports.claimReport', () => {
   });
 
   it('returns already_claimed when another staff member claimed it', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue({
       status: 'Claimed',
       claimedById: 99
@@ -466,16 +465,12 @@ describe('reports.claimReport', () => {
 
 describe('reports.unclaimReport', () => {
   it('unclames a report owned by the requester', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({
-      status: 'Claimed',
-      claimedById: 7
-    } as never);
-    prismaMock.report.update.mockResolvedValue({} as never);
+    prismaMock.report.updateMany.mockResolvedValue({ count: 1 } as never);
 
     const result = await unclaimReport(1, 7);
 
     expect(result.ok).toBe(true);
-    expect(prismaMock.report.update).toHaveBeenCalledWith(
+    expect(prismaMock.report.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'Open', claimedById: null })
       })
@@ -483,6 +478,7 @@ describe('reports.unclaimReport', () => {
   });
 
   it('returns not_found when report does not exist', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue(null);
     const result = await unclaimReport(1, 7);
     expect(result.ok).toBe(false);
@@ -490,6 +486,7 @@ describe('reports.unclaimReport', () => {
   });
 
   it('returns not_claimed when report is not in Claimed status', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue({
       status: 'Open',
       claimedById: null
@@ -500,6 +497,7 @@ describe('reports.unclaimReport', () => {
   });
 
   it('returns forbidden when a different staff member tries to unclaim', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 } as never);
     prismaMock.report.findUnique.mockResolvedValue({
       status: 'Claimed',
       claimedById: 99

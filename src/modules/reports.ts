@@ -180,41 +180,75 @@ export async function getReport(
   };
 }
 
-export async function claimReport(id: number, staffUserId: number) {
-  const report = await prisma.report.findUnique({
-    where: { id },
-    select: { status: true, claimedById: true }
-  });
-  if (!report) return { ok: false as const, reason: 'not_found' };
-  if (report.status === 'Resolved')
-    return { ok: false as const, reason: 'resolved' };
-  if (report.claimedById !== null && report.claimedById !== staffUserId) {
-    return { ok: false as const, reason: 'already_claimed' };
-  }
+/** The claim fields a refusal is decided from. */
+const claimStateSelect = { status: true, claimedById: true } as const;
 
-  await prisma.report.update({
-    where: { id },
+/**
+ * Why a claim moved nothing, from the report as it now is. Only called after
+ * the compare-and-swap missed, so a report that reads as claimable changed
+ * back meanwhile, and another staff member holds it for all this caller knows.
+ */
+const claimRefusal = (
+  report: { status: ReportStatus; claimedById: number | null } | null
+) => {
+  if (!report) return 'not_found' as const;
+  if (report.status === 'Resolved') return 'resolved' as const;
+  return 'already_claimed' as const;
+};
+
+/**
+ * Claim a report. A compare-and-swap, like `resolveReport`: it moves only a
+ * report that is not resolved and is unclaimed or already this caller's, so a
+ * claim cannot reopen a report resolved after the caller loaded it, nor take
+ * one another staff member claimed meanwhile (#802).
+ */
+export async function claimReport(id: number, staffUserId: number) {
+  const { count } = await prisma.report.updateMany({
+    where: {
+      id,
+      status: { not: 'Resolved' },
+      OR: [{ claimedById: null }, { claimedById: staffUserId }]
+    },
     data: { status: 'Claimed', claimedById: staffUserId, claimedAt: new Date() }
   });
+  if (count === 0) {
+    const report = await prisma.report.findUnique({
+      where: { id },
+      select: claimStateSelect
+    });
+    return { ok: false as const, reason: claimRefusal(report) };
+  }
+
   await audit(prisma, staffUserId, 'report.claim', 'Report', id);
   return { ok: true as const };
 }
 
-export async function unclaimReport(id: number, staffUserId: number) {
-  const report = await prisma.report.findUnique({
-    where: { id },
-    select: { status: true, claimedById: true }
-  });
-  if (!report) return { ok: false as const, reason: 'not_found' };
-  if (report.status !== 'Claimed')
-    return { ok: false as const, reason: 'not_claimed' };
-  if (report.claimedById !== staffUserId)
-    return { ok: false as const, reason: 'forbidden' };
+/** Why an unclaim moved nothing, from the report as it now is. */
+const unclaimRefusal = (
+  report: { status: ReportStatus; claimedById: number | null } | null
+) => {
+  if (!report) return 'not_found' as const;
+  if (report.status !== 'Claimed') return 'not_claimed' as const;
+  return 'forbidden' as const;
+};
 
-  await prisma.report.update({
-    where: { id },
+/**
+ * Release this caller's claim. A compare-and-swap on "claimed by me", so an
+ * unclaim cannot reopen a report resolved after the caller loaded it (#802).
+ */
+export async function unclaimReport(id: number, staffUserId: number) {
+  const { count } = await prisma.report.updateMany({
+    where: { id, status: 'Claimed', claimedById: staffUserId },
     data: { status: 'Open', claimedById: null, claimedAt: null }
   });
+  if (count === 0) {
+    const report = await prisma.report.findUnique({
+      where: { id },
+      select: claimStateSelect
+    });
+    return { ok: false as const, reason: unclaimRefusal(report) };
+  }
+
   await audit(prisma, staffUserId, 'report.unclaim', 'Report', id);
   return { ok: true as const };
 }
