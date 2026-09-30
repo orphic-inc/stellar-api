@@ -124,8 +124,5 @@
     "src/modules/notificationFilters.ts::created::notificationFilter.create": "userId is the session user (POST /notification-filters), and users are never hard-deleted (noHardDelete.spec.ts). NotificationFilter carries no unique constraint, and artistIds/communityIds are plain arrays, not relations. #831.",
     "src/modules/tag.ts::tag::tag.upsert": "promoteTag's upsert has one unique field (name) in its where, a scalar update and no nested writes, so Prisma compiles it to a native INSERT … ON CONFLICT (\"name\") DO UPDATE (probed); two concurrent promotions of one new name both succeed. Tag has no foreign key the create sets. #841."
   },
-  "unreviewed": [
-    "src/modules/assetStore.ts::putAsset::asset.update",
-    "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert"
-  ]
+  "unreviewed": []
 }
