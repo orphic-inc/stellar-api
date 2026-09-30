@@ -9,6 +9,7 @@ All notable changes to stellar-api are documented here.
 ### Added
 
 - **"Invited by" on the member profile** (#849, from #638). The profile responses (`GET /profile/me`, `GET /profile/user/{userId}`, and `PUT /profile/me`) gain `invitedBy: { inviter: { id, username } | null } | null`. Only a viewer holding `invites_manage` sees it, the owner included; it is `null` for anyone else. An inner `null` inviter means nobody invited the member.
+- **The inviter, a same-IP flag and per-IP account counts in the registration log** (#850, from #638). Each `GET /users/registration-log` row gains `inviter`, which is null when nobody invited the account and otherwise carries the same fields as the row. Each row also gains `sameIp`, true when the account and its inviter hold the same IP. Both the account and its inviter gain `lastIpAccounts`, the number of accounts holding that IP, which is null when there is no IP. Every IP is the account's current one, not the one it registered from. Existing fields are unchanged.
 
 ### Fixed
 

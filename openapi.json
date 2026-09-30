@@ -1834,6 +1834,11 @@
             "type": "string",
             "nullable": true
           },
+          "lastIpAccounts": {
+            "type": "integer",
+            "nullable": true,
+            "description": "How many accounts currently hold `lastIp`, this one included. Null when `lastIp` is null."
+          },
           "userRank": {
             "type": "object",
             "properties": {
@@ -1848,6 +1853,66 @@
               "id",
               "name"
             ]
+          },
+          "inviter": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "dateRegistered": {
+                "type": "string"
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "lastIp": {
+                "type": "string",
+                "nullable": true
+              },
+              "lastIpAccounts": {
+                "type": "integer",
+                "nullable": true,
+                "description": "How many accounts currently hold `lastIp`, this one included. Null when `lastIp` is null."
+              },
+              "userRank": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "email",
+              "dateRegistered",
+              "disabled",
+              "lastIp",
+              "lastIpAccounts",
+              "userRank"
+            ],
+            "description": "Who invited this account; null when nobody did."
+          },
+          "sameIp": {
+            "type": "boolean",
+            "description": "True when this account's current IP equals its inviter's. Current IPs, not IPs at registration."
           }
         },
         "required": [
@@ -1857,7 +1922,10 @@
           "dateRegistered",
           "disabled",
           "lastIp",
-          "userRank"
+          "lastIpAccounts",
+          "userRank",
+          "inviter",
+          "sameIp"
         ]
       },
       "UserRankState": {

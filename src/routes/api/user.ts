@@ -20,6 +20,7 @@ import {
   getUserIpHistory,
   updateStaffBio
 } from '../../modules/user';
+import { getRegistrationLog } from '../../modules/registrationLog';
 import {
   generateRecoveryToken,
   persistRecoveryToken
@@ -584,26 +585,10 @@ router.get(
   '/registration-log',
   ...requirePermission('registration_log_view'),
   validateQuery(registrationLogQuerySchema),
-  authHandler(async (req, res) => {
+  authHandler(async (_req, res) => {
     const pg = parsedPage(res);
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        orderBy: { dateRegistered: 'desc' },
-        skip: pg.skip,
-        take: pg.limit,
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          dateRegistered: true,
-          disabled: true,
-          lastIp: true,
-          userRank: { select: { id: true, name: true } }
-        }
-      }),
-      prisma.user.count()
-    ]);
-    paginatedResponse(res, users, total, pg);
+    const { rows, total } = await getRegistrationLog(pg);
+    paginatedResponse(res, rows, total, pg);
   })
 );
 
