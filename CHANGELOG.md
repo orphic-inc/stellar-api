@@ -45,6 +45,11 @@ All notable changes to stellar-api are documented here.
     - What deleting a release should do is #793. No ui surface calls this route.
   - **Resolved:** all 5 sites. 2 are guarded, and 3 are recorded as internally derived. `noHardDelete.spec.ts` gains tags.
 
+- **Creating or renaming a site stylesheet onto a taken name no longer answers `500`** (#796, the twelfth guard-coverage burn-down under ADR-0048: `stylesheet.ts`).
+  - **Name taken:** it now answers **`409`** (new on `POST` and `PUT /stylesheet`). A write that races another onto the name, or onto the default, also answers `409`. A write racing a delete answers `404`.
+  - **The default can no longer be deleted by a race:** a stylesheet made default after a delete read it would have been deleted, leaving the registry with no default (#376). The delete is now conditional on the row not being the default.
+  - **Resolved:** all 5 sites.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "$comment": "Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, not a mute button: a new unguarded site fails, and an entry that becomes guarded or disappears fails as stale. `internallyDerived` records sites whose constrained ids cannot dangle (session- or internally-sourced), each with the reason — a prior read is NOT a reason, it leaves a TOCTOU window. Regenerate with: npm run prisma:guard-coverage -- --write",
-  "generated": "2026-09-29",
+  "generated": "2026-09-30",
   "internallyDerived": {
     "POST /announcements/blog::blog.create": "Blog's only foreign key is userId, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
     "POST /announcements/global-notice::globalNotice.create": "GlobalNotice's only foreign key is createdById, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
@@ -149,11 +149,6 @@
     "src/modules/reports.ts::report::report.create",
     "src/modules/reports.ts::unclaimReport::report.update",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
-    "src/modules/stylesheet.ts::createStylesheet::stylesheet.create",
-    "src/modules/stylesheet.ts::createStylesheet::stylesheet.create#2",
-    "src/modules/stylesheet.ts::deleteStylesheet::stylesheet.delete",
-    "src/modules/stylesheet.ts::updateStylesheet::stylesheet.update",
-    "src/modules/stylesheet.ts::updateStylesheet::stylesheet.update#2",
     "src/modules/stylesheetFixtures.ts::created::authorStylesheet.create",
     "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::authorStylesheet.update",
     "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::stylesheet.upsert",

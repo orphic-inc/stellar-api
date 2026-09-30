@@ -512,13 +512,15 @@ describe('DELETE /api/stylesheet/:id', () => {
     prismaMock.stylesheet.findUnique.mockResolvedValue(
       makeStylesheet({ isDefault: false }) as never
     );
-    prismaMock.stylesheet.delete.mockResolvedValue({} as never);
+    prismaMock.stylesheet.deleteMany.mockResolvedValue({ count: 1 } as never);
 
     const res = await request(app).delete('/api/stylesheet/1');
 
     expect(res.status).toBe(204);
-    expect(prismaMock.stylesheet.delete).toHaveBeenCalledWith({
-      where: { id: 1 }
+    // Conditional on isDefault: false, so a row promoted to default after the
+    // read is never deleted (#596).
+    expect(prismaMock.stylesheet.deleteMany).toHaveBeenCalledWith({
+      where: { id: 1, isDefault: false }
     });
   });
 
