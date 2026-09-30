@@ -102,8 +102,7 @@ jest.mock('../modules/topicSession', () => ({
   deleteTopic: jest.fn(),
   trashTopic: jest.fn(),
   replyToTopic: jest.fn(),
-  voteTopicPoll: jest.fn(),
-  markTopicRead: jest.fn()
+  voteTopicPoll: jest.fn()
 }));
 
 jest.mock('../modules/pm', () => ({
