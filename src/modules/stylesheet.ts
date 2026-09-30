@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 import { authorStylesheetIdFromCssUrl } from './stylesheetRegistry';
 
 type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
@@ -87,6 +88,27 @@ export const getStylesheetStats = async () => {
   }));
 };
 
+/**
+ * `Stylesheet.name` is unique, and nothing checked it before the write, so a
+ * taken name answered 500 (#596). Read first, so the answer says which
+ * constraint it was; the writes still catch the race past this read.
+ */
+const assertNameFree = async (name: string | undefined, exceptId?: number) => {
+  if (name === undefined) return;
+  const taken = await prisma.stylesheet.findUnique({
+    where: { name },
+    select: { id: true }
+  });
+  if (taken && taken.id !== exceptId)
+    throw new AppError(409, 'A stylesheet with that name already exists');
+};
+
+/** A concurrent write took the name, or was made default at the same time. */
+const CONFLICT: [number, string] = [
+  409,
+  'Another stylesheet change conflicted with this one; retry'
+];
+
 export const createStylesheet = async (data: {
   name: string;
   description: string;
@@ -94,17 +116,22 @@ export const createStylesheet = async (data: {
   isDefault: boolean;
 }) => {
   await assertDeliveryTargetResolves(data.cssUrl);
+  await assertNameFree(data.name);
 
-  if (data.isDefault) {
-    return prisma.$transaction(async (tx) => {
-      await tx.stylesheet.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false }
+  try {
+    if (data.isDefault) {
+      return await prisma.$transaction(async (tx) => {
+        await tx.stylesheet.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false }
+        });
+        return tx.stylesheet.create({ data });
       });
-      return tx.stylesheet.create({ data });
-    });
+    }
+    return await prisma.stylesheet.create({ data });
+  } catch (err) {
+    translatePrismaError(err, { P2002: CONFLICT });
   }
-  return prisma.stylesheet.create({ data });
 };
 
 export const updateStylesheet = async (
@@ -120,6 +147,7 @@ export const updateStylesheet = async (
   if (!existing) throw new AppError(404, 'Stylesheet not found');
 
   await assertDeliveryTargetResolves(data.cssUrl);
+  await assertNameFree(data.name, id);
 
   // The other half of the single-default invariant. `stylesheets_one_default`
   // enforces at most one; nothing enforced at least one, so passing
@@ -132,16 +160,23 @@ export const updateStylesheet = async (
       'Cannot unset the default stylesheet — set another as default instead'
     );
 
-  if (data.isDefault) {
-    return prisma.$transaction(async (tx) => {
-      await tx.stylesheet.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false }
+  try {
+    if (data.isDefault) {
+      return await prisma.$transaction(async (tx) => {
+        await tx.stylesheet.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false }
+        });
+        return tx.stylesheet.update({ where: { id }, data });
       });
-      return tx.stylesheet.update({ where: { id }, data });
+    }
+    return await prisma.stylesheet.update({ where: { id }, data });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: CONFLICT,
+      P2025: [404, 'Stylesheet not found']
     });
   }
-  return prisma.stylesheet.update({ where: { id }, data });
 };
 
 export const deleteStylesheet = async (id: number) => {
@@ -149,5 +184,15 @@ export const deleteStylesheet = async (id: number) => {
   if (!existing) throw new AppError(404, 'Stylesheet not found');
   if (existing.isDefault)
     throw new AppError(400, 'Cannot delete the default stylesheet');
-  await prisma.stylesheet.delete({ where: { id } });
+  // Conditional (#596): the row can be made default after the read above, and
+  // an unconditional delete would then remove the default (#376). Nothing
+  // deleted means it went, or became the default, in between.
+  const { count } = await prisma.stylesheet.deleteMany({
+    where: { id, isDefault: false }
+  });
+  if (count === 0) {
+    const now = await prisma.stylesheet.findUnique({ where: { id } });
+    if (!now) throw new AppError(404, 'Stylesheet not found');
+    throw new AppError(400, 'Cannot delete the default stylesheet');
+  }
 };

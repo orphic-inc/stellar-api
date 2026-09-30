@@ -3280,7 +3280,10 @@ registry.registerPath({
     201: {
       description: 'Stylesheet created',
       content: { 'application/json': { schema: Stylesheet } }
-    }
+    },
+    409: msgResponse(
+      'The name is taken, or a concurrent change took it or the default'
+    )
   }
 });
 
@@ -3299,7 +3302,10 @@ registry.registerPath({
       description: 'Stylesheet updated',
       content: { 'application/json': { schema: Stylesheet } }
     },
-    404: msgResponse('Not found')
+    404: msgResponse('Not found'),
+    409: msgResponse(
+      'The name is taken, or a concurrent change took it or the default'
+    )
   }
 });
 

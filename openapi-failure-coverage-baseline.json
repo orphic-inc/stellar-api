@@ -150,7 +150,6 @@
     "POST /staff-inbox/responses",
     "POST /staff-inbox/tickets",
     "POST /stats/snapshot",
-    "POST /stylesheet",
     "POST /stylesheet/author",
     "POST /subscriptions/subscribe",
     "POST /subscriptions/subscribe-comments",
