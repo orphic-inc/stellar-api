@@ -1,5 +1,5 @@
-import { prisma } from '../lib/prisma';
-import { hasPermission } from '../lib/rankPermissions';
+import { hasAnyPermission, hasPermission } from '../lib/rankPermissions';
+import { getUserRankAccess } from '../lib/userRankAccess';
 
 export type ViewerContext = {
   viewerId: number | null;
@@ -22,13 +22,8 @@ export const loadViewerContext = async (
 ): Promise<ViewerContext> => {
   if (!viewerUserId) return ANONYMOUS;
 
-  const viewer = await prisma.user.findUnique({
-    where: { id: viewerUserId },
-    select: {
-      userRank: { select: { permissions: true } }
-    }
-  });
-  const perms = (viewer?.userRank.permissions ?? {}) as Record<string, boolean>;
+  // Every rank the viewer holds, as `loadPermissions` resolves them (#855).
+  const perms = (await getUserRankAccess(viewerUserId))?.permissions ?? {};
   const canSeeInviter = hasPermission(perms, 'invites_manage');
 
   if (viewerUserId === targetUserId) {
@@ -40,13 +35,12 @@ export const loadViewerContext = async (
     };
   }
 
-  const isStaff = !!(
-    perms.staff ||
-    perms.admin ||
-    perms.users_edit ||
-    perms.users_warn ||
-    perms.users_disable
-  );
+  const isStaff = hasAnyPermission(perms, [
+    'staff',
+    'users_edit',
+    'users_warn',
+    'users_disable'
+  ]);
 
   return { viewerId: viewerUserId, isOwner: false, isStaff, canSeeInviter };
 };

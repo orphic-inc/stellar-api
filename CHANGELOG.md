@@ -18,6 +18,7 @@ All notable changes to stellar-api are documented here.
 
 ### Fixed
 
+- **A profile now counts a viewer's secondary ranks** (#855). The profile read only the viewer's primary rank to decide what they may see. A moderator whose powers came from a secondary rank therefore passed the permission checks on the user routes but saw a profile as an ordinary member would: no hidden email or stats, no "Invited by". It now resolves permissions across every rank the viewer holds, as every other permission check does. Nothing becomes visible to a viewer without the permission.
 - **Golden Rule 1's IRC link now reaches a page** (#630). `${irc}` resolved to `/irc`, a route stellar-ui never had, so the link was dead on `/rules`. It could not have served its reader anyway: the rule addresses a disabled member, who has no session. `${irc}` now resolves to the public page about IRC, the same destination the disabled login and the deactivation email already name (#622). The `irc_guide_article` entry in `GET /rules/tree`'s `variables` map, which duplicated it, is removed; the map's schema is unchanged.
   - **Operators:** `STELLAR_IRC_URL` is retired and ignored, and the api logs a warning at boot while it is still set. Set `STELLAR_IRC_GUIDE_URL` instead if the default, `${STELLAR_PUBLIC_KB_BASE}/irc`, is not your IRC page. ADR-0020 is amended.
 
