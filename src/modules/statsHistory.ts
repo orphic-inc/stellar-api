@@ -1,4 +1,4 @@
-import { StatSnapshotPeriod, UserSettings } from '@prisma/client';
+import { Prisma, StatSnapshotPeriod, UserSettings } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { getSystemStats } from './stats';
@@ -84,27 +84,38 @@ export async function captureSiteStats(): Promise<void> {
   const bucketAt = hourBucket();
   const stats = await getSystemStats();
 
-  await prisma.siteStatSnapshot.upsert({
-    where: { bucketAt },
-    update: {},
-    create: {
-      bucketAt,
-      maxUsers: stats.maxUsers,
-      totalUsers: stats.totalUsers,
-      enabledUsers: stats.enabledUsers,
-      activeToday: stats.activeToday,
-      activeThisWeek: stats.activeThisWeek,
-      activeThisMonth: stats.activeThisMonth,
-      communities: stats.communities,
-      releases: stats.releases,
-      artists: stats.artists,
-      blogPosts: stats.blogPosts,
-      announcements: stats.announcements,
-      comments: stats.comments,
-      contributedLinks: stats.contributedLinks,
-      contributedLinkDownloads: stats.contributedLinkDownloads
-    }
-  });
+  // An empty `update` makes this a read then an insert, not ON CONFLICT, so the
+  // hourly job and an admin's manual snapshot in the same hour can both insert
+  // (#844). The loser meets the unique bucketAt: the hour is already captured,
+  // and the first capture stands, as `update: {}` intends.
+  try {
+    await prisma.siteStatSnapshot.upsert({
+      where: { bucketAt },
+      update: {},
+      create: {
+        bucketAt,
+        maxUsers: stats.maxUsers,
+        totalUsers: stats.totalUsers,
+        enabledUsers: stats.enabledUsers,
+        activeToday: stats.activeToday,
+        activeThisWeek: stats.activeThisWeek,
+        activeThisMonth: stats.activeThisMonth,
+        communities: stats.communities,
+        releases: stats.releases,
+        artists: stats.artists,
+        blogPosts: stats.blogPosts,
+        announcements: stats.announcements,
+        comments: stats.comments,
+        contributedLinks: stats.contributedLinks,
+        contributedLinkDownloads: stats.contributedLinkDownloads
+      }
+    });
+  } catch (err) {
+    const alreadyCaptured =
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002';
+    if (!alreadyCaptured) throw err;
+  }
 }
 
 // ─── Query functions ─────────────────────────────────────────────────────────

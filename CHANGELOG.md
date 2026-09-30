@@ -108,6 +108,9 @@ All notable changes to stellar-api are documented here.
   - **`PUT /profile/me/donor-title` with an empty body** could answer `500` when two first writes by one member raced: an empty update makes Prisma read, then insert. The loser now retries once and answers with the row.
   - **Resolved:** all 7 sites. 3 are guarded, and 4 are recorded as internally derived. `profile` joins the tables no production code hard-deletes.
 - **Two concurrent installs no longer answer `500` from the Golden Rules or wiki seed** (#835, #836, the thirty-sixth and thirty-seventh guard-coverage burn-downs under ADR-0048: `goldenRules.ts` and `wikiFixtures.ts`). Both `POST /install`s run the baseline seed side by side, so each seeder's "already seeded?" read could miss rows the other was creating, and the loser's insert met a unique key. That now counts as already seeded, as #787 made it for the rank, rule and forum seeds. A wiki fixture id held by a different page still fails loudly. The concurrent install itself is #786.
+- **The fixture seed and the site stat snapshot no longer fail on a concurrent write** (#843, #844, the forty-first and forty-second guard-coverage burn-downs under ADR-0048: `assetStore.ts` and `statsHistory.ts`). This was the last group: the guard-coverage baseline now holds **0 `unreviewed`** sites, ADR-0048's commitment for the v0.11.0 cut (#596).
+  - **A built-in theme asset whose bytes a member had also uploaded** could fail the seed, at boot or in `POST /install` (answering `500`), when the asset sweep reclaimed the member's copy mid-seed. The seed now stores the fixture afresh.
+  - **Two site stat snapshots in one hour,** the hourly job and an admin's `POST /stats/snapshot`, could answer `500` or log a job failure. The hour's first capture now stands.
 
 ## [0.9.10] — 2026-09-29
 

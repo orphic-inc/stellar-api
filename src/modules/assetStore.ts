@@ -14,7 +14,12 @@
  * bodies here without touching a caller.
  */
 import { createHash } from 'crypto';
-import { AssetKind, Prisma, type PrismaClient } from '@prisma/client';
+import {
+  AssetKind,
+  Prisma,
+  type Asset,
+  type PrismaClient
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { validateAsset } from '../lib/assetValidate';
@@ -31,6 +36,32 @@ export interface PutAssetInput {
   /** Omitted for site-owned assets (the built-in theme fixtures). */
   ownerId?: number;
 }
+
+/**
+ * The row to answer with when the bytes are already stored, promoting a
+ * member-owned row when site-owned intent meets it (see putAsset). Null when the
+ * sweep reclaimed that member row after the caller read it (#843): the fixture
+ * still needs its bytes, so the caller stores them afresh.
+ */
+const settleExisting = async (
+  client: PrismaClient,
+  existing: Asset,
+  siteOwned: boolean
+): Promise<Asset | null> => {
+  if (!siteOwned || existing.ownerId === null) return existing;
+  try {
+    return await client.asset.update({
+      where: { hash: existing.hash },
+      data: { ownerId: null }
+    });
+  } catch (err) {
+    const swept =
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2025';
+    if (swept) return null;
+    throw err;
+  }
+};
 
 /**
  * Validate and store a payload, returning its row. Idempotent by content: a
@@ -61,10 +92,8 @@ export const putAsset = async (
 
   const existing = await client.asset.findUnique({ where: { hash } });
   if (existing) {
-    if (siteOwned && existing.ownerId !== null) {
-      return client.asset.update({ where: { hash }, data: { ownerId: null } });
-    }
-    return existing;
+    const settled = await settleExisting(client, existing, siteOwned);
+    if (settled) return settled;
   }
 
   try {

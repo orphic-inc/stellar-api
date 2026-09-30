@@ -5,6 +5,7 @@
  * orphan sweep's actual delete predicate (owned, aged, unreferenced; referenced,
  * in-grace, and site-owned all spared).
  */
+import type { PrismaClient } from '@prisma/client';
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
 import {
   putAsset,
@@ -127,7 +128,57 @@ describe('putAsset seeder/member collision', () => {
     // And it drops off the member's quota.
     expect(await getOwnedAssetCount(ownerId, testPrisma)).toBe(0);
   });
+
+  it('stores the fixture when the sweep reclaimed the member row mid-promotion (#843)', async () => {
+    const bytes = png('swept-mid-promotion');
+    await uploadAsset(
+      { data: bytes, kind: 'ThemeImage', ownerId, assetLimit: null },
+      testPrisma
+    );
+    // The sweep collects the member's row after the seeder read it and before
+    // the seeder's promotion lands.
+    const sweepIt = () =>
+      testPrisma.asset.deleteMany({ where: { hash: hashAsset(bytes) } });
+
+    const seeded = await putAsset(
+      { data: bytes, kind: 'ThemeImage' },
+      interruptedAssetUpdate(sweepIt)
+    );
+
+    expect(seeded.ownerId).toBeNull();
+    const row = await testPrisma.asset.findUniqueOrThrow({
+      where: { hash: hashAsset(bytes) }
+    });
+    expect(row.ownerId).toBeNull();
+  });
 });
+
+/**
+ * A client whose first `asset.update` runs `before` just ahead of it: the other
+ * writer landing between a read and the write that acted on it.
+ */
+function interruptedAssetUpdate(before: () => Promise<unknown>): PrismaClient {
+  let fired = false;
+  const bound = (obj: object, key: string | symbol) => {
+    const value = Reflect.get(obj, key) as unknown;
+    return typeof value === 'function' ? value.bind(obj) : value;
+  };
+  return new Proxy(testPrisma, {
+    get(client, key) {
+      if (key !== 'asset') return bound(client, key);
+      return new Proxy(client.asset, {
+        get(delegate, method) {
+          if (method !== 'update' || fired) return bound(delegate, method);
+          return async (args: Parameters<typeof delegate.update>[0]) => {
+            fired = true;
+            await before();
+            return delegate.update(args);
+          };
+        }
+      });
+    }
+  });
+}
 
 describe('sweepOrphanedAssets', () => {
   const age = (hash: string) =>
