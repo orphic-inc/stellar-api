@@ -12,6 +12,7 @@ import { normalizePassword } from './badPasswords';
 import { isEmailBlacklisted } from './emailBlacklist';
 import { countSeats } from './settings';
 import { isInviteLapsed, livePendingInviteWhere } from './inviteExpiry';
+import { carriedInviteNote } from './inviteNote';
 import { getLogger } from './logging';
 
 const log = getLogger('auth');
@@ -255,7 +256,8 @@ const createRegisteredUser = async (
         // Every account has an InviteTree row (#633, ADR-0042). `inviterId` is
         // null unless the claim took an invite, so an edge can only name an
         // inviter whose invite this registration actually consumed.
-        inviteTree: { create: { inviterId: account.inviterId } }
+        inviteTree: { create: { inviterId: account.inviterId } },
+        moderationNotes: await carriedInviteNote(tx, account)
       },
       select: authUserSelect
     });

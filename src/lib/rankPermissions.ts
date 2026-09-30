@@ -207,6 +207,12 @@ export const PERMISSION_GROUPS = [
           'Send invites without spending from the invite balance. Every other invite gate still applies.'
       },
       {
+        key: 'invites_note',
+        label: 'Invite notes',
+        description:
+          "Attach a staff note when inviting. It is carried to the invitee's moderation notes when they register."
+      },
+      {
         key: 'ratio_policy_manage',
         label: 'Manage ratio policy',
         description: 'Manage ratio policy tools and ratio watch.'
