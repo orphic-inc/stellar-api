@@ -56,6 +56,8 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['privateMessage', 'private_messages'],
   // Withdrawn by `deletedAt`: an adopter's Site slot still points at it (#798).
   ['authorStylesheet', 'author_stylesheets'],
+  // Reports are resolved, never deleted (#802).
+  ['report', 'reports'],
   ['downloadAccessGrant', 'download_access_grants'],
   ['consumer', 'consumers']
 ];
