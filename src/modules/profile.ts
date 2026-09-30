@@ -1048,9 +1048,9 @@ const buildProfileView = async (
     // The rows, not User.warned, which outlives expiry (#719).
     warned: activeWarnedAt(user.warnings, now)?.toISOString() ?? null,
     standing,
-    inviteCount: viewer.isOwner || viewer.isStaff ? user.inviteCount : null,
+    inviteCount: viewer.canSeeInviteBalance ? user.inviteCount : null,
     // Same visibility as the balance it governs (#636): a revoke is not public.
-    canInvite: viewer.isOwner || viewer.isStaff ? user.canInvite : null,
+    canInvite: viewer.canSeeInviteBalance ? user.canInvite : null,
     staffBio: user.staffBio ?? null,
     stats: {
       contributed: canSeeUploaded ? user.contributed.toString() : null,

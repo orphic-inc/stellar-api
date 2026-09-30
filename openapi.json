@@ -1312,11 +1312,13 @@
           },
           "inviteCount": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "The member's invite balance. Null unless the viewer is the owner, is staff, or holds invites_manage or invites_edit."
           },
           "canInvite": {
             "type": "boolean",
-            "nullable": true
+            "nullable": true,
+            "description": "Whether the member may send invites. The same audience as inviteCount; null for anyone else."
           },
           "invitedBy": {
             "type": "object",
@@ -1510,11 +1512,13 @@
           },
           "inviteCount": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "The member's invite balance. Null unless the viewer is the owner, is staff, or holds invites_manage or invites_edit."
           },
           "canInvite": {
             "type": "boolean",
-            "nullable": true
+            "nullable": true,
+            "description": "Whether the member may send invites. The same audience as inviteCount; null for anyone else."
           },
           "invitedBy": {
             "type": "object",

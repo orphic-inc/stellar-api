@@ -7,13 +7,17 @@ export type ViewerContext = {
   isStaff: boolean;
   // Who invited this member: `invites_manage` only, the owner included (#849).
   canSeeInviter: boolean;
+  // `inviteCount` and `canInvite`: the owner, staff, or either invite
+  // permission, without the rest of what `isStaff` discloses (#655).
+  canSeeInviteBalance: boolean;
 };
 
 const ANONYMOUS: ViewerContext = {
   viewerId: null,
   isOwner: false,
   isStaff: false,
-  canSeeInviter: false
+  canSeeInviter: false,
+  canSeeInviteBalance: false
 };
 
 export const loadViewerContext = async (
@@ -31,7 +35,8 @@ export const loadViewerContext = async (
       viewerId: viewerUserId,
       isOwner: true,
       isStaff: false,
-      canSeeInviter
+      canSeeInviter,
+      canSeeInviteBalance: true
     };
   }
 
@@ -42,7 +47,16 @@ export const loadViewerContext = async (
     'users_disable'
   ]);
 
-  return { viewerId: viewerUserId, isOwner: false, isStaff, canSeeInviter };
+  const canSeeInviteBalance =
+    isStaff || hasAnyPermission(perms, ['invites_manage', 'invites_edit']);
+
+  return {
+    viewerId: viewerUserId,
+    isOwner: false,
+    isStaff,
+    canSeeInviter,
+    canSeeInviteBalance
+  };
 };
 
 type InviteEdge = {
