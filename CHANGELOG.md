@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **"Invited by" on the member profile** (#849, from #638). The profile responses (`GET /profile/me`, `GET /profile/user/{userId}`, and `PUT /profile/me`) gain `invitedBy: { inviter: { id, username } | null } | null`. Only a viewer holding `invites_manage` sees it, the owner included; it is `null` for anyone else. An inner `null` inviter means nobody invited the member.
+
 ### Fixed
 
 - **Golden Rule 1's IRC link now reaches a page** (#630). `${irc}` resolved to `/irc`, a route stellar-ui never had, so the link was dead on `/rules`. It could not have served its reader anyway: the rule addresses a disabled member, who has no session. `${irc}` now resolves to the public page about IRC, the same destination the disabled login and the deactivation email already name (#622). The `irc_guide_article` entry in `GET /rules/tree`'s `variables` map, which duplicated it, is removed; the map's schema is unchanged.

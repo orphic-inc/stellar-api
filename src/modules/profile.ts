@@ -5,6 +5,11 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import {
+  invitedByView,
+  loadViewerContext,
+  type ViewerContext
+} from './profileViewer';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { contributionVisibleTo, releaseVisibleTo } from './communityAccess';
 import { sanitizePlain } from '../lib/sanitize';
@@ -27,12 +32,6 @@ import {
 } from './reputation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-type ViewerContext = {
-  viewerId: number | null;
-  isOwner: boolean;
-  isStaff: boolean;
-};
 
 type UserSettingsView = {
   id: number;
@@ -184,6 +183,7 @@ const PROFILE_BASE_SELECT = {
   warnings: { select: { createdAt: true, expiresAt: true } },
   inviteCount: true,
   canInvite: true,
+  inviteTree: { select: { inviter: { select: { id: true, username: true } } } },
   staffBio: true,
   contributed: true,
   consumed: true,
@@ -289,36 +289,6 @@ const buildInviteTree = (
       });
 
   return build(rootUserId);
-};
-
-const loadViewerContext = async (
-  targetUserId: number,
-  viewerUserId?: number
-): Promise<ViewerContext> => {
-  if (!viewerUserId) {
-    return { viewerId: null, isOwner: false, isStaff: false };
-  }
-
-  if (viewerUserId === targetUserId) {
-    return { viewerId: viewerUserId, isOwner: true, isStaff: false };
-  }
-
-  const viewer = await prisma.user.findUnique({
-    where: { id: viewerUserId },
-    select: {
-      userRank: { select: { permissions: true } }
-    }
-  });
-  const perms = (viewer?.userRank.permissions ?? {}) as Record<string, boolean>;
-  const isStaff = !!(
-    perms.staff ||
-    perms.admin ||
-    perms.users_edit ||
-    perms.users_warn ||
-    perms.users_disable
-  );
-
-  return { viewerId: viewerUserId, isOwner: false, isStaff };
 };
 
 const getActivitySummary = async (
@@ -1150,12 +1120,13 @@ export const getProfileById = async (
     select: PROFILE_BASE_SELECT
   });
   if (!user) return null;
-  return buildProfileView(
+  const view = await buildProfileView(
     user,
     viewer,
     viewer.isOwner || viewer.isStaff,
     bbViewer
   );
+  return { ...view, invitedBy: invitedByView(user, viewer) };
 };
 
 export const getProfileByLookup = async (
@@ -1191,12 +1162,13 @@ export const getProfileByLookup = async (
 
   if (!user) return null;
   const viewer = await loadViewerContext(user.id, viewerUserId);
-  return buildProfileView(
+  const view = await buildProfileView(
     user,
     viewer,
     viewer.isOwner || viewer.isStaff,
     bbViewer
   );
+  return { ...view, invitedBy: invitedByView(user, viewer) };
 };
 
 export const updateProfile = async (

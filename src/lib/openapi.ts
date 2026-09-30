@@ -1014,6 +1014,15 @@ const PublicProfile = registry.register(
     inviteCount: z.number().nullable(),
     // Owner or staff only, like inviteCount; null for anyone else (#636).
     canInvite: z.boolean().nullable(),
+    // `invites_manage` only, the owner included; null for anyone else (#849).
+    // An inner null inviter means nobody invited this member.
+    invitedBy: z
+      .object({ inviter: StaffUserRef.nullable() })
+      .nullable()
+      .openapi({
+        description:
+          'Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did.'
+      }),
     staffBio: z.string().nullable(),
     stats: ProfileStats,
     userRank: UserRankSummary.extend({

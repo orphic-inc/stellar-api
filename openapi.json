@@ -1318,6 +1318,32 @@
             "type": "boolean",
             "nullable": true
           },
+          "invitedBy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "inviter": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "username"
+                ]
+              }
+            },
+            "required": [
+              "inviter"
+            ],
+            "description": "Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did."
+          },
           "staffBio": {
             "type": "string",
             "nullable": true
@@ -1417,6 +1443,7 @@
           "standing",
           "inviteCount",
           "canInvite",
+          "invitedBy",
           "staffBio",
           "stats",
           "userRank",
@@ -1488,6 +1515,32 @@
           "canInvite": {
             "type": "boolean",
             "nullable": true
+          },
+          "invitedBy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "inviter": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "username"
+                ]
+              }
+            },
+            "required": [
+              "inviter"
+            ],
+            "description": "Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did."
           },
           "staffBio": {
             "type": "string",
@@ -1591,6 +1644,7 @@
           "standing",
           "inviteCount",
           "canInvite",
+          "invitedBy",
           "staffBio",
           "stats",
           "userRank",
