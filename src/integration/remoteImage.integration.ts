@@ -21,6 +21,7 @@ import { createPost, createTopic } from '../modules/forum';
 import { renderSiteBBCode } from '../modules/bbcodeRender';
 import { addImageSrcs } from '../modules/imageSrc';
 import type { UrlGuardResult } from '../lib/ssrfGuard';
+import type { PrismaClient } from '@prisma/client';
 
 const PNG = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -128,6 +129,66 @@ describe('import', () => {
       registerRemoteImages([url], userId, {}, testPrisma)
     ]);
     expect(await testPrisma.remoteImage.count({ where: { url } })).toBe(1);
+  });
+});
+
+/**
+ * `testPrisma`, but running `before` just ahead of the first write to a remote
+ * image row: the moment another writer's delete lands mid-import.
+ */
+const interruptedBy = (before: () => Promise<unknown>): PrismaClient => {
+  let fired = false;
+  const bound = (obj: object, key: string | symbol) => {
+    const value = Reflect.get(obj, key) as unknown;
+    return typeof value === 'function' ? value.bind(obj) : value;
+  };
+  return new Proxy(testPrisma, {
+    get(client, key) {
+      if (key !== 'remoteImage') return bound(client, key);
+      return new Proxy(client.remoteImage, {
+        get(delegate, method) {
+          if (method !== 'update' || fired) return bound(delegate, method);
+          return async (args: Parameters<typeof delegate.update>[0]) => {
+            fired = true;
+            await before();
+            return delegate.update(args);
+          };
+        }
+      });
+    }
+  });
+};
+
+describe('an import whose row or asset vanished mid-import (#812)', () => {
+  it('counts a row the prune deleted as failed, without erroring', async () => {
+    await registerRemoteImages([urlFor('/pruned.png')], userId, {}, testPrisma);
+    const pruneIt = () => testPrisma.remoteImage.deleteMany({});
+
+    const tally = await processDueRemoteImages(interruptedBy(pruneIt), {
+      fetchOptions: { check }
+    });
+
+    expect(tally).toEqual({ imported: 0, retry: 0, failed: 1 });
+    expect(await testPrisma.remoteImage.count()).toBe(0);
+  });
+
+  it('retries a row whose asset the sweep collected before it was recorded', async () => {
+    await registerRemoteImages([urlFor('/swept.png')], userId, {}, testPrisma);
+    const sweepIt = () =>
+      testPrisma.asset.deleteMany({ where: { kind: 'Imported' } });
+
+    const tally = await processDueRemoteImages(interruptedBy(sweepIt), {
+      fetchOptions: { check }
+    });
+
+    // Untouched and still leased: the next cycle imports it again.
+    expect(tally).toEqual({ imported: 0, retry: 1, failed: 0 });
+    const row = await testPrisma.remoteImage.findFirstOrThrow();
+    expect(row).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+      assetHash: null
+    });
   });
 });
 
