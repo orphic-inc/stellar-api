@@ -8,6 +8,7 @@
  * first and would otherwise hide it — refuses a row that moved after the read.
  */
 import { truncateAll, seedDefaults, testPrisma } from '../test/dbHelpers';
+import { prisma } from '../lib/prisma';
 import {
   applyRatioRules,
   overridePolicyStatus,
@@ -245,5 +246,36 @@ describe('the claim, on its own', () => {
 
     expect((await toWatch()).count).toBe(1);
     expect((await toWatch()).count).toBe(0);
+  });
+});
+
+describe('a first evaluation that loses the race to create the row (#800)', () => {
+  it("reads the winner's row and evaluates as normal", async () => {
+    await mkUser({ level: 1000 });
+    const member = await shortMember();
+
+    // Deterministic, where two real evaluations collide only sometimes: the
+    // other evaluation inserts first, and this one's insert hits the key.
+    const lost = async () => {
+      await testPrisma.ratioPolicyState.create({
+        data: { userId: member.id, status: 'OK' }
+      });
+      return testPrisma.ratioPolicyState.create({
+        data: { userId: member.id, status: 'OK' }
+      });
+    };
+    const spy = jest
+      .spyOn(prisma.ratioPolicyState, 'upsert')
+      .mockImplementationOnce(lost as never);
+
+    try {
+      expect(await applyRatioRules(member.id, 'download')).toEqual({
+        kind: 'watch_started'
+      });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await auditsFor(member.id)).toHaveLength(1);
+    expect((await stateOf(member.id)).status).toBe('WATCH');
   });
 });

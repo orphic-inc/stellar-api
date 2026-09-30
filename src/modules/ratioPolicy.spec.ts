@@ -2,7 +2,7 @@
  * Unit tests for the ratio policy state machine.
  */
 
-import { RatioPolicyStatus, RatioDisableCause } from '@prisma/client';
+import { Prisma, RatioPolicyStatus, RatioDisableCause } from '@prisma/client';
 
 const mockPrismaUser = {
   findUniqueOrThrow: jest.fn(),
@@ -11,6 +11,7 @@ const mockPrismaUser = {
 };
 const mockPrismaPolicy = {
   findUnique: jest.fn(),
+  findUniqueOrThrow: jest.fn(),
   findMany: jest.fn(),
   count: jest.fn(),
   upsert: jest.fn(),
@@ -145,6 +146,44 @@ describe('applyRatioRules', () => {
       trigger: 'watch_expired'
     });
   };
+
+  const prismaError = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('conflict', {
+      code,
+      clientVersion: 'test'
+    });
+
+  it("reads the winner's row when a concurrent first evaluation created it (#800)", async () => {
+    short();
+    // Two downloads at once, and no row yet: the other evaluation inserted first.
+    mockPrismaPolicy.upsert.mockRejectedValue(prismaError('P2002'));
+    mockPrismaPolicy.findUniqueOrThrow.mockResolvedValue(
+      makeState({
+        status: RatioPolicyStatus.WATCH,
+        watchStartedAt: STARTED_AT,
+        watchExpiresAt: new Date(Date.now() - 1),
+        consumedAtWatchStart: 19n * GiB
+      })
+    );
+
+    expect(await applyRatioRules(1, 'sweep')).toEqual({
+      kind: 'download_disabled',
+      trigger: 'watch_expired'
+    });
+    expect(mockPrismaPolicy.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { userId: 1 }
+    });
+  });
+
+  it('still fails on any other error creating the row', async () => {
+    short();
+    mockPrismaPolicy.upsert.mockRejectedValue(prismaError('P2003'));
+
+    await expect(applyRatioRules(1, 'sweep')).rejects.toMatchObject({
+      code: 'P2003'
+    });
+    expect(mockPrismaPolicy.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
 
   it('claims a transition on the row as it was read', async () => {
     await expiredWatch();
