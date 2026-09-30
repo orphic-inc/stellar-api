@@ -5197,6 +5197,7 @@
           "invites_manage",
           "invites_edit",
           "invites_unlimited",
+          "invites_note",
           "ratio_policy_manage",
           "site_history_manage",
           "ip_bans_manage",
@@ -14309,7 +14310,8 @@
                   },
                   "reason": {
                     "type": "string",
-                    "maxLength": 1000
+                    "maxLength": 1000,
+                    "description": "A staff note, carried to the invitee's moderation notes. Ignored unless the sender holds `invites_note` (#851)."
                   }
                 },
                 "required": [
@@ -26757,6 +26759,9 @@
                       "invites_unlimited": {
                         "type": "boolean"
                       },
+                      "invites_note": {
+                        "type": "boolean"
+                      },
                       "ratio_policy_manage": {
                         "type": "boolean"
                       },
@@ -27223,6 +27228,9 @@
                         "type": "boolean"
                       },
                       "invites_unlimited": {
+                        "type": "boolean"
+                      },
+                      "invites_note": {
                         "type": "boolean"
                       },
                       "ratio_policy_manage": {

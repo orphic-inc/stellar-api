@@ -184,6 +184,17 @@ const hasUnlimitedInvites = async (
   res: Response
 ) => hasPermission(await loadPermissions(req, res), 'invites_unlimited');
 
+// A note becomes a staff record on the invitee, so only `invites_note` may
+// write one (#851). Anyone else's is dropped, not refused.
+const inviteNoteFrom = async (
+  req: Parameters<typeof loadPermissions>[0],
+  res: Response,
+  reason: string | undefined
+) =>
+  hasPermission(await loadPermissions(req, res), 'invites_note')
+    ? (reason ?? '')
+    : '';
+
 // GET /api/profile/me/invites/eligibility — can you send an invite right now,
 // and if not, why (#637). Same gates and words as the send.
 router.get(
@@ -321,7 +332,8 @@ router.post(
     const { email, reason } = parsedBody<InviteInput>(res);
     // Every gate, capacity included (#624, #637), is answered inside
     // createInvite before it writes, so a refused member keeps their invite.
-    const result = await createInvite(req.user.id, email, reason ?? '', {
+    const note = await inviteNoteFrom(req, res, reason);
+    const result = await createInvite(req.user.id, email, note, {
       unlimited: await hasUnlimitedInvites(req, res)
     });
     if (!result.ok) {

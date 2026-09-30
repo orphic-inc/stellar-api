@@ -208,6 +208,7 @@ export const DEFAULT_RANKS = [
       tags_manage: true,
       invites_manage: true,
       invites_edit: true,
+      invites_note: true,
       recovery_manage: true,
       users_edit: true,
       users_warn: true,

@@ -74,7 +74,13 @@ export const profileUpdateSchema = z.object({
 
 export const inviteSchema = z.object({
   email: z.string().email('Valid email is required'),
-  reason: z.string().max(1000).optional()
+  reason: z
+    .string()
+    .max(1000)
+    .optional()
+    .describe(
+      "A staff note, carried to the invitee's moderation notes. Ignored unless the sender holds `invites_note` (#851)."
+    )
 });
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
