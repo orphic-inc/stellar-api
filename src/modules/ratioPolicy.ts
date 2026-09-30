@@ -1,4 +1,4 @@
-import { RatioDisableCause, RatioPolicyStatus } from '@prisma/client';
+import { Prisma, RatioDisableCause, RatioPolicyStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { getLogger } from './logging';
@@ -146,6 +146,31 @@ const claimTransition = async (
 };
 
 /**
+ * The member's policy row, created on their first evaluation.
+ *
+ * The empty `update` makes Prisma read and then insert rather than send one
+ * `ON CONFLICT` statement, so two first evaluations (two downloads at once)
+ * race on the key. The loser reads the row the winner created (#800).
+ */
+const loadPolicyRow = async (userId: number) => {
+  try {
+    return await prisma.ratioPolicyState.upsert({
+      where: { userId },
+      update: {},
+      create: { userId, status: RatioPolicyStatus.OK }
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      return prisma.ratioPolicyState.findUniqueOrThrow({ where: { userId } });
+    }
+    throw err;
+  }
+};
+
+/**
  * Apply the ratio rules to one member (ADR-0044 §4): load, decide, claim, then
  * PM after the commit so a failed PM cannot undo the transition. Returns the
  * transition this call made, or `null`.
@@ -164,11 +189,7 @@ export const applyRatioRules = async (
       select: { consumed: true }
     })
   ]);
-  const row = await prisma.ratioPolicyState.upsert({
-    where: { userId },
-    update: {},
-    create: { userId, status: RatioPolicyStatus.OK }
-  });
+  const row = await loadPolicyRow(userId);
 
   const t = decideRatioTransition(row, stats, user.consumed, now, {
     allowWatchStart: by === 'download'

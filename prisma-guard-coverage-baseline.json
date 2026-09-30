@@ -96,7 +96,10 @@
     "src/modules/releaseLifecycle.ts::createCommunityRelease::releaseHistory.create": "releaseId is the release created earlier in the same transaction, not yet visible to any other; actorId is session-derived.",
     "src/modules/releaseLifecycle.ts::deleteCommunityRelease::tag.update": "Each tag id comes from the release's own tags, read just before, and tags are never hard-deleted (noHardDelete.spec.ts). The update only decrements occurrences.",
     "src/modules/authorStylesheet.ts::createAuthorStylesheet::authorStylesheet.create": "authorId is the session user's (POST /stylesheet/author), and AuthorStylesheet has no unique constraint. Users are never hard-deleted (noHardDelete.spec.ts). #798.",
-    "src/modules/authorStylesheet.ts::adoptAuthorStylesheet::user.update": "adopterId is the session user's (POST /stylesheet/author-stylesheet/:id/adopt). User.userSettingsId is required, so the nested settings update always finds its row, and the adopted sheet was read just before. Users, user settings and author stylesheets are never hard-deleted (noHardDelete.spec.ts). #798."
+    "src/modules/authorStylesheet.ts::adoptAuthorStylesheet::user.update": "adopterId is the session user's (POST /stylesheet/author-stylesheet/:id/adopt). User.userSettingsId is required, so the nested settings update always finds its row, and the adopted sheet was read just before. Users, user settings and author stylesheets are never hard-deleted (noHardDelete.spec.ts). #798.",
+    "src/modules/ratioPolicy.ts::claimTransition::user.update": "userId is the member applyRatioRules read with findUniqueOrThrow just before. Users are never hard-deleted (noHardDelete.spec.ts). #800.",
+    "src/modules/ratioPolicy.ts::state::user.update": "userId is the user read in the same transaction, which answers 404 when absent (POST /ratio-policy/:userId/override, ratio_policy_manage). Users are never hard-deleted (noHardDelete.spec.ts). #800.",
+    "src/modules/ratioPolicy.ts::written::ratioPolicyState.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"userId\") (verified on the test database, #800), so it cannot race to P2002. Its only FK is the user read in the same transaction, and users are never hard-deleted (noHardDelete.spec.ts)."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
@@ -126,10 +129,6 @@
     "src/modules/profile.ts::updateProfile::userSettings.update",
     "src/modules/rankProgressionJob.ts::applyRankChange::notification.create",
     "src/modules/rankProgressionJob.ts::applyRankChange::user.update",
-    "src/modules/ratioPolicy.ts::claimTransition::user.update",
-    "src/modules/ratioPolicy.ts::row::ratioPolicyState.upsert",
-    "src/modules/ratioPolicy.ts::state::user.update",
-    "src/modules/ratioPolicy.ts::written::ratioPolicyState.upsert",
     "src/modules/releaseTags.ts::attachTagWithVotes::releaseHistory.create",
     "src/modules/releaseTags.ts::attachTagWithVotes::releaseTagVote.create",
     "src/modules/releaseTags.ts::releaseTag::releaseTag.create",

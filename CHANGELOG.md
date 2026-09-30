@@ -55,6 +55,10 @@ All notable changes to stellar-api are documented here.
   - **Two concurrent withdrawals** both stamped the sheet, so the recorded time was the second one. Only the first now stamps it, and the second answers `404`, as an already-withdrawn sheet does.
   - **Resolved:** all 4 sites. 2 are closed by the conditional writes, and 2 are recorded as internally derived. `noHardDelete.spec.ts` gains author stylesheets. The contract is unchanged.
 
+- **A member's first two downloads at once no longer lose one ratio policy evaluation** (#800, the fourteenth guard-coverage burn-down under ADR-0048: `ratioPolicy.ts`).
+  - **The race:** the first evaluation creates the member's policy row by reading and then inserting. Two at once both inserted, and the loser failed on the key, so its evaluation was logged as failed and skipped. The loser now reads the row the winner created and evaluates as normal.
+  - **Resolved:** all 4 sites. 1 is guarded, and 3 are recorded as internally derived, including the staff override's upsert, which Prisma sends as a single `INSERT … ON CONFLICT`. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
