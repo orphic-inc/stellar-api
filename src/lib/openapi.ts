@@ -1011,9 +1011,16 @@ const PublicProfile = registry.register(
     // has expired (#719). The same rows `standing` reads.
     warned: z.string().nullable(),
     standing: z.enum(['pristine', 'clean', 'neutral', 'poor', 'hammer']),
-    inviteCount: z.number().nullable(),
-    // Owner or staff only, like inviteCount; null for anyone else (#636).
-    canInvite: z.boolean().nullable(),
+    // Owner, staff, invites_manage or invites_edit; null for anyone else
+    // (#636, #655). An invite permission reveals these two fields and no more.
+    inviteCount: z.number().nullable().openapi({
+      description:
+        "The member's invite balance. Null unless the viewer is the owner, is staff, or holds invites_manage or invites_edit."
+    }),
+    canInvite: z.boolean().nullable().openapi({
+      description:
+        'Whether the member may send invites. The same audience as inviteCount; null for anyone else.'
+    }),
     // `invites_manage` only, the owner included; null for anyone else (#849).
     // An inner null inviter means nobody invited this member.
     invitedBy: z
