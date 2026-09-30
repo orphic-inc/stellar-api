@@ -54,6 +54,8 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['privateConversation', 'private_conversations'],
   ['privateConversationParticipant', 'private_conversation_participants'],
   ['privateMessage', 'private_messages'],
+  // Withdrawn by `deletedAt`: an adopter's Site slot still points at it (#798).
+  ['authorStylesheet', 'author_stylesheets'],
   ['downloadAccessGrant', 'download_access_grants'],
   ['consumer', 'consumers']
 ];

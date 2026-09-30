@@ -94,17 +94,15 @@
     "src/modules/releaseWorkbench/tags.ts::tag::tag.upsert": "Prisma sends this upsert as one INSERT … ON CONFLICT (\"name\") DO UPDATE (the same shape as contribution.ts's countTags, verified from the SQL in #782): the where and create name the same single unique field and nothing is nested, so a concurrent create cannot raise P2002. Tag owns no foreign key.",
     "src/modules/releaseLifecycle.ts::createCommunityRelease::tag.update": "Each tag is read by id in the same transaction just before, and tags are never hard-deleted (noHardDelete.spec.ts). The update only increments occurrences.",
     "src/modules/releaseLifecycle.ts::createCommunityRelease::releaseHistory.create": "releaseId is the release created earlier in the same transaction, not yet visible to any other; actorId is session-derived.",
-    "src/modules/releaseLifecycle.ts::deleteCommunityRelease::tag.update": "Each tag id comes from the release's own tags, read just before, and tags are never hard-deleted (noHardDelete.spec.ts). The update only decrements occurrences."
+    "src/modules/releaseLifecycle.ts::deleteCommunityRelease::tag.update": "Each tag id comes from the release's own tags, read just before, and tags are never hard-deleted (noHardDelete.spec.ts). The update only decrements occurrences.",
+    "src/modules/authorStylesheet.ts::createAuthorStylesheet::authorStylesheet.create": "authorId is the session user's (POST /stylesheet/author), and AuthorStylesheet has no unique constraint. Users are never hard-deleted (noHardDelete.spec.ts). #798.",
+    "src/modules/authorStylesheet.ts::adoptAuthorStylesheet::user.update": "adopterId is the session user's (POST /stylesheet/author-stylesheet/:id/adopt). User.userSettingsId is required, so the nested settings update always finds its row, and the adopted sheet was read just before. Users, user settings and author stylesheets are never hard-deleted (noHardDelete.spec.ts). #798."
   },
   "unreviewed": [
     "src/modules/artist.ts::artist::artist.update",
     "src/modules/artist.ts::artist::artist.update#2",
     "src/modules/artist.ts::createArtistHistoryEntry::artistHistory.create",
     "src/modules/assetStore.ts::putAsset::asset.update",
-    "src/modules/authorStylesheet.ts::adoptAuthorStylesheet::user.update",
-    "src/modules/authorStylesheet.ts::createAuthorStylesheet::authorStylesheet.create",
-    "src/modules/authorStylesheet.ts::deleteAuthorStylesheet::authorStylesheet.update",
-    "src/modules/authorStylesheet.ts::updateAuthorStylesheet::authorStylesheet.update",
     "src/modules/comment.ts::deleteComment::auditLog.create",
     "src/modules/comment.ts::deleteComment::comment.update",
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert",

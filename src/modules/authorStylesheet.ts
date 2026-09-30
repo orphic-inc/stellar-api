@@ -111,10 +111,16 @@ export const updateAuthorStylesheet = async (
 
   assertSafeSource(input.source);
 
-  return prisma.authorStylesheet.update({
-    where: { id },
+  // Conditional on `deletedAt: null`: a withdrawal landing after the read above
+  // must not let this edit reach the withdrawn sheet, which `/css` still serves
+  // to its adopters (#798).
+  const { count } = await prisma.authorStylesheet.updateMany({
+    where: { id, deletedAt: null },
     data: { name: input.name, source: input.source }
   });
+  if (count === 0) throw new AppError(404, 'Author stylesheet not found');
+
+  return prisma.authorStylesheet.findUniqueOrThrow({ where: { id } });
 };
 
 /**
@@ -140,10 +146,13 @@ export const deleteAuthorStylesheet = async (id: number, authorId: number) => {
   if (existing.authorId !== authorId)
     throw new AppError(403, 'Not your stylesheet');
 
-  await prisma.authorStylesheet.update({
-    where: { id },
+  // Conditional for the same reason as the filter above: of two concurrent
+  // withdrawals, only the first stamps `deletedAt`; the second 404s (#798).
+  const { count } = await prisma.authorStylesheet.updateMany({
+    where: { id, deletedAt: null },
     data: { deletedAt: new Date() }
   });
+  if (count === 0) throw new AppError(404, 'Author stylesheet not found');
 };
 
 /**

@@ -50,6 +50,11 @@ All notable changes to stellar-api are documented here.
   - **The default can no longer be deleted by a race:** a stylesheet made default after a delete read it would have been deleted, leaving the registry with no default (#376). The delete is now conditional on the row not being the default.
   - **Resolved:** all 5 sites.
 
+- **An authored stylesheet can no longer be edited after its author withdraws it** (#798, the thirteenth guard-coverage burn-down under ADR-0048: `authorStylesheet.ts`).
+  - **The race:** an edit that read the sheet before a withdrawal landed saved onto the withdrawn sheet. Adopters still receive that sheet through `/css`, so they got the edit. The edit is now conditional on the sheet being live, and a late one answers the existing `404`.
+  - **Two concurrent withdrawals** both stamped the sheet, so the recorded time was the second one. Only the first now stamps it, and the second answers `404`, as an already-withdrawn sheet does.
+  - **Resolved:** all 4 sites. 2 are closed by the conditional writes, and 2 are recorded as internally derived. `noHardDelete.spec.ts` gains author stylesheets. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

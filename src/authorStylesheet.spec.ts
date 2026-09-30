@@ -299,7 +299,8 @@ describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
     prismaMock.authorStylesheet.findFirst.mockResolvedValue({
       authorId: 7
     } as never);
-    prismaMock.authorStylesheet.update.mockResolvedValue({
+    prismaMock.authorStylesheet.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.authorStylesheet.findUniqueOrThrow.mockResolvedValue({
       ...mockSheet,
       name: 'Renamed'
     } as never);
@@ -310,6 +311,10 @@ describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Renamed');
+    expect(prismaMock.authorStylesheet.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, deletedAt: null },
+      data: { name: 'Renamed', source: 'body { color: red; }' }
+    });
   });
 
   it("403s on someone else's sheet", async () => {
@@ -322,7 +327,7 @@ describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
       .send({ name: 'Hijack', source: 'body {}' });
 
     expect(res.status).toBe(403);
-    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+    expect(prismaMock.authorStylesheet.updateMany).not.toHaveBeenCalled();
   });
 
   it('holds an edit to the same store-time boundary as a create', async () => {
@@ -338,7 +343,7 @@ describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+    expect(prismaMock.authorStylesheet.updateMany).not.toHaveBeenCalled();
   });
 
   it('404s on a withdrawn sheet — the edit path filters deletedAt', async () => {
@@ -350,6 +355,24 @@ describe('PUT /api/stylesheet/author-stylesheet/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('404s when a withdrawal lands between the read and the edit (#798)', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 7
+    } as never);
+    // The conditional write matched nothing: the sheet was withdrawn meanwhile.
+    prismaMock.authorStylesheet.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app)
+      .put('/api/stylesheet/author-stylesheet/1')
+      .send({ name: 'Late', source: 'body {}' });
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Author stylesheet not found' });
+    expect(
+      prismaMock.authorStylesheet.findUniqueOrThrow
+    ).not.toHaveBeenCalled();
+  });
 });
 
 describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
@@ -357,7 +380,7 @@ describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
     prismaMock.authorStylesheet.findFirst.mockResolvedValue({
       authorId: 7
     } as never);
-    prismaMock.authorStylesheet.update.mockResolvedValue({} as never);
+    prismaMock.authorStylesheet.updateMany.mockResolvedValue({ count: 1 });
 
     const res = await request(app).delete(
       '/api/stylesheet/author-stylesheet/1'
@@ -365,12 +388,11 @@ describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
 
     expect(res.status).toBe(204);
     // Soft: the row is stamped, never removed — an adopter still points at it.
-    expect(prismaMock.authorStylesheet.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 1 },
-        data: { deletedAt: expect.any(Date) }
-      })
-    );
+    // Only a live sheet is stamped, so the first withdrawal's time stands.
+    expect(prismaMock.authorStylesheet.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, deletedAt: null },
+      data: { deletedAt: expect.any(Date) }
+    });
     expect(prismaMock.authorStylesheet.delete).not.toHaveBeenCalled();
   });
 
@@ -384,7 +406,7 @@ describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+    expect(prismaMock.authorStylesheet.updateMany).not.toHaveBeenCalled();
   });
 
   it('404s on an already-withdrawn sheet, leaving the first timestamp', async () => {
@@ -395,7 +417,22 @@ describe('DELETE /api/stylesheet/author-stylesheet/:id', () => {
     );
 
     expect(res.status).toBe(404);
-    expect(prismaMock.authorStylesheet.update).not.toHaveBeenCalled();
+    expect(prismaMock.authorStylesheet.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('404s the second of two concurrent withdrawals (#798)', async () => {
+    prismaMock.authorStylesheet.findFirst.mockResolvedValue({
+      authorId: 7
+    } as never);
+    // Both requests passed the read; the other one stamped the sheet first.
+    prismaMock.authorStylesheet.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app).delete(
+      '/api/stylesheet/author-stylesheet/1'
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ msg: 'Author stylesheet not found' });
   });
 });
 
