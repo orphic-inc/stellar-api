@@ -5,7 +5,7 @@
  * to test; here it is a stub returning whatever the case needs.
  */
 import { mockDeep, mockReset } from 'jest-mock-extended';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { RemoteFetchResult } from './lib/remoteFetch';
 
 const prismaMock = mockDeep<PrismaClient>();
@@ -244,6 +244,79 @@ describe('importRemoteImage', () => {
       reason: string;
     };
     expect(data.reason).toMatch(/Unsupported asset type/);
+  });
+});
+
+describe('importRemoteImage when its row or asset vanished (#812)', () => {
+  const row = {
+    id: 3,
+    url: 'https://a.example/x.png',
+    attempts: 0,
+    requestedById: 7
+  };
+  const prismaError = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('gone', {
+      code,
+      clientVersion: 'test'
+    });
+  const storesBytes = () => {
+    mockFetchResult = { ok: true, data: PNG, finalUrl: row.url };
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockImplementation(((args: {
+      data: { hash: string };
+    }) => Promise.resolve({ hash: args.data.hash })) as never);
+  };
+
+  it('answers failed when the prune deleted the row before it was imported', async () => {
+    storesBytes();
+    prismaMock.remoteImage.update.mockRejectedValue(prismaError('P2025'));
+
+    expect(await importRemoteImage(row)).toBe('failed');
+  });
+
+  it('answers retry when the sweep collected the reused asset first', async () => {
+    storesBytes();
+    prismaMock.remoteImage.update.mockRejectedValue(prismaError('P2003'));
+
+    // The row is untouched and still leased, so the next cycle re-imports it.
+    expect(await importRemoteImage(row)).toBe('retry');
+  });
+
+  it('answers failed when the prune deleted the row before a backoff', async () => {
+    mockFetchResult = { ok: false, reason: 'timed out', retryable: true };
+    prismaMock.remoteImage.update.mockRejectedValue(prismaError('P2025'));
+
+    expect(await importRemoteImage(row)).toBe('failed');
+  });
+
+  it('answers failed when the prune deleted the row before a final failure', async () => {
+    mockFetchResult = { ok: false, reason: 'refused', retryable: false };
+    prismaMock.remoteImage.update.mockRejectedValue(prismaError('P2025'));
+
+    expect(await importRemoteImage(row)).toBe('failed');
+  });
+
+  it.each([
+    ['an import', () => storesBytes()],
+    [
+      'a backoff',
+      () => {
+        mockFetchResult = { ok: false, reason: 'timed out', retryable: true };
+      }
+    ],
+    [
+      'a final failure',
+      () => {
+        mockFetchResult = { ok: false, reason: 'refused', retryable: false };
+      }
+    ]
+  ])('still throws any other database error on %s', async (_name, arrange) => {
+    arrange();
+    prismaMock.remoteImage.update.mockRejectedValue(prismaError('P2010'));
+
+    await expect(importRemoteImage(row)).rejects.toMatchObject({
+      code: 'P2010'
+    });
   });
 });
 

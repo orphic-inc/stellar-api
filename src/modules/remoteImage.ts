@@ -18,6 +18,7 @@
  */
 import {
   AssetKind,
+  Prisma,
   RemoteImageStatus,
   type PrismaClient,
   type RemoteImage
@@ -197,17 +198,54 @@ export async function importRemoteImage(
     },
     client
   );
-  await client.remoteImage.update({
-    where: { id: row.id },
-    data: {
-      attempts,
-      status: RemoteImageStatus.imported,
-      reason: null,
-      assetHash: asset.hash
-    }
-  });
-  return 'imported';
+  return recordImported(client, row.id, attempts, asset.hash);
 }
+
+const hasPrismaCode = (err: unknown, code: string): boolean =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
+
+/**
+ * A row's write found it gone: `pruneUnreferencedRemoteImages` deleted it
+ * mid-import, because nothing references its URL any more (#812). There is
+ * nothing left to import or retry.
+ */
+const pruned = (id: number): ImportOutcome => {
+  log.info('Remote image row pruned mid-import', { id });
+  return 'failed';
+};
+
+/**
+ * Point the row at its stored asset. The asset can vanish first: `putAsset`
+ * reuses identical bytes, so it may be an old, unreferenced one that the sweep
+ * collects between the two writes (P2003). The row is then untouched and still
+ * leased; the lease lapses, and the next cycle imports it again (#812).
+ */
+const recordImported = async (
+  client: PrismaClient,
+  id: number,
+  attempts: number,
+  assetHash: string
+): Promise<ImportOutcome> => {
+  try {
+    await client.remoteImage.update({
+      where: { id },
+      data: {
+        attempts,
+        status: RemoteImageStatus.imported,
+        reason: null,
+        assetHash
+      }
+    });
+    return 'imported';
+  } catch (err) {
+    if (hasPrismaCode(err, 'P2025')) return pruned(id);
+    if (hasPrismaCode(err, 'P2003')) {
+      log.info('Remote image asset swept mid-import; retrying', { id });
+      return 'retry';
+    }
+    throw err;
+  }
+};
 
 /**
  * A failed fetch: back off and retry if it may succeed later and retries remain,
@@ -224,14 +262,19 @@ const recordFetchFailure = async (
     await fail(client, id, attempts, result.reason);
     return 'failed';
   }
-  await client.remoteImage.update({
-    where: { id },
-    data: {
-      attempts,
-      reason: result.reason,
-      nextAttemptAt: new Date(Date.now() + delay)
-    }
-  });
+  try {
+    await client.remoteImage.update({
+      where: { id },
+      data: {
+        attempts,
+        reason: result.reason,
+        nextAttemptAt: new Date(Date.now() + delay)
+      }
+    });
+  } catch (err) {
+    if (hasPrismaCode(err, 'P2025')) return pruned(id);
+    throw err;
+  }
   return 'retry';
 };
 
@@ -251,20 +294,30 @@ function imageMime(data: Buffer): MimeResult {
   return { ok: true, mime };
 }
 
-const fail = (
+const fail = async (
   client: PrismaClient,
   id: number,
   attempts: number,
   reason: string
-) =>
-  client.remoteImage.update({
-    where: { id },
-    data: {
-      attempts,
-      status: RemoteImageStatus.failed,
-      reason: reason.slice(0, 300)
+): Promise<void> => {
+  try {
+    await client.remoteImage.update({
+      where: { id },
+      data: {
+        attempts,
+        status: RemoteImageStatus.failed,
+        reason: reason.slice(0, 300)
+      }
+    });
+  } catch (err) {
+    // Pruned mid-import: the failure has nowhere to be recorded, and no need.
+    if (hasPrismaCode(err, 'P2025')) {
+      pruned(id);
+      return;
     }
-  });
+    throw err;
+  }
+};
 
 export interface ProcessOptions {
   batch?: number;

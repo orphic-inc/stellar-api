@@ -83,6 +83,11 @@ All notable changes to stellar-api are documented here.
   - **Resolved:** all 3 sites. 1 is guarded, and 2 are recorded as internally derived.
   - **Also recorded:** the 3 sites in `stylesheetFixtures.ts` (#810), the built-in theme seeder, as internally derived. Its registry upsert is a single `INSERT … ON CONFLICT`. Two seeders running at once can still create a duplicate built-in sheet; that belongs to #786.
 
+- **The remote image import no longer logs an error when a cleanup lands mid-import** (#812, the twenty-first guard-coverage burn-down under ADR-0048: `remoteImage.ts`).
+  - **A row the prune deleted** (an unreferenced URL past its grace period) made the import's write fail, logged as "Remote image import errored". It now counts as `failed`, since nothing is left to import.
+  - **An asset the sweep collected** between storing the bytes and recording them did the same. Identical bytes reuse one asset, so an import can land on an old, unreferenced one. It now counts as `retry`: the row is untouched, and the next cycle imports it again.
+  - **Resolved:** all 3 sites are guarded. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
