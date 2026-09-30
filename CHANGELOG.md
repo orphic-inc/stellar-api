@@ -93,6 +93,11 @@ All notable changes to stellar-api are documented here.
   - **Their history entries,** and the one an attached contribution records, are recorded as internally derived. The first two follow the write that locked the release row. An attached contribution pins its release for good.
   - **Resolved:** all 5 sites. 2 are guarded, and 3 are recorded as internally derived. The contract is unchanged.
 
+- **Voting on a release is ready for a release to be deletable** (#818, #819, the twenty-fifth and twenty-sixth guard-coverage burn-downs under ADR-0048: `releaseWorkbench/votes.ts` and `top10.ts`).
+  - **The vote and its recount** write rows keyed to the release. A release that vanished after the vote route read it would answer `500`. Both now answer that read's own `404 Release not found`. This is latent until #793, like #814 and #815. Neither write can race to a duplicate key, because Prisma sends both as a single `INSERT … ON CONFLICT`.
+  - **`recomputeVoteAggregate` moves** from `top10.ts` into `releaseWorkbench/votes.ts`, beside the vote write that is its only caller.
+  - **Resolved:** both sites are guarded. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added

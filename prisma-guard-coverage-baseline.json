@@ -135,11 +135,9 @@
     "src/modules/profile.ts::updateProfile::userSettings.update",
     "src/modules/rankProgressionJob.ts::applyRankChange::notification.create",
     "src/modules/rankProgressionJob.ts::applyRankChange::user.update",
-    "src/modules/releaseWorkbench/votes.ts::voteOnReleaseWorkbench::releaseVote.upsert",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
     "src/modules/tag.ts::demoteTag::tag.update",
     "src/modules/tag.ts::tag::tag.upsert",
-    "src/modules/top10.ts::recomputeVoteAggregate::releaseVoteAggregate.upsert",
     "src/modules/topicSession.ts::markTopicRead::forumLastReadTopic.upsert",
     "src/modules/wikiFixtures.ts::seedWikiFixtures::wikiPage.create"
   ]
