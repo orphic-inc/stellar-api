@@ -102,7 +102,11 @@
     "src/modules/ratioPolicy.ts::written::ratioPolicyState.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"userId\") (verified on the test database, #800), so it cannot race to P2002. Its only FK is the user read in the same transaction, and users are never hard-deleted (noHardDelete.spec.ts).",
     "src/modules/reports.ts::report::report.create": "reporterId is the session user's (POST /reports). targetId is polymorphic, not a foreign key, and Report has no unique constraint. Users are never hard-deleted (noHardDelete.spec.ts). #802.",
     "src/modules/reports.ts::note::reportNote.create": "reportId is the report read just before, and authorId is the session user's (POST /reports/:id/notes, reports_manage). Reports and users are never hard-deleted (noHardDelete.spec.ts), and ReportNote has no unique constraint. #802.",
-    "src/modules/artist.ts::createArtistHistoryEntry::artistHistory.create": "Every caller passes an artist it just created (createArtist) or just wrote under deletedAt: null (updateArtist, revertArtistFromHistory), and editedBy is the session user's. Artists and users are never hard-deleted (noHardDelete.spec.ts), and ArtistHistory has no unique constraint. #804."
+    "src/modules/artist.ts::createArtistHistoryEntry::artistHistory.create": "Every caller passes an artist it just created (createArtist) or just wrote under deletedAt: null (updateArtist, revertArtistFromHistory), and editedBy is the session user's. Artists and users are never hard-deleted (noHardDelete.spec.ts), and ArtistHistory has no unique constraint. #804.",
+    "src/modules/e2eFixtures.ts::release::release.create": "A one-shot seed for the Playwright e2e stack: its only caller is the seed-e2e-users CLI, run once per stack, which refuses NODE_ENV=production unless ALLOW_E2E_SEED=true. No request reaches it and there is no second writer. communityId was read just before, and the credited artist found or created just before, in the same run. #806.",
+    "src/modules/e2eFixtures.ts::contributor::contributor.upsert": "A one-shot seed for the Playwright e2e stack: its only caller is the seed-e2e-users CLI, run once per stack, which refuses NODE_ENV=production unless ALLOW_E2E_SEED=true. No request reaches it and there is no second writer. A read-then-insert, but with no concurrent seeder it cannot race to P2002. userId is a user the same script seeded, and the community was read just before. #806.",
+    "src/modules/e2eFixtures.ts::contribution::contribution.create": "A one-shot seed for the Playwright e2e stack: its only caller is the seed-e2e-users CLI, run once per stack, which refuses NODE_ENV=production unless ALLOW_E2E_SEED=true. No request reaches it and there is no second writer. The release, edition and contributor were all read or created just before in the same run. #806.",
+    "src/modules/linkHealth.ts::recordContributionReport::contributionReport.create": "contributionId was checked visible just before by POST /contributions/:id/report (#774), and reporterId is the session user's. Contributions and users are never hard-deleted (noHardDelete.spec.ts), and ContributionReport has no unique constraint. #807."
   },
   "unreviewed": [
     "src/modules/assetStore.ts::putAsset::asset.update",
@@ -110,9 +114,6 @@
     "src/modules/comment.ts::deleteComment::comment.update",
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert",
     "src/modules/donor.ts::updated::donorForumUsername.upsert",
-    "src/modules/e2eFixtures.ts::contribution::contribution.create",
-    "src/modules/e2eFixtures.ts::contributor::contributor.upsert",
-    "src/modules/e2eFixtures.ts::release::release.create",
     "src/modules/goldenRules.ts::seedGoldenRules::rule.create",
     "src/modules/inactivityJob.ts::applyDisable::user.update",
     "src/modules/inactivityJob.ts::applyWarn::user.update",
@@ -121,9 +122,6 @@
     "src/modules/inviteExpiryJob.ts::expireLapsedInvite::user.update",
     "src/modules/ircNick.ts::claimIrcNick::user.update",
     "src/modules/ircNick.ts::clearIrcNick::user.update",
-    "src/modules/linkHealth.ts::checkContributionLink::contribution.update",
-    "src/modules/linkHealth.ts::recordContributionReport::contribution.update",
-    "src/modules/linkHealth.ts::recordContributionReport::contributionReport.create",
     "src/modules/notificationFilters.ts::created::notificationFilter.create",
     "src/modules/profile.ts::updateProfile::profile.update",
     "src/modules/profile.ts::updateProfile::userSettings.update",

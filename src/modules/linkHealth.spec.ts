@@ -9,13 +9,20 @@ import { LinkHealthStatus } from '@prisma/client';
 const mockPrismaContribution = {
   findUnique: jest.fn(),
   findMany: jest.fn(),
-  update: jest.fn(),
   updateMany: jest.fn(),
   groupBy: jest.fn()
 };
 
+const mockPrismaContributionReport = {
+  create: jest.fn(),
+  findMany: jest.fn()
+};
+
 jest.mock('../lib/prisma', () => ({
-  prisma: { contribution: mockPrismaContribution }
+  prisma: {
+    contribution: mockPrismaContribution,
+    contributionReport: mockPrismaContributionReport
+  }
 }));
 
 jest.mock('./logging', () => ({
@@ -39,6 +46,7 @@ import {
   sweepStaleWarnLinks,
   recheckStaleLinks,
   checkContributionLink,
+  recordContributionReport,
   getCommunityHealthPulse,
   computePulse,
   applyHealthAccrual
@@ -95,7 +103,13 @@ describe('sweepStaleWarnLinks', () => {
 
     expect(mockPrismaContribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: [1, 2] } },
+        // The stale-WARN condition again: a link a check proved PASS since the
+        // read above is not failed (#807).
+        where: {
+          id: { in: [1, 2] },
+          linkStatus: 'WARN',
+          linkStatusChangedAt: { lt: expect.any(Date) }
+        },
         data: expect.objectContaining({ linkStatus: 'FAIL' })
       })
     );
@@ -161,6 +175,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
   beforeEach(() => {
     jest.clearAllMocks();
     allowAllUrls();
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('stamps the change when status flips (WARN → PASS)', async () => {
@@ -173,7 +188,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('PASS');
     expect(data.linkStatusChangedAt).toBeInstanceOf(Date);
     // Entering PASS opens the uptime segment (#95 / ADR-0019).
@@ -190,7 +205,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('PASS');
     expect(data.linkStatusChangedAt).toBeUndefined();
     // Still accruing: the open segment is left untouched (no re-open, no bank).
@@ -207,7 +222,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     });
     fetchMock.mockResolvedValue({ ok: true, status: 200 });
     await checkContributionLink(5);
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatusChangedAt).toBeInstanceOf(Date);
     // Self-heal: a backfilled PASS that never opened a segment opens one now.
     expect(data.healthySince).toBeInstanceOf(Date);
@@ -225,7 +240,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
     // 404 → FAIL.
     fetchMock.mockResolvedValue({ ok: false, status: 404 });
     await checkContributionLink(5);
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('FAIL');
     expect(data.healthySince).toBeNull();
     // Banked = prior 1000ms + the elapsed open segment (> 0).
@@ -247,7 +262,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
 
     await checkContributionLink(5);
 
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('FAIL');
     // The point of the guard: no socket is opened at all.
     expect(fetchMock).not.toHaveBeenCalled();
@@ -279,7 +294,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
 
     await checkContributionLink(5);
 
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('FAIL');
     // Both hops were checked, and the second was never dialled.
     expect(mockCheckPublicUrl).toHaveBeenCalledTimes(2);
@@ -305,7 +320,7 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
 
     await checkContributionLink(5);
 
-    const { data } = mockPrismaContribution.update.mock.calls[0][0];
+    const { data } = mockPrismaContribution.updateMany.mock.calls[0][0];
     expect(data.linkStatus).toBe('PASS');
     expect(mockCheckPublicUrl).toHaveBeenNthCalledWith(
       2,
@@ -315,6 +330,142 @@ describe('checkContributionLink stamps linkStatusChangedAt on transition', () =>
 });
 
 // ─── applyHealthAccrual (pure) ────────────────────────────────────────────────
+
+describe('link-state writes swap on the state they read (#807)', () => {
+  const fetchMock = jest.fn();
+  const T0 = new Date('2020-01-01T00:00:00Z');
+  const T1 = new Date('2020-01-02T00:00:00Z');
+  /** Read by the check: a PASS link accruing since T0. */
+  const passing = {
+    downloadUrl: 'http://example.test/x',
+    linkStatus: 'PASS',
+    linkStatusChangedAt: T0,
+    healthyMs: 0n,
+    healthySince: T0
+  };
+  /** Written meanwhile by a report: WARN, its PASS segment banked. */
+  const warnedMeanwhile = {
+    linkStatus: 'WARN',
+    linkStatusChangedAt: T1,
+    healthyMs: 86_400_000n,
+    healthySince: null
+  };
+
+  beforeAll(() => {
+    (global as unknown as { fetch: jest.Mock }).fetch = fetchMock;
+  });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    allowAllUrls();
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+  });
+
+  it('a check swaps on the linkStatus and healthySince it read', async () => {
+    mockPrismaContribution.findUnique.mockResolvedValue(passing);
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 1 });
+
+    await checkContributionLink(5);
+
+    expect(mockPrismaContribution.updateMany.mock.calls[0][0].where).toEqual({
+      id: 5,
+      linkStatus: 'PASS',
+      healthySince: T0
+    });
+  });
+
+  it('a check that lost the swap recomputes from the row as it now is', async () => {
+    mockPrismaContribution.findUnique
+      .mockResolvedValueOnce(passing)
+      .mockResolvedValueOnce(warnedMeanwhile);
+    mockPrismaContribution.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    await checkContributionLink(5);
+
+    const retry = mockPrismaContribution.updateMany.mock.calls[1][0];
+    expect(retry.where).toEqual({
+      id: 5,
+      linkStatus: 'WARN',
+      healthySince: null
+    });
+    // Its PASS result stands. The report's banked day is kept rather than
+    // counted again, and a fresh segment opens: WARN → PASS is a change.
+    expect(retry.data).toMatchObject({
+      linkStatus: 'PASS',
+      healthyMs: 86_400_000n,
+      healthySince: expect.any(Date),
+      linkStatusChangedAt: expect.any(Date)
+    });
+    expect(retry.data.healthySince).not.toEqual(T0);
+  });
+
+  it('gives up after three lost swaps', async () => {
+    mockPrismaContribution.findUnique.mockResolvedValue(passing);
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 0 });
+
+    await checkContributionLink(5);
+
+    expect(mockPrismaContribution.updateMany).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops without writing when the contribution is gone on the re-read', async () => {
+    mockPrismaContribution.findUnique
+      .mockResolvedValueOnce(passing)
+      .mockResolvedValueOnce(null);
+    mockPrismaContribution.updateMany.mockResolvedValue({ count: 0 });
+
+    await checkContributionLink(5);
+
+    expect(mockPrismaContribution.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  describe('a report reaching the warn threshold', () => {
+    const threeReporters = [
+      { reporterId: 1 },
+      { reporterId: 2 },
+      { reporterId: 3 }
+    ];
+    beforeEach(() => {
+      mockPrismaContributionReport.create.mockResolvedValue({});
+      mockPrismaContributionReport.findMany.mockResolvedValue(threeReporters);
+    });
+
+    it('warns with a swap on the state it read, banking the PASS segment', async () => {
+      mockPrismaContribution.findUnique.mockResolvedValue(passing);
+      mockPrismaContribution.updateMany.mockResolvedValue({ count: 1 });
+
+      await recordContributionReport(5, 3, 'dead');
+
+      const write = mockPrismaContribution.updateMany.mock.calls[0][0];
+      expect(write.where).toEqual({
+        id: 5,
+        linkStatus: 'PASS',
+        healthySince: T0
+      });
+      expect(write.data).toMatchObject({
+        linkStatus: 'WARN',
+        healthySince: null
+      });
+      expect(write.data.healthyMs).toBeGreaterThan(0n);
+    });
+
+    it('writes nothing when a check failed the link meanwhile', async () => {
+      mockPrismaContribution.findUnique
+        .mockResolvedValueOnce(passing)
+        .mockResolvedValueOnce({ ...warnedMeanwhile, linkStatus: 'FAIL' });
+      mockPrismaContribution.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await recordContributionReport(5, 3, 'dead');
+
+      // One lost swap, then the re-read FAIL is not downgraded to WARN, and
+      // no recheck is scheduled (it would read the row and dial the URL).
+      expect(mockPrismaContribution.updateMany).toHaveBeenCalledTimes(1);
+      expect(mockPrismaContribution.findUnique).toHaveBeenCalledTimes(2);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+});
 
 describe('applyHealthAccrual', () => {
   const now = new Date('2026-06-21T00:00:00Z');

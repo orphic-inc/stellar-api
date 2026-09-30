@@ -1,4 +1,4 @@
-import { LinkHealthStatus } from '@prisma/client';
+import { LinkHealthStatus, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getLogger } from './logging';
 import { sendSystemMessage } from './pm';
@@ -134,45 +134,85 @@ export const applyHealthAccrual = (
   return { healthyMs: current.healthyMs, healthySince: current.healthySince };
 };
 
+/** The link-state columns a status write is computed from. */
+const linkStateSelect = {
+  linkStatus: true,
+  linkStatusChangedAt: true,
+  healthyMs: true,
+  healthySince: true
+} as const;
+
+type LinkState = Prisma.ContributionGetPayload<{
+  select: typeof linkStateSelect;
+}>;
+
+/** Attempts before a contended link-state write gives up. */
+const LINK_WRITE_ATTEMPTS = 3;
+
+/**
+ * Write a contribution's link state, computed from the row as it now is (#807).
+ *
+ * A check, a report's auto-warn and the WARN sweep all move these columns, and
+ * each computes the next state, accrual included, from what it read. Written by
+ * id alone, a check could bank against a segment a report already banked, and
+ * a report could downgrade a FAIL it never saw. So this swaps on the
+ * `(linkStatus, healthySince)` it computed from and, on a miss, re-reads and
+ * recomputes: the caller's own evidence (a check's HTTP result) is kept, and
+ * only the base it applies to is refreshed. `next` returns null to write
+ * nothing. Returns whether it wrote.
+ */
+const writeLinkState = async (
+  contributionId: number,
+  read: LinkState,
+  next: (row: LinkState) => Prisma.ContributionUpdateManyMutationInput | null
+): Promise<boolean> => {
+  let row: LinkState | null = read;
+  for (let attempt = 0; row && attempt < LINK_WRITE_ATTEMPTS; attempt += 1) {
+    const data = next(row);
+    if (!data) return false;
+    const { count } = await prisma.contribution.updateMany({
+      where: {
+        id: contributionId,
+        linkStatus: row.linkStatus,
+        healthySince: row.healthySince
+      },
+      data
+    });
+    if (count === 1) return true;
+    row = await prisma.contribution.findUnique({
+      where: { id: contributionId },
+      select: linkStateSelect
+    });
+  }
+  if (row)
+    log.warn('Link state write gave up under contention', { contributionId });
+  return false;
+};
+
 export const checkContributionLink = async (
   contributionId: number
 ): Promise<void> => {
   const contribution = await prisma.contribution.findUnique({
     where: { id: contributionId },
-    select: {
-      downloadUrl: true,
-      linkStatus: true,
-      linkStatusChangedAt: true,
-      healthyMs: true,
-      healthySince: true
-    }
+    select: { downloadUrl: true, ...linkStateSelect }
   });
   if (!contribution) return;
 
   const status = await checkUrl(contribution.downloadUrl);
   const now = new Date();
-  // Stamp the transition time when the status actually changes — or when it's
-  // never been stamped (backfill) — so the WARN sweep has a clock to read.
-  const stampChange =
-    status !== contribution.linkStatus ||
-    contribution.linkStatusChangedAt === null;
-  const accrual = applyHealthAccrual(
-    status,
-    {
-      healthyMs: contribution.healthyMs,
-      healthySince: contribution.healthySince
-    },
-    now
-  );
-  await prisma.contribution.update({
-    where: { id: contributionId },
-    data: {
+  await writeLinkState(contributionId, contribution, (row) => {
+    // Stamp the transition time when the status actually changes — or when
+    // it's never been stamped (backfill) — so the WARN sweep has a clock to read.
+    const stampChange =
+      status !== row.linkStatus || row.linkStatusChangedAt === null;
+    const accrual = applyHealthAccrual(status, row, now);
+    return {
       linkStatus: status,
       linkCheckedAt: now,
       healthyMs: accrual.healthyMs,
       healthySince: accrual.healthySince,
       ...(stampChange ? { linkStatusChangedAt: now } : {})
-    }
+    };
   });
   log.info('Link checked', { contributionId, status });
 };
@@ -188,18 +228,20 @@ export const sweepStaleWarnLinks = async (): Promise<void> => {
   // affected contributors can be PM'd (updateMany returns only a count). The
   // window between this read and the update is harmless: at worst a link that
   // recovered in between is re-PM'd, and the update's own WHERE is the source of
-  // truth for the status change.
+  // truth for the status change. It repeats the stale-WARN condition for that
+  // reason: a link a check just proved PASS must not be failed (#807).
+  const stale = {
+    linkStatus: LinkHealthStatus.WARN,
+    linkStatusChangedAt: { lt: cutoff }
+  };
   const promoting = await prisma.contribution.findMany({
-    where: {
-      linkStatus: LinkHealthStatus.WARN,
-      linkStatusChangedAt: { lt: cutoff }
-    },
+    where: stale,
     select: { id: true, userId: true, release: { select: { title: true } } }
   });
   if (promoting.length === 0) return;
 
   await prisma.contribution.updateMany({
-    where: { id: { in: promoting.map((c) => c.id) } },
+    where: { id: { in: promoting.map((c) => c.id) }, ...stale },
     data: { linkStatus: LinkHealthStatus.FAIL, linkStatusChangedAt: now }
   });
   log.info('Swept stale WARN links to FAIL', { count: promoting.length });
@@ -283,33 +325,30 @@ export const recordContributionReport = async (
   if (distinctReporters.length >= REPORT_WARN_THRESHOLD) {
     const current = await prisma.contribution.findUnique({
       where: { id: contributionId },
-      select: { linkStatus: true, healthyMs: true, healthySince: true }
+      select: linkStateSelect
     });
-    // Only warn from a healthy/unknown state: don't reset the sweep clock on
-    // an already-WARN link, and don't downgrade a confirmed FAIL back to WARN.
-    if (
-      current &&
-      current.linkStatus !== LinkHealthStatus.WARN &&
-      current.linkStatus !== LinkHealthStatus.FAIL
-    ) {
-      const now = new Date();
+    if (!current) return;
+    const now = new Date();
+    const warned = await writeLinkState(contributionId, current, (row) => {
+      // Only warn from a healthy/unknown state: don't reset the sweep clock on
+      // an already-WARN link, and don't downgrade a confirmed FAIL back to WARN.
+      if (
+        row.linkStatus === LinkHealthStatus.WARN ||
+        row.linkStatus === LinkHealthStatus.FAIL
+      )
+        return null;
       // Bank any open PASS segment before flipping to WARN (same accrual block
       // as checkContributionLink — ADR-0019). Don't rely on the async recheck
       // below landing to close the segment.
-      const accrual = applyHealthAccrual(
-        LinkHealthStatus.WARN,
-        { healthyMs: current.healthyMs, healthySince: current.healthySince },
-        now
-      );
-      await prisma.contribution.update({
-        where: { id: contributionId },
-        data: {
-          linkStatus: LinkHealthStatus.WARN,
-          linkStatusChangedAt: now,
-          healthyMs: accrual.healthyMs,
-          healthySince: accrual.healthySince
-        }
-      });
+      const accrual = applyHealthAccrual(LinkHealthStatus.WARN, row, now);
+      return {
+        linkStatus: LinkHealthStatus.WARN,
+        linkStatusChangedAt: now,
+        healthyMs: accrual.healthyMs,
+        healthySince: accrual.healthySince
+      };
+    });
+    if (warned) {
       log.info('Contribution auto-warned by reports', {
         contributionId,
         distinctReporters: distinctReporters.length

@@ -69,6 +69,14 @@ All notable changes to stellar-api are documented here.
   - **Revert:** `POST /artists/revert/{historyId}` never checked at all, so it restored a withdrawn artist's old name. A withdrawn artist's history entry now answers the existing `404 History entry not found`, as its history list already did.
   - **Resolved:** all 3 sites. 2 are closed by the conditional writes, and 1 is recorded as internally derived. The contract is unchanged.
 
+- **Link-health writers no longer undo each other** (#807, the eighteenth guard-coverage burn-down under ADR-0048: `linkHealth.ts`). A link check, a report's auto-warn and the daily WARN sweep each compute a contribution's next link state, uptime included, from a row they read earlier.
+  - **A check that read before a report landed** overwrote the report's WARN with uptime computed from its stale read, counting the report's already-banked healthy time again.
+  - **A report that read before a check landed** could downgrade the check's confirmed FAIL back to WARN.
+  - **The sweep** failed a stale-WARN link even when a check had just proved it healthy, and a failed link is never rechecked.
+  - **Now:** the check and the report write only over the state they computed from. When another write landed first, they recompute from the row as it now is and try again, up to three times. The check keeps its fresh result. The sweep's update repeats its stale-WARN condition.
+  - **Resolved:** all 3 sites. 2 go through the new swap, and 1 is recorded as internally derived. The contract is unchanged.
+  - **Also recorded:** the 3 sites in `e2eFixtures.ts` (#806), the Playwright stack's one-shot seeder, as internally derived: the seeder never serves a request, and nothing else writes to the stack while it runs.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
