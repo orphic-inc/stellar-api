@@ -107,6 +107,7 @@ All notable changes to stellar-api are documented here.
   - **`PUT /users/{id}/irc-nick`** answers `404 User not found` when an admin addresses an id with no user, for both a claim and a clear. It answered `500`. The `404` is declared in the contract.
   - **`PUT /profile/me/donor-title` with an empty body** could answer `500` when two first writes by one member raced: an empty update makes Prisma read, then insert. The loser now retries once and answers with the row.
   - **Resolved:** all 7 sites. 3 are guarded, and 4 are recorded as internally derived. `profile` joins the tables no production code hard-deletes.
+- **Two concurrent installs no longer answer `500` from the Golden Rules or wiki seed** (#835, #836, the thirty-sixth and thirty-seventh guard-coverage burn-downs under ADR-0048: `goldenRules.ts` and `wikiFixtures.ts`). Both `POST /install`s run the baseline seed side by side, so each seeder's "already seeded?" read could miss rows the other was creating, and the loser's insert met a unique key. That now counts as already seeded, as #787 made it for the rank, rule and forum seeds. A wiki fixture id held by a different page still fails loudly. The concurrent install itself is #786.
 
 ## [0.9.10] — 2026-09-29
 

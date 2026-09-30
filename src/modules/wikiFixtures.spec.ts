@@ -11,7 +11,7 @@
  * Pure (no DB): `resolveSiteVariables` takes its client as a parameter, so a stub
  * covering the one lookup it makes is enough.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
 import {
@@ -108,6 +108,41 @@ describe('seedWikiFixtures', () => {
     expect(sql).toContain('setval');
     expect(sql).toContain('wiki_pages');
     expect(sql).toContain(String(WIKI_USER_PAGE_ID_FLOOR - 1));
+  });
+
+  const lostInsert = () =>
+    new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+      code: 'P2002',
+      clientVersion: 'test'
+    });
+
+  it('treats a page a concurrent seed created as already seeded (#836)', async () => {
+    const create = jest.fn(async () => ({}));
+    create.mockRejectedValueOnce(lostInsert());
+    const count = jest.fn(async () => 1);
+    const client = {
+      wikiPage: { findUnique: async () => null, create, count },
+      $queryRawUnsafe: async () => 1
+    } as unknown as PrismaClient;
+
+    await expect(seedWikiFixtures(client, 42)).resolves.toBeUndefined();
+    expect(count).toHaveBeenCalledWith({
+      where: { slug: BUILTIN_WIKI_FIXTURES[0].slug }
+    });
+    expect(create).toHaveBeenCalledTimes(BUILTIN_WIKI_FIXTURES.length);
+  });
+
+  it('rethrows when another page holds the fixture id (#836)', async () => {
+    const create = jest.fn(async () => ({}));
+    create.mockRejectedValueOnce(lostInsert());
+    const client = {
+      wikiPage: { findUnique: async () => null, create, count: async () => 0 },
+      $queryRawUnsafe: async () => 1
+    } as unknown as PrismaClient;
+
+    await expect(seedWikiFixtures(client, 42)).rejects.toMatchObject({
+      code: 'P2002'
+    });
   });
 
   it('skips fixtures that already exist but still reserves the block', async () => {

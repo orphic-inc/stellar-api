@@ -9,6 +9,7 @@
  * Group titles + machine codes are seed-authored (not present in the prose), so
  * they are checked for internal consistency, not against the markdown.
  */
+import { Prisma } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { PrismaClient } from '@prisma/client';
@@ -135,6 +136,26 @@ describe('seedGoldenRules', () => {
     for (const rule of GOLDEN_RULES) {
       expect(rows.map((r) => r.code)).toContain(rule.code);
     }
+  });
+
+  it('treats a rule a concurrent seed created as already seeded (#835)', async () => {
+    const { create, count, client } = fakeRuleClient();
+    count.mockResolvedValueOnce(0);
+    create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: 'test'
+      })
+    );
+    await expect(seedGoldenRules(client)).resolves.toBeUndefined();
+    // The loser carries on past the lost insert to the rules still missing.
+    expect(create).toHaveBeenCalledTimes(GOLDEN_RULES.length);
+  });
+
+  it('rethrows any other error from a rule insert', async () => {
+    const { create, client } = fakeRuleClient();
+    create.mockRejectedValueOnce(new Error('connection lost'));
+    await expect(seedGoldenRules(client)).rejects.toThrow('connection lost');
   });
 
   it('stays a no-op once the golden rules are already seeded', async () => {
