@@ -111,7 +111,10 @@
     "src/modules/releaseTags.ts::attachTagWithVotes::releaseHistory.create": "releaseId was just referenced by this call's releaseTag insert in the same transaction, which holds a key-share lock on the release row until commit. actorId is the session user's; users are never hard-deleted (noHardDelete.spec.ts). #809.",
     "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::authorStylesheet.update": "The id was read just before by (authorId, name), and author stylesheets are never hard-deleted (noHardDelete.spec.ts). #810.",
     "src/modules/stylesheetFixtures.ts::created::authorStylesheet.create": "authorId is the System user, which is never hard-deleted (noHardDelete.spec.ts), and AuthorStylesheet has no unique constraint. Two concurrent seeders can each create a same-named fixture; that duplicate is #786's class, not an error. #810.",
-    "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::stylesheet.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"name\") DO UPDATE (verified on the test database, #810), so concurrent seeders cannot race to P2002, and it has no foreign key."
+    "src/modules/stylesheetFixtures.ts::seedStylesheetFixtures::stylesheet.upsert": "Prisma sends this as a native INSERT … ON CONFLICT (\"name\") DO UPDATE (verified on the test database, #810), so concurrent seeders cannot race to P2002, and it has no foreign key.",
+    "src/modules/releaseWorkbench/history.ts::revertReleaseWorkbenchHistory::releaseHistory.create": "Written in the same transaction, right after the release.update that locked the release row (and is guarded, #814), so the release cannot vanish before it. actorId is the session user's; users are never hard-deleted (noHardDelete.spec.ts). #814.",
+    "src/modules/releaseWorkbench/metadata.ts::updateReleaseWorkbenchMetadata::releaseHistory.create": "Written in the same transaction, after the release.update that locked the release row (and is guarded, #815), so the release cannot vanish before it. actorId is the session user's; users are never hard-deleted (noHardDelete.spec.ts). #815.",
+    "src/modules/releaseWorkbench/contributions.ts::attachReleaseWorkbenchContribution::releaseHistory.create": "The release is the one addContributionToRelease just attached a committed contribution to. Contribution → Release is Restrict and contributions are never hard-deleted, and noHardDelete.spec.ts pins that a release delete cannot cascade into its contributions, so this release can never be deleted. actorId is the session user's. #816."
   },
   "unreviewed": [
     "src/modules/assetStore.ts::putAsset::asset.update",
@@ -132,11 +135,6 @@
     "src/modules/profile.ts::updateProfile::userSettings.update",
     "src/modules/rankProgressionJob.ts::applyRankChange::notification.create",
     "src/modules/rankProgressionJob.ts::applyRankChange::user.update",
-    "src/modules/releaseWorkbench/contributions.ts::attachReleaseWorkbenchContribution::releaseHistory.create",
-    "src/modules/releaseWorkbench/history.ts::revertReleaseWorkbenchHistory::release.update",
-    "src/modules/releaseWorkbench/history.ts::revertReleaseWorkbenchHistory::releaseHistory.create",
-    "src/modules/releaseWorkbench/metadata.ts::updateReleaseWorkbenchMetadata::release.update",
-    "src/modules/releaseWorkbench/metadata.ts::updateReleaseWorkbenchMetadata::releaseHistory.create",
     "src/modules/releaseWorkbench/votes.ts::voteOnReleaseWorkbench::releaseVote.upsert",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
     "src/modules/tag.ts::demoteTag::tag.update",

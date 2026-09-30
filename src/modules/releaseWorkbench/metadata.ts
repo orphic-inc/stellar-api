@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { getReleaseWorkbenchView } from './load';
 import {
@@ -47,17 +48,23 @@ export const updateReleaseWorkbenchMetadata = async (
   );
 
   await prisma.$transaction(async (tx) => {
-    await tx.release.update({
-      where: { id: ref.releaseId },
-      data: {
-        ...(input.title !== undefined && { title: input.title }),
-        ...(input.description !== undefined && {
-          description: input.description
-        }),
-        ...(input.image !== undefined && { image: input.image }),
-        ...(input.year !== undefined && { year: input.year })
-      }
-    });
+    // The release can vanish after the read above (#793 decides what deleting
+    // one means); answer as that read does (#815).
+    try {
+      await tx.release.update({
+        where: { id: ref.releaseId },
+        data: {
+          ...(input.title !== undefined && { title: input.title }),
+          ...(input.description !== undefined && {
+            description: input.description
+          }),
+          ...(input.image !== undefined && { image: input.image }),
+          ...(input.year !== undefined && { year: input.year })
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Release not found'] });
+    }
 
     const refreshed = await tx.release.findUniqueOrThrow({
       where: { id: ref.releaseId },

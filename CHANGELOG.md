@@ -88,6 +88,11 @@ All notable changes to stellar-api are documented here.
   - **An asset the sweep collected** between storing the bytes and recording them did the same. Identical bytes reuse one asset, so an import can land on an old, unreferenced one. It now counts as `retry`: the row is untouched, and the next cycle imports it again.
   - **Resolved:** all 3 sites are guarded. The contract is unchanged.
 
+- **The release workbench's edits are ready for a release to be deletable** (#814, #815, #816, the twenty-second to twenty-fourth guard-coverage burn-downs under ADR-0048: `releaseWorkbench/history.ts`, `metadata.ts` and `contributions.ts`).
+  - **The edit and the revert** read a release, then write it by id. If the release vanished in between, the write would answer `500`. It now answers the read's own `404 Release not found`. No release can be deleted today, because every release keeps an edition, so this is latent until #793 decides what deleting one means.
+  - **Their history entries,** and the one an attached contribution records, are recorded as internally derived. The first two follow the write that locked the release row. An attached contribution pins its release for good.
+  - **Resolved:** all 5 sites. 2 are guarded, and 3 are recorded as internally derived. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
