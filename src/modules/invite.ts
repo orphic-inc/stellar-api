@@ -149,6 +149,32 @@ export const getInviteRefusal = async (
 };
 
 /**
+ * Insert a new invite row. The address had no row at the read before the
+ * transaction, so a concurrent invite to it can create one first. The loser meets
+ * the email key and refuses as an already-invited address does. `inviteKey` is
+ * 160 random bits, so a P2002 here is the address.
+ *
+ * This translation used to sit in `refusalFor`, one call up, where the guard
+ * coverage check cannot see it (#822); it moved here unchanged.
+ */
+const createInviteRow = async (
+  tx: Prisma.TransactionClient,
+  data: Prisma.InviteUncheckedCreateInput
+): Promise<void> => {
+  try {
+    await tx.invite.create({ data });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      throw new InviteRefused('already_invited');
+    }
+    throw err;
+  }
+};
+
+/**
  * Write the invite and spend one, atomically. Returns the invite this call
  * expired on the way, if any, so the caller can notify its inviter once the
  * transaction has committed.
@@ -196,7 +222,7 @@ const writeInvite = (
       });
       if (count === 0) throw new InviteRefused('already_invited');
     } else {
-      await tx.invite.create({ data: { ...fields, inviterId, email } });
+      await createInviteRow(tx, { ...fields, inviterId, email });
     }
 
     const spent = await tx.user.updateMany({
@@ -234,19 +260,12 @@ const isAddressTaken = (existing: ExistingInvite | null, now: Date): boolean =>
   );
 
 /**
- * Map a failed write to a refusal, or `null` for an error that is not one.
- * Two first-time sends to the same address: the loser hits `email @unique`.
+ * Map a failed write to a refusal, or `null` for an error that is not one. Two
+ * first-time sends to the same address arrive here too: `createInviteRow`
+ * turns the loser's `email @unique` into a refusal where the write is made.
  */
-const refusalFor = (err: unknown): RefusalReason | null => {
-  if (err instanceof InviteRefused) return err.reason;
-  if (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === 'P2002'
-  ) {
-    return 'already_invited';
-  }
-  return null;
-};
+const refusalFor = (err: unknown): RefusalReason | null =>
+  err instanceof InviteRefused ? err.reason : null;
 
 /**
  * Everything that refuses before the write, so nothing is spent: the send gates
