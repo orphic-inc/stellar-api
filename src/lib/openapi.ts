@@ -1119,16 +1119,32 @@ const DuplicateIpGroup = registry.register(
   })
 );
 
+// One side of a registration log row. Both IP fields describe the account's
+// CURRENT IP, not the one it registered from, which Stellar does not keep (#850).
+const RegistrationLogAccount = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  email: z.string(),
+  dateRegistered: z.string(),
+  disabled: z.boolean(),
+  lastIp: z.string().nullable(),
+  lastIpAccounts: z.number().int().nullable().openapi({
+    description:
+      'How many accounts currently hold `lastIp`, this one included. Null when `lastIp` is null.'
+  }),
+  userRank: z.object({ id: z.number().int(), name: z.string() })
+});
+
 const RegistrationLogEntry = registry.register(
   'RegistrationLogEntry',
-  z.object({
-    id: z.number().int(),
-    username: z.string(),
-    email: z.string(),
-    dateRegistered: z.string(),
-    disabled: z.boolean(),
-    lastIp: z.string().nullable(),
-    userRank: z.object({ id: z.number().int(), name: z.string() })
+  RegistrationLogAccount.extend({
+    inviter: RegistrationLogAccount.nullable().openapi({
+      description: 'Who invited this account; null when nobody did.'
+    }),
+    sameIp: z.boolean().openapi({
+      description:
+        "True when this account's current IP equals its inviter's. Current IPs, not IPs at registration."
+    })
   })
 );
 
