@@ -9,8 +9,12 @@
  * shapes from the same input row.
  */
 
-import { ReleaseTagVoteDirection } from '@prisma/client';
-import { buildPlainTags, buildReleaseTagPayload } from './releaseTags';
+import { Prisma, ReleaseTagVoteDirection } from '@prisma/client';
+import {
+  attachTagWithVotes,
+  buildPlainTags,
+  buildReleaseTagPayload
+} from './releaseTags';
 
 const tag = (id: number, name: string, occurrences = 0) => ({
   id,
@@ -117,5 +121,54 @@ describe('buildReleaseTagPayload', () => {
       ]
     );
     expect(rows.map((r) => r.name)).toEqual(['ambient', 'jazz', 'rock']);
+  });
+});
+
+describe('attachTagWithVotes', () => {
+  const prismaError = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('constraint', {
+      code,
+      clientVersion: 'test'
+    });
+
+  const fakeTx = () => ({
+    releaseTag: { create: jest.fn().mockResolvedValue({ id: 40 }) },
+    releaseTagVote: { create: jest.fn().mockResolvedValue({}) },
+    releaseHistory: { create: jest.fn().mockResolvedValue({}) }
+  });
+  const attach = (tx: ReturnType<typeof fakeTx>) =>
+    attachTagWithVotes(tx as never, 3, 7, tag(9, 'jazz'), true);
+
+  it('creates the tag row, its author up-vote and the history entry', async () => {
+    const tx = fakeTx();
+
+    await attach(tx);
+
+    expect(tx.releaseTagVote.create).toHaveBeenCalledWith({
+      data: { releaseTagId: 40, userId: 7, direction: 'up' }
+    });
+    expect(tx.releaseHistory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['P2002', 409, 'Release already has this tag'],
+    ['P2003', 404, 'Release not found']
+  ])(
+    'answers %s as %i, writing nothing more (#809)',
+    async (code, statusCode, message) => {
+      const tx = fakeTx();
+      tx.releaseTag.create.mockRejectedValue(prismaError(code));
+
+      await expect(attach(tx)).rejects.toMatchObject({ statusCode, message });
+      expect(tx.releaseTagVote.create).not.toHaveBeenCalled();
+      expect(tx.releaseHistory.create).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rethrows any other error untranslated', async () => {
+    const tx = fakeTx();
+    tx.releaseTag.create.mockRejectedValue(prismaError('P2010'));
+
+    await expect(attach(tx)).rejects.toMatchObject({ code: 'P2010' });
   });
 });

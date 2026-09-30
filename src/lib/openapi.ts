@@ -5856,7 +5856,11 @@ registry.registerPath({
       'A tag name has no usable characters once normalized (#689), or the ' +
         'request is invalid'
     ),
-    409: msgResponse('Release already has this tag')
+    404: msgResponse('Release not found'),
+    409: msgResponse(
+      'Release already has this tag, including when a concurrent add of the ' +
+        'same tag won (#809)'
+    )
   }
 });
 
