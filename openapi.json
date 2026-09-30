@@ -24950,8 +24950,18 @@
               }
             }
           },
+          "404": {
+            "description": "Release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
           "409": {
-            "description": "Release already has this tag",
+            "description": "Release already has this tag, including when a concurrent add of the same tag won (#809)",
             "content": {
               "application/json": {
                 "schema": {

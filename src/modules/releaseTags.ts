@@ -1,5 +1,6 @@
 import { ReleaseHistoryAction, ReleaseTagVoteDirection } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { translatePrismaError } from '../lib/prismaErrors';
 import type { ReleaseSnapshot } from './releaseWorkbench/snapshot';
 import type { ReleaseTagView } from './releaseWorkbench/types';
 
@@ -105,6 +106,12 @@ export const buildReleaseTagPayload = (
  * `Prisma.TransactionClient`, because the two call sites pass different things —
  * an interactive transaction from the workbench, the plain client from the
  * lifecycle create path — and both satisfy this.
+ *
+ * The workbench checks "already has this tag" before its transaction, so two
+ * concurrent adds of one tag both pass it and the second insert hits the
+ * `(releaseId, tagId)` key: that answers the check's own 409 (#809). The vote
+ * and history rows are written against the tag row and release this call just
+ * wrote, in the same transaction.
  */
 export const attachTagWithVotes = async (
   tx: Pick<typeof prisma, 'releaseTag' | 'releaseTagVote' | 'releaseHistory'>,
@@ -114,15 +121,23 @@ export const attachTagWithVotes = async (
   writeHistory: boolean,
   snapshot?: ReleaseSnapshot
 ): Promise<void> => {
-  const releaseTag = await tx.releaseTag.create({
-    data: {
-      releaseId,
-      tagId: tag.id,
-      userId: actorId,
-      positiveVotes: 3,
-      negativeVotes: 1
-    }
-  });
+  let releaseTag;
+  try {
+    releaseTag = await tx.releaseTag.create({
+      data: {
+        releaseId,
+        tagId: tag.id,
+        userId: actorId,
+        positiveVotes: 3,
+        negativeVotes: 1
+      }
+    });
+  } catch (err) {
+    translatePrismaError(err, {
+      P2002: [409, 'Release already has this tag'],
+      P2003: [404, 'Release not found']
+    });
+  }
   await tx.releaseTagVote.create({
     data: {
       releaseTagId: releaseTag.id,

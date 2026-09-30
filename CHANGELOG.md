@@ -77,6 +77,12 @@ All notable changes to stellar-api are documented here.
   - **Resolved:** all 3 sites. 2 go through the new swap, and 1 is recorded as internally derived. The contract is unchanged.
   - **Also recorded:** the 3 sites in `e2eFixtures.ts` (#806), the Playwright stack's one-shot seeder, as internally derived: the seeder never serves a request, and nothing else writes to the stack while it runs.
 
+- **Two concurrent adds of the same tag to a release no longer answer `500`** (#809, the nineteenth guard-coverage burn-down under ADR-0048: `releaseTags.ts`).
+  - **The race:** `POST /communities/{communityId}/releases/{releaseId}/tags` checks "already has this tag" before its transaction, so both adds passed, and the second failed on the release-and-tag key. It now answers that check's own **`409 Release already has this tag`**, and its occurrence count is rolled back. A release that vanished mid-add answers `404`.
+  - **Contract:** the route now declares the `404` its pre-read already answered.
+  - **Resolved:** all 3 sites. 1 is guarded, and 2 are recorded as internally derived.
+  - **Also recorded:** the 3 sites in `stylesheetFixtures.ts` (#810), the built-in theme seeder, as internally derived. Its registry upsert is a single `INSERT … ON CONFLICT`. Two seeders running at once can still create a duplicate built-in sheet; that belongs to #786.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
