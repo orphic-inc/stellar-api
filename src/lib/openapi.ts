@@ -1706,6 +1706,7 @@ registry.registerPath({
       content: { 'application/json': { schema: IrcNickLinkResult } }
     },
     403: msgResponse('Not self or admin'),
+    404: msgResponse('No user has that id (an admin addressing another user)'),
     409: msgResponse('Nick already verified by another account')
   }
 });

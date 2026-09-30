@@ -103,6 +103,10 @@ All notable changes to stellar-api are documented here.
   - **The deactivation email now follows the disable,** so only a member who was actually disabled is told so ([ADR-0038](docs/adr/0038-inactivity-is-a-clock-not-a-timestamp.md), amended). The warning stamp is likewise claimed before its notices go out.
   - **A rank change, rank lock, warning or disable** that staff made meanwhile was overwritten by the rank sweep's older decision. That write is now a claim too. A rank deleted meanwhile no longer logs an error; the next sweep settles it.
   - **Resolved:** all 4 sites. 3 become conditional claims, and the rank-change notification is recorded as internally derived. The contract is unchanged.
+- **Three member self-service writes no longer answer `500`** (#828 to #831, the thirty-second to thirty-fifth guard-coverage burn-downs under ADR-0048: `profile.ts`, `ircNick.ts`, `donor.ts` and `notificationFilters.ts`).
+  - **`PUT /users/{id}/irc-nick`** answers `404 User not found` when an admin addresses an id with no user, for both a claim and a clear. It answered `500`. The `404` is declared in the contract.
+  - **`PUT /profile/me/donor-title` with an empty body** could answer `500` when two first writes by one member raced: an empty update makes Prisma read, then insert. The loser now retries once and answers with the row.
+  - **Resolved:** all 7 sites. 3 are guarded, and 4 are recorded as internally derived. `profile` joins the tables no production code hard-deletes.
 
 ## [0.9.10] — 2026-09-29
 

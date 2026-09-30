@@ -75,6 +75,20 @@ describe('claimIrcNick', () => {
     expect(result.code).toBe('');
     expect(mockPrismaUser.update).not.toHaveBeenCalled();
   });
+
+  it('answers 404 when an admin addresses a user that does not exist (#829)', async () => {
+    mockPrismaUser.findUnique.mockResolvedValue(null);
+    mockPrismaUser.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: 'test'
+      })
+    );
+    await expect(claimIrcNick(404404, 'Alice')).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'User not found'
+    });
+  });
 });
 
 // ─── clearIrcNick ────────────────────────────────────────────────────────────
@@ -91,6 +105,19 @@ describe('clearIrcNick', () => {
         ircNickNonce: null,
         ircNickNonceExpiresAt: null
       }
+    });
+  });
+
+  it('answers 404 when an admin addresses a user that does not exist (#829)', async () => {
+    mockPrismaUser.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: 'test'
+      })
+    );
+    await expect(clearIrcNick(404404)).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'User not found'
     });
   });
 });

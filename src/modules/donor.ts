@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { AppError } from '../lib/errors';
@@ -190,11 +191,31 @@ export const updateDonorForumTitle = async (
     ...(data.useComma !== undefined && { useComma: data.useComma })
   };
 
-  const updated = await prisma.donorForumUsername.upsert({
-    where: { userId },
-    create: { userId, prefix: '', suffix: '', useComma: true, ...sanitized },
-    update: sanitized
-  });
+  // An empty `update` makes this upsert a read-then-insert rather than
+  // ON CONFLICT, so two first writes can both insert (#830). The loser's
+  // second attempt finds the winner's row and updates it.
+  let updated;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      updated = await prisma.donorForumUsername.upsert({
+        where: { userId },
+        create: {
+          userId,
+          prefix: '',
+          suffix: '',
+          useComma: true,
+          ...sanitized
+        },
+        update: sanitized
+      });
+      break;
+    } catch (err) {
+      const lostInsert =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002';
+      if (!lostInsert || attempt > 1) throw err;
+    }
+  }
 
   return {
     prefix: updated.prefix,
