@@ -60,4 +60,6 @@ A deployment with no SMTP configured will still warn and still disable, notifyin
 
 Two orderings become load-bearing and must survive future edits. The warn PM precedes the disable because `sendSystemMessage` refuses disabled recipients, and the deactivation email precedes the `disabled` write for the same reason. Both are pinned by tests that fail by name.
 
+_(Amended 2026-09-29, by [#825](https://github.com/orphic-inc/stellar-api/issues/825). **The deactivation email now follows the `disabled` write.** The reason given above holds only for the PM: the mailer never reads `disabled`, so the email arrives either way. Each write is now a conditional claim on the account as the sweep read it, because a batch is read well before each account is written, and a member can sign in meanwhile. Sent first, the email told a member the claim then missed that they had been disabled. The warn stamp is likewise claimed before its PM and email go out. The PM still precedes any disable, which is the ordering that matters. The tests that pin the order were updated to match.)_
+
 `GET /auth` and the disable path now have a third reason an account can be disabled. Nothing reads a disable _reason_ today, and #279 deliberately does not add one — see Decision 3.

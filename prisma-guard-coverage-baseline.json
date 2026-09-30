@@ -116,7 +116,8 @@
     "src/modules/releaseWorkbench/metadata.ts::updateReleaseWorkbenchMetadata::releaseHistory.create": "Written in the same transaction, after the release.update that locked the release row (and is guarded, #815), so the release cannot vanish before it. actorId is the session user's; users are never hard-deleted (noHardDelete.spec.ts). #815.",
     "src/modules/releaseWorkbench/contributions.ts::attachReleaseWorkbenchContribution::releaseHistory.create": "The release is the one addContributionToRelease just attached a committed contribution to. Contribution → Release is Restrict and contributions are never hard-deleted, and noHardDelete.spec.ts pins that a release delete cannot cascade into its contributions, so this release can never be deleted. actorId is the session user's. #816.",
     "src/modules/inviteExpiryJob.ts::expireLapsedInvite::user.update": "The refund increments the inviter of the invite this call just claimed (pending → expired) in the same transaction. Invite.inviter is a required relation (Restrict), and users are never hard-deleted (noHardDelete.spec.ts), so the inviter exists. #823.",
-    "src/modules/inviteControls.ts::claimCancellation::user.update": "The refund increments the inviter of the invite this call just claimed (pending → cancelled) and re-read in the same transaction. Invite.inviter is a required relation (Restrict), and users are never hard-deleted (noHardDelete.spec.ts), so the inviter exists. #821."
+    "src/modules/inviteControls.ts::claimCancellation::user.update": "The refund increments the inviter of the invite this call just claimed (pending → cancelled) and re-read in the same transaction. Invite.inviter is a required relation (Restrict), and users are never hard-deleted (noHardDelete.spec.ts), so the inviter exists. #821.",
+    "src/modules/rankProgressionJob.ts::applyRankChange::notification.create": "Written only after this call's own claim on the user landed, so userId is a user just updated; actorId is the SysOp resolveSystemActorId read at the sweep's start. Users are never hard-deleted (noHardDelete.spec.ts), and Notification carries no unique constraint. #826."
   },
   "unreviewed": [
     "src/modules/assetStore.ts::putAsset::asset.update",
@@ -125,15 +126,11 @@
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert",
     "src/modules/donor.ts::updated::donorForumUsername.upsert",
     "src/modules/goldenRules.ts::seedGoldenRules::rule.create",
-    "src/modules/inactivityJob.ts::applyDisable::user.update",
-    "src/modules/inactivityJob.ts::applyWarn::user.update",
     "src/modules/ircNick.ts::claimIrcNick::user.update",
     "src/modules/ircNick.ts::clearIrcNick::user.update",
     "src/modules/notificationFilters.ts::created::notificationFilter.create",
     "src/modules/profile.ts::updateProfile::profile.update",
     "src/modules/profile.ts::updateProfile::userSettings.update",
-    "src/modules/rankProgressionJob.ts::applyRankChange::notification.create",
-    "src/modules/rankProgressionJob.ts::applyRankChange::user.update",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
     "src/modules/tag.ts::demoteTag::tag.update",
     "src/modules/tag.ts::tag::tag.upsert",
