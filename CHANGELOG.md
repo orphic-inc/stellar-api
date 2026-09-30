@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.9.11] — 2026-09-30
+
 ### Fixed
 
 - **Two first uploads by one member no longer answer `500`** (#782, the sixth guard-coverage burn-down under ADR-0048: `contribution.ts`).
@@ -3721,7 +3723,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.11...HEAD
+[0.9.11]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/orphic-inc/stellar-api/compare/v0.9.7...v0.9.8
