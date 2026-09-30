@@ -39,6 +39,8 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   // Users are disabled, never deleted (AGENTS.md, "Soft delete").
   ['user', 'users'],
   ['userSettings', 'user_settings'],
+  // A member's profile row lives as long as the user does (#828).
+  ['profile', 'profiles'],
   ['request', 'requests'],
   ['requestBounty', 'request_bounties'],
   ['contribution', 'contributions'],

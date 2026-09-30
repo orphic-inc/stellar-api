@@ -17,6 +17,7 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { translatePrismaError } from '../lib/prismaErrors';
 
 /** Verification Code lifetime (ADR-0015). */
 export const NONCE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -73,14 +74,19 @@ export const claimIrcNick = async (
 
   const code = generateVerificationCode();
   const expiresAt = new Date(Date.now() + NONCE_TTL_MS);
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      pendingIrcNick: nick,
-      ircNickNonce: code,
-      ircNickNonceExpiresAt: expiresAt
-    }
-  });
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        pendingIrcNick: nick,
+        ircNickNonce: code,
+        ircNickNonceExpiresAt: expiresAt
+      }
+    });
+  } catch (err) {
+    // An admin addresses the user by path id, and nothing above reads it (#829).
+    translatePrismaError(err, { P2025: [404, 'User not found'] });
+  }
   return { code, expiresAt, alreadyVerified: false };
 };
 
@@ -88,15 +94,20 @@ export const claimIrcNick = async (
  * Clear both the Verified IRC Link and any pending Nick Claim for `userId`.
  */
 export const clearIrcNick = async (userId: number): Promise<void> => {
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ircNick: null,
-      pendingIrcNick: null,
-      ircNickNonce: null,
-      ircNickNonceExpiresAt: null
-    }
-  });
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ircNick: null,
+        pendingIrcNick: null,
+        ircNickNonce: null,
+        ircNickNonceExpiresAt: null
+      }
+    });
+  } catch (err) {
+    // As in claimIrcNick: an admin's path id may name no user (#829).
+    translatePrismaError(err, { P2025: [404, 'User not found'] });
+  }
 };
 
 export interface VerifyResult {
