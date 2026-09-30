@@ -30,7 +30,7 @@
  *
  * Pages are owned by the reserved System user, like the stylesheet fixtures.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -102,6 +102,10 @@ export function readWikiFixtureBody(slug: string): string {
   );
 }
 
+/** Whether a page under this fixture's slug exists — the seeded state. */
+const fixtureSeeded = async (client: PrismaClient, slug: string) =>
+  (await client.wikiPage.count({ where: { slug } })) > 0;
+
 /**
  * Seed the built-in wiki pages, owned by the System user.
  *
@@ -129,15 +133,28 @@ export async function seedWikiFixtures(
     });
     if (existing) continue;
 
-    await client.wikiPage.create({
-      data: {
-        id: fixture.id,
-        slug: fixture.slug,
-        title: fixture.title,
-        body: readWikiFixtureBody(fixture.slug),
-        authorId: systemUserId
+    try {
+      await client.wikiPage.create({
+        data: {
+          id: fixture.id,
+          slug: fixture.slug,
+          title: fixture.title,
+          body: readWikiFixtureBody(fixture.slug),
+          authorId: systemUserId
+        }
+      });
+    } catch (err) {
+      // A concurrent seed (two `POST /install`s) created this fixture after the
+      // read above (#836). Postgres names the primary key first, so the P2002
+      // cannot tell that apart from another page holding the pinned id: only a
+      // row under this slug means "already seeded".
+      const lostInsert =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002';
+      if (!lostInsert || !(await fixtureSeeded(client, fixture.slug))) {
+        throw err;
       }
-    });
+    }
   }
 
   // Reserve the fixture id block: advance the sequence to the user-page floor,

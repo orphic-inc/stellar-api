@@ -11,7 +11,7 @@
  * `resolveSiteVariables()` and substituted UI-side (ADR-0020); they are stored
  * verbatim here so the prose is the single authored source.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 export interface GoldenSubRule {
   /** Stable key, unique within the parent rule. */
@@ -238,22 +238,32 @@ export async function seedGoldenRules(client: PrismaClient): Promise<void> {
   });
   if (existing > 0) return;
 
+  // Two `POST /install`s on a fresh site run this side by side, so the count
+  // above can miss rules the other is creating (#835). A P2002 on `code`
+  // means that rule is already seeded; carry on with the rest.
   for (let i = 0; i < GOLDEN_RULES.length; i++) {
     const rule = GOLDEN_RULES[i];
-    await client.rule.create({
-      data: {
-        code: rule.code,
-        title: rule.title,
-        sortOrder: (i + 1) * 10,
-        subRules: {
-          create: rule.subRules.map((sub, j) => ({
-            code: sub.code,
-            title: sub.title,
-            description: sub.description,
-            sortOrder: (j + 1) * 10
-          }))
+    try {
+      await client.rule.create({
+        data: {
+          code: rule.code,
+          title: rule.title,
+          sortOrder: (i + 1) * 10,
+          subRules: {
+            create: rule.subRules.map((sub, j) => ({
+              code: sub.code,
+              title: sub.title,
+              description: sub.description,
+              sortOrder: (j + 1) * 10
+            }))
+          }
         }
-      }
-    });
+      });
+    } catch (err) {
+      const alreadySeeded =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002';
+      if (!alreadySeeded) throw err;
+    }
   }
 }
