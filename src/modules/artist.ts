@@ -50,19 +50,26 @@ export const createArtist = async (
   return artist;
 };
 
+/**
+ * Edit a live artist. Conditional on `deletedAt: null`, so an edit racing a
+ * withdrawal cannot rename the withdrawn artist its release credits still
+ * show (#804); the route's read is only the common case of that 404.
+ */
 export const updateArtist = async (
   id: number,
   editorId: number,
   data: { name?: string; vanityHouse?: boolean; description?: string }
 ) =>
   prisma.$transaction(async (tx) => {
-    const artist = await tx.artist.update({
-      where: { id },
+    const { count } = await tx.artist.updateMany({
+      where: { id, deletedAt: null },
       data: {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.vanityHouse !== undefined && { vanityHouse: data.vanityHouse })
       }
     });
+    if (count === 0) throw new AppError(404, 'Artist not found');
+    const artist = await tx.artist.findUniqueOrThrow({ where: { id } });
     await createArtistHistoryEntry({
       db: tx,
       artistId: id,
@@ -101,6 +108,11 @@ export const createArtistHistoryEntry = async ({
     }
   });
 
+/**
+ * Restore an artist's name and flag from a history entry. Null when the entry
+ * is missing or its artist is withdrawn: a withdrawn artist's history answers
+ * 404 everywhere else, and a revert must not edit it either (#804).
+ */
 export const revertArtistFromHistory = async ({
   historyId,
   editedBy
@@ -114,14 +126,18 @@ export const revertArtistFromHistory = async ({
   if (!entry) return null;
 
   const data = entry.data as Record<string, unknown>;
-  const artist = await prisma.artist.update({
-    where: { id: entry.artistId },
+  const { count } = await prisma.artist.updateMany({
+    where: { id: entry.artistId, deletedAt: null },
     data: {
       ...(data.name !== undefined && { name: data.name as string }),
       ...(data.vanityHouse !== undefined && {
         vanityHouse: data.vanityHouse as boolean
       })
     }
+  });
+  if (count === 0) return null;
+  const artist = await prisma.artist.findUniqueOrThrow({
+    where: { id: entry.artistId }
   });
 
   await createArtistHistoryEntry({

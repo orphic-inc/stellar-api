@@ -64,6 +64,11 @@ All notable changes to stellar-api are documented here.
   - **Both are now compare-and-swaps,** as resolving already was. A claim moves only a report that is not resolved and is unclaimed or already yours, and an unclaim only one you hold. A miss answers the existing refusal: `404`, `422`, `409` for claim, or `403` for unclaim.
   - **Resolved:** all 4 sites. 2 are closed by the compare-and-swaps, and 2 are recorded as internally derived. `noHardDelete.spec.ts` gains reports. The contract is unchanged.
 
+- **Editing or reverting an artist can no longer rename a withdrawn one** (#804, the sixteenth guard-coverage burn-down under ADR-0048: `artist.ts`). A withdrawn artist keeps its row, and release credits still show its name.
+  - **Edit:** `PUT /artists/{id}` read a live artist, then wrote by id, so an edit racing a withdrawal renamed the withdrawn artist. The write is now conditional on the artist being live, and a late edit answers the existing `404`.
+  - **Revert:** `POST /artists/revert/{historyId}` never checked at all, so it restored a withdrawn artist's old name. A withdrawn artist's history entry now answers the existing `404 History entry not found`, as its history list already did.
+  - **Resolved:** all 3 sites. 2 are closed by the conditional writes, and 1 is recorded as internally derived. The contract is unchanged.
+
 ## [0.9.10] — 2026-09-29
 
 ### Added
