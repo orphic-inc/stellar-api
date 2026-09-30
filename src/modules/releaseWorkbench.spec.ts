@@ -67,7 +67,7 @@ jest.mock('./top10', () => ({
   recomputeVoteAggregate: jest.fn()
 }));
 
-import { RegistrationStatus, FileType } from '@prisma/client';
+import { Prisma, RegistrationStatus, FileType } from '@prisma/client';
 import { releaseWorkbench } from './releaseWorkbench';
 import { getUserRankAccess } from '../lib/userRankAccess';
 import { addContributionToRelease } from './contribution';
@@ -352,6 +352,64 @@ describe('releaseWorkbench session', () => {
         action: 'edit'
       })
     });
+  });
+
+  const releaseGone = () =>
+    new Prisma.PrismaClientKnownRequestError('gone', {
+      code: 'P2025',
+      clientVersion: 'test'
+    });
+
+  it('answers 404 when the release vanished before a metadata edit (#815)', async () => {
+    prismaMock.contribution.findFirst.mockResolvedValue({ id: 5 } as never);
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.update.mockRejectedValue(releaseGone());
+
+    const session = await releaseWorkbench.open({
+      actorId: 7,
+      communityId: 1,
+      releaseId: 3
+    });
+
+    await expect(
+      session.updateMetadata({ title: 'Updated' })
+    ).rejects.toMatchObject({ statusCode: 404, message: 'Release not found' });
+    expect(prismaMock.releaseHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 when the release vanished before a revert (#814)', async () => {
+    prismaMock.contribution.findFirst.mockResolvedValue(null as never);
+    prismaMock.releaseHistory.findFirst.mockResolvedValue({
+      id: 91,
+      releaseId: 3,
+      action: 'edit',
+      createdAt: new Date('2024-06-01T00:00:00Z'),
+      snapshot: {
+        title: 'Revision Title',
+        description: 'Classic',
+        image: null,
+        year: 1959,
+        isEdition: false,
+        edition: null,
+        tagIds: [7],
+        tagNames: ['jazz']
+      },
+      after: null
+    } as never);
+    prismaMock.release.findFirst.mockResolvedValue(makeRelease() as never);
+    prismaMock.release.update.mockRejectedValue(releaseGone());
+
+    const session = await releaseWorkbench.open({
+      actorId: 7,
+      communityId: 1,
+      releaseId: 3,
+      permissions: { communities_manage: true }
+    });
+
+    await expect(
+      session.revertHistory({ historyId: 91 })
+    ).rejects.toMatchObject({ statusCode: 404, message: 'Release not found' });
+    expect(prismaMock.releaseHistory.create).not.toHaveBeenCalled();
   });
 
   it('attaches contributions through the session seam', async () => {

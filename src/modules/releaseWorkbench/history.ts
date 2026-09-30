@@ -1,6 +1,7 @@
 import { ReleaseHistoryAction } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { translatePrismaError } from '../../lib/prismaErrors';
 import { loadReleaseWorkbenchAuthority } from './authority';
 import { getReleaseWorkbenchView } from './load';
 import {
@@ -55,15 +56,21 @@ export const revertReleaseWorkbenchHistory = async (
   );
 
   await prisma.$transaction(async (tx) => {
-    await tx.release.update({
-      where: { id: ref.releaseId },
-      data: {
-        title: restoreState.title,
-        description: restoreState.description,
-        image: restoreState.image,
-        year: restoreState.year
-      }
-    });
+    // The release can vanish after the read above (#793 decides what deleting
+    // one means); answer as that read does (#814).
+    try {
+      await tx.release.update({
+        where: { id: ref.releaseId },
+        data: {
+          title: restoreState.title,
+          description: restoreState.description,
+          image: restoreState.image,
+          year: restoreState.year
+        }
+      });
+    } catch (err) {
+      translatePrismaError(err, { P2025: [404, 'Release not found'] });
+    }
 
     const changedFields = changedReleaseFields(
       currentSnapshot,
