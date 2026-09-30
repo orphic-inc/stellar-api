@@ -4,8 +4,8 @@
  * The canonical prose (`CODE_OF_CONDUCT.md`) and its seeded mirror store tokens
  * verbatim; this assembles the `variables` map that `GET /api/rules/tree` ships
  * alongside the verbatim tree. The API single-sources the VALUES; the UI does the
- * mechanical substitution and owns presentation (e.g. renders `${irc}` as the nav
- * link, `${vpns_article}` as an anchor to the resolved URL). No value is ever
+ * mechanical substitution and owns presentation (e.g. renders `${irc}` and
+ * `${vpns_article}` as anchors to the resolved URLs). No value is ever
  * duplicated cross-repo.
  *
  * Token classes:
@@ -34,8 +34,10 @@ export async function resolveSiteVariables(
     // text tokens
     site_name: site.name,
     disabled_channel: site.disabledChannel,
-    // config-backed routes
-    irc: site.ircUrl,
+    // config-backed routes. `irc` is the public page about IRC, not an in-app
+    // route: Golden Rule 1 addresses a disabled member, who has no session. The
+    // disabled login and the deactivation email name the same value (#622, #630).
+    irc: site.ircGuideUrl,
     staffpm: site.staffPmPath,
     public_kb: kb,
     // Stellar Public KB articles. Only pre-account content earns a place here:
@@ -61,11 +63,21 @@ export async function resolveSiteVariables(
     forum_rules_article: '/wiki/forum-rules',
     staff_rules_article: '/wiki/staff-rules',
     irc_rules_article: `${kb}/irc/etiquette`,
-    // How to reach IRC at all, for someone with no session: the destination the
-    // disabled login and the deactivation email name (#622). Config-backed
-    // rather than built from `kb` here, so those two read the same value.
-    irc_guide_article: site.ircGuideUrl,
     // the seeded Bugs forum (id-based; resolved by name)
     bugs_forum: bugsForum ? `/forums/${bugsForum.id}` : '/forums'
   };
 }
+
+/**
+ * The boot warning for a retired setting (#630). `STELLAR_IRC_URL` once set
+ * `${irc}`, and `.env.default` and compose's `.env.api.example` set it
+ * explicitly, so a deploy still carries it. Now `${irc}` follows
+ * `STELLAR_IRC_GUIDE_URL`; an operator who customized the old one is told
+ * rather than left to find their value silently ignored.
+ */
+export const retiredSiteEnvWarning = (
+  env: NodeJS.ProcessEnv = process.env
+): string | null =>
+  env.STELLAR_IRC_URL
+    ? 'STELLAR_IRC_URL is ignored: ${irc} now follows STELLAR_IRC_GUIDE_URL (#630)'
+    : null;

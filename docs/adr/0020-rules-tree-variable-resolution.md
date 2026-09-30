@@ -28,6 +28,8 @@ The stored bodies stay verbatim; `src/modules/goldenRules.ts` (`GOLDEN_RULES` + 
 
 - Adding/renaming a token is a two-line change in `siteVariables.ts` + the prose; the contract is the `variables` map shape, registered in `src/lib/openapi.ts` (`{ rules, variables }`) so the API/UI contract gate (ADR-0018) covers it.
 - The UI must implement substitution and per-token presentation; until it does, the rules render with literal `${...}` tokens visible. This is the downstream stellar-ui work.
-- Config values (`STELLAR_SITE_NAME`, `STELLAR_IRC_URL`, `STELLAR_DISABLED_CHANNEL`, `STELLAR_STAFFPM_PATH`, `STELLAR_PUBLIC_KB_BASE`) are all optional with sane defaults — the endpoint never fails closed on a missing variable.
+  _(Amended 2026-09-30, by [#630](https://github.com/orphic-inc/stellar-api/issues/630). **`${irc}` is the public page about IRC, not a UI route.** It resolves to `STELLAR_IRC_GUIDE_URL` (default `${public_kb}/irc`), because Golden Rule 1 addresses a disabled member, who has no session and so cannot reach any in-app route. `STELLAR_IRC_URL` (default `/irc`, a route stellar-ui never had) is retired and ignored, with a boot warning when it is still set, and the `irc_guide_article` token it duplicated is removed. The config list below is updated to match.)_
+
+- Config values (`STELLAR_SITE_NAME`, `STELLAR_DISABLED_CHANNEL`, `STELLAR_STAFFPM_PATH`, `STELLAR_PUBLIC_KB_BASE`, `STELLAR_IRC_GUIDE_URL`) are all optional with sane defaults — the endpoint never fails closed on a missing variable.
 - `${bugs_forum}` depends on the seeded Bugs forum existing; absent it, the resolver falls back to `/forums`. The `/forums/:id` route shape is assumed against stellar-ui and noted as an open confirmation in PRD-09.
 - CRS micro-impact magnitudes remain PRD-05 TBD; seeded weights are `0`, so resolution and scoring evolve independently.

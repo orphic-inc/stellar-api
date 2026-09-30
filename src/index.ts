@@ -1,9 +1,13 @@
 import { http } from './modules/config';
 import { getLogger } from './modules/logging';
+import { retiredSiteEnvWarning } from './modules/siteVariables';
 import { prisma } from './lib/prisma';
 import app from './app';
 
 const log = getLogger('app');
+
+const retired = retiredSiteEnvWarning();
+if (retired) log.warn(retired);
 
 const server = app.listen(http.port, () =>
   log.info(`Listening on port ${http.port}`)
