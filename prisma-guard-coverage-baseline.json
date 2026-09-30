@@ -121,12 +121,11 @@
     "src/modules/profile.ts::updateProfile::profile.update": "Addressed by the profileId read off the member's own User row in this call; PUT /profile/me takes the member from the session. Profiles live as long as their user and are never hard-deleted (noHardDelete.spec.ts), and the write sets no unique column. #828.",
     "src/modules/profile.ts::updateProfile::userSettings.update": "Addressed by the userSettingsId read off the member's own User row in this call; PUT /profile/me takes the member from the session. Settings rows are never hard-deleted (noHardDelete.spec.ts). activeAuthorStylesheetId is pre-read, and author stylesheets are withdrawn by deletedAt, never deleted (noHardDelete.spec.ts). No unique column is written. #828.",
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert": "userId is the session user (PUT /profile/me/donor-rewards), and users are never hard-deleted (noHardDelete.spec.ts). The upsert runs only with a non-empty update, which Prisma compiles to a native INSERT … ON CONFLICT (\"userId\"), so two first writes cannot meet the unique key. #830.",
-    "src/modules/notificationFilters.ts::created::notificationFilter.create": "userId is the session user (POST /notification-filters), and users are never hard-deleted (noHardDelete.spec.ts). NotificationFilter carries no unique constraint, and artistIds/communityIds are plain arrays, not relations. #831."
+    "src/modules/notificationFilters.ts::created::notificationFilter.create": "userId is the session user (POST /notification-filters), and users are never hard-deleted (noHardDelete.spec.ts). NotificationFilter carries no unique constraint, and artistIds/communityIds are plain arrays, not relations. #831.",
+    "src/modules/tag.ts::tag::tag.upsert": "promoteTag's upsert has one unique field (name) in its where, a scalar update and no nested writes, so Prisma compiles it to a native INSERT … ON CONFLICT (\"name\") DO UPDATE (probed); two concurrent promotions of one new name both succeed. Tag has no foreign key the create sets. #841."
   },
   "unreviewed": [
     "src/modules/assetStore.ts::putAsset::asset.update",
-    "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
-    "src/modules/tag.ts::demoteTag::tag.update",
-    "src/modules/tag.ts::tag::tag.upsert"
+    "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert"
   ]
 }

@@ -2,6 +2,7 @@
  * Unit tests for the tag name rule (#689, ADR-0047) and the curated tag
  * vocabulary (#298, ADR-0045).
  */
+import { Prisma } from '@prisma/client';
 
 const mockTag = {
   upsert: jest.fn(),
@@ -192,6 +193,19 @@ describe('demoteTag', () => {
     expect(mockTag.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 1 }, data: { isOfficial: false } })
     );
+  });
+
+  it('answers 404 for an id that names no tag (#841)', async () => {
+    mockTag.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: 'test'
+      })
+    );
+    await expect(demoteTag(999)).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Tag not found'
+    });
   });
 });
 
