@@ -95,9 +95,9 @@ describe('deleteComment', () => {
       where: { id: comment.id }
     });
 
-    await expect(deleteComment(comment.id, author.id, true)).rejects.toThrow(
-      expect.objectContaining({ code: 'P2025' })
-    );
+    await expect(
+      deleteComment(comment.id, author.id, true)
+    ).rejects.toMatchObject({ statusCode: 404, message: 'Comment not found' });
 
     const dbComment = await testPrisma.comment.findUniqueOrThrow({
       where: { id: comment.id }

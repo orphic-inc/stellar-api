@@ -1,5 +1,6 @@
 import { Comment, CommentPage } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { translatePrismaError } from '../lib/prismaErrors';
 import {
   communityReadableWhere,
   contributionVisibleTo,
@@ -11,23 +12,30 @@ export const deleteComment = async (
   id: number,
   actorId: number,
   isModAction: boolean
-) =>
-  prisma.$transaction([
-    // Only a live comment (#703): a second delete throws P2025 and the batch
-    // drops its audit row, rather than re-stamping and logging it twice.
-    prisma.comment.update({
-      where: { id, deletedAt: null },
-      data: { deletedAt: new Date() }
-    }),
-    prisma.auditLog.create({
-      data: {
-        actorId,
-        action: isModAction ? 'comment.mod_delete' : 'comment.delete',
-        targetType: 'Comment',
-        targetId: id
-      }
-    })
-  ]);
+): Promise<void> => {
+  try {
+    await prisma.$transaction([
+      // Only a live comment (#703): a second delete throws P2025 and the batch
+      // drops its audit row, rather than re-stamping and logging it twice.
+      prisma.comment.update({
+        where: { id, deletedAt: null },
+        data: { deletedAt: new Date() }
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId,
+          action: isModAction ? 'comment.mod_delete' : 'comment.delete',
+          targetType: 'Comment',
+          targetId: id
+        }
+      })
+    ]);
+  } catch (err) {
+    // A delete that lost the race to another; the caller's read cannot close
+    // it (#838).
+    translatePrismaError(err, { P2025: [404, 'Comment not found'] });
+  }
+};
 
 type ThreadCheck = (pageId: number, viewerId: number) => Promise<boolean>;
 

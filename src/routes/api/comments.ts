@@ -404,12 +404,8 @@ router.delete(
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    try {
-      await deleteComment(id, req.user.id, !isOwner);
-    } catch (err) {
-      // Lost a race with another delete; the read above cannot close it.
-      translatePrismaError(err, { P2025: [404, 'Comment not found'] });
-    }
+    // A delete that loses the race to another answers 404 from deleteComment.
+    await deleteComment(id, req.user.id, !isOwner);
     res.status(204).send();
   })
 );

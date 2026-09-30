@@ -125,11 +125,8 @@
   },
   "unreviewed": [
     "src/modules/assetStore.ts::putAsset::asset.update",
-    "src/modules/comment.ts::deleteComment::auditLog.create",
-    "src/modules/comment.ts::deleteComment::comment.update",
     "src/modules/statsHistory.ts::captureSiteStats::siteStatSnapshot.upsert",
     "src/modules/tag.ts::demoteTag::tag.update",
-    "src/modules/tag.ts::tag::tag.upsert",
-    "src/modules/topicSession.ts::markTopicRead::forumLastReadTopic.upsert"
+    "src/modules/tag.ts::tag::tag.upsert"
   ]
 }

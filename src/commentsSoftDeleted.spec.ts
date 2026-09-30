@@ -6,6 +6,7 @@ import {
   prismaMock
 } from './test/apiTestHarness';
 import { makeComment } from './test/factories';
+import { AppError } from './lib/errors';
 
 // #703: `deleteComment` only stamps `deletedAt` and keeps the body, so PUT and
 // DELETE on /comments/:id must treat a soft-deleted comment as missing — at
@@ -85,7 +86,8 @@ describe('DELETE /api/comments/:id — soft-deleted comments (#703)', () => {
     prismaMock.comment.findUnique.mockResolvedValue(
       makeComment({ id: 12, authorId: 7 }) as never
     );
-    deleteCommentMock.mockRejectedValue(prismaErr('P2025'));
+    // deleteComment translates the lost race itself (#838).
+    deleteCommentMock.mockRejectedValue(new AppError(404, 'Comment not found'));
 
     const res = await request(app).delete('/api/comments/12');
 

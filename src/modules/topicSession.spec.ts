@@ -14,9 +14,6 @@ const mockTx = {
   },
   subscription: {
     findUnique: jest.fn()
-  },
-  forumLastReadTopic: {
-    upsert: jest.fn()
   }
 };
 
@@ -38,9 +35,6 @@ jest.mock('../lib/prisma', () => ({
     },
     subscription: {
       findUnique: jest.fn()
-    },
-    forumLastReadTopic: {
-      upsert: jest.fn()
     },
     $transaction: jest.fn((arg: unknown) => {
       if (typeof arg === 'function') return arg(mockTx);
@@ -86,8 +80,7 @@ import {
   deleteTopic,
   trashTopic,
   replyToTopic,
-  voteTopicPoll,
-  markTopicRead
+  voteTopicPoll
 } from './topicSession';
 
 // ─── Typed mocks ─────────────────────────────────────────────────────────────
@@ -98,7 +91,6 @@ const prismaMock = prisma as unknown as {
   forumPost: { findMany: jest.Mock; count: jest.Mock; findFirst: jest.Mock };
   forumPoll: { findUnique: jest.Mock };
   subscription: { findUnique: jest.Mock };
-  forumLastReadTopic: { upsert: jest.Mock };
   $transaction: jest.Mock;
 };
 const createPostForumMock = forumCreatePost as jest.Mock;
@@ -596,57 +588,5 @@ describe('voteTopicPoll', () => {
       { id: 7, userRankLevel: 1000, permittedForumIds: [] },
       0
     );
-  });
-});
-
-// ─── markTopicRead ────────────────────────────────────────────────────────────
-
-describe('markTopicRead', () => {
-  const mockPost = {
-    id: 21,
-    forumTopicId: 44,
-    deletedAt: null,
-    forumTopic: {
-      forumId: 9,
-      forum: { minClassRead: 0 }
-    }
-  };
-
-  it('throws 404 when the post does not exist', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue(null);
-
-    await expect(markTopicRead(44, 99, baseActor)).rejects.toMatchObject({
-      statusCode: 404
-    });
-  });
-
-  it('throws 403 when the user rank is below minClassRead', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue({
-      ...mockPost,
-      forumTopic: { forumId: 9, forum: { minClassRead: 500 } }
-    } as never);
-
-    await expect(
-      markTopicRead(44, 21, { ...baseActor, userRankLevel: 10 })
-    ).rejects.toMatchObject({ statusCode: 403 });
-  });
-
-  it('upserts the last-read record and returns it', async () => {
-    prismaMock.forumPost.findFirst.mockResolvedValue(mockPost as never);
-    prismaMock.forumLastReadTopic.upsert.mockResolvedValue({
-      id: 1,
-      userId: 7,
-      forumTopicId: 44,
-      forumPostId: 21
-    });
-
-    const result = await markTopicRead(44, 21, baseActor);
-
-    expect(result.forumPostId).toBe(21);
-    expect(prismaMock.forumLastReadTopic.upsert).toHaveBeenCalledWith({
-      where: { userId_forumTopicId: { userId: 7, forumTopicId: 44 } },
-      create: { userId: 7, forumTopicId: 44, forumPostId: 21 },
-      update: { forumPostId: 21 }
-    });
   });
 });
