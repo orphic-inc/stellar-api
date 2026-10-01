@@ -377,7 +377,9 @@ const AuthUser = registry.register(
       permissions: z.record(z.string(), z.boolean()).optional(),
       personalCollageLimit: z.number().int().optional(),
       authorStylesheetLimit: z.number().int().optional(),
-      assetLimit: z.number().int().nullable().optional(),
+      // #716: the primary rank's upload allowance, as enforced. Null is
+      // unlimited and 0 is none, so a client disables its upload control on 0.
+      assetLimit: z.number().int().nullable(),
       // #715: the primary rank's allowance, as enforced. Null is unlimited and
       // 0 is none, so a client hides the filters entry point on 0 only.
       notificationFilterLimit: z.number().int().nullable()

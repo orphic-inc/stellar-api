@@ -168,6 +168,41 @@ describe('toAuthUser — the notification filter allowance (#715)', () => {
   });
 });
 
+describe('toAuthUser — the asset upload allowance (#716)', () => {
+  // The primary rank's value, as routes/api/asset.ts enforces it (#369).
+  const withLimits = (primary: number | null, secondary?: number | null) => {
+    const raw = rawUser(
+      { personalCollageLimit: 0, authorStylesheetLimit: 0 },
+      secondary === undefined
+        ? []
+        : [{ personalCollageLimit: 0, authorStylesheetLimit: 0 }]
+    ) as unknown as {
+      userRank: Record<string, unknown>;
+      secondaryRanks: { userRank: Record<string, unknown> }[];
+    };
+    raw.userRank.assetLimit = primary;
+    if (secondary !== undefined)
+      raw.secondaryRanks[0].userRank.assetLimit = secondary;
+    return toAuthUser(raw as unknown as Parameters<typeof toAuthUser>[0]);
+  };
+
+  it('is selected for the session', () => {
+    expect(authUserSelect.userRank.select.assetLimit).toBe(true);
+  });
+
+  it('carries the primary rank’s cap', () => {
+    expect(withLimits(3).userRank.assetLimit).toBe(3);
+  });
+
+  it('keeps unlimited as null, never 0: 0 means the rank has none', () => {
+    expect(withLimits(null).userRank.assetLimit).toBeNull();
+  });
+
+  it('is not raised by a secondary rank, which enforcement does not read', () => {
+    expect(withLimits(0, 5).userRank.assetLimit).toBe(0);
+  });
+});
+
 /**
  * `warnedUntil` (#719): when the member's own warned state ends, for the expiry
  * tooltip on their own name. On the session, not AuthorRef, so no viewer ever
