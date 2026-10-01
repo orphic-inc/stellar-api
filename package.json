@@ -27,6 +27,7 @@
     "openapi:failure-coverage": "ts-node -T src/scripts/check-openapi-failure-coverage.ts",
     "openapi:gate-marks": "ts-node -T src/scripts/check-gate-marks.ts",
     "version:check": "ts-node -T src/scripts/check-version-consistency.ts",
+    "env:coverage": "ts-node -T src/scripts/check-env-coverage.ts",
     "changelog:check": "ts-node -T src/scripts/check-changelog.ts",
     "db:generate": "prisma generate",
     "db:erd": "prisma generate --generator erd",

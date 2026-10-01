@@ -141,6 +141,12 @@ jobs:
       - name: Version consistency
         if: ${{ !cancelled() }}
         run: npm run version:check
+      - name: Environment coverage
+        # #682: runtime env reads ⊆ .env.default ⊆ docs/README.md's table, no
+        # .env.default variable read by nothing, and AGENTS.md's curated table
+        # ⊆ .env.default. Drifted twice by hand before this (#653, #737).
+        if: ${{ !cancelled() }}
+        run: npm run env:coverage
       - name: Version consistency (tag)
         if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
         run: git fetch --tags --force && npm run version:check -- --check-tag
