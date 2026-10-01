@@ -63,7 +63,13 @@ describe('literal addresses', () => {
     ['IPv6 loopback', 'http://[::1]:8080/'],
     ['IPv6 unique-local', 'http://[fc00::1]/'],
     ['IPv6 link-local', 'http://[fe80::1]/'],
-    ['IPv4-mapped loopback', 'http://[::ffff:127.0.0.1]/']
+    ['IPv4-mapped loopback', 'http://[::ffff:127.0.0.1]/'],
+    // BlockList unwraps only the mapped form above; these carry an IPv4
+    // address it would not see (#863).
+    ['IPv4-compatible loopback', 'http://[::127.0.0.1]/'],
+    ['NAT64 well-known metadata', 'http://[64:ff9b::a9fe:a9fe]/'],
+    ['NAT64 local-use loopback', 'http://[64:ff9b:1::7f00:1]/'],
+    ['6to4 loopback', 'http://[2002:7f00:1::]/']
   ])('rejects %s', async (_label, url) => {
     const result = await checkPublicUrl(url);
     expect(result.ok).toBe(false);
@@ -77,6 +83,13 @@ describe('literal addresses', () => {
     await expect(checkPublicUrl('http://93.184.216.34/f.zip')).resolves.toEqual(
       expect.objectContaining({ ok: true })
     );
+  });
+
+  // The #863 prefixes are narrow: ordinary global unicast still passes.
+  it('allows a public IPv6 literal', async () => {
+    await expect(
+      checkPublicUrl('http://[2606:4700:4700::1111]/')
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('never consults DNS for a literal address', async () => {
@@ -94,6 +107,13 @@ describe('name resolution', () => {
       'reason',
       expect.stringContaining('resolves to non-routable address')
     );
+  });
+
+  it('rejects a name whose AAAA record embeds a private IPv4 (#863)', async () => {
+    resolvesTo('64:ff9b::7f00:1');
+    await expect(
+      checkPublicUrl('http://nat64.example.com/')
+    ).resolves.toMatchObject({ ok: false });
   });
 
   // Fail-closed: which address the HTTP client picks is not ours to predict, so

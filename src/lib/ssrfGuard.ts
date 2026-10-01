@@ -65,6 +65,16 @@ BLOCKED.addAddress('::1', 'ipv6'); // loopback
 BLOCKED.addSubnet('fc00::', 7, 'ipv6'); // unique local
 BLOCKED.addSubnet('fe80::', 10, 'ipv6'); // link-local
 BLOCKED.addSubnet('ff00::', 8, 'ipv6'); // multicast
+// IPv6 forms that carry an IPv4 address (#863). `BlockList` unwraps only the
+// mapped form (::ffff:0:0/96), so a private IPv4 inside any of these would
+// pass the IPv4 rules above. Each is blocked whole, not unwrapped: a DNS64
+// host's public sites live in 64:ff9b::/96 too, and that topology is not one
+// Stellar ships, so failing closed costs nothing and keeps the translator
+// itself out of reach.
+BLOCKED.addSubnet('::', 96, 'ipv6'); // IPv4-compatible (RFC 4291, deprecated)
+BLOCKED.addSubnet('64:ff9b::', 96, 'ipv6'); // NAT64 well-known (RFC 6052)
+BLOCKED.addSubnet('64:ff9b:1::', 48, 'ipv6'); // NAT64 local-use (RFC 8215)
+BLOCKED.addSubnet('2002::', 16, 'ipv6'); // 6to4 (RFC 3056, deprecated)
 
 /**
  * `addresses` are the ones the check vetted: every address the name resolved to,
