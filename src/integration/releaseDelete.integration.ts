@@ -50,10 +50,9 @@ const makeUser = async () => {
 
 /**
  * A release created as the api creates one, so with its default edition,
- * credit and history, plus one of each row that hangs off it.
+ * credit and history, tagged once.
  */
-const ghostRelease = async () => {
-  const user = await makeUser();
+const createRelease = async (actorId: number) => {
   const community = await testPrisma.community.create({
     data: {
       name: `Community-${randomUUID().slice(0, 8)}`,
@@ -69,7 +68,7 @@ const ghostRelease = async () => {
     data: { name: `jazz-${randomUUID().slice(0, 8)}` }
   });
   const release = await createCommunityRelease({
-    actorId: user.id,
+    actorId,
     communityId: community.id,
     data: {
       credits: [{ artistId: artist.id }],
@@ -81,45 +80,43 @@ const ghostRelease = async () => {
       tagIds: [jazz.id]
     }
   });
+  return { communityId: community.id, releaseId: release.id, tagId: jazz.id };
+};
+
+/** One of each row a member or curator hangs off a release. */
+const hangRowsOff = async (releaseId: number, userId: number) => {
   const group = await testPrisma.releaseGroup.create({
     data: { title: 'Kind of Blue', identityKey: `kob-${randomUUID()}` }
   });
   await testPrisma.release.update({
-    where: { id: release.id },
+    where: { id: releaseId },
     data: { releaseGroupId: group.id }
   });
   const comment = await testPrisma.comment.create({
-    data: {
-      page: 'release',
-      releaseId: release.id,
-      authorId: user.id,
-      body: 'Nice'
-    }
+    data: { page: 'release', releaseId, authorId: userId, body: 'Nice' }
   });
-  await testPrisma.bookmarkRelease.create({
-    data: { userId: user.id, releaseId: release.id }
-  });
+  await testPrisma.bookmarkRelease.create({ data: { userId, releaseId } });
   await testPrisma.releaseVote.create({
-    data: { userId: user.id, releaseId: release.id, positive: true }
+    data: { userId, releaseId, positive: true }
   });
   const collage = await testPrisma.collage.create({
     data: {
       name: `Collage-${randomUUID().slice(0, 8)}`,
       description: 'd',
-      userId: user.id,
+      userId,
       numEntries: 1,
-      entries: { create: { releaseId: release.id, userId: user.id } }
+      entries: { create: { releaseId, userId } }
     }
   });
-  return {
-    actorId: user.id,
-    communityId: community.id,
-    releaseId: release.id,
-    tagId: jazz.id,
-    groupId: group.id,
-    collageId: collage.id,
-    commentId: comment.id
-  };
+  return { groupId: group.id, collageId: collage.id, commentId: comment.id };
+};
+
+/** A release with no contributions, and every kind of row off it. */
+const ghostRelease = async () => {
+  const user = await makeUser();
+  const release = await createRelease(user.id);
+  const rows = await hangRowsOff(release.releaseId, user.id);
+  return { actorId: user.id, ...release, ...rows };
 };
 
 /** A contribution on the release's default edition, as an upload writes it. */
