@@ -1346,6 +1346,55 @@
             ],
             "description": "Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did."
           },
+          "ratioWatch": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "expiresAt": {
+                "type": "string"
+              },
+              "deficit": {
+                "type": "string"
+              },
+              "consumedSinceWatch": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "expiresAt",
+              "deficit",
+              "consumedSinceWatch"
+            ],
+            "description": "An active ratio watch, shown to every viewer. Null unless the member is on an unexpired watch and still short of the required ratio. `deficit` is the bytes still to contribute; byte figures are strings."
+          },
+          "ratioPolicy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "OK",
+                  "WATCH",
+                  "DOWNLOAD_DISABLED"
+                ]
+              },
+              "disabledCause": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "RATIO",
+                  "STAFF",
+                  null
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "disabledCause"
+            ],
+            "description": "The member's ratio policy status. Null unless the viewer holds ratio_policy_manage; `disabledCause` is null unless DOWNLOAD_DISABLED."
+          },
           "staffBio": {
             "type": "string",
             "nullable": true
@@ -1446,6 +1495,8 @@
           "inviteCount",
           "canInvite",
           "invitedBy",
+          "ratioWatch",
+          "ratioPolicy",
           "staffBio",
           "stats",
           "userRank",
@@ -1545,6 +1596,55 @@
               "inviter"
             ],
             "description": "Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did."
+          },
+          "ratioWatch": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "expiresAt": {
+                "type": "string"
+              },
+              "deficit": {
+                "type": "string"
+              },
+              "consumedSinceWatch": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "expiresAt",
+              "deficit",
+              "consumedSinceWatch"
+            ],
+            "description": "An active ratio watch, shown to every viewer. Null unless the member is on an unexpired watch and still short of the required ratio. `deficit` is the bytes still to contribute; byte figures are strings."
+          },
+          "ratioPolicy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "OK",
+                  "WATCH",
+                  "DOWNLOAD_DISABLED"
+                ]
+              },
+              "disabledCause": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "RATIO",
+                  "STAFF",
+                  null
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "disabledCause"
+            ],
+            "description": "The member's ratio policy status. Null unless the viewer holds ratio_policy_manage; `disabledCause` is null unless DOWNLOAD_DISABLED."
           },
           "staffBio": {
             "type": "string",
@@ -1649,6 +1749,8 @@
           "inviteCount",
           "canInvite",
           "invitedBy",
+          "ratioWatch",
+          "ratioPolicy",
           "staffBio",
           "stats",
           "userRank",

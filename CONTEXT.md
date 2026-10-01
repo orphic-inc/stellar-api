@@ -66,6 +66,14 @@ _Avoid_: Work (that is the composition), master, album row, group, container
 The standalone `contributed`/`consumed` download gate (required-ratio brackets + the `OK/WATCH/LEECH_DISABLED` policy). Distinct from **RatioScore**. The Ratio Mechanism never reads CRS.
 _Avoid_: ratio score, ratio policy (when meaning the whole gate)
 
+**Ratio Watch**:
+The `WATCH` state of the **Ratio Mechanism**: a member below their required ratio, with a deadline (`watchExpiresAt`) to recover before downloads are disabled. An active watch is public on the member's profile whatever their privacy flags say (ADR-0052); a disable is shown only to `ratio_policy_manage`.
+_Avoid_: ratio warning, probation
+
+**Watch Deficit**:
+The bytes a member on **Ratio Watch** must still contribute to meet their required ratio: the required ratio times `consumed`, less `contributed`. Shown as `deficit` on the profile.
+_Avoid_: debt, owed, balance due
+
 **RatioScore**:
 A bounded CRS **Dimension Scorer** derived one-way from a user's current ratio health. An input to reputation, never an enforcement lever.
 _Avoid_: ratio, required ratio

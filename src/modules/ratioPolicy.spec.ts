@@ -29,7 +29,11 @@ jest.mock('../lib/prisma', () => ({
 }));
 
 jest.mock('./ratio', () => ({
-  getRatioStats: jest.fn()
+  getRatioStats: jest.fn(),
+  getEligibleContributionBytes: jest.fn(),
+  // The real bracket table, as a plain function so resetMocks leaves it be.
+  computeRequiredRatio: (consumed: bigint, eligible: bigint) =>
+    jest.requireActual('./ratio').computeRequiredRatio(consumed, eligible)
 }));
 
 jest.mock('./logging', () => ({
@@ -45,11 +49,12 @@ jest.mock('./rankProgressionJob', () => ({
 import {
   applyRatioRules,
   evaluateRatioPolicy,
+  getProfileRatioViews,
   listRatioWatch,
   overridePolicyStatus
 } from './ratioPolicy';
 import { resolveSystemActorId } from './rankProgressionJob';
-import { getRatioStats } from './ratio';
+import { getEligibleContributionBytes, getRatioStats } from './ratio';
 import { audit } from '../lib/audit';
 import { sendSystemMessage } from './pm';
 
@@ -487,5 +492,119 @@ describe('listRatioWatch', () => {
     // The tiebreak is only a tiebreak if it is unique. `RatioPolicyState` has
     // no `id` column; `userId` is the @id, which is what makes this total.
     expect(args.skip).toBe(25);
+  });
+});
+
+describe('getProfileRatioViews (#658)', () => {
+  const NOW = new Date('2026-10-01T00:00:00Z');
+  const LATER = new Date('2026-10-08T00:00:00Z');
+  const EARLIER = new Date('2026-09-30T00:00:00Z');
+  // 200 GiB consumed sits in the top bracket: 0.6 required with no coverage.
+  const short = { contributed: 100n * GiB, consumed: 200n * GiB };
+  const mockEligible = getEligibleContributionBytes as jest.MockedFunction<
+    typeof getEligibleContributionBytes
+  >;
+
+  beforeEach(() => mockEligible.mockResolvedValue(0n));
+
+  const watchRow = (over: Record<string, unknown> = {}) => ({
+    status: RatioPolicyStatus.WATCH,
+    watchExpiresAt: LATER,
+    consumedAtWatchStart: 190n * GiB,
+    disabledCause: null,
+    ...over
+  });
+
+  it('shows an active watch to a viewer without the permission', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(watchRow());
+
+    const views = await getProfileRatioViews(1, short, false, NOW);
+
+    expect(views).toEqual({
+      ratioWatch: {
+        expiresAt: LATER.toISOString(),
+        deficit: (20n * GiB).toString(),
+        consumedSinceWatch: (10n * GiB).toString()
+      },
+      ratioPolicy: null
+    });
+  });
+
+  it('counts nothing consumed during a watch with no baseline', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(
+      watchRow({ consumedAtWatchStart: null })
+    );
+
+    const views = await getProfileRatioViews(1, short, false, NOW);
+
+    expect(views.ratioWatch?.consumedSinceWatch).toBe('0');
+  });
+
+  it('hides an expired watch, without reading contributions', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(
+      watchRow({ watchExpiresAt: EARLIER })
+    );
+
+    const views = await getProfileRatioViews(1, short, false, NOW);
+
+    expect(views.ratioWatch).toBeNull();
+    expect(mockEligible).not.toHaveBeenCalled();
+  });
+
+  it('hides a watch the member is no longer short on', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(watchRow());
+
+    const views = await getProfileRatioViews(
+      1,
+      { contributed: 120n * GiB, consumed: 200n * GiB },
+      false,
+      NOW
+    );
+
+    expect(views.ratioWatch).toBeNull();
+  });
+
+  it('hides a download disable from a viewer without the permission', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(
+      watchRow({
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        disabledCause: RatioDisableCause.STAFF
+      })
+    );
+
+    const views = await getProfileRatioViews(1, short, false, NOW);
+
+    expect(views).toEqual({ ratioWatch: null, ratioPolicy: null });
+    expect(mockEligible).not.toHaveBeenCalled();
+  });
+
+  it('shows ratio_policy_manage a download disable and its cause', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(
+      watchRow({
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        disabledCause: RatioDisableCause.STAFF
+      })
+    );
+
+    const views = await getProfileRatioViews(1, short, true, NOW);
+
+    expect(views).toEqual({
+      ratioWatch: null,
+      ratioPolicy: {
+        status: RatioPolicyStatus.DOWNLOAD_DISABLED,
+        disabledCause: RatioDisableCause.STAFF
+      }
+    });
+  });
+
+  it('reads a member with no policy row as OK', async () => {
+    mockPrismaPolicy.findUnique.mockResolvedValue(null);
+
+    const views = await getProfileRatioViews(1, short, true, NOW);
+
+    expect(views).toEqual({
+      ratioWatch: null,
+      ratioPolicy: { status: RatioPolicyStatus.OK, disabledCause: null }
+    });
   });
 });
