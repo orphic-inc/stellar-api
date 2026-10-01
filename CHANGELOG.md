@@ -23,6 +23,11 @@ All notable changes to stellar-api are documented here.
   - `POST` and `PUT /tools/promotion-rules` now reject a `fromRank` or `toRank` at level 500 or above with `422`. A rule from Stellarige to Staff used to be accepted, though the sweep never promotes into a staff rank.
   - A rank moved to level 500 or above now reports the rules into or out of it in `staleRules`, even when the levels stay adjacent.
   - The staff level is now one constant, `STAFF_LEVEL` in `rankProgression.ts`, shared by the promotion sweep, the inactivity sweep and the invite handout.
+- **`DELETE /communities/{communityId}/releases/{releaseId}` now deletes a release with no contributions** (#793). Every release keeps an edition, and Edition → Release is Restrict, so the verb answered `409` (before #596, `500`) for every release.
+  - It now removes the release with its editions, credits, comments and bookmarks. Tag occurrences and collage entry counts are decremented.
+  - It leaves an `audit` row (`release.delete`), plus a line in the release group's log when the release was in one.
+  - A release with any contribution is still refused with `409`, now worded `A release with contributions cannot be deleted`.
+- **`POST /communities/{communityId}/releases/{releaseId}/contributions` answers `404` when the release is deleted mid-upload** (#793), rather than `500`.
 
 ### Removed
 
