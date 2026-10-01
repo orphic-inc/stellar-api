@@ -84,6 +84,7 @@ npm run openapi:completeness # are all mounted routes registered in lib/openapi.
 npm run openapi:gate-marks   # does every layer ahead of a handler carry markGate or markNotGate? (#558; gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
+npm run env:coverage     # do the code, .env.default, docs/README.md and this file agree on env vars? (#682; gated)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
 npm run db:seed          # recreate default user ranks after a DB reset; then go to /install
 npm run db:reset         # prisma migrate reset
@@ -178,6 +179,12 @@ before concluding a branch is failing.
 ## Environment
 
 Copy `.env.default` → `.env`.
+
+This table is the subset agents reach for most, not the full list. `.env.default`
+lists every variable an operator sets, and the
+[environment reference](docs/README.md#environment-reference) explains each one.
+`npm run env:coverage` holds them to the code. It also fails on a name here that
+`.env.default` no longer has, so a retired variable leaves this table too (#682).
 
 | Variable                            | Purpose                                                                                                                                       |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
