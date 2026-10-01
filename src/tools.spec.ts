@@ -177,6 +177,80 @@ describe('PUT /api/tools/user-ranks/:id', () => {
   });
 });
 
+// #718: a level change that takes promotion rules off the ladder reports them.
+describe('PUT /api/tools/user-ranks/:id — staleRules', () => {
+  // User 100 → Member 150 → Power User 200, with a rule for each step and one
+  // already off the ladder before any change (its toRank is not a primary).
+  const ladder = [
+    { id: 1, level: 100, secondary: false },
+    { id: 2, level: 150, secondary: false },
+    { id: 3, level: 200, secondary: false },
+    { id: 9, level: 50, secondary: true }
+  ];
+  // A function, not a value: makePromotionRule is declared further down.
+  const rules = () => [
+    makePromotionRule({ id: 1, fromRankId: 1, toRankId: 2 }),
+    makePromotionRule({ id: 2, fromRankId: 2, toRankId: 3 }),
+    makePromotionRule({ id: 3, fromRankId: 1, toRankId: 9 })
+  ];
+
+  /** Rank 2 moves from 150 to `level`; reads see the ladder after the move. */
+  const moveMember = (level: number) => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeRank({ id: 2, level: 150 }) as never
+    );
+    prismaMock.userRank.update.mockResolvedValue(
+      makeRank({ id: 2, level }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+    prismaMock.userRank.findMany.mockResolvedValue(
+      ladder.map((r) => (r.id === 2 ? { ...r, level } : r)) as never
+    );
+    prismaMock.rankPromotionRule.findMany.mockResolvedValue(rules() as never);
+    return request(app).put('/api/tools/user-ranks/2').send({ level });
+  };
+
+  beforeEach(() => {
+    setRankPermissionsManager();
+  });
+
+  it('lists the rules the change took off the ladder, and only those', async () => {
+    // Member above Power User: User → Member now skips a rung, and Member →
+    // Power User now steps down. Rule 3 was already off and is not reported.
+    const res = await moveMember(250);
+
+    expect(res.status).toBe(200);
+    expect(res.body.level).toBe(250);
+    expect(res.body.staleRules.map((r: { id: number }) => r.id)).toEqual([
+      1, 2
+    ]);
+    expect(res.body.staleRules[0].minContributed).toBe('536870912000');
+  });
+
+  it('omits staleRules when the ladder order survives the change', async () => {
+    const res = await moveMember(175);
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('staleRules');
+  });
+
+  it('does not read the rules when neither level nor secondary changed', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(makeRank() as never);
+    prismaMock.userRank.update.mockResolvedValue(
+      makeRank({ name: 'Renamed' }) as never
+    );
+    prismaMock.auditLog.create.mockResolvedValue({} as never);
+
+    const res = await request(app)
+      .put('/api/tools/user-ranks/1')
+      .send({ name: 'Renamed' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('staleRules');
+    expect(prismaMock.rankPromotionRule.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /api/tools/user-ranks/:id', () => {
   beforeEach(() => {
     setRankPermissionsManager();
@@ -509,6 +583,30 @@ describe('POST /api/tools/promotion-rules', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.msg).toMatch(/adjacent/);
+  });
+
+  // #718: the ladder check looks only between the ends, so a secondary end
+  // passed it and the rule sat dead.
+  it.each([
+    ['fromRank', 1],
+    ['toRank', 2]
+  ])('returns 422 when %s is a secondary rank', async (_end, secondaryId) => {
+    prismaMock.userRank.findUnique.mockImplementation(((args: {
+      where: { id?: number };
+    }) =>
+      Promise.resolve({
+        level: args.where.id === 1 ? 100 : 150,
+        secondary: args.where.id === secondaryId
+      })) as never);
+    prismaMock.userRank.findMany.mockResolvedValue([] as never);
+
+    const res = await request(app)
+      .post('/api/tools/promotion-rules')
+      .send({ fromRankId: 1, toRankId: 2 });
+
+    expect(res.status).toBe(422);
+    expect(res.body.msg).toMatch(/primary/);
+    expect(prismaMock.rankPromotionRule.create).not.toHaveBeenCalled();
   });
 
   it('returns 409 on a duplicate rank pair', async () => {

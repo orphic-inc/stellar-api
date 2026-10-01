@@ -4957,6 +4957,39 @@ const UserRank = registry.register(
   })
 );
 
+// ─── Rank Promotion Rule schema (#170) ──────────────────────────────────────────
+// minContributed is bytes and crosses the wire as a string (past MAX_SAFE_INTEGER).
+
+const RankExtraPredicateEnum = z
+  .enum(['DISTINCT_RELEASES_500', 'QUALITY_CONTRIB_500'])
+  .nullable();
+
+const PromotionRule = registry.register(
+  'PromotionRule',
+  z.object({
+    id: z.number(),
+    fromRankId: z.number(),
+    fromRankName: z.string().nullable(),
+    toRankId: z.number(),
+    toRankName: z.string().nullable(),
+    minContributed: z.string(),
+    minRatio: z.number(),
+    minContributions: z.number(),
+    minAccountAgeDays: z.number(),
+    extra: RankExtraPredicateEnum,
+    enabled: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  })
+);
+
+// The PUT /tools/user-ranks/{id} response: the rank, plus the promotion rules
+// this change took off the ladder, present only when there are any (#718).
+const UserRankUpdated = registry.register(
+  'UserRankUpdated',
+  UserRank.extend({ staleRules: z.array(PromotionRule).optional() })
+);
+
 const StaffGroup = registry.register(
   'StaffGroup',
   z.object({
@@ -6319,8 +6352,9 @@ registry.registerPath({
   },
   responses: {
     200: {
-      description: 'User rank updated',
-      content: { 'application/json': { schema: UserRank } }
+      description:
+        'User rank updated. `staleRules` is present only when this level or secondary change took promotion rules off the ladder; the change is not refused, and the evaluator skips those rules (#718).',
+      content: { 'application/json': { schema: UserRankUpdated } }
     },
     404: msgResponse('Not found'),
     409: msgResponse('Duplicate rank name or level'),
@@ -6419,30 +6453,8 @@ registry.registerPath({
 });
 
 // ─── Rank Promotion Rules (#170) ─────────────────────────────────────────────────
-// minContributed is bytes and crosses the wire as a string (past MAX_SAFE_INTEGER).
-
-const RankExtraPredicateEnum = z
-  .enum(['DISTINCT_RELEASES_500', 'QUALITY_CONTRIB_500'])
-  .nullable();
-
-const PromotionRule = registry.register(
-  'PromotionRule',
-  z.object({
-    id: z.number(),
-    fromRankId: z.number(),
-    fromRankName: z.string().nullable(),
-    toRankId: z.number(),
-    toRankName: z.string().nullable(),
-    minContributed: z.string(),
-    minRatio: z.number(),
-    minContributions: z.number(),
-    minAccountAgeDays: z.number(),
-    extra: RankExtraPredicateEnum,
-    enabled: z.boolean(),
-    createdAt: z.string(),
-    updatedAt: z.string()
-  })
-);
+// PromotionRule and RankExtraPredicateEnum are registered beside UserRank,
+// because the user-rank PUT response (UserRankUpdated) carries them (#718).
 
 const PromotionRuleCreateBody = z.object({
   fromRankId: z.number().int().positive(),
@@ -6498,7 +6510,9 @@ registry.registerPath({
       content: { 'application/json': { schema: PromotionRule } }
     },
     409: msgResponse('Duplicate rank pair'),
-    422: msgResponse('fromRank or toRank not found')
+    422: msgResponse(
+      'fromRank or toRank not found, secondary, or not adjacent on the ladder'
+    )
   }
 });
 
@@ -6519,7 +6533,9 @@ registry.registerPath({
     },
     404: msgResponse('Not found'),
     409: msgResponse('Duplicate rank pair'),
-    422: msgResponse('fromRank or toRank not found')
+    422: msgResponse(
+      'fromRank or toRank not found, secondary, or not adjacent on the ladder'
+    )
   }
 });
 

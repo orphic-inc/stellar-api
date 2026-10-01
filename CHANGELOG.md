@@ -6,9 +6,15 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`PUT /tools/user-ranks/{id}` reports the promotion rules a rank change takes off the ladder** (#718). It returns them in an optional `staleRules` array of `PromotionRule`, present only when the change's new `level` or `secondary` leaves a rule that was adjacent before no longer adjacent. The change itself still goes through, so staff can reorder the ladder. stellar-ui#383 reads the field.
+
 ### Fixed
 
 - **The egress guard now refuses IPv6 addresses that carry an IPv4 one** (#863). NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible (`::/96`) addresses passed `checkPublicUrl`, because only the IPv4-mapped form was unwrapped. On a network that routes them, the link checker and the remote image import could be pointed at loopback or cloud metadata. Each prefix is now blocked whole.
+- **A promotion rule off the ladder no longer moves anyone** (#718). The adjacency check ran only when a rule was written, so a later level change could leave a rule skipping a rung. Because the sweep took the first enabled rule it found, such a rule could promote a member past a rung, shadow the right rule, or demote a member into the wrong rank, a secondary one included. The evaluator now skips every rule that is not an adjacent step between primary ranks on the current ladder.
+- **`POST` and `PUT /tools/promotion-rules` reject a secondary `fromRank` or `toRank` with `422`** (#718). The adjacency check looked only at the rungs between the two ranks, so a rule with a secondary end was accepted and never fired.
 
 ## [0.10.0] — 2026-09-30
 

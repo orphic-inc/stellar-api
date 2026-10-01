@@ -5454,6 +5454,91 @@
           "userCount"
         ]
       },
+      "PromotionRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fromRankId": {
+            "type": "number"
+          },
+          "fromRankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toRankId": {
+            "type": "number"
+          },
+          "toRankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "minContributed": {
+            "type": "string"
+          },
+          "minRatio": {
+            "type": "number"
+          },
+          "minContributions": {
+            "type": "number"
+          },
+          "minAccountAgeDays": {
+            "type": "number"
+          },
+          "extra": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "DISTINCT_RELEASES_500",
+              "QUALITY_CONTRIB_500",
+              null
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fromRankId",
+          "fromRankName",
+          "toRankId",
+          "toRankName",
+          "minContributed",
+          "minRatio",
+          "minContributions",
+          "minAccountAgeDays",
+          "extra",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UserRankUpdated": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserRank"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "staleRules": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PromotionRule"
+                }
+              }
+            }
+          }
+        ]
+      },
       "StaffGroup": {
         "type": "object",
         "properties": {
@@ -6317,73 +6402,6 @@
         "required": [
           "data",
           "meta"
-        ]
-      },
-      "PromotionRule": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "fromRankId": {
-            "type": "number"
-          },
-          "fromRankName": {
-            "type": "string",
-            "nullable": true
-          },
-          "toRankId": {
-            "type": "number"
-          },
-          "toRankName": {
-            "type": "string",
-            "nullable": true
-          },
-          "minContributed": {
-            "type": "string"
-          },
-          "minRatio": {
-            "type": "number"
-          },
-          "minContributions": {
-            "type": "number"
-          },
-          "minAccountAgeDays": {
-            "type": "number"
-          },
-          "extra": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "DISTINCT_RELEASES_500",
-              "QUALITY_CONTRIB_500",
-              null
-            ]
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "fromRankId",
-          "fromRankName",
-          "toRankId",
-          "toRankName",
-          "minContributed",
-          "minRatio",
-          "minContributions",
-          "minAccountAgeDays",
-          "extra",
-          "enabled",
-          "createdAt",
-          "updatedAt"
         ]
       },
       "Artist": {
@@ -27445,11 +27463,11 @@
         },
         "responses": {
           "200": {
-            "description": "User rank updated",
+            "description": "User rank updated. `staleRules` is present only when this level or secondary change took promotion rules off the ladder; the change is not refused, and the evaluator skips those rules (#718).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserRank"
+                  "$ref": "#/components/schemas/UserRankUpdated"
                 }
               }
             }
@@ -27771,7 +27789,7 @@
             }
           },
           "422": {
-            "description": "fromRank or toRank not found",
+            "description": "fromRank or toRank not found, secondary, or not adjacent on the ladder",
             "content": {
               "application/json": {
                 "schema": {
@@ -27995,7 +28013,7 @@
             }
           },
           "422": {
-            "description": "fromRank or toRank not found",
+            "description": "fromRank or toRank not found, secondary, or not adjacent on the ladder",
             "content": {
               "application/json": {
                 "schema": {
