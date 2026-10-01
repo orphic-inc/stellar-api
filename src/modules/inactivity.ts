@@ -15,6 +15,8 @@
  * define the rule.
  */
 
+import { STAFF_LEVEL } from './rankProgression';
+
 /** Warn once the account has been idle this long. */
 export const WARN_AFTER_DAYS = 110;
 /** Disable once it has been idle this long, and not before. */
@@ -60,8 +62,8 @@ export interface InactivityDecision {
   reason: string;
 }
 
-/** Ranks at or above this level are assigned, never auto-managed. */
-export const STAFF_LEVEL = 500;
+/** Ranks at or above this level are assigned, never auto-managed (#866). */
+export { STAFF_LEVEL };
 
 /**
  * The dormancy clock: the most recent moment we have evidence the account was

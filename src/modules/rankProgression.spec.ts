@@ -8,6 +8,8 @@ import {
   evaluateRankChange,
   isAdjacentPromotionStep,
   isOnLadder,
+  isAutoManaged,
+  STAFF_LEVEL,
   DEFAULT_RANKS,
   DEFAULT_RULES,
   RankPromotionRule,
@@ -260,6 +262,26 @@ describe('evaluateRankChange — rules off the ladder (#718)', () => {
       offLadder(rankId('User'), rankId('Power User'))
     ]);
     expect(result.direction).toBe('none');
+  });
+});
+
+describe('isAutoManaged (#866)', () => {
+  it.each([
+    ['a primary rank below the staff level', 450, false, true],
+    ['a primary rank at the staff level', STAFF_LEVEL, false, false],
+    ['a primary rank above it', 1000, false, false],
+    ['a secondary rank', 120, true, false]
+  ])('is right for %s', (_case, level, secondary, expected) => {
+    expect(isAutoManaged({ level, secondary })).toBe(expected);
+  });
+
+  it('agrees with the default ladder', () => {
+    expect(
+      DEFAULT_RANKS.every(
+        (r) =>
+          isAutoManaged({ level: r.level, secondary: false }) === r.autoManaged
+      )
+    ).toBe(true);
   });
 });
 

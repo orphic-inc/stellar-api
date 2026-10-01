@@ -21,6 +21,23 @@ export interface Rank {
   autoManaged: boolean;
 }
 
+/**
+ * Primary ranks at or above this level are staff: assigned by hand, never
+ * auto-managed (#866). The one copy; the inactivity sweep and the invite
+ * handout re-export it.
+ */
+export const STAFF_LEVEL = 500;
+
+/**
+ * Whether automated jobs manage members of this rank (#866): primary, and below
+ * the staff level. Promotion rules join only these ranks. The inactivity sweep
+ * and the invite handout apply the same threshold to a member's primary rank.
+ */
+export const isAutoManaged = (rank: {
+  level: number;
+  secondary: boolean;
+}): boolean => !rank.secondary && rank.level < STAFF_LEVEL;
+
 export interface RankPromotionRule {
   fromRankId: number;
   toRankId: number;
@@ -167,11 +184,12 @@ export const evaluateRankChange = (
   if (!current.autoManaged)
     return stay(`${current.name} is assigned, never auto-managed`);
 
-  // Only rules that are an adjacent step on the ladder as it stands now (#718).
-  // The write path checks adjacency, but a later level change can strand a
-  // rule; left in, it would promote past a rung, shadow the right rule, or
-  // demote into the wrong rank.
-  const live = rules.filter((r) => r.enabled && isOnLadder(r, ranks));
+  // Only rules that are an adjacent step on the ladder as it stands now (#718),
+  // which holds auto-managed ranks only (#866). The write path checks this,
+  // but a later level change can strand a rule; left in, it would promote past
+  // a rung, shadow the right rule, or demote into the wrong rank.
+  const ladder = ranks.filter((r) => r.autoManaged);
+  const live = rules.filter((r) => r.enabled && isOnLadder(r, ladder));
 
   // Demotion takes precedence over promotion: a user must remain a valid
   // member of their current class before they can advance. This only diverges
@@ -218,10 +236,10 @@ export const isAdjacentPromotionStep = (
   !otherLadderLevels.some((level) => level > fromLevel && level < toLevel);
 
 /**
- * True when `rule` is an adjacent step on `ladder`, the primary ranks only
- * (#718). An endpoint missing from the ladder — a secondary rank, or a deleted
- * one — fails, so the evaluator and the stale-rule report share one answer
- * with the write-time guard.
+ * True when `rule` is an adjacent step on `ladder`, the auto-managed ranks only
+ * (#718, #866). An endpoint missing from the ladder — a secondary rank, a staff
+ * rank, or a deleted one — fails, so the evaluator and the stale-rule report
+ * share one answer with the write-time guard.
  */
 export const isOnLadder = (
   rule: Pick<RankPromotionRule, 'fromRankId' | 'toRankId'>,

@@ -84,6 +84,7 @@ const formatRank = (
     r.permissions as Record<string, boolean> | null | undefined
   ),
   secondary: r.secondary,
+  autoManaged: promotionRules.isAutoManaged(r),
   permittedForumIds: r.permittedForumIds,
   color: r.color,
   badge: r.badge,

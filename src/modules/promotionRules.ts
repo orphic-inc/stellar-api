@@ -8,7 +8,14 @@
  * time, so a rule this module reports as stranded is one the sweep ignores.
  */
 import { prisma } from '../lib/prisma';
-import { isAdjacentPromotionStep, isOnLadder } from './rankProgression';
+
+export { isAutoManaged } from './rankProgression';
+import {
+  isAdjacentPromotionStep,
+  isAutoManaged,
+  isOnLadder,
+  STAFF_LEVEL
+} from './rankProgression';
 
 export const promotionRuleInclude = {
   fromRank: { select: { name: true } },
@@ -36,11 +43,11 @@ export async function validatePromotionRulePair(
     })
   ]);
   if (!fromRank || !toRank) return 'fromRank or toRank does not exist';
-  // The ladder check below only looks at the rungs between, never the ends; a
-  // secondary end would pass it and sit dead, as the sweep loads only primaries
-  // (#718).
-  if (fromRank.secondary || toRank.secondary) {
-    return 'fromRank and toRank must both be primary ranks';
+  // The ladder check below only looks at the rungs between, never the ends. A
+  // secondary end (#718) or a staff end (#866) would pass it and sit dead: the
+  // sweep moves members only between auto-managed ranks.
+  if (!isAutoManaged(fromRank) || !isAutoManaged(toRank)) {
+    return `fromRank and toRank must both be primary ranks below the staff level (${STAFF_LEVEL})`;
   }
 
   const ladderLevels = await prisma.userRank.findMany({
@@ -65,8 +72,9 @@ export async function validatePromotionRulePair(
 
 /**
  * The promotion rules a rank update just took off the ladder (#718). A level or
- * secondary change can strand a rule written when it was adjacent; the update
- * still goes through, and the rules are reported instead. Rules already off the
+ * secondary change can strand a rule written when it was adjacent, including a
+ * level moved across the staff level (#866); the update still goes through, and
+ * the rules are reported instead. Rules already off the
  * ladder before this change are not this change's doing and are left out.
  */
 export async function rulesStrandedBy(
@@ -85,14 +93,14 @@ export async function rulesStrandedBy(
       include: promotionRuleInclude
     })
   ]);
-  const ladderNow = ranks.filter((r) => !r.secondary);
+  const ladderNow = ranks.filter(isAutoManaged);
   const ladderBefore = ranks
     .map((r) =>
       r.id === before.id
         ? { ...r, level: before.level, secondary: before.secondary }
         : r
     )
-    .filter((r) => !r.secondary);
+    .filter(isAutoManaged);
   return rules.filter(
     (r) => isOnLadder(r, ladderBefore) && !isOnLadder(r, ladderNow)
   );

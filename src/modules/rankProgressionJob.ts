@@ -25,7 +25,8 @@ import {
   RankProgressionInput,
   RankProgressionResult,
   RankExtraPredicate,
-  RankPromotionRule
+  RankPromotionRule,
+  isAutoManaged
 } from './rankProgression';
 
 const log = getLogger('rankProgressionJob');
@@ -33,13 +34,12 @@ const log = getLogger('rankProgressionJob');
 const STARTUP_DELAY_MS = 45_000;
 const BATCH_SIZE = 500;
 const DAY_MS = 86_400_000;
-const STAFF_LEVEL = 500; // ranks at/above this are assigned, never auto-managed
 const LOSSLESS_BITRATES: Bitrate[] = [Bitrate.Lossless, Bitrate.Lossless24];
 
 /**
  * Project the DB ranks/rules onto the evaluator's interfaces. autoManaged is
- * derived from level: everything below Staff (500) is on the auto ladder; Staff
- * and SysOp are assigned and never auto-reached or auto-demoted.
+ * `isAutoManaged` (#866): everything below Staff (500) is on the auto ladder;
+ * Staff and SysOp are assigned and never auto-reached or auto-demoted.
  */
 export const loadLadder = async (): Promise<{
   ranks: Rank[];
@@ -57,7 +57,7 @@ export const loadLadder = async (): Promise<{
     id: r.id,
     level: r.level,
     name: r.name,
-    autoManaged: r.level < STAFF_LEVEL
+    autoManaged: isAutoManaged({ level: r.level, secondary: false })
   }));
 
   const rules: RankPromotionRule[] = ruleRows.map((r) => ({

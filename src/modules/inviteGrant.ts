@@ -30,13 +30,14 @@
  *    of the rule a form cannot mistype away.
  */
 import type { Standing } from './standing';
+import { STAFF_LEVEL } from './rankProgression';
 
 /** How long a member must hold their account before any grant. */
 export const MIN_TENURE_DAYS = 30;
 /** The accrual window. Independent of how often the job ticks. */
 export const PERIOD_DAYS = 14;
-/** Ranks at or above this level are assigned; staff create accounts directly. */
-export const STAFF_LEVEL = 500;
+/** Ranks at or above this level are assigned; staff create accounts directly (#866). */
+export { STAFF_LEVEL };
 
 export const DAY_MS = 86_400_000;
 

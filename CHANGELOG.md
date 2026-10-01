@@ -9,12 +9,20 @@ All notable changes to stellar-api are documented here.
 ### Added
 
 - **`PUT /tools/user-ranks/{id}` reports the promotion rules a rank change takes off the ladder** (#718). It returns them in an optional `staleRules` array of `PromotionRule`, present only when the change's new `level` or `secondary` leaves a rule that was adjacent before no longer adjacent. The change itself still goes through, so staff can reorder the ladder. stellar-ui#383 reads the field.
+- **`UserRank` gains `autoManaged`** (#866), on every `/tools/user-ranks` response.
+  - It is false for a secondary rank and for a primary rank at level 500 or above (staff).
+  - A member whose primary rank isn't auto-managed is never auto-promoted or demoted, disabled for inactivity, or granted invites by the handout.
+  - A rank whose level crosses 500 changes all three for everyone holding it. The change is allowed, and its `PUT` response carries the new value.
 
 ### Fixed
 
 - **The egress guard now refuses IPv6 addresses that carry an IPv4 one** (#863). NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible (`::/96`) addresses passed `checkPublicUrl`, because only the IPv4-mapped form was unwrapped. On a network that routes them, the link checker and the remote image import could be pointed at loopback or cloud metadata. Each prefix is now blocked whole.
 - **A promotion rule off the ladder no longer moves anyone** (#718). The adjacency check ran only when a rule was written, so a later level change could leave a rule skipping a rung. Because the sweep took the first enabled rule it found, such a rule could promote a member past a rung, shadow the right rule, or demote a member into the wrong rank, a secondary one included. The evaluator now skips every rule that is not an adjacent step between primary ranks on the current ladder.
 - **`POST` and `PUT /tools/promotion-rules` reject a secondary `fromRank` or `toRank` with `422`** (#718). The adjacency check looked only at the rungs between the two ranks, so a rule with a secondary end was accepted and never fired.
+- **Staff ranks are never a promotion target** (#866).
+  - `POST` and `PUT /tools/promotion-rules` now reject a `fromRank` or `toRank` at level 500 or above with `422`. A rule from Stellarige to Staff used to be accepted, though the sweep never promotes into a staff rank.
+  - A rank moved to level 500 or above now reports the rules into or out of it in `staleRules`, even when the levels stay adjacent.
+  - The staff level is now one constant, `STAFF_LEVEL` in `rankProgression.ts`, shared by the promotion sweep, the inactivity sweep and the invite handout.
 
 ### Removed
 

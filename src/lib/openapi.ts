@@ -4918,6 +4918,10 @@ const UserRank = registry.register(
     // normalizePermissions() always returns a map, empty at worst — never null.
     permissions: z.record(z.string(), z.boolean()),
     secondary: z.boolean(),
+    autoManaged: z.boolean().openapi({
+      description:
+        "False for a secondary rank, and for a primary rank at level 500 or above (staff). Promotion rules join only auto-managed ranks. A member whose primary rank isn't auto-managed is never auto-promoted or demoted, disabled for inactivity, or granted invites by the handout (#866)."
+    }),
     permittedForumIds: z.array(z.number().int()),
     color: z.string(),
     badge: z.string(),
@@ -6493,7 +6497,7 @@ registry.registerPath({
     },
     409: msgResponse('Duplicate rank pair'),
     422: msgResponse(
-      'fromRank or toRank not found, secondary, or not adjacent on the ladder'
+      'fromRank or toRank not found, not auto-managed (secondary or staff), or not adjacent on the ladder'
     )
   }
 });
@@ -6516,7 +6520,7 @@ registry.registerPath({
     404: msgResponse('Not found'),
     409: msgResponse('Duplicate rank pair'),
     422: msgResponse(
-      'fromRank or toRank not found, secondary, or not adjacent on the ladder'
+      'fromRank or toRank not found, not auto-managed (secondary or staff), or not adjacent on the ladder'
     )
   }
 });
