@@ -7,7 +7,10 @@
 import {
   evaluateRankChange,
   isAdjacentPromotionStep,
+  isOnLadder,
   DEFAULT_RANKS,
+  DEFAULT_RULES,
+  RankPromotionRule,
   RankProgressionInput
 } from './rankProgression';
 
@@ -188,6 +191,100 @@ describe('evaluateRankChange — guards', () => {
       maxed({ currentRankId: rankId('Staff') })
     );
     expect(result.direction).toBe('none');
+  });
+});
+
+// ─── rules off the ladder (#718) ────────────────────────────────────────────────
+
+/**
+ * A rule with criteria no one can lapse below or fail to reach; what matters is
+ * only where it points. Put first, it is the one `rules.find` used to take.
+ */
+const offLadder = (
+  fromRankId: number,
+  toRankId: number
+): RankPromotionRule => ({
+  fromRankId,
+  toRankId,
+  minContributed: 0n,
+  minRatio: 0,
+  minContributions: 0,
+  minAccountAgeDays: 0,
+  extra: null,
+  enabled: true
+});
+
+/** A secondary rank's id: never on the ladder the sweep loads. */
+const DONOR_ID = 99;
+
+describe('evaluateRankChange — rules off the ladder (#718)', () => {
+  it('promotes by the adjacent rule, not one that skips a rung', () => {
+    const result = evaluateRankChange(maxed(), [
+      offLadder(rankId('User'), rankId('Power User')),
+      ...DEFAULT_RULES
+    ]);
+    expect(result.direction).toBe('promote');
+    expect(result.targetRankId).toBe(rankId('Member'));
+  });
+
+  it('demotes by the adjacent rule, not one that spans two rungs', () => {
+    // A stale Member → Elite rule with impossible stock criteria would demote
+    // an Elite two rungs, to Member.
+    const stale = {
+      ...offLadder(rankId('Member'), rankId('Elite')),
+      minContributed: 10_000n * GiB
+    };
+    const result = evaluateRankChange(
+      maxed({ currentRankId: rankId('Elite'), contributed: 1n * GiB }),
+      [stale, ...DEFAULT_RULES]
+    );
+    expect(result.direction).toBe('demote');
+    expect(result.targetRankId).toBe(rankId('Power User'));
+  });
+
+  it('never demotes into a secondary rank', () => {
+    const intoDonor = {
+      ...offLadder(DONOR_ID, rankId('Member')),
+      minContributed: 10_000n * GiB
+    };
+    const result = evaluateRankChange(
+      maxed({ currentRankId: rankId('Member'), contributed: 0n }),
+      [intoDonor, ...DEFAULT_RULES]
+    );
+    expect(result.direction).toBe('demote');
+    expect(result.targetRankId).toBe(rankId('User'));
+  });
+
+  it('a stale rule alone leaves the member where they are', () => {
+    const result = evaluateRankChange(maxed(), [
+      offLadder(rankId('User'), rankId('Power User'))
+    ]);
+    expect(result.direction).toBe('none');
+  });
+});
+
+describe('isOnLadder', () => {
+  const ladder = [
+    { id: 1, level: 100 },
+    { id: 2, level: 150 },
+    { id: 3, level: 200 }
+  ];
+
+  it('accepts an adjacent step', () => {
+    expect(isOnLadder({ fromRankId: 1, toRankId: 2 }, ladder)).toBe(true);
+  });
+
+  it('rejects a step over a rung', () => {
+    expect(isOnLadder({ fromRankId: 1, toRankId: 3 }, ladder)).toBe(false);
+  });
+
+  it('rejects an endpoint missing from the ladder', () => {
+    expect(isOnLadder({ fromRankId: 1, toRankId: DONOR_ID }, ladder)).toBe(
+      false
+    );
+    expect(isOnLadder({ fromRankId: DONOR_ID, toRankId: 2 }, ladder)).toBe(
+      false
+    );
   });
 });
 

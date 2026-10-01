@@ -32,7 +32,7 @@ import {
   type CreateStaffGroupInput,
   type UpdateStaffGroupInput
 } from '../../schemas/staff';
-import { isAdjacentPromotionStep } from '../../modules/rankProgression';
+import * as promotionRules from '../../modules/promotionRules';
 
 const router = express.Router();
 
@@ -337,7 +337,7 @@ router.put(
         displayStaff,
         staffGroupId: effectiveStaffGroupId
       });
-      res.json(formatRank(rank));
+      res.json(await rankWithStaleRules(existing, rank));
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -399,51 +399,18 @@ router.delete(
 // rank tooling (rank_permissions_manage). The unique [fromRankId, toRankId] pair
 // surfaces as a 409.
 
-const promotionRuleInclude = {
-  fromRank: { select: { name: true } },
-  toRank: { select: { name: true } }
-} as const;
+const { promotionRuleInclude, validatePromotionRulePair } = promotionRules;
 
-/**
- * Existence + adjacency guard shared by create/update. Returns an error
- * message to surface as a 422, or null when the pair is valid. Adjacency is
- * scoped to the primary ladder (secondary ranks like Donor/VIP overlay tags
- * don't participate in auto-progression — see rankProgressionJob.loadLadder).
- */
-async function validatePromotionRulePair(
-  fromRankId: number,
-  toRankId: number
-): Promise<string | null> {
-  const [fromRank, toRank] = await Promise.all([
-    prisma.userRank.findUnique({
-      where: { id: fromRankId },
-      select: { level: true }
-    }),
-    prisma.userRank.findUnique({
-      where: { id: toRankId },
-      select: { level: true }
-    })
-  ]);
-  if (!fromRank || !toRank) return 'fromRank or toRank does not exist';
-
-  const ladderLevels = await prisma.userRank.findMany({
-    where: {
-      secondary: false,
-      id: { notIn: [fromRankId, toRankId] }
-    },
-    select: { level: true }
-  });
-
-  if (
-    !isAdjacentPromotionStep(
-      fromRank.level,
-      toRank.level,
-      ladderLevels.map((r) => r.level)
-    )
-  ) {
-    return 'fromRank and toRank must be adjacent rungs on the ladder (toRank the very next level up, nothing in between)';
-  }
-  return null;
+/** The PUT /user-ranks/:id body, plus any rules the change stranded (#718). */
+async function rankWithStaleRules(
+  before: { id: number; level: number; secondary: boolean },
+  rank: Parameters<typeof formatRank>[0]
+) {
+  const stale = await promotionRules.rulesStrandedBy(before, rank);
+  return {
+    ...formatRank(rank),
+    ...(stale.length > 0 && { staleRules: stale.map(formatPromotionRule) })
+  };
 }
 
 // GET /api/tools/promotion-rules — list all promotion rules

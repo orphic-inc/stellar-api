@@ -278,6 +278,7 @@ src/
     inviteTree.ts             # Who-invited-whom topology (#61) — pure subtree assembly + summary over inviterId adjacency rows
     rankProgression.ts        # Pure, table-driven evaluator for automated class progression: promote one step / demote / stay. Owns ALL the policy; no DB
     rankProgressionJob.ts     # The DB-bound shell around that evaluator — loads ladder + rules, builds inputs, applies the decisions
+    promotionRules.ts         # Promotion rule admin (#170, #718): the write-time pair check, and the rules a rank change strands (reported as `staleRules`)
     inactivity.ts             # Dormancy clock + pure evaluator (#279, ADR-0038): max(lastLogin, dateRegistered, reactivatedAt) → warn / disable / none. Owns the policy; no DB
     inactivityJob.ts          # The DB-bound sweep around that evaluator — cursor-paged, `INACTIVITY_MODE` gates the WRITES not the evaluation, disables capped per cycle
     inviteGrant.ts            # Invite handout evaluator (#282, ADR-0039) — pure: rate/cap + balance + clock + standing → grant / advance / none. Accrual, not top-up; no back-pay; a capped period is spent. Owns the policy; no DB

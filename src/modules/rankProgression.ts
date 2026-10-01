@@ -167,13 +167,17 @@ export const evaluateRankChange = (
   if (!current.autoManaged)
     return stay(`${current.name} is assigned, never auto-managed`);
 
+  // Only rules that are an adjacent step on the ladder as it stands now (#718).
+  // The write path checks adjacency, but a later level change can strand a
+  // rule; left in, it would promote past a rung, shadow the right rule, or
+  // demote into the wrong rank.
+  const live = rules.filter((r) => r.enabled && isOnLadder(r, ranks));
+
   // Demotion takes precedence over promotion: a user must remain a valid
   // member of their current class before they can advance. This only diverges
   // from promotion in the prestige tiers, where the Extra predicates let the
   // outgoing rule pass while the incoming (current-class) one has lapsed.
-  const incoming = rules.find(
-    (r) => r.enabled && r.toRankId === input.currentRankId
-  );
+  const incoming = live.find((r) => r.toRankId === input.currentRankId);
   if (incoming && !meetsStock(incoming, input)) {
     return {
       targetRankId: incoming.fromRankId,
@@ -183,9 +187,7 @@ export const evaluateRankChange = (
   }
 
   // Promotion: the outgoing rule from the current rank. One step only.
-  const outgoing = rules.find(
-    (r) => r.enabled && r.fromRankId === input.currentRankId
-  );
+  const outgoing = live.find((r) => r.fromRankId === input.currentRankId);
   if (outgoing) {
     const target = ranks.find((r) => r.id === outgoing.toRankId);
     if (target?.autoManaged && meetsAll(outgoing, input)) {
@@ -214,3 +216,23 @@ export const isAdjacentPromotionStep = (
 ): boolean =>
   toLevel > fromLevel &&
   !otherLadderLevels.some((level) => level > fromLevel && level < toLevel);
+
+/**
+ * True when `rule` is an adjacent step on `ladder`, the primary ranks only
+ * (#718). An endpoint missing from the ladder — a secondary rank, or a deleted
+ * one — fails, so the evaluator and the stale-rule report share one answer
+ * with the write-time guard.
+ */
+export const isOnLadder = (
+  rule: Pick<RankPromotionRule, 'fromRankId' | 'toRankId'>,
+  ladder: Pick<Rank, 'id' | 'level'>[]
+): boolean => {
+  const from = ladder.find((r) => r.id === rule.fromRankId);
+  const to = ladder.find((r) => r.id === rule.toRankId);
+  if (!from || !to) return false;
+  return isAdjacentPromotionStep(
+    from.level,
+    to.level,
+    ladder.filter((r) => r.id !== from.id && r.id !== to.id).map((r) => r.level)
+  );
+};
