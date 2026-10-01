@@ -17040,6 +17040,37 @@
         "tags": [
           "Assets"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ThemeImage",
+                "Avatar"
+              ],
+              "description": "A label on the bytes; both kinds run the same quota."
+            },
+            "required": false,
+            "description": "A label on the bytes; both kinds run the same quota.",
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avatar",
+                "customIcon",
+                "secondAvatar"
+              ],
+              "description": "The image field this upload will replace (#871). Its current asset does not count toward the quota, so a member at the limit can upload the replacement; saving it releases the old one."
+            },
+            "required": false,
+            "description": "The image field this upload will replace (#871). Its current asset does not count toward the quota, so a member at the limit can upload the replacement; saving it releases the old one.",
+            "name": "field",
+            "in": "query"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/octet-stream": {

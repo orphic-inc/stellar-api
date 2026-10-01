@@ -276,7 +276,27 @@ describe('getOwnedAssetCount', () => {
     expect(await getOwnedAssetCount(42)).toBe(3);
     // The limit governs uploads; an import answers to its own daily ceiling.
     expect(prismaMock.asset.count).toHaveBeenCalledWith({
-      where: { ownerId: 42, kind: { not: 'Imported' } }
+      where: {
+        ownerId: 42,
+        kind: { not: 'Imported' },
+        releasedAt: null,
+        hash: { notIn: [] }
+      }
+    });
+  });
+
+  // #871: a released asset stops counting, and so does the one an upload for
+  // that image field is about to replace.
+  it('leaves released assets and the replaced field asset out', async () => {
+    prismaMock.asset.count.mockResolvedValue(0);
+
+    await getOwnedAssetCount(42, undefined, ['f'.repeat(64)]);
+
+    expect(prismaMock.asset.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        releasedAt: null,
+        hash: { notIn: ['f'.repeat(64)] }
+      })
     });
   });
 });

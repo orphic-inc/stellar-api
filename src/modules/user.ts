@@ -7,6 +7,7 @@ import { getDefaultStylesheetName } from './stylesheet';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
 import { computeRatio } from './ratio';
 import { registerBBCodeImages } from './remoteImage';
+import { settlingImageAssets } from './assetStore';
 import { CONTAGION_REACH } from './contagion';
 import {
   activeDonorRank,
@@ -68,50 +69,21 @@ export const updateUserSettings = async (
   });
   if (!user) return null;
 
-  const [settings] = await prisma.$transaction([
-    prisma.userSettings.update({
-      where: { id: user.userSettingsId },
-      data: {
-        ...(data.siteAppearance !== undefined && {
-          siteAppearance: data.siteAppearance
-        }),
-        ...(data.externalStylesheet !== undefined && {
-          externalStylesheet: data.externalStylesheet
-        }),
-        ...(data.styledTooltips !== undefined && {
-          styledTooltips: data.styledTooltips
-        }),
-        ...(data.notificationMethod !== undefined && {
-          notificationMethod: data.notificationMethod
-        }),
-        ...(data.showEmail !== undefined && { showEmail: data.showEmail }),
-        ...(data.showLastSeen !== undefined && {
-          showLastSeen: data.showLastSeen
-        }),
-        ...(data.showContributedStats !== undefined && {
-          showContributedStats: data.showContributedStats
-        }),
-        ...(data.showConsumedStats !== undefined && {
-          showConsumedStats: data.showConsumedStats
-        }),
-        ...(data.showRatioStats !== undefined && {
-          showRatioStats: data.showRatioStats
-        }),
-        ...(data.showMatureContent !== undefined && {
-          showMatureContent: data.showMatureContent
-        })
-      }
-    }),
-    ...(data.avatar !== undefined
-      ? [
-          prisma.user.update({
-            where: { id: userId },
-            data: { avatar: data.avatar }
-          })
-        ]
-      : [])
-  ]);
-  return { ...settings, avatar: data.avatar };
+  // Prisma skips an undefined field, so the settings pass straight through.
+  const { avatar, ...settingsData } = data;
+  // Releases an uploaded avatar the write moved off (#871).
+  const [settings] = await settlingImageAssets(userId, () =>
+    prisma.$transaction([
+      prisma.userSettings.update({
+        where: { id: user.userSettingsId },
+        data: settingsData
+      }),
+      ...(avatar !== undefined
+        ? [prisma.user.update({ where: { id: userId }, data: { avatar } })]
+        : [])
+    ])
+  );
+  return { ...settings, avatar };
 };
 
 export const createUser = async (

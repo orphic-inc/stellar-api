@@ -13,6 +13,7 @@ All notable changes to stellar-api are documented here.
   - It is false for a secondary rank and for a primary rank at level 500 or above (staff).
   - A member whose primary rank isn't auto-managed is never auto-promoted or demoted, disabled for inactivity, or granted invites by the handout.
   - A rank whose level crosses 500 changes all three for everyone holding it. The change is allowed, and its `PUT` response carries the new value.
+- **`POST /asset` takes an optional `field`** (`avatar`, `customIcon` or `secondAvatar`), the image field the upload will replace (#871). That field's current asset doesn't count toward `assetLimit`, so a member at their limit can upload the replacement. The contract now also declares the existing `kind` parameter.
 
 ### Fixed
 
@@ -33,6 +34,7 @@ All notable changes to stellar-api are documented here.
   - Affected: `Release.artist`, `ReleaseBrowseItem.artist`, `ReleaseContributionDetail.releaseFile`, `ReleaseHistoryEntry.snapshot`, `ForumTopicSession.poll`, `PrivateMessage.sender`, `StaffInboxMessage.sender`, `StaffInboxTicket.assignedUser`, `.resolver` and its messages' `sender`, and `GET /home/featured`'s `albumOfTheMonth` and `vanityHouse` and `GET /rules`'s `main`.
   - The wire format is unchanged. A spec fails the build if any `allOf` member carries `nullable` again.
 - **The session's `userRank.assetLimit` now arrives** (#716). `AuthUser` declared it, but the session never selected it, so a client read `undefined`. It's now always present: the primary rank's value, as `POST /asset` enforces it. `null` means unlimited and `0` means no uploads.
+- **Replacing or clearing an uploaded image frees its slot at once** (#871). A replaced avatar, donor icon or second avatar used to count toward `assetLimit` until the orphan sweep reclaimed it, up to 48 hours later, so a member on a 1-upload rank couldn't change their avatar. A write that moves every image field off an asset the member owns now marks it released (`Asset.releasedAt`), and the quota stops counting it. Setting it again re-counts it. Deletion stays with the sweep, which can see the same image embedded in a stylesheet.
 
 ### Removed
 

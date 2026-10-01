@@ -216,6 +216,60 @@ describe('POST /api/asset', () => {
     expect(res.body.msg).toMatch(/limit reached/);
   });
 
+  // #871: the upload names the image field it will replace, so that field's
+  // current asset is not counted against the quota its successor must fit.
+  it('does not count the asset the named field holds', async () => {
+    withRank(1);
+    prismaMock.user.findUnique.mockResolvedValue({
+      avatar: '',
+      profile: { avatar: `/api/asset/${'b'.repeat(64)}` },
+      donorReward: null
+    } as never);
+    prismaMock.asset.findFirst.mockResolvedValue(null);
+    prismaMock.asset.count.mockResolvedValue(0);
+    prismaMock.asset.findUnique.mockResolvedValue(null);
+    prismaMock.asset.create.mockResolvedValue(memberAsset as never);
+
+    const res = await request(app)
+      .post('/api/asset?kind=Avatar&field=avatar')
+      .set('Content-Type', 'image/png')
+      .send(BYTES);
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.asset.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        releasedAt: null,
+        hash: { notIn: ['b'.repeat(64)] }
+      })
+    });
+  });
+
+  it('counts every unreleased asset when no field is named', async () => {
+    withRank(3);
+    prismaMock.asset.findFirst.mockResolvedValue(null);
+    prismaMock.asset.count.mockResolvedValue(3);
+
+    await request(app)
+      .post('/api/asset')
+      .set('Content-Type', 'image/png')
+      .send(BYTES);
+
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.asset.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ releasedAt: null, hash: { notIn: [] } })
+    });
+  });
+
+  it('rejects a field outside the image fields', async () => {
+    const res = await request(app)
+      .post('/api/asset?field=profileInfo')
+      .set('Content-Type', 'image/png')
+      .send(BYTES);
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.asset.create).not.toHaveBeenCalled();
+  });
+
   it('rejects a font upload (fonts stay seeder-only)', async () => {
     withRank(null);
     const WOFF2 = Buffer.concat([

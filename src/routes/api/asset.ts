@@ -13,6 +13,8 @@ import { AppError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
 import {
   getAssetByHash,
+  heldImageHashes,
+  IMAGE_FIELDS,
   uploadAsset,
   assetUrl
 } from '../../modules/assetStore';
@@ -31,7 +33,10 @@ const assetHashParamsSchema = z.object({
 // image-only bytes on top of this. Defaulting to `ThemeImage` keeps every
 // caller written against the pre-#396 route working unchanged.
 const assetUploadQuerySchema = z.object({
-  kind: z.enum(['ThemeImage', 'Avatar']).default('ThemeImage')
+  kind: z.enum(['ThemeImage', 'Avatar']).default('ThemeImage'),
+  // The image field this upload will replace (#871), so its current asset
+  // does not count against the quota the replacement is checked against.
+  field: z.enum(IMAGE_FIELDS).optional()
 });
 type AssetUploadQuery = z.infer<typeof assetUploadQuerySchema>;
 
@@ -61,7 +66,7 @@ router.post(
     'bodyLimit'
   ),
   asyncHandler(async (req, res) => {
-    const { kind } = parsedQuery<AssetUploadQuery>(res);
+    const { kind, field } = parsedQuery<AssetUploadQuery>(res);
 
     // A Content-Type outside the allowlist leaves express.raw with nothing to
     // claim, so req.body arrives as the empty object express.json left behind.
@@ -87,7 +92,8 @@ router.post(
       mime: req.get('content-type')?.split(';')[0]?.trim(),
       ownerId: req.user!.id,
       // null = unlimited (staff); 0 = no uploads (rejected in uploadAsset); N = cap.
-      assetLimit: rank?.assetLimit ?? null
+      assetLimit: rank?.assetLimit ?? null,
+      replacing: field ? (await heldImageHashes(req.user!.id))[field] : []
     });
 
     res.status(201).json({
