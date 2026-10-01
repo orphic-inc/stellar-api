@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-09-30
+
 ### Added
 
 - **"Invited by" on the member profile** (#849, from #638). The profile responses (`GET /profile/me`, `GET /profile/user/{userId}`, and `PUT /profile/me`) gain `invitedBy: { inviter: { id, username } | null } | null`. Only a viewer holding `invites_manage` sees it, the owner included; it is `null` for anyone else. An inner `null` inviter means nobody invited the member.
@@ -3748,7 +3750,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.9.11...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/orphic-inc/stellar-api/compare/v0.9.11...v0.10.0
 [0.9.11]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/orphic-inc/stellar-api/compare/v0.9.8...v0.9.9
