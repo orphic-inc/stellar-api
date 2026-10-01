@@ -63,7 +63,7 @@ Releases the viewer may access — the group never widens visibility (ADR-0023).
 _Avoid_: Work (that is the composition), master, album row, group, container
 
 **Ratio Mechanism**:
-The standalone `contributed`/`consumed` download gate (required-ratio brackets + the `OK/WATCH/LEECH_DISABLED` policy). Distinct from **RatioScore**. The Ratio Mechanism never reads CRS.
+The standalone `contributed`/`consumed` download gate (required-ratio brackets + the `OK/WATCH/DOWNLOAD_DISABLED` policy). Distinct from **RatioScore**. The Ratio Mechanism never reads CRS.
 _Avoid_: ratio score, ratio policy (when meaning the whole gate)
 
 **Ratio Watch**:
