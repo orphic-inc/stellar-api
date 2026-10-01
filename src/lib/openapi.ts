@@ -12049,23 +12049,12 @@ export function buildOpenApiDocument(routes: readonly Operation[]) {
     securitySchemes: SECURITY_SCHEMES
   };
 
-  // Scoped to the schemas the nullable-ref registered-schema path (#295) is
-  // known to reach, rather than walking the whole document: PublicProfile,
-  // MyProfile (which spreads PublicProfile.shape), and ProfilePercentiles,
-  // whose privacy-gated dimensions are nullable refs since #723.
-  const schemas = doc.components?.schemas;
-  if (schemas) {
-    for (const name of [
-      'PublicProfile',
-      'MyProfile',
-      'ProfilePercentiles'
-    ] as const) {
-      const schema = schemas[name];
-      if (schema) {
-        schemas[name] = normalizeNullableRefsDeep(schema) as typeof schema;
-      }
-    }
-  }
+  // Every nullable registered ref, wherever it sits (#295, #725): a list of
+  // schema names fell behind the code, and 13 fields reached the ui non-null.
+  doc.components = normalizeNullableRefsDeep(
+    doc.components
+  ) as typeof doc.components;
+  doc.paths = normalizeNullableRefsDeep(doc.paths) as typeof doc.paths;
 
   applyImageSrcDerivations(doc);
   applyGateDerivations(doc.paths ?? {}, routes);

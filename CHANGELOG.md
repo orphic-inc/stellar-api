@@ -28,6 +28,10 @@ All notable changes to stellar-api are documented here.
   - It leaves an `audit` row (`release.delete`), plus a line in the release group's log when the release was in one.
   - A release with any contribution is still refused with `409`, now worded `A release with contributions cannot be deleted`.
 - **`POST /communities/{communityId}/releases/{releaseId}/contributions` answers `404` when the release is deleted mid-upload** (#793), rather than `500`.
+- **13 nullable fields in `openapi.json` now type as nullable in a generated client** (#725). A nullable field holding a registered schema was emitted as `allOf: [ref, { nullable: true }]`, which openapi-typescript reads as `X & unknown`, dropping the `null`.
+  - The reshape to `{ allOf: [ref], nullable: true }` (#295) covered only three listed schemas. It now walks the whole document.
+  - Affected: `Release.artist`, `ReleaseBrowseItem.artist`, `ReleaseContributionDetail.releaseFile`, `ReleaseHistoryEntry.snapshot`, `ForumTopicSession.poll`, `PrivateMessage.sender`, `StaffInboxMessage.sender`, `StaffInboxTicket.assignedUser`, `.resolver` and its messages' `sender`, and `GET /home/featured`'s `albumOfTheMonth` and `vanityHouse` and `GET /rules`'s `main`.
+  - The wire format is unchanged. A spec fails the build if any `allOf` member carries `nullable` again.
 
 ### Removed
 

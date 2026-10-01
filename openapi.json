@@ -4069,11 +4069,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ForumPoll"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "subscription": {
             "type": "object",
@@ -4778,11 +4776,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReleaseFileQuality"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "edition": {
             "$ref": "#/components/schemas/EditionIdentity"
@@ -4968,11 +4964,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReleaseSnapshot"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "createdAt": {
             "type": "string"
@@ -5130,11 +5124,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReleaseArtist"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "credits": {
             "type": "array",
@@ -5732,11 +5724,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReleaseArtist"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "credits": {
             "type": "array",
@@ -7195,11 +7185,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/AuthorRef"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -7413,21 +7401,17 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/AuthorRef"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "resolver": {
             "allOf": [
               {
                 "$ref": "#/components/schemas/AuthorRef"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           },
           "messages": {
             "type": "array",
@@ -7447,11 +7431,9 @@
                   "allOf": [
                     {
                       "$ref": "#/components/schemas/AuthorRef"
-                    },
-                    {
-                      "nullable": true
                     }
-                  ]
+                  ],
+                  "nullable": true
                 }
               },
               "required": [
@@ -7515,11 +7497,9 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/AuthorRef"
-              },
-              {
-                "nullable": true
               }
-            ]
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -15387,21 +15367,17 @@
                       "allOf": [
                         {
                           "$ref": "#/components/schemas/HomepageFeaturedAlbum"
-                        },
-                        {
-                          "nullable": true
                         }
-                      ]
+                      ],
+                      "nullable": true
                     },
                     "vanityHouse": {
                       "allOf": [
                         {
                           "$ref": "#/components/schemas/HomepageFeaturedRelease"
-                        },
-                        {
-                          "nullable": true
                         }
-                      ]
+                      ],
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -36876,11 +36852,9 @@
                       "allOf": [
                         {
                           "$ref": "#/components/schemas/RulesPage"
-                        },
-                        {
-                          "nullable": true
                         }
-                      ]
+                      ],
+                      "nullable": true
                     },
                     "pages": {
                       "type": "array",
