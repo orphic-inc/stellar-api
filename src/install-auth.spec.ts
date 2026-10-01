@@ -689,7 +689,6 @@ describe('API auth/profile/user flows', () => {
         badge: '',
         displayStaff: false
       },
-      inviteTree: [],
       community: null,
       email: null,
       dateRegistered: '2026-04-24T00:00:00.000Z',
@@ -857,7 +856,6 @@ describe('API auth/profile/user flows', () => {
       staffBio: null,
       recentContributions: [],
       recentSnatches: [],
-      inviteTree: [],
       community: null
     } as never);
 
@@ -936,7 +934,6 @@ describe('API auth/profile/user flows', () => {
       recentContributions: [],
       recentSnatches: [],
       userSettings: undefined,
-      inviteTree: [],
       community: null
     } as never);
 

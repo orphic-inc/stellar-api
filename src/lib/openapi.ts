@@ -953,23 +953,6 @@ const ProfileSnatch = registry.register(
   })
 );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const InviteNodeSchema: z.ZodType<any> = z.lazy(() =>
-  z.object({
-    id: z.number(),
-    username: z.string(),
-    email: z.string().email().optional(),
-    joinedAt: z.string(),
-    lastSeen: z.string().nullable().optional(),
-    contributed: z.string().optional(),
-    consumed: z.string().optional(),
-    ratio: z.string().optional(),
-    children: z.array(InviteNodeSchema).optional()
-  })
-);
-
-const InviteNode = registry.register('InviteNode', InviteNodeSchema);
-
 // PRD-01 Profile Integration: community-stats block. Null when the target's
 // privacy flags hide their ratio stats from this viewer; the reputation `ratio`
 // dimension is omitted (and the score recomputed) when consumed stats are hidden.
@@ -1067,7 +1050,6 @@ const PublicProfile = registry.register(
     staffPmOverview: ProfileStaffPmOverview.nullable(),
     recentContributions: z.array(ProfileContribution),
     recentSnatches: z.array(ProfileSnatch),
-    inviteTree: z.array(InviteNode),
     community: CommunityStats.nullable()
   })
 );

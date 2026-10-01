@@ -16,6 +16,13 @@ All notable changes to stellar-api are documented here.
 - **A promotion rule off the ladder no longer moves anyone** (#718). The adjacency check ran only when a rule was written, so a later level change could leave a rule skipping a rung. Because the sweep took the first enabled rule it found, such a rule could promote a member past a rung, shadow the right rule, or demote a member into the wrong rank, a secondary one included. The evaluator now skips every rule that is not an adjacent step between primary ranks on the current ladder.
 - **`POST` and `PUT /tools/promotion-rules` reject a secondary `fromRank` or `toRank` with `422`** (#718). The adjacency check looked only at the rungs between the two ranks, so a rule with a secondary end was accepted and never fired.
 
+### Removed
+
+- **`inviteTree` is gone from the profile (`PublicProfile`, `MyProfile`), with its `InviteNode` schema** (#856).
+  - It went to the owner and to staff, and every node carried the invitee's contributed, consumed and ratio figures, whatever the invitee's privacy settings said.
+  - No consumer read it. stellar-ui's invite tree reads `GET /users/{id}/invite-tree`, which applies those settings and is unchanged.
+  - The profile also stops making the second recursive invite subtree read the field needed.
+
 ## [0.10.0] — 2026-09-30
 
 ### Added
