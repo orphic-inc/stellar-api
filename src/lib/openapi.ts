@@ -1030,6 +1030,30 @@ const PublicProfile = registry.register(
         description:
           'Who invited this member. Null unless the viewer holds invites_manage; `inviter` is null when nobody did.'
       }),
+    // Any viewer, whatever the privacy flags say: privacy is a privilege
+    // (#658, ADR-0052). Only an unexpired WATCH with bytes still owed.
+    ratioWatch: z
+      .object({
+        expiresAt: z.string(),
+        deficit: z.string(),
+        consumedSinceWatch: z.string()
+      })
+      .nullable()
+      .openapi({
+        description:
+          'An active ratio watch, shown to every viewer. Null unless the member is on an unexpired watch and still short of the required ratio. `deficit` is the bytes still to contribute; byte figures are strings.'
+      }),
+    // `ratio_policy_manage` only, the owner included; null for anyone else (#658).
+    ratioPolicy: z
+      .object({
+        status: z.enum(['OK', 'WATCH', 'DOWNLOAD_DISABLED']),
+        disabledCause: z.nativeEnum(RatioDisableCause).nullable()
+      })
+      .nullable()
+      .openapi({
+        description:
+          "The member's ratio policy status. Null unless the viewer holds ratio_policy_manage; `disabledCause` is null unless DOWNLOAD_DISABLED."
+      }),
     staffBio: z.string().nullable(),
     stats: ProfileStats,
     userRank: UserRankSummary.extend({

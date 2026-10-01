@@ -2,7 +2,11 @@ import { Prisma, RatioDisableCause, RatioPolicyStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { audit } from '../lib/audit';
 import { getLogger } from './logging';
-import { getRatioStats } from './ratio';
+import {
+  computeRequiredRatio,
+  getEligibleContributionBytes,
+  getRatioStats
+} from './ratio';
 import { AppError } from '../lib/errors';
 import { site } from './config';
 import { sendSystemMessage } from './pm';
@@ -233,6 +237,87 @@ export const getPolicyState = async (
     };
   }
   return serializeState(state);
+};
+
+/** An active watch as any viewer sees it on a member's profile (#658). */
+export interface RatioWatchView {
+  expiresAt: string;
+  /** Bytes still to contribute to meet the required ratio. */
+  deficit: string;
+  consumedSinceWatch: string;
+}
+
+/** The policy status, for a viewer holding `ratio_policy_manage` (#658). */
+export interface RatioPolicySummary {
+  status: RatioPolicyStatus;
+  disabledCause: RatioDisableCause | null;
+}
+
+/**
+ * The ratio policy on a member's profile (ADR-0052). Privacy is a privilege:
+ * an active watch shows to every viewer whatever the member's privacy flags
+ * say. The watch shows only while it is unexpired and the member is still
+ * short. The status, including `DOWNLOAD_DISABLED`, is for `canSeePolicy` only.
+ * The contribution read behind the required ratio runs only for an active watch.
+ */
+export const getProfileRatioViews = async (
+  userId: number,
+  balance: { contributed: bigint; consumed: bigint },
+  canSeePolicy: boolean,
+  now = new Date()
+): Promise<{
+  ratioWatch: RatioWatchView | null;
+  ratioPolicy: RatioPolicySummary | null;
+}> => {
+  const state = await prisma.ratioPolicyState.findUnique({
+    where: { userId },
+    select: {
+      status: true,
+      watchExpiresAt: true,
+      consumedAtWatchStart: true,
+      disabledCause: true
+    }
+  });
+  const ratioPolicy = canSeePolicy
+    ? {
+        status: state?.status ?? RatioPolicyStatus.OK,
+        disabledCause: state?.disabledCause ?? null
+      }
+    : null;
+
+  const ratioWatch =
+    state?.status === RatioPolicyStatus.WATCH
+      ? await activeWatchView(userId, state, balance, now)
+      : null;
+  return { ratioWatch, ratioPolicy };
+};
+
+/** A watch as a viewer sees it: null once expired or no longer short. */
+const activeWatchView = async (
+  userId: number,
+  state: { watchExpiresAt: Date | null; consumedAtWatchStart: bigint | null },
+  { contributed, consumed }: { contributed: bigint; consumed: bigint },
+  now: Date
+): Promise<RatioWatchView | null> => {
+  if (state.watchExpiresAt === null || state.watchExpiresAt <= now) {
+    return null;
+  }
+  const required = computeRequiredRatio(
+    consumed,
+    await getEligibleContributionBytes(userId)
+  );
+  const deficit = BigInt(Math.ceil(Number(consumed) * required)) - contributed;
+  if (deficit <= 0n) return null;
+
+  return {
+    expiresAt: state.watchExpiresAt.toISOString(),
+    deficit: deficit.toString(),
+    // As the rules read it: no baseline is no consumption during the watch.
+    consumedSinceWatch: (state.consumedAtWatchStart === null
+      ? 0n
+      : consumed - state.consumedAtWatchStart
+    ).toString()
+  };
 };
 
 export interface OverridePolicyInput {

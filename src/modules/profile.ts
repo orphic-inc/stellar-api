@@ -6,8 +6,8 @@ import type {
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import {
-  invitedByView,
   loadViewerContext,
+  withViewerFields,
   type ViewerContext
 } from './profileViewer';
 import { primaryArtist, releaseCreditsSelect } from './releaseCredits';
@@ -1126,7 +1126,7 @@ export const getProfileById = async (
     viewer.isOwner || viewer.isStaff,
     bbViewer
   );
-  return { ...view, invitedBy: invitedByView(user, viewer) };
+  return withViewerFields(view, user, viewer);
 };
 
 export const getProfileByLookup = async (
@@ -1168,7 +1168,7 @@ export const getProfileByLookup = async (
     viewer.isOwner || viewer.isStaff,
     bbViewer
   );
-  return { ...view, invitedBy: invitedByView(user, viewer) };
+  return withViewerFields(view, user, viewer);
 };
 
 export const updateProfile = async (
