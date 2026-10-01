@@ -133,10 +133,18 @@ export const getAssetByHash = (hash: string, client: PrismaClient = prisma) =>
  */
 export const getOwnedAssetCount = (
   ownerId: number,
-  client: PrismaClient = prisma
+  client: PrismaClient = prisma,
+  replacing: string[] = []
 ): Promise<number> =>
   client.asset.count({
-    where: { ownerId, kind: { not: AssetKind.Imported } }
+    where: {
+      ownerId,
+      kind: { not: AssetKind.Imported },
+      // A released asset no longer counts (#871), and neither does the one an
+      // upload is about to replace: the member is uploading its successor.
+      releasedAt: null,
+      hash: { notIn: replacing }
+    }
   });
 
 /**
@@ -161,6 +169,8 @@ export const uploadAsset = async (
     mime?: string;
     ownerId: number;
     assetLimit: number | null;
+    /** The hashes held by the image field this upload is for (#871). */
+    replacing?: string[];
   },
   client: PrismaClient = prisma
 ) => {
@@ -179,7 +189,11 @@ export const uploadAsset = async (
       select: { id: true }
     });
     if (!alreadyOwned) {
-      const owned = await getOwnedAssetCount(input.ownerId, client);
+      const owned = await getOwnedAssetCount(
+        input.ownerId,
+        client,
+        input.replacing
+      );
       if (owned >= input.assetLimit) {
         throw new AppError(400, `Asset limit reached (${input.assetLimit}).`);
       }
@@ -206,3 +220,74 @@ export const assetUrl = (hash: string): string => `/api/asset/${hash}`;
  * whole string an asset address", which is the question a field validator asks.
  */
 export const ASSET_PATH = /^\/api\/asset\/[0-9a-f]{64}$/;
+
+/** The image fields an upload can be for (#871). */
+export const IMAGE_FIELDS = ['avatar', 'customIcon', 'secondAvatar'] as const;
+export type ImageField = (typeof IMAGE_FIELDS)[number];
+
+const hashOf = (value: string | null | undefined): string[] =>
+  value && ASSET_PATH.test(value)
+    ? [value.slice(value.lastIndexOf('/') + 1)]
+    : [];
+
+/**
+ * The asset hashes a member's image fields hold, by field (#871). `avatar`
+ * covers both avatar columns: `PUT /profile/me` writes the profile's, and
+ * `PUT /users/settings` the user's.
+ */
+export const heldImageHashes = async (
+  userId: number,
+  client: PrismaClient = prisma
+): Promise<Record<ImageField, string[]>> => {
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: {
+      avatar: true,
+      profile: { select: { avatar: true } },
+      donorReward: { select: { customIcon: true, secondAvatar: true } }
+    }
+  });
+  return {
+    avatar: [...hashOf(user?.avatar), ...hashOf(user?.profile.avatar)],
+    customIcon: hashOf(user?.donorReward?.customIcon),
+    secondAvatar: hashOf(user?.donorReward?.secondAvatar)
+  };
+};
+
+const allHeld = (byField: Record<ImageField, string[]>): string[] => [
+  ...new Set(Object.values(byField).flat())
+];
+
+/**
+ * Run a write to a member's image fields, then settle their assets (#871). An
+ * owned asset the write moved every field off is released, so it stops
+ * counting toward `assetLimit` at once; one a field holds again is not.
+ *
+ * Release, never delete: the same hash can be embedded in a post or a
+ * stylesheet, and only the orphan sweep's full scan can see that. Settling
+ * after a concurrent write can only miss a release, never release a held
+ * asset, because it reads what the fields hold once the write is done.
+ */
+export const settlingImageAssets = async <T>(
+  userId: number,
+  write: () => Promise<T>,
+  client: PrismaClient = prisma
+): Promise<T> => {
+  const before = allHeld(await heldImageHashes(userId, client));
+  const result = await write();
+  const held = allHeld(await heldImageHashes(userId, client));
+  const dropped = before.filter((hash) => !held.includes(hash));
+  if (held.length > 0) {
+    await client.asset.updateMany({
+      where: { ownerId: userId, hash: { in: held }, releasedAt: { not: null } },
+      data: { releasedAt: null }
+    });
+  }
+  if (dropped.length > 0) {
+    await client.asset.updateMany({
+      where: { ownerId: userId, hash: { in: dropped }, releasedAt: null },
+      data: { releasedAt: new Date() }
+    });
+  }
+  return result;
+};

@@ -800,17 +800,22 @@ enum AssetKind {
 /// cross-repo change landed. Deliberately bounded — revisit when content imagery
 /// makes the table large. `assetStore.ts` is the seam a driver swap replaces.
 model Asset {
-  id        Int       @id @default(autoincrement())
-  hash      String    @unique
-  mime      String
-  size      Int
-  kind      AssetKind
-  data      Bytes
+  id         Int       @id @default(autoincrement())
+  hash       String    @unique
+  mime       String
+  size       Int
+  kind       AssetKind
+  data       Bytes
   /// Null = site-owned (the built-in theme fixtures). A user-owned asset dies
   /// with its owner, extending the AuthorStylesheet cascade precedent.
-  ownerId   Int?
-  owner     User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
+  ownerId    Int?
+  owner      User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  /// When the owner's last image field moved off this asset (#871). A released
+  /// asset stops counting toward the rank's `assetLimit` at once; deletion
+  /// stays with the orphan sweep, the only reader that can see an embed of the
+  /// same hash elsewhere. Null while one of the owner's image fields holds it.
+  releasedAt DateTime?
 
   remoteImages RemoteImage[]
 

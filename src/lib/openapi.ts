@@ -28,6 +28,7 @@ import {
 } from '@prisma/client';
 import { appVersion } from './version';
 import { INVITE_GATE_ORDER } from '../modules/inviteGates';
+import { IMAGE_FIELDS } from '../modules/assetStore';
 import type { Operation } from './openapiCompleteness';
 import { type GateKind, expectedCodes, type Gate } from './routeGate';
 import {
@@ -3253,6 +3254,20 @@ registry.registerPath({
   path: '/asset',
   tags: ['Assets'],
   request: {
+    query: z.object({
+      kind: z.enum(['ThemeImage', 'Avatar']).optional().openapi({
+        description: 'A label on the bytes; both kinds run the same quota.'
+      }),
+      field: z
+        .enum(IMAGE_FIELDS)
+        .optional()
+        .openapi({
+          description:
+            'The image field this upload will replace (#871). Its current ' +
+            'asset does not count toward the quota, so a member at the limit ' +
+            'can upload the replacement; saving it releases the old one.'
+        })
+    }),
     body: {
       content: { 'application/octet-stream': { schema: z.string() } }
     }

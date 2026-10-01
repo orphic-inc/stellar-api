@@ -147,6 +147,33 @@ describe('PUT /api/profile/me', () => {
     expect(res.status).toBe(404);
   });
 
+  // #871: the save releases the uploaded avatar it moved off, so it stops
+  // counting toward assetLimit before the member's next upload.
+  it('releases the owned asset the avatar moved off', async () => {
+    const old = 'c'.repeat(64);
+    // Before the save, then after it; other lookups keep the harness default.
+    const held = [`/api/asset/${old}`, ''];
+    const fallback = prismaMock.user.findUnique.getMockImplementation();
+    prismaMock.user.findUnique.mockImplementation(((args: {
+      select?: { donorReward?: unknown };
+    }) =>
+      args.select?.donorReward
+        ? Promise.resolve({
+            avatar: '',
+            profile: { avatar: held.shift() },
+            donorReward: null
+          })
+        : fallback?.(args as never)) as never);
+
+    const res = await request(app).put('/api/profile/me').send({ avatar: '' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.asset.updateMany).toHaveBeenCalledWith({
+      where: { ownerId: 7, hash: { in: [old] }, releasedAt: null },
+      data: { releasedAt: expect.any(Date) }
+    });
+  });
+
   // #396/#361. An avatar renders to every viewer of a member's profile and posts,
   // and this field was a bare `.url()` — so it took `http:` and `ftp:` too. These
   // mirror the externalStylesheet cases below, which is the boundary ADR-0024 §3

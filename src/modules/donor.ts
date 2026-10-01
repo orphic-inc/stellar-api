@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { sanitizePlain } from '../lib/sanitize';
 import { AppError } from '../lib/errors';
 import { registerWriteImages } from './remoteImage';
+import { settlingImageAssets } from './assetStore';
 
 export type PerksMap = {
   iconMouseOverText?: boolean;
@@ -159,11 +160,14 @@ export const updateDonorRewards = async (
       { fields: [allowed.customIcon, allowed.secondAvatar] },
       userId
     );
-    await prisma.donorReward.upsert({
-      where: { userId },
-      create: { userId, ...allowed },
-      update: allowed
-    });
+    // Releases an uploaded image the write moved off (#871).
+    await settlingImageAssets(userId, () =>
+      prisma.donorReward.upsert({
+        where: { userId },
+        create: { userId, ...allowed },
+        update: allowed
+      })
+    );
   }
 
   const settings = await getDonorSettings(userId);

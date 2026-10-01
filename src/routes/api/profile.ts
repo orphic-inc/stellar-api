@@ -30,6 +30,7 @@ import { loadPermissions } from '../../middleware/permissions';
 import { hasPermission } from '../../lib/rankPermissions';
 import { audit } from '../../lib/audit';
 import { registerWriteImages } from '../../modules/remoteImage';
+import { settlingImageAssets } from '../../modules/assetStore';
 import { z } from 'zod';
 import {
   validate,
@@ -254,10 +255,10 @@ router.put(
       { bodies: [data.profileInfo], fields: [data.avatar] },
       req.user.id
     );
-    const updated = await updateProfile(
-      req.user.id,
-      data,
-      await resolveViewer(req)
+    const viewer = await resolveViewer(req);
+    // Releases an uploaded avatar the save moved off (#871).
+    const updated = await settlingImageAssets(req.user.id, () =>
+      updateProfile(req.user.id, data, viewer)
     );
     if (!updated) return res.status(404).json({ msg: 'User not found' });
     await audit(prisma, req.user.id, 'profile.update', 'User', req.user.id, {
