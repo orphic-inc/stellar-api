@@ -6,6 +6,10 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The egress guard now refuses IPv6 addresses that carry an IPv4 one** (#863). NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible (`::/96`) addresses passed `checkPublicUrl`, because only the IPv4-mapped form was unwrapped. On a network that routes them, the link checker and the remote image import could be pointed at loopback or cloud metadata. Each prefix is now blocked whole.
+
 ## [0.10.0] — 2026-09-30
 
 ### Added
