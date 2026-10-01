@@ -20,11 +20,7 @@ import { renderSiteBBCode, type BBViewer } from './bbcodeRender';
 import { computeRatio } from './ratio';
 import { parsePerks, type PerksMap } from './donor';
 import { activeWarnedAt, computeStanding } from './standing';
-import {
-  getInviteSubtreeRows,
-  getMemberInviteTreeView,
-  type InviteSubtreeRow
-} from './user';
+import { getMemberInviteTreeView } from './user';
 import {
   getReputation,
   filterReputationView,
@@ -46,18 +42,6 @@ type UserSettingsView = {
   showConsumedStats: boolean;
   showRatioStats: boolean;
   showMatureContent: boolean;
-};
-
-type InviteTreeNode = {
-  id: number;
-  username: string;
-  email?: string;
-  joinedAt: string;
-  lastSeen: string | null;
-  contributed: string;
-  consumed: string;
-  ratio: string;
-  children: InviteTreeNode[];
 };
 
 type RecentContribution = {
@@ -251,45 +235,6 @@ const PROFILE_BASE_SELECT = {
 type ProfileUserRecord = Prisma.UserGetPayload<{
   select: typeof PROFILE_BASE_SELECT;
 }>;
-
-// Nest the flat subtree rows under `rootUserId` by their inviter pointer,
-// producing the profile's invite-tree contract. A `seen` set guards a corrupt
-// edge from looping; siblings are username-ordered for a stable render.
-const buildInviteTree = (
-  rows: InviteSubtreeRow[],
-  rootUserId: number,
-  includeEmail: boolean
-): InviteTreeNode[] => {
-  const byInviter = new Map<number, InviteSubtreeRow[]>();
-  for (const row of rows) {
-    if (row.inviterId === null) continue;
-    const list = byInviter.get(row.inviterId);
-    if (list) list.push(row);
-    else byInviter.set(row.inviterId, [row]);
-  }
-
-  const seen = new Set<number>([rootUserId]);
-  const build = (inviterId: number): InviteTreeNode[] =>
-    (byInviter.get(inviterId) ?? [])
-      .filter((row) => !seen.has(row.userId))
-      .sort((a, b) => a.username.localeCompare(b.username))
-      .map((row) => {
-        seen.add(row.userId);
-        return {
-          id: row.userId,
-          username: row.username,
-          ...(includeEmail ? { email: row.email } : {}),
-          joinedAt: row.dateRegistered.toISOString(),
-          lastSeen: row.lastLogin?.toISOString() ?? null,
-          contributed: row.contributed.toString(),
-          consumed: row.consumed.toString(),
-          ratio: computeRatio(row.contributed, row.consumed).toFixed(2),
-          children: build(row.userId)
-        };
-      });
-
-  return build(rootUserId);
-};
 
 const getActivitySummary = async (
   userId: number
@@ -943,7 +888,6 @@ export const buildCommunityStats = (
 const buildProfileView = async (
   user: ProfileUserRecord,
   viewer: ViewerContext,
-  includeInviteTree: boolean,
   bbViewer: BBViewer
 ) => {
   const settings = user.userSettings as UserSettingsView;
@@ -979,7 +923,6 @@ const buildProfileView = async (
     activitySummary,
     recentContributions,
     recentSnatches,
-    inviteRows,
     collageShelves,
     staffPmOverview,
     friendCount,
@@ -989,9 +932,6 @@ const buildProfileView = async (
     getActivitySummary(user.id),
     getRecentContributions(user.id, viewer.viewerId),
     canSeeSnatches ? getRecentSnatches(user.id) : Promise.resolve([]),
-    includeInviteTree
-      ? getInviteSubtreeRows(user.id)
-      : Promise.resolve([] as InviteSubtreeRow[]),
     getProfileCollages(user.id, viewer.viewerId),
     viewer.isStaff ? getStaffPmOverview(user.id) : Promise.resolve(null),
     canSeeRatio
@@ -1101,10 +1041,6 @@ const buildProfileView = async (
     staffPmOverview,
     recentContributions,
     recentSnatches,
-    inviteTree:
-      includeInviteTree && inviteRows.length
-        ? buildInviteTree(inviteRows, user.id, viewer.isOwner || viewer.isStaff)
-        : [],
     community
   };
 };
@@ -1120,12 +1056,7 @@ export const getProfileById = async (
     select: PROFILE_BASE_SELECT
   });
   if (!user) return null;
-  const view = await buildProfileView(
-    user,
-    viewer,
-    viewer.isOwner || viewer.isStaff,
-    bbViewer
-  );
+  const view = await buildProfileView(user, viewer, bbViewer);
   return withViewerFields(view, user, viewer);
 };
 
@@ -1162,12 +1093,7 @@ export const getProfileByLookup = async (
 
   if (!user) return null;
   const viewer = await loadViewerContext(user.id, viewerUserId);
-  const view = await buildProfileView(
-    user,
-    viewer,
-    viewer.isOwner || viewer.isStaff,
-    bbViewer
-  );
+  const view = await buildProfileView(user, viewer, bbViewer);
   return withViewerFields(view, user, viewer);
 };
 

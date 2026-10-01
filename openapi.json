@@ -1154,48 +1154,6 @@
           "artist"
         ]
       },
-      "InviteNode": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "username": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "joinedAt": {
-            "type": "string"
-          },
-          "lastSeen": {
-            "type": "string",
-            "nullable": true
-          },
-          "contributed": {
-            "type": "string"
-          },
-          "consumed": {
-            "type": "string"
-          },
-          "ratio": {
-            "type": "string"
-          },
-          "children": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InviteNode"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "username",
-          "joinedAt"
-        ]
-      },
       "CommunityStats": {
         "type": "object",
         "properties": {
@@ -1460,12 +1418,6 @@
               "$ref": "#/components/schemas/ProfileSnatch"
             }
           },
-          "inviteTree": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InviteNode"
-            }
-          },
           "community": {
             "allOf": [
               {
@@ -1508,7 +1460,6 @@
           "staffPmOverview",
           "recentContributions",
           "recentSnatches",
-          "inviteTree",
           "community",
           "avatarSrc"
         ]
@@ -1711,12 +1662,6 @@
               "$ref": "#/components/schemas/ProfileSnatch"
             }
           },
-          "inviteTree": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InviteNode"
-            }
-          },
           "community": {
             "allOf": [
               {
@@ -1762,7 +1707,6 @@
           "staffPmOverview",
           "recentContributions",
           "recentSnatches",
-          "inviteTree",
           "community",
           "userSettings",
           "avatarSrc"
