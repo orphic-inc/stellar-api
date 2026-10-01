@@ -195,3 +195,49 @@ describe('feedToken and bodyLimit gates are not cookie credentials (#558)', () =
     expect(doc.paths['/asset'].post.responses['413']).toBeDefined();
   });
 });
+
+/**
+ * A nullable registered ref must reach the ui as `X | null` (#295, #725).
+ * zod-to-openapi emits `{ allOf: [ref, { nullable: true }] }`, which
+ * openapi-typescript reads as `X & unknown`, dropping the null. The build
+ * reshapes that exact form; this fails on any `allOf` member still carrying
+ * `nullable`, so a variant the reshape does not recognise fails here too.
+ */
+describe('nullable registered refs keep their null (#725)', () => {
+  const doc = buildOpenApiDocument(
+    collectRoutes(createApp()).filter(isContractRoute).map(stripApi)
+  );
+
+  const nullableAllOfMembers = (node: unknown, path = ''): string[] => {
+    if (Array.isArray(node)) {
+      return node.flatMap((v, i) => nullableAllOfMembers(v, `${path}/${i}`));
+    }
+    if (!node || typeof node !== 'object') return [];
+    const record = node as Record<string, unknown>;
+    const here =
+      Array.isArray(record.allOf) &&
+      record.allOf.some((m) => !!m && typeof m === 'object' && 'nullable' in m)
+        ? [path]
+        : [];
+    return here.concat(
+      Object.entries(record).flatMap(([k, v]) =>
+        nullableAllOfMembers(v, `${path}/${k}`)
+      )
+    );
+  };
+
+  it('leaves no allOf member carrying nullable', () => {
+    expect(nullableAllOfMembers(doc)).toEqual([]);
+  });
+
+  it('marks the ref itself nullable instead', () => {
+    const schemas = doc.components?.schemas as Record<
+      string,
+      { properties: Record<string, unknown> }
+    >;
+    expect(schemas.StaffInboxTicket.properties.assignedUser).toEqual({
+      allOf: [{ $ref: '#/components/schemas/AuthorRef' }],
+      nullable: true
+    });
+  });
+});
