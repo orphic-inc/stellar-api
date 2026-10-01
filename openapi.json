@@ -321,6 +321,7 @@
               "level",
               "name",
               "color",
+              "assetLimit",
               "notificationFilterLimit"
             ]
           },

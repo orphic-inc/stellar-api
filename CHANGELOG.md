@@ -32,6 +32,7 @@ All notable changes to stellar-api are documented here.
   - The reshape to `{ allOf: [ref], nullable: true }` (#295) covered only three listed schemas. It now walks the whole document.
   - Affected: `Release.artist`, `ReleaseBrowseItem.artist`, `ReleaseContributionDetail.releaseFile`, `ReleaseHistoryEntry.snapshot`, `ForumTopicSession.poll`, `PrivateMessage.sender`, `StaffInboxMessage.sender`, `StaffInboxTicket.assignedUser`, `.resolver` and its messages' `sender`, and `GET /home/featured`'s `albumOfTheMonth` and `vanityHouse` and `GET /rules`'s `main`.
   - The wire format is unchanged. A spec fails the build if any `allOf` member carries `nullable` again.
+- **The session's `userRank.assetLimit` now arrives** (#716). `AuthUser` declared it, but the session never selected it, so a client read `undefined`. It's now always present: the primary rank's value, as `POST /asset` enforces it. `null` means unlimited and `0` means no uploads.
 
 ### Removed
 

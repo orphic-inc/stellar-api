@@ -63,7 +63,10 @@ export const authUserSelect = {
       // The primary rank's alone (#715), because that is what
       // getFilterAllowance enforces. Null is unlimited and stays null on the
       // wire: `0` means the rank has no filters, unlike the two limits above.
-      notificationFilterLimit: true
+      notificationFilterLimit: true,
+      // The primary rank's alone (#716), as routes/api/asset.ts enforces it,
+      // with the same null-is-unlimited reading: `0` means no uploads.
+      assetLimit: true
     }
   },
   secondaryRanks: {
