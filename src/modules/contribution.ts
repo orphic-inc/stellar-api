@@ -401,6 +401,22 @@ export const createContributionSubmission = async ({
   };
 };
 
+/**
+ * A contribution on an existing release. A release with no contributions can
+ * be deleted (#793), and its edition with it, between addContributionToRelease's
+ * read and this write: the upload then answers as a missing release.
+ */
+const createReleaseContribution = async (
+  tx: Prisma.TransactionClient,
+  data: Prisma.ContributionUncheckedCreateInput
+) => {
+  try {
+    return await tx.contribution.create({ data, select: contributionSelect });
+  } catch (err) {
+    translatePrismaError(err, { P2003: [404, 'Release not found'] });
+  }
+};
+
 export const addContributionToRelease = async ({
   userId,
   communityId,
@@ -435,19 +451,16 @@ export const addContributionToRelease = async ({
       // default edition, creating one if the release has none yet.
       const edition = await defaultEditionFor(tx, release, input.media);
 
-      return tx.contribution.create({
-        data: {
-          userId,
-          releaseId,
-          editionId: edition.id,
-          contributorId: contributor.id,
-          type: input.fileType as FileType,
-          downloadUrl: input.downloadUrl,
-          sizeInBytes: input.sizeInBytes ?? null,
-          releaseDescription: input.releaseDescription,
-          releaseFile: releaseFileCreate(input)
-        },
-        select: contributionSelect
+      return createReleaseContribution(tx, {
+        userId,
+        releaseId,
+        editionId: edition.id,
+        contributorId: contributor.id,
+        type: input.fileType as FileType,
+        downloadUrl: input.downloadUrl,
+        sizeInBytes: input.sizeInBytes ?? null,
+        releaseDescription: input.releaseDescription,
+        releaseFile: releaseFileCreate(input)
       });
     })
     .then((contribution) => {

@@ -7,8 +7,17 @@ const prismaMock = {
     create: jest.fn(),
     findUniqueOrThrow: jest.fn(),
     findFirst: jest.fn(),
+    updateMany: jest.fn(),
+    count: jest.fn(),
     delete: jest.fn()
   },
+  comment: { deleteMany: jest.fn() },
+  bookmarkRelease: { deleteMany: jest.fn() },
+  releaseArtist: { deleteMany: jest.fn() },
+  edition: { deleteMany: jest.fn() },
+  collage: { updateMany: jest.fn() },
+  auditLog: { create: jest.fn() },
+  groupLog: { create: jest.fn() },
   releaseTag: { create: jest.fn() },
   releaseTagVote: { create: jest.fn() },
   releaseHistory: { create: jest.fn() },
@@ -99,20 +108,99 @@ describe('releaseLifecycle', () => {
     });
   });
 
-  it('deletes community releases and decrements tag occurrences', async () => {
-    prismaMock.release.findFirst.mockResolvedValue({
-      id: 3,
-      releaseTags: [{ tagId: 7 }]
-    } as never);
+  describe('deleteCommunityRelease (#793)', () => {
+    const remove = () =>
+      deleteCommunityRelease({ actorId: 7, communityId: 1, releaseId: 3 });
 
-    await deleteCommunityRelease({ communityId: 1, releaseId: 3 });
+    const ghost = (overrides: Record<string, unknown> = {}) => {
+      prismaMock.release.updateMany.mockResolvedValue({ count: 1 } as never);
+      prismaMock.release.findUniqueOrThrow.mockResolvedValue({
+        title: 'Kind of Blue',
+        releaseGroupId: null,
+        releaseTags: [],
+        collageEntries: [],
+        ...overrides
+      } as never);
+    };
 
-    expect(prismaMock.tag.update).toHaveBeenCalledWith({
-      where: { id: 7 },
-      data: { occurrences: { decrement: 1 } }
+    it('claims only a release in the community with no contributions', async () => {
+      ghost();
+      await remove();
+      expect(prismaMock.release.updateMany).toHaveBeenCalledWith({
+        where: { id: 3, communityId: 1, contributions: { none: {} } },
+        data: { updatedAt: expect.any(Date) }
+      });
     });
-    expect(prismaMock.release.delete).toHaveBeenCalledWith({
-      where: { id: 3 }
+
+    it('deletes the rows a Restrict would block on, then the release', async () => {
+      ghost();
+      await remove();
+      for (const model of [
+        prismaMock.comment,
+        prismaMock.bookmarkRelease,
+        prismaMock.releaseArtist,
+        prismaMock.edition
+      ]) {
+        expect(model.deleteMany).toHaveBeenCalledWith({
+          where: { releaseId: 3 }
+        });
+      }
+      expect(prismaMock.release.delete).toHaveBeenCalledWith({
+        where: { id: 3 }
+      });
+    });
+
+    it('decrements tag occurrences and collage entry counts', async () => {
+      ghost({
+        releaseTags: [{ tagId: 7 }],
+        collageEntries: [{ collageId: 4 }, { collageId: 5 }]
+      });
+      await remove();
+      expect(prismaMock.tag.update).toHaveBeenCalledWith({
+        where: { id: 7 },
+        data: { occurrences: { decrement: 1 } }
+      });
+      expect(prismaMock.collage.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [4, 5] } },
+        data: { numEntries: { decrement: 1 } }
+      });
+    });
+
+    it('touches no collage when the release is in none', async () => {
+      ghost();
+      await remove();
+      expect(prismaMock.collage.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('writes an audit row, and no group log outside a group', async () => {
+      ghost();
+      await remove();
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          actorId: 7,
+          action: 'release.delete',
+          targetType: 'Release',
+          targetId: 3,
+          metadata: {
+            communityId: 1,
+            title: 'Kind of Blue',
+            releaseGroupId: null
+          }
+        }
+      });
+      expect(prismaMock.groupLog.create).not.toHaveBeenCalled();
+    });
+
+    it("logs the deletion on the release's group", async () => {
+      ghost({ releaseGroupId: 9 });
+      await remove();
+      expect(prismaMock.groupLog.create).toHaveBeenCalledWith({
+        data: {
+          releaseGroupId: 9,
+          userId: 7,
+          info: 'Deleted release "Kind of Blue" (#3).'
+        }
+      });
     });
   });
 });
@@ -175,13 +263,32 @@ describe('releaseLifecycle guards', () => {
 
   describe('deleteCommunityRelease', () => {
     const remove = () =>
-      deleteCommunityRelease({ communityId: 1, releaseId: 3 });
+      deleteCommunityRelease({ actorId: 7, communityId: 1, releaseId: 3 });
 
     beforeEach(() => {
-      prismaMock.release.findFirst.mockResolvedValue({
-        id: 3,
-        releaseTags: []
+      prismaMock.release.updateMany.mockResolvedValue({ count: 1 } as never);
+      prismaMock.release.findUniqueOrThrow.mockResolvedValue({
+        title: 'Kind of Blue',
+        releaseGroupId: null,
+        releaseTags: [],
+        collageEntries: []
       } as never);
+    });
+
+    it('answers 404 when no release with that id is in the community', async () => {
+      prismaMock.release.updateMany.mockResolvedValue({ count: 0 } as never);
+      prismaMock.release.count.mockResolvedValue(0);
+      await expect(remove()).rejects.toEqual(refusal(404, 'Release not found'));
+      expect(prismaMock.release.delete).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when the release has a contribution', async () => {
+      prismaMock.release.updateMany.mockResolvedValue({ count: 0 } as never);
+      prismaMock.release.count.mockResolvedValue(1);
+      await expect(remove()).rejects.toEqual(
+        refusal(409, 'A release with contributions cannot be deleted')
+      );
+      expect(prismaMock.edition.deleteMany).not.toHaveBeenCalled();
     });
 
     it('answers 404 when a concurrent delete won', async () => {
@@ -189,15 +296,13 @@ describe('releaseLifecycle guards', () => {
       await expect(remove()).rejects.toEqual(refusal(404, 'Release not found'));
     });
 
-    // Every release keeps an edition, and Edition → Release is Restrict (#793).
-    it('answers 409 when the release still has editions or contributions', async () => {
-      prismaMock.release.delete.mockRejectedValue(prismaErr('P2003'));
+    // A contribution that lands after the claim meets the Restrict (#793).
+    it('answers 409 when a contribution landed after the claim', async () => {
+      prismaMock.edition.deleteMany.mockRejectedValue(prismaErr('P2003'));
       await expect(remove()).rejects.toEqual(
-        refusal(
-          409,
-          'A release with editions or contributions cannot be deleted'
-        )
+        refusal(409, 'A release with contributions cannot be deleted')
       );
+      expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
     });
   });
 });

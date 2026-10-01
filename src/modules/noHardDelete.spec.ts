@@ -44,9 +44,9 @@ const NEVER_HARD_DELETED: Array<[delegate: string, table: string]> = [
   ['request', 'requests'],
   ['requestBounty', 'request_bounties'],
   ['contribution', 'contributions'],
-  // Withdrawn by `deletedAt` (DELETE /artists/:id); editions have no delete.
+  // Withdrawn by `deletedAt` (DELETE /artists/:id). Editions are not listed:
+  // a release with no contributions is deleted with its editions (#793).
   ['artist', 'artists'],
-  ['edition', 'editions'],
   // Tags only count down (occurrences); a tag row is never removed (#596).
   ['tag', 'tags'],
   // Staff PM tickets are resolved, never deleted (#596).
@@ -144,8 +144,9 @@ describe('rows no production code hard-deletes', () => {
     );
   });
 
-  // An edition or a contribution pins its release (#596): a release delete
-  // fails while either exists, rather than taking them with it.
+  // A contribution pins its release (#596): a release delete fails while one
+  // exists, rather than taking it with it. Editions are deleted explicitly,
+  // and only with a release that has no contributions (#793).
   it.each([
     ['Edition', 'release'],
     ['Contribution', 'release']

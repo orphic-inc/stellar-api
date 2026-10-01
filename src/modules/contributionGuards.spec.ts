@@ -120,6 +120,14 @@ describe('addContributionToRelease', () => {
     expect(prismaMock.contribution.create).not.toHaveBeenCalled();
   });
 
+  // A release with no contributions can be deleted with its editions (#793).
+  it('answers the missing-release 404 when a ghost release was deleted', async () => {
+    prismaMock.contributor.upsert.mockResolvedValue({ id: 4 } as never);
+    prismaMock.edition.findFirst.mockResolvedValue({ id: 2 } as never);
+    prismaMock.contribution.create.mockRejectedValue(prismaErr('P2003'));
+    await expect(attach()).rejects.toEqual(refusal(404, 'Release not found'));
+  });
+
   it('attaches to the existing edition without creating one', async () => {
     prismaMock.contributor.upsert.mockResolvedValue({ id: 4 } as never);
     prismaMock.edition.findFirst.mockResolvedValue({ id: 2 } as never);

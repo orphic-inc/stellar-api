@@ -548,12 +548,16 @@ router.delete(
   '/:releaseId',
   ...requirePermission('communities_manage'),
   validateParams(releaseParamsSchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  authHandler(async (req, res) => {
     const { communityId, releaseId } = parsedParams<{
       communityId: number;
       releaseId: number;
     }>(res);
-    await deleteCommunityRelease({ communityId, releaseId });
+    await deleteCommunityRelease({
+      actorId: req.user.id,
+      communityId,
+      releaseId
+    });
     res.status(204).send();
   })
 );

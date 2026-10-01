@@ -5413,9 +5413,10 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Delete a release',
   description:
-    'Requires `communities_manage`. A release with editions or ' +
-    'contributions is refused with `409`; every release keeps an edition, ' +
-    'so this is every release until #793 decides what the verb should do.',
+    'Requires `communities_manage`. Deletes a release with no ' +
+    'contributions, with its editions, credits, comments and bookmarks, and ' +
+    'leaves an audit row (#793). A release with any contribution is refused ' +
+    'with `409`.',
   request: {
     params: z.object({
       communityId: z.string(),
@@ -5427,9 +5428,7 @@ registry.registerPath({
       description: 'Release deleted'
     },
     404: msgResponse('Release not found'),
-    409: msgResponse(
-      'A release with editions or contributions cannot be deleted'
-    )
+    409: msgResponse('A release with contributions cannot be deleted')
   }
 });
 

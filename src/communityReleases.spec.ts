@@ -1141,20 +1141,41 @@ describe('DELETE /api/communities/:communityId/releases/:releaseId', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
-    prismaMock.release.findFirst.mockResolvedValue(null);
+    prismaMock.release.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.release.count.mockResolvedValue(0);
 
     const res = await request(app).delete('/api/communities/1/releases/3');
 
     expect(res.status).toBe(404);
   });
 
+  // Only a release with no contributions can be deleted (#793).
+  it('returns 409 when the release has a contribution', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.release.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.release.count.mockResolvedValue(1);
+
+    const res = await request(app).delete('/api/communities/1/releases/3');
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      msg: 'A release with contributions cannot be deleted'
+    });
+    expect(prismaMock.release.delete).not.toHaveBeenCalled();
+  });
+
   it('deletes the release for admins', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
-    prismaMock.release.findFirst.mockResolvedValue({
-      id: 3,
-      releaseTags: [{ tagId: 7 }]
+    prismaMock.release.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.release.findUniqueOrThrow.mockResolvedValue({
+      title: 'Kind of Blue',
+      releaseGroupId: null,
+      releaseTags: [{ tagId: 7 }],
+      collageEntries: []
     } as never);
     prismaMock.$transaction.mockImplementation(async (cb: unknown) =>
       (cb as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock)
@@ -1170,6 +1191,10 @@ describe('DELETE /api/communities/:communityId/releases/:releaseId', () => {
     expect(prismaMock.tag.update).toHaveBeenCalledWith({
       where: { id: 7 },
       data: { occurrences: { decrement: 1 } }
+    });
+    // The audit row names the session user as the actor.
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ actorId: 7, action: 'release.delete' })
     });
   });
 });
