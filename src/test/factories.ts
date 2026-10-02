@@ -53,8 +53,8 @@ export function makeUserRank(
     secondary: false,
     permittedForumIds: [],
     uploadRequired: 0,
-    personalCollageLimit: 0,
-    authorStylesheetLimit: 0,
+    personalCollageLimit: null,
+    authorStylesheetLimit: null,
     assetLimit: null,
     displayStaff: false,
     staffGroupId: null
@@ -63,13 +63,12 @@ export function makeUserRank(
 
 /**
  * The `user.findUnique` payload `getUserRankQuotas` reads (#369): a member's
- * quota columns across primary + secondary ranks. Both default to `0`, which is
- * this pair of columns' spelling of **unlimited** — so a test states only the
- * limit it is about.
+ * quota columns across primary + secondary ranks. Both default to `null`,
+ * **unlimited** (#881), so a test states only the limit it is about.
  */
 type QuotaSlice = {
-  personalCollageLimit?: number;
-  authorStylesheetLimit?: number;
+  personalCollageLimit?: number | null;
+  authorStylesheetLimit?: number | null;
 };
 
 export function makeRankQuotas(
@@ -77,8 +76,8 @@ export function makeRankQuotas(
   ...secondaries: QuotaSlice[]
 ) {
   const rank = (slice: QuotaSlice) => ({
-    personalCollageLimit: 0,
-    authorStylesheetLimit: 0,
+    personalCollageLimit: null,
+    authorStylesheetLimit: null,
     ...slice
   });
   return {

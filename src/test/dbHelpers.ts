@@ -101,8 +101,16 @@ export const openRegistration = async (): Promise<void> => {
 
 /** Inserts the minimum seed data required by most business logic. */
 export const seedDefaults = async (): Promise<void> => {
+  // Unlimited collages and stylesheets, explicitly: the schema default is 0,
+  // none (#881), and suites that create either rely on not meeting a quota.
   await testPrisma.userRank.create({
-    data: { level: 100, name: 'User', permissions: {} }
+    data: {
+      level: 100,
+      name: 'User',
+      permissions: {},
+      personalCollageLimit: null,
+      authorStylesheetLimit: null
+    }
   });
   // Exactly one default stylesheet, because user creation resolves a theme name
   // from it and since #376 that throws rather than falling back to a literal.

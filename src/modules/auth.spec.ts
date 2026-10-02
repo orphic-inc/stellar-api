@@ -9,10 +9,12 @@ jest.mock('../lib/prisma', () => ({ prisma: {} }));
 
 import { authUserSelect, toAuthUser } from './auth';
 
-const rank = (limits: {
-  personalCollageLimit: number;
-  authorStylesheetLimit: number;
-}) => ({
+type Limits = {
+  personalCollageLimit: number | null;
+  authorStylesheetLimit: number | null;
+};
+
+const rank = (limits: Limits) => ({
   id: 1,
   level: 100,
   name: 'User',
@@ -23,13 +25,7 @@ const rank = (limits: {
   ...limits
 });
 
-const rawUser = (
-  primary: { personalCollageLimit: number; authorStylesheetLimit: number },
-  secondaries: {
-    personalCollageLimit: number;
-    authorStylesheetLimit: number;
-  }[] = []
-) =>
+const rawUser = (primary: Limits, secondaries: Limits[] = []) =>
   ({
     id: 7,
     username: 'kai',
@@ -54,13 +50,22 @@ describe('toAuthUser — advertised rank quotas', () => {
     expect(user.userRank.authorStylesheetLimit).toBe(5);
   });
 
-  it('advertises unlimited as 0 when any rank in the set is unlimited', () => {
-    // The wire has always spelled unlimited as 0; the bug was Math.max
-    // reporting the donor's 5 and thereby *capping* an unlimited rank.
+  it('advertises unlimited as null when any rank in the set is unlimited', () => {
+    // The bug was Math.max reporting the donor's 5 and thereby *capping* an
+    // unlimited rank (#369). Null is unlimited on the wire too (#881).
     const user = toAuthUser(
-      rawUser({ personalCollageLimit: 0, authorStylesheetLimit: 0 }, [
+      rawUser({ personalCollageLimit: null, authorStylesheetLimit: null }, [
         { personalCollageLimit: 4, authorStylesheetLimit: 5 }
       ])
+    );
+    expect(user.userRank.personalCollageLimit).toBeNull();
+    expect(user.userRank.authorStylesheetLimit).toBeNull();
+  });
+
+  // #881: 0 is none, and the session says so rather than reading it as unlimited.
+  it('advertises 0 as none', () => {
+    const user = toAuthUser(
+      rawUser({ personalCollageLimit: 0, authorStylesheetLimit: 0 })
     );
     expect(user.userRank.personalCollageLimit).toBe(0);
     expect(user.userRank.authorStylesheetLimit).toBe(0);

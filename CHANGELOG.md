@@ -18,7 +18,12 @@ All notable changes to stellar-api are documented here.
 ### Changed
 
 - **A fresh install's entry rank (User) can upload one image** (#876). The seeded `assetLimit` goes from `0` to `1`, so a new member can upload an avatar; stellar-ui is moving to upload-only avatar fields. The rest of the ladder is unchanged, with Member also at 1.
-  - **Existing installs keep their value**, since the seed only creates missing ranks. To let new members upload, raise User's asset limit in the rank editor, or set `"assetLimit"` on the User rank directly while the editor can't (stellar-ui#376).
+  - **Existing installs take the new value at their next container start.** The container seeds on every boot, and the seed rewrites a seeded rank's limits whenever its name still matches (#882), so an install's User rank moves to `1` as well. A User rank that was renamed keeps its value.
+- **`personalCollageLimit` and `authorStylesheetLimit` read `0` as none and `null` as unlimited** (#881), as `assetLimit` and `notificationFilterLimit` do. One rank form edits all four limits, and before this `0` meant unlimited for these two and none for the others.
+  - **A contract change.** Both are now `integer | null` on `UserRank` responses, on `POST` and `PUT /tools/user-ranks`, and on the session's `userRank`, where they are now always present. The session used to say `0` for unlimited and now says `null`.
+  - **No rank changes behaviour.** A migration turns each `0` (and any negative) into `null`.
+  - **A rank created without either field grants none** (default `0`). A rank at `0` refuses the first personal collage or authored stylesheet, and a secondary rank can still raise it.
+  - **Fresh installs cap author stylesheets** up the ladder: User 1, Member 1, Power User 2, Elite 3, Stellarific 4, Stellartastic 5, Stellarige 6, and Staff and SysOp unlimited. Before, every rank could author unlimited stylesheets, and authoring has no permission gate. The seed writes this only when it creates a rank, so existing installs keep unlimited stylesheets.
 
 ### Fixed
 

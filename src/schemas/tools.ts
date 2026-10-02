@@ -18,14 +18,13 @@ export const createRankSchema = z.object({
   permittedForumIds: z.array(z.number().int().positive()).default([]),
   color: z.string().optional(),
   badge: z.string().optional(),
-  personalCollageLimit: z.number().int().min(0).optional(),
-  authorStylesheetLimit: z.number().int().min(0).optional(),
-  // #342 semantic: 0 = no uploads, a positive N = the cap, null = unlimited.
-  // Nullable, unlike the count-only sibling limits above, because null is the
-  // uncapped tier staff hold.
+  // The nullable rank limits (#342, #881): 0 = none, a positive N = the cap,
+  // null = unlimited.
+  personalCollageLimit: z.number().int().min(0).nullable().optional(),
+  authorStylesheetLimit: z.number().int().min(0).nullable().optional(),
   assetLimit: z.number().int().min(0).nullable().optional(),
   // #282: 0 = this class earns / holds no invites. Not nullable — there is no
-  // "unlimited" tier for an invite faucet, unlike assetLimit directly above.
+  // "unlimited" tier for an invite faucet, unlike the limits directly above.
   inviteGrantPerPeriod: z.number().int().min(0).optional(),
   inviteCap: z.number().int().min(0).optional(),
   // #263: the assetLimit semantic — 0 = no filters, N = the cap, null = unlimited.
@@ -43,8 +42,8 @@ export const updateRankSchema = z
     permittedForumIds: z.array(z.number().int().positive()).optional(),
     color: z.string().optional(),
     badge: z.string().optional(),
-    personalCollageLimit: z.number().int().min(0).optional(),
-    authorStylesheetLimit: z.number().int().min(0).optional(),
+    personalCollageLimit: z.number().int().min(0).nullable().optional(),
+    authorStylesheetLimit: z.number().int().min(0).nullable().optional(),
     assetLimit: z.number().int().min(0).nullable().optional(),
     inviteGrantPerPeriod: z.number().int().min(0).optional(),
     inviteCap: z.number().int().min(0).optional(),

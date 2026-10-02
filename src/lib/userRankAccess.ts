@@ -106,31 +106,26 @@ export type RankQuotas = {
 };
 
 /**
- * Resolve a "0 means unlimited" rank quota across every rank a member holds
- * (primary + secondary).
+ * Resolve a nullable rank quota across every rank a member holds (primary +
+ * secondary). `0` means none, `null` means unlimited, and a positive N is the
+ * cap: the reading `personalCollageLimit` and `authorStylesheetLimit` share
+ * with `assetLimit` (#881).
  *
  * Two rules, and the order matters:
  *
- *   - **`0` anywhere wins, and means unlimited.** A plain `Math.max` inverts
- *     this: it reads an unlimited rank as the weakest one in the set, so a
- *     donor perk of 5 would *cap* an unlimited primary rank at 5 (#369).
- *   - otherwise the **highest** cap in the set applies, so a secondary rank can
- *     only ever raise a ceiling, never lower one.
+ *   - **`null` anywhere wins, and means unlimited.** A plain `Math.max` would
+ *     drop it, so a donor perk of 5 would *cap* an unlimited primary rank at 5
+ *     (#369).
+ *   - otherwise the **highest** cap in the set applies, `0` included, so a
+ *     secondary rank can only ever raise a ceiling, never lower one.
  *
- * `0 = unlimited` is the schema's own semantic for `personalCollageLimit` and
- * `authorStylesheetLimit` — `UserRank.assetLimit` documents itself as the
- * deliberate opposite. Non-positive values are folded into the unlimited case:
- * the columns are `Int` with no check constraint, and reading a stray negative
- * as a cap would refuse every write rather than allow them.
- *
- * An empty set is unlimited, preserving the behaviour of the call sites this
- * replaces — both read `if (rank && rank.limit > 0)`, so a missing rank row
+ * An empty set is unlimited: a member with no rank row has always been
  * enforced nothing.
  */
-export const resolveRankQuota = (limits: number[]): number | null =>
-  limits.length === 0 || limits.some((limit) => limit <= 0)
+export const resolveRankQuota = (limits: (number | null)[]): number | null =>
+  limits.length === 0 || limits.some((limit) => limit === null)
     ? null
-    : Math.max(...limits);
+    : Math.max(...(limits as number[]));
 
 /**
  * Load a member's quotas across primary + secondary ranks. The enforcement-side
