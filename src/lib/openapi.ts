@@ -5347,6 +5347,9 @@ registry.registerPath({
   path: '/communities/{id}/curators',
   tags: ['Communities'],
   summary: 'Promote a user to community curator',
+  description:
+    "Staff (`communities_manage` or `admin`), or this community's leader. " +
+    'A curator who is not the leader is refused (#895, ADR-0053).',
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5361,7 +5364,7 @@ registry.registerPath({
     204: {
       description: 'Curator added'
     },
-    403: msgResponse('Not a community admin or curator'),
+    403: msgResponse('Not staff or the community leader'),
     404: msgResponse('User not found')
   }
 });
@@ -5372,8 +5375,10 @@ registry.registerPath({
   tags: ['Communities'],
   summary: 'Demote a community curator',
   description:
-    'The leader is always a curator, so removing them is refused for every ' +
-    'caller; reassign the leader through `PUT /communities/{id}` first (#891).',
+    "Staff (`communities_manage` or `admin`), this community's leader, or " +
+    'the curator themselves, stepping down (#895, ADR-0053). The leader is ' +
+    'always a curator, so removing them is refused for every caller; ' +
+    'reassign the leader through `PUT /communities/{id}` first (#891).',
   request: {
     params: z.object({ id: z.string(), userId: z.string() })
   },
@@ -5381,7 +5386,7 @@ registry.registerPath({
     204: {
       description: 'Curator removed'
     },
-    403: msgResponse('Not a community admin or curator'),
+    403: msgResponse('Not staff, the community leader, or the curator'),
     404: msgResponse('Community or user not found'),
     409: msgResponse('The target is the community leader')
   }

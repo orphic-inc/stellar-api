@@ -452,7 +452,7 @@ describe('DELETE /api/communities/:id/members/:userId', () => {
 describe('POST /api/communities/:id/curators', () => {
   it('returns 404 when the user does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ curators: [{ id: 7 }] }) as never
+      makeCommunity({ leaderId: 7, curators: [{ id: 7 }] }) as never
     );
     prismaMock.user.findUnique.mockResolvedValue(null);
 
@@ -461,6 +461,34 @@ describe('POST /api/communities/:id/curators', () => {
       .send({ userId: 8 });
 
     expect(res.status).toBe(404);
+  });
+
+  // Only the leader, or staff, adds curators (#895, ADR-0053).
+  it('refuses with 403 when a curator who is not the leader adds one', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 9, curators: [{ id: 7 }, { id: 9 }] }) as never
+    );
+
+    const res = await request(app)
+      .post('/api/communities/1/curators')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.community.update).not.toHaveBeenCalled();
+  });
+
+  it('adds a curator for the leader', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 7, curators: [{ id: 7 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 8 } as never);
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .post('/api/communities/1/curators')
+      .send({ userId: 8 });
+
+    expect(res.status).toBe(204);
   });
 
   it('adds a curator for admins', async () => {
@@ -484,9 +512,9 @@ describe('POST /api/communities/:id/curators', () => {
 });
 
 describe('DELETE /api/communities/:id/curators/:userId', () => {
-  it('removes a curator for another curator', async () => {
+  it('removes a curator for the leader', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ curators: [{ id: 7 }] }) as never
+      makeCommunity({ leaderId: 7, curators: [{ id: 7 }, { id: 8 }] }) as never
     );
     prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
 
@@ -499,15 +527,60 @@ describe('DELETE /api/communities/:id/curators/:userId', () => {
     });
   });
 
-  // The leader is always a curator (ADR-0021, narrowed by ADR-0033). A
-  // leader stops being one only by being replaced as leader, through PUT /:id
-  // (#891).
-  it('refuses with 409 when a curator targets the leader', async () => {
+  it('removes a curator for communities_manage', async () => {
     prismaMock.community.findUnique.mockResolvedValue(
-      makeCommunity({ leaderId: 8, curators: [{ id: 7 }, { id: 8 }] }) as never
+      makeCommunity({ leaderId: 9, curators: [{ id: 8 }, { id: 9 }] }) as never
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app).delete('/api/communities/1/curators/8');
+
+    expect(res.status).toBe(204);
+  });
+
+  // Only the leader, or staff, removes another curator; any curator may
+  // remove themselves (#895, ADR-0053).
+  it('refuses with 403 when a curator who is not the leader removes another', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({
+        leaderId: 9,
+        curators: [{ id: 7 }, { id: 8 }, { id: 9 }]
+      }) as never
     );
 
     const res = await request(app).delete('/api/communities/1/curators/8');
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.community.update).not.toHaveBeenCalled();
+  });
+
+  it('lets a curator remove themselves', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 9, curators: [{ id: 7 }, { id: 9 }] }) as never
+    );
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app).delete('/api/communities/1/curators/7');
+
+    expect(res.status).toBe(204);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { curators: { disconnect: { id: 7 } } }
+    });
+  });
+
+  // The leader is always a curator (ADR-0021, narrowed by ADR-0033). A
+  // leader stops being one only by being replaced as leader, through PUT /:id
+  // (#891) — themselves included.
+  it('refuses with 409 when the leader removes themselves', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 7, curators: [{ id: 7 }] }) as never
+    );
+
+    const res = await request(app).delete('/api/communities/1/curators/7');
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({

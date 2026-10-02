@@ -1,6 +1,6 @@
 # CommunityLeader: a first-class, single-holder community leader pointer
 
-**Status: Accepted — amended by [ADR-0033](0033-community-membership-and-the-curator-role.md) (Accepted 2026-07-24).** Serves [PRD-08 collages & cover art](../prd/08-collages-and-cover-art.md) (the sole `CommunityLeader` mention); reuses the `communities_manage` gate from [ADR-0001 granular permission checks](0001-granular-permission-checks.md). Resolves #216. Ships the leader _model_; the Requests → new-community flow that will consume it is deferred (see below).
+**Status: Accepted — amended by [ADR-0033](0033-community-membership-and-the-curator-role.md) (Accepted 2026-07-24); its deferred succession policy is [ADR-0053](0053-community-leadership-curator-authority-and-handoff.md) (Accepted 2026-10-02).** Serves [PRD-08 collages & cover art](../prd/08-collages-and-cover-art.md) (the sole `CommunityLeader` mention); reuses the `communities_manage` gate from [ADR-0001 granular permission checks](0001-granular-permission-checks.md). Resolves #216. Ships the leader _model_; the Requests → new-community flow that will consume it is deferred (see below).
 
 **The amendment, in one line:** the superset invariant narrows from `leaderId ⟹ user ∈ staff ∧ user is a Consumer` to `leaderId ⟹ user ∈ curators` — the `Consumer` half is dropped and `staff` is renamed `curators`. Everything else below stands. The narrowing is marked at each affected point.
 
