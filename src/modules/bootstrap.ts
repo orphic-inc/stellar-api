@@ -32,10 +32,10 @@ export const DEFAULT_RANKS = [
     color: '',
     badge: '',
     personalCollageLimit: 1,
-    // Asset upload scales up the ladder like personalCollageLimit but starts at
-    // zero (#342): a brand-new User has no reason to upload a stylesheet asset,
-    // so they upload nothing. 0 = none, null = unlimited (staff).
-    assetLimit: 0,
+    // Asset upload scales up the ladder like personalCollageLimit (#342). It
+    // starts at one (#876): an avatar can only be set by upload, so a
+    // brand-new User needs a slot for it. 0 = none, null = unlimited (staff).
+    assetLimit: 1,
     // Contribution notification filters (#263, ADR-0049) start closed on every
     // member rank: staff opt a class in from the rank editor. Staff hold null.
     notificationFilterLimit: 0,
