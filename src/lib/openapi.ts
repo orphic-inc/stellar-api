@@ -6362,7 +6362,9 @@ registry.registerPath({
       content: { 'application/json': { schema: UserRankUpdated } }
     },
     404: msgResponse('Not found'),
-    409: msgResponse('Duplicate rank name or level'),
+    409: msgResponse(
+      'Duplicate rank name or level, or the change would move the entry rank off level 100, where new members join (#882)'
+    ),
     422: msgResponse('Staff group not found')
   }
 });

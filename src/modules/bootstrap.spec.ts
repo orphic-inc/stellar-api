@@ -66,40 +66,52 @@ describe('seedRankPromotionRules', () => {
     { id: 19, level: 1000 }
   ];
 
-  const makeClient = (ranks: { id: number; level: number }[]) => {
-    const upsert = jest.fn().mockResolvedValue(undefined);
+  const makeClient = (
+    ranks: { id: number; level: number }[],
+    existingRules = 0
+  ) => {
+    const createMany = jest.fn().mockResolvedValue({ count: 0 });
     const client = {
       userRank: { findMany: jest.fn().mockResolvedValue(ranks) },
-      rankPromotionRule: { upsert }
+      rankPromotionRule: {
+        count: jest.fn().mockResolvedValue(existingRules),
+        createMany
+      }
     } as unknown as PrismaClient;
-    return { client, upsert };
+    const rows = () =>
+      createMany.mock.calls[0][0].data as {
+        fromRankId: number;
+        toRankId: number;
+        minContributed: bigint;
+        minAccountAgeDays: number;
+        extra: string | null;
+      }[];
+    return { client, createMany, rows };
   };
 
   it('seeds one rule per DEFAULT_RULES rung, resolving from/to ids by level', async () => {
-    const { client, upsert } = makeClient(fullRanks);
+    const { client, rows } = makeClient(fullRanks);
     await seedRankPromotionRules(client);
 
-    expect(upsert).toHaveBeenCalledTimes(DEFAULT_RULES.length);
-    const first = upsert.mock.calls[0][0];
+    expect(rows()).toHaveLength(DEFAULT_RULES.length);
     // User(100)→Member(150) projected onto DB ids 11→12.
-    expect(first.where.fromRankId_toRankId).toEqual({
-      fromRankId: 11,
-      toRankId: 12
-    });
-    expect(first.create.minContributed).toBe(10n * GiB);
-    expect(first.create.minAccountAgeDays).toBe(7);
+    expect(rows()[0]).toMatchObject({ fromRankId: 11, toRankId: 12 });
+    expect(rows()[0].minContributed).toBe(10n * GiB);
+    expect(rows()[0].minAccountAgeDays).toBe(7);
   });
 
-  it('is create-if-absent so runtime tuning survives a re-seed', async () => {
-    const { client, upsert } = makeClient(fullRanks);
+  // #882: once any rule exists the rules are staff's, so a rule staff tuned or
+  // deleted stays as they left it.
+  it('writes nothing once any rule exists', async () => {
+    const { client, createMany } = makeClient(fullRanks, 1);
     await seedRankPromotionRules(client);
-    for (const call of upsert.mock.calls) expect(call[0].update).toEqual({});
+    expect(createMany).not.toHaveBeenCalled();
   });
 
   it('carries the prestige Extra predicates onto the top two rungs', async () => {
-    const { client, upsert } = makeClient(fullRanks);
+    const { client, rows } = makeClient(fullRanks);
     await seedRankPromotionRules(client);
-    expect(upsert.mock.calls.map((c) => c[0].create.extra)).toEqual([
+    expect(rows().map((r) => r.extra)).toEqual([
       null,
       null,
       null,
@@ -109,14 +121,44 @@ describe('seedRankPromotionRules', () => {
     ]);
   });
 
-  it('skips rungs whose ranks are not seeded yet instead of throwing', async () => {
+  it('skips rungs whose ranks do not exist instead of throwing', async () => {
     // Only User + Member exist — only the 100→150 rung is seedable.
-    const { client, upsert } = makeClient([
+    const { client, rows } = makeClient([
       { id: 11, level: 100 },
       { id: 12, level: 150 }
     ]);
     await seedRankPromotionRules(client);
-    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(rows()).toHaveLength(1);
+  });
+});
+
+describe('seedRanks (#882)', () => {
+  const makeClient = (existingRanks: number) => {
+    const createMany = jest.fn().mockResolvedValue({ count: 0 });
+    const client = {
+      userRank: {
+        count: jest.fn().mockResolvedValue(existingRanks),
+        createMany
+      }
+    } as unknown as PrismaClient;
+    return { client, createMany };
+  };
+
+  it('creates the whole default ladder in one insert on a fresh install', async () => {
+    const { client, createMany } = makeClient(0);
+    await seedRanks(client);
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(
+      createMany.mock.calls[0][0].data.map((r: { level: number }) => r.level)
+    ).toEqual(DEFAULT_RANKS.map((r) => r.level));
+  });
+
+  // Once any rank exists the ranks are staff's: an edited one isn't rewritten,
+  // and a deleted one isn't recreated.
+  it('writes nothing once any rank exists', async () => {
+    const { client, createMany } = makeClient(1);
+    await seedRanks(client);
+    expect(createMany).not.toHaveBeenCalled();
   });
 });
 
@@ -132,17 +174,17 @@ describe('a concurrent seed that wins a unique key', () => {
       clientVersion: 'test'
     });
 
-  it('seedRanks carries on past a rank created concurrently', async () => {
-    const create = jest.fn().mockRejectedValue(prismaErr('P2002'));
+  it('seedRanks carries on past a ladder created concurrently', async () => {
+    const createMany = jest.fn().mockRejectedValue(prismaErr('P2002'));
     const client = {
-      userRank: { findUnique: jest.fn().mockResolvedValue(null), create }
+      userRank: { count: jest.fn().mockResolvedValue(0), createMany }
     } as unknown as PrismaClient;
     await expect(seedRanks(client)).resolves.toBeUndefined();
-    expect(create).toHaveBeenCalledTimes(DEFAULT_RANKS.length);
+    expect(createMany).toHaveBeenCalledTimes(1);
   });
 
-  it('seedRankPromotionRules carries on past a rule created concurrently', async () => {
-    const upsert = jest.fn().mockRejectedValue(prismaErr('P2002'));
+  it('seedRankPromotionRules carries on past rules created concurrently', async () => {
+    const createMany = jest.fn().mockRejectedValue(prismaErr('P2002'));
     const client = {
       userRank: {
         findMany: jest
@@ -151,10 +193,10 @@ describe('a concurrent seed that wins a unique key', () => {
             DEFAULT_RANKS.map((r, i) => ({ id: i + 1, level: r.level }))
           )
       },
-      rankPromotionRule: { upsert }
+      rankPromotionRule: { count: jest.fn().mockResolvedValue(0), createMany }
     } as unknown as PrismaClient;
     await expect(seedRankPromotionRules(client)).resolves.toBeUndefined();
-    expect(upsert).toHaveBeenCalledTimes(DEFAULT_RULES.length);
+    expect(createMany).toHaveBeenCalledTimes(1);
   });
 
   it('seedSystemUser returns the id of the System user created concurrently', async () => {

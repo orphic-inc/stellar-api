@@ -29,6 +29,13 @@ export interface Rank {
 export const STAFF_LEVEL = 500;
 
 /**
+ * The level new members join at: registration, staff-created users and the
+ * System user all take the rank here. Staff can't move that rank off it
+ * (#882), because the boot seed no longer recreates it.
+ */
+export const ENTRY_RANK_LEVEL = 100;
+
+/**
  * Whether automated jobs manage members of this rank (#866): primary, and below
  * the staff level. Promotion rules join only these ranks. The inactivity sweep
  * and the invite handout apply the same threshold to a member's primary rank.

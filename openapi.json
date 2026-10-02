@@ -27480,7 +27480,7 @@
             }
           },
           "409": {
-            "description": "Duplicate rank name or level",
+            "description": "Duplicate rank name or level, or the change would move the entry rank off level 100, where new members join (#882)",
             "content": {
               "application/json": {
                 "schema": {

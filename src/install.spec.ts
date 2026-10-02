@@ -435,8 +435,11 @@ describe('POST /api/install', () => {
     });
 
     expect(res.status).toBe(201);
-    // One create per rung of the full class ladder.
-    expect(prismaMock.userRank.create).toHaveBeenCalledTimes(
+    // The full class ladder, in one insert (#882).
+    expect(prismaMock.userRank.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([expect.objectContaining({ level: 100 })])
+    });
+    expect(prismaMock.userRank.createMany.mock.calls[0][0]!.data).toHaveLength(
       DEFAULT_RANKS.length
     );
     expect(prismaMock.forumCategory.create).toHaveBeenCalled();
