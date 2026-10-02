@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-10-02
+
 ### Added
 
 - **`PUT /tools/user-ranks/{id}` reports the promotion rules a rank change takes off the ladder** (#718). It returns them in an optional `staleRules` array of `PromotionRule`, present only when the change's new `level` or `secondary` leaves a rule that was adjacent before no longer adjacent. The change itself still goes through, so staff can reorder the ladder. stellar-ui#383 reads the field.
@@ -3800,7 +3802,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/orphic-inc/stellar-api/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/orphic-inc/stellar-api/compare/v0.9.11...v0.10.0
 [0.9.11]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/orphic-inc/stellar-api/compare/v0.9.9...v0.9.10
