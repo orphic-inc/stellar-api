@@ -21,7 +21,9 @@ const storedAsset = {
   mime: 'image/png',
   size: BYTES.length,
   kind: 'ThemeImage',
-  data: BYTES,
+  // What Prisma 6 returns for a `Bytes` column: a Uint8Array, not a Buffer.
+  // A Buffer stub hid that `res.send` serialised the bytes as a JSON object.
+  data: new Uint8Array(BYTES),
   ownerId: null,
   createdAt: new Date('2026-07-19T00:00:00Z')
 };
