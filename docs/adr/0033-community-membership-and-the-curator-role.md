@@ -50,7 +50,7 @@ The detail response gains a `members` view derived from the union, each entry ca
 
 **One deliberate exception: clearing the leader removes their curator role** (#892, Kai, 2026-10-02). `PUT /:id` with `leaderId: null` disconnects the outgoing leader from `curators`, because a leader cleared without a successor is being demoted. A handoff to a new leader leaves the outgoing one a curator, and a `curatorIds` in the same call stands as given.
 
-**Curators are peers today, and that is not the intended model** (Kai, 2026-10-02). Any curator can add or remove any other, since both curator routes gate on `assertCommunityAdminOrCurator`. The intent is that only a community's leader adds or removes curators. That is a leader power, so it is decided in #219, the succession policy, not here.
+**Curators are no longer peers** (#895). Any curator could add or remove any other, which was never the intended model. [ADR-0053](0053-community-leadership-curator-authority-and-handoff.md) makes the leader, or staff, the one who appoints curators. A curator can still remove themselves.
 
 `POST /:id/members` is unchanged: it means "add an ordinary joined-to-consume member", which is the one place a `Consumer` link is the honest representation.
 

@@ -6,6 +6,13 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Only a community's leader, or staff, adds or removes its curators** (#895, ADR-0053). Any curator could add or remove any other, which was never the intended model.
+  - `POST /communities/{id}/curators` and `DELETE /communities/{id}/curators/{userId}` now pass for `communities_manage` or `admin`, or the community's leader. A curator who isn't the leader gets `403` where they got `204`. **A contract change.**
+  - A curator can still remove themselves, to step down. The leader can't (the `409` from #891): they hand off or are cleared first.
+  - Admitting and removing members is unchanged: still curators and staff.
+
 ### Fixed
 
 - **A community's leader stays one of its curators** (#891). ADR-0021 holds that the leader is always a curator, and two paths could break it:

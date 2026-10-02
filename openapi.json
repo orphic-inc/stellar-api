@@ -23139,6 +23139,7 @@
           "Communities"
         ],
         "summary": "Promote a user to community curator",
+        "description": "Staff (`communities_manage` or `admin`), or this community's leader. A curator who is not the leader is refused (#895, ADR-0053).",
         "parameters": [
           {
             "schema": {
@@ -23193,7 +23194,7 @@
             }
           },
           "403": {
-            "description": "Not a community admin or curator",
+            "description": "Not staff or the community leader",
             "content": {
               "application/json": {
                 "schema": {
@@ -23236,7 +23237,7 @@
           "Communities"
         ],
         "summary": "Demote a community curator",
-        "description": "The leader is always a curator, so removing them is refused for every caller; reassign the leader through `PUT /communities/{id}` first (#891).",
+        "description": "Staff (`communities_manage` or `admin`), this community's leader, or the curator themselves, stepping down (#895, ADR-0053). The leader is always a curator, so removing them is refused for every caller; reassign the leader through `PUT /communities/{id}` first (#891).",
         "parameters": [
           {
             "schema": {
@@ -23280,7 +23281,7 @@
             }
           },
           "403": {
-            "description": "Not a community admin or curator",
+            "description": "Not staff, the community leader, or the curator",
             "content": {
               "application/json": {
                 "schema": {

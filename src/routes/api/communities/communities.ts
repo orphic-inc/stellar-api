@@ -45,21 +45,31 @@ import releaseRouter from './release';
 import { registerBodyImages } from '../../../middleware/imageSrc';
 
 /**
- * Load a community and assert the caller may administer its membership.
- *
- * The four membership routes — add/remove a consuming member, add/remove a
- * curator — carried this verbatim. Unlike the collage guards, every copy here
- * really was identical: same load, same 404, same permission pair, same 403
- * message, so there is nothing per-route to preserve by leaving it in place.
+ * Load a community and assert the caller may administer it: staff
+ * (`communities_manage`/`admin`), or a user `edge` admits.
  *
  * ADR-0001 keeps `communities_manage`/`admin` as explicit permission reads
- * rather than a named role; a curator of *this* community passes on the
- * membership edge instead, which is why the check needs the loaded row.
+ * rather than a named role; a curator or the leader of *this* community passes
+ * on the membership edge instead, which is why the check needs the loaded row.
+ * Members are admitted by curators; curators are appointed by the leader
+ * (#895, ADR-0053).
  */
-const assertCommunityAdminOrCurator = async (
+type CommunityEdge = (
+  community: { leaderId: number | null; curators: { id: number }[] },
+  callerId: number
+) => boolean;
+
+const curatorEdge: CommunityEdge = (community, callerId) =>
+  community.curators.some((c) => c.id === callerId);
+
+const leaderEdge: CommunityEdge = (community, callerId) =>
+  community.leaderId === callerId;
+
+const assertCommunityAdminOr = async (
   id: number,
   req: AuthenticatedRequest,
-  res: Response
+  res: Response,
+  edge: CommunityEdge
 ) => {
   const community = await prisma.community.findUnique({
     where: { id },
@@ -69,8 +79,8 @@ const assertCommunityAdminOrCurator = async (
 
   const perms = await loadPermissions(req, res);
   const isAdmin = !!(perms['communities_manage'] || perms['admin']);
-  const isCurator = community.curators.some((c) => c.id === req.user.id);
-  if (!isAdmin && !isCurator) throw new AppError(403, 'Permission denied');
+  if (!isAdmin && !edge(community, req.user.id))
+    throw new AppError(403, 'Permission denied');
 
   return community;
 };
@@ -296,7 +306,7 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { userId, role } = parsedBody<AddMemberInput>(res);
 
-    await assertCommunityAdminOrCurator(id, req, res);
+    await assertCommunityAdminOr(id, req, res, curatorEdge);
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
@@ -334,7 +344,7 @@ router.delete(
   authHandler(async (req, res) => {
     const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
 
-    const community = await assertCommunityAdminOrCurator(id, req, res);
+    const community = await assertCommunityAdminOr(id, req, res, curatorEdge);
 
     // This route removes the consumer and contributor links. When the target also holds
     // a curator or leader role, refuse rather than partially removing them: no
@@ -380,7 +390,7 @@ router.delete(
   })
 );
 
-// POST /api/communities/:id/curators — add a curator (communities_manage or curator)
+// POST /api/communities/:id/curators — add a curator (communities_manage or the leader)
 router.post(
   '/:id/curators',
   requireAuth,
@@ -390,7 +400,7 @@ router.post(
     const { id } = parsedParams<{ id: number }>(res);
     const { userId } = parsedBody<{ userId: number }>(res);
 
-    await assertCommunityAdminOrCurator(id, req, res);
+    await assertCommunityAdminOr(id, req, res, leaderEdge);
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ msg: 'User not found' });
@@ -409,7 +419,8 @@ router.post(
   })
 );
 
-// DELETE /api/communities/:id/curators/:userId — remove a curator (communities_manage or curator)
+// DELETE /api/communities/:id/curators/:userId — remove a curator (communities_manage,
+// the leader, or the curator themselves)
 router.delete(
   '/:id/curators/:userId',
   requireAuth,
@@ -417,7 +428,13 @@ router.delete(
   authHandler(async (req, res) => {
     const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
 
-    const community = await assertCommunityAdminOrCurator(id, req, res);
+    // The leader, or a curator stepping down (#895, ADR-0053).
+    const community = await assertCommunityAdminOr(
+      id,
+      req,
+      res,
+      (c, callerId) => leaderEdge(c, callerId) || callerId === userId
+    );
 
     // The leader is always a curator (ADR-0021, narrowed by ADR-0033), so this
     // route refuses them for every caller. A leader stops being a curator only
