@@ -134,6 +134,11 @@ export const addMemberSchema = addCuratorSchema.extend({
   role: z.enum(['consumer', 'contributor']).default('consumer')
 });
 
+// POST /communities/:id/leader-offer: the curator to hand leadership to (#896)
+export const leaderOfferSchema = z.object({
+  userId: z.number().int().positive()
+});
+
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export type CreateReleaseInput = z.infer<typeof createReleaseSchema>;
@@ -145,3 +150,4 @@ export type ReleaseCreditRoleInput = z.infer<typeof releaseCreditRoleSchema>;
 export type ReleaseTagVoteInput = z.infer<typeof releaseTagVoteSchema>;
 export type AddCuratorInput = z.infer<typeof addCuratorSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
+export type LeaderOfferInput = z.infer<typeof leaderOfferSchema>;

@@ -41,6 +41,9 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => resetApiTestState());
 
+// A PUT that changes the leader also ends any pending handoff (#896).
+const offerCleared = { leaderOfferToId: null, leaderOfferedAt: null };
+
 // The predicate itself is unit-tested in modules/communityAccess.spec.ts; here
 // it is exercised through the routes that gate on it.
 
@@ -899,6 +902,7 @@ describe('PUT /api/communities/:id', () => {
       where: { id: 1 },
       data: {
         leaderId: 7,
+        ...offerCleared,
         curators: { connect: { id: 7 } }
       }
     });
@@ -934,7 +938,7 @@ describe('PUT /api/communities/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.community.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { leaderId: 7, curators: { connect: { id: 7 } } }
+      data: { leaderId: 7, ...offerCleared, curators: { connect: { id: 7 } } }
     });
   });
 
@@ -962,7 +966,11 @@ describe('PUT /api/communities/:id', () => {
       expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.community.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { leaderId: null, curators: { disconnect: { id: 8 } } }
+        data: {
+          leaderId: null,
+          ...offerCleared,
+          curators: { disconnect: { id: 8 } }
+        }
       });
       expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -986,7 +994,11 @@ describe('PUT /api/communities/:id', () => {
       expect(res.status).toBe(200);
       expect(prismaMock.community.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { leaderId: null, curators: { set: [{ id: 8 }, { id: 9 }] } }
+        data: {
+          leaderId: null,
+          ...offerCleared,
+          curators: { set: [{ id: 8 }, { id: 9 }] }
+        }
       });
     });
 
@@ -1002,7 +1014,11 @@ describe('PUT /api/communities/:id', () => {
       expect(res.status).toBe(200);
       expect(prismaMock.community.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { leaderId: null, curators: { set: [{ id: 9 }] } }
+        data: {
+          leaderId: null,
+          ...offerCleared,
+          curators: { set: [{ id: 9 }] }
+        }
       });
     });
 
@@ -1061,6 +1077,7 @@ describe('PUT /api/communities/:id', () => {
       where: { id: 1 },
       data: {
         leaderId: 7,
+        ...offerCleared,
         curators: { set: [{ id: 8 }, { id: 9 }, { id: 7 }] }
       }
     });

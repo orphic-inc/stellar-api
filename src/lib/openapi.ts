@@ -92,6 +92,7 @@ import {
   releaseCreditRoleSchema,
   releaseTagVoteSchema,
   addCuratorSchema,
+  leaderOfferSchema,
   addMemberSchema
 } from '../schemas/community';
 import {
@@ -4548,6 +4549,15 @@ const CommunityMember = registry.register(
   })
 );
 
+// A leader's pending handoff (#896, ADR-0053 §8), shown to its parties only.
+const CommunityLeaderOffer = registry.register(
+  'CommunityLeaderOffer',
+  z.object({
+    to: CommunityCurator,
+    offeredAt: z.string().datetime()
+  })
+);
+
 const Community = registry.register(
   'Community',
   z.object({
@@ -4564,6 +4574,9 @@ const Community = registry.register(
     curators: z.array(CommunityCurator).optional(),
     // Detail view only — the browse list keeps cheap relation counts instead.
     members: z.array(CommunityMember).optional(),
+    // Detail view only: the live offer for the leader, the named successor or
+    // `communities_manage`; null for everyone else, and once it lapses.
+    leaderOffer: CommunityLeaderOffer.nullable().optional(),
     _count: z
       .object({
         releases: z.number(),
@@ -5389,6 +5402,81 @@ registry.registerPath({
     403: msgResponse('Not staff, the community leader, or the curator'),
     404: msgResponse('Community or user not found'),
     409: msgResponse('The target is the community leader')
+  }
+});
+
+const leaderOfferNotFound = msgResponse(
+  'Community not found, or no live offer to the caller. Anyone but the ' +
+    'named successor gets this, so the offer stays private (ADR-0053 §8)'
+);
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{id}/leader-offer',
+  tags: ['Communities'],
+  summary: 'Offer community leadership to a curator',
+  description:
+    "This community's leader only. The target must be an enabled curator " +
+    'and not the leader. Replaces any pending offer, notifies the target ' +
+    '(`community_leader_offered`), and lapses after 7 days (#896, ADR-0053).',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { 'application/json': { schema: leaderOfferSchema } } }
+  },
+  responses: {
+    204: { description: 'Offer made' },
+    403: msgResponse('Not the community leader, or not a member'),
+    404: msgResponse('Community not found'),
+    409: msgResponse('The target is the leader, or not an enabled curator')
+  }
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/communities/{id}/leader-offer',
+  tags: ['Communities'],
+  summary: 'Withdraw a pending leadership offer',
+  description:
+    "This community's leader only. Idempotent: with no live offer there is " +
+    'nothing to withdraw. Notifies no one (#896, ADR-0053).',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'No offer is pending' },
+    403: msgResponse('Not the community leader, or not a member'),
+    404: msgResponse('Community not found')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{id}/leader-offer/accept',
+  tags: ['Communities'],
+  summary: 'Accept a leadership offer',
+  description:
+    'The named successor only. Re-checks every lapse rule, then makes the ' +
+    'caller leader; the outgoing leader stays a curator and is notified ' +
+    '(`community_leader_accepted`) (#896, ADR-0053).',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'The caller leads the community' },
+    403: msgResponse('Not a member of this community'),
+    404: leaderOfferNotFound
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/communities/{id}/leader-offer/decline',
+  tags: ['Communities'],
+  summary: 'Decline a leadership offer',
+  description:
+    'The named successor only. Ends the offer and notifies the leader ' +
+    '(`community_leader_declined`) (#896, ADR-0053).',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    204: { description: 'Offer declined' },
+    403: msgResponse('Not a member of this community'),
+    404: leaderOfferNotFound
   }
 });
 

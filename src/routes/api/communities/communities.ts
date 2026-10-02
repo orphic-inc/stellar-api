@@ -42,6 +42,13 @@ import {
   paginationBase
 } from '../../../lib/pagination';
 import releaseRouter from './release';
+import leaderOfferRouter from './leaderOffer';
+import {
+  LEADER_OFFER_CLEARED,
+  leaderCuratorWrite,
+  leaderOfferFor,
+  leavesLeaderless
+} from '../../../modules/communityLeadership';
 import { registerBodyImages } from '../../../middleware/imageSrc';
 
 /**
@@ -85,56 +92,12 @@ const assertCommunityAdminOr = async (
   return community;
 };
 
-/**
- * The curator write a PUT /:id makes, so the leader stays a curator
- * (ADR-0021, narrowed by ADR-0033).
- *
- * - `curatorIds` replaces the whole set, so the leader is folded back in: the
- *   body's `leaderId` when sent, else the current leader (#891). A cleared
- *   leader is not folded, so the list stands as given (#892).
- * - Otherwise a new leader is connected, leaving the outgoing one a curator (a
- *   handoff), and a cleared leader is disconnected: a clear with no successor
- *   is a demotion (#892, ADR-0033 §5).
- */
-const leaderCuratorWrite = (
-  curatorIds: number[] | undefined,
-  leaderId: number | null | undefined,
-  previousLeaderId: number | null
-) => {
-  if (curatorIds !== undefined) {
-    const kept = leaderId !== undefined ? leaderId : previousLeaderId;
-    const ids =
-      kept !== null ? [...new Set([...curatorIds, kept])] : curatorIds;
-    return { set: ids.map((cid) => ({ id: cid })) };
-  }
-  if (leaderId === undefined) return undefined;
-  if (leaderId !== null) return { connect: { id: leaderId } };
-  return previousLeaderId !== null
-    ? { disconnect: { id: previousLeaderId } }
-    : undefined;
-};
-
-/**
- * Invite-only and closed communities need a leader, as at create. Checked on
- * the state a PUT /:id would leave, and only when it changes either side, so
- * an unrelated edit to an older row is not refused (#892).
- */
-const leavesLeaderless = (
-  registrationStatus: RegistrationStatus | undefined,
-  leaderId: number | null | undefined,
-  existing: { registrationStatus: RegistrationStatus; leaderId: number | null }
-) => {
-  if (registrationStatus === undefined && leaderId === undefined) return false;
-  const status = registrationStatus ?? existing.registrationStatus;
-  const leader = leaderId !== undefined ? leaderId : existing.leaderId;
-  return status !== RegistrationStatus.open && leader === null;
-};
-
 /** The write PUT /:id makes, with its constraint translation (#564). */
 const updateCommunityRow = async (
   id: number,
   body: UpdateCommunityInput,
-  curators: ReturnType<typeof leaderCuratorWrite>
+  curators: ReturnType<typeof leaderCuratorWrite>,
+  previousLeaderId: number | null
 ) => {
   const {
     name,
@@ -156,6 +119,10 @@ const updateCommunityRow = async (
         ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
+        // A changed leader ends any pending handoff (ADR-0053 §5, #896).
+        ...(leaderId !== undefined &&
+          leaderId !== previousLeaderId &&
+          LEADER_OFFER_CLEARED),
         ...(curators !== undefined && { curators })
       }
     });
@@ -179,6 +146,7 @@ const memberParamsSchema = z.object({
   userId: z.coerce.number().int().positive()
 });
 router.use('/:communityId/releases', releaseRouter);
+router.use('/:id/leader-offer', leaderOfferRouter);
 
 const communitiesQuerySchema = z.object({ ...paginationBase });
 const healthHistoryQuerySchema = z.object({
@@ -245,7 +213,14 @@ router.get(
     // reconstruct a roster from (ADR-0033 §Decision 4). Loaded after the gate so
     // a 403 costs nothing extra; `_count` stays relation counts, which is what
     // it always was.
-    res.json({ ...community, members: await listCommunityMembers(id) });
+    // The pending handoff, for its parties and staff only (ADR-0053 §8, #896).
+    const perms = await loadPermissions(req, res);
+    const isStaff = !!(perms['communities_manage'] || perms['admin']);
+    res.json({
+      ...community,
+      members: await listCommunityMembers(id),
+      leaderOffer: await leaderOfferFor(community, req.user.id, isStaff)
+    });
   })
 );
 
@@ -578,7 +553,8 @@ router.put(
     const community = await updateCommunityRow(
       id,
       body,
-      leaderCuratorWrite(curatorIds, leaderId, existing.leaderId)
+      leaderCuratorWrite(curatorIds, leaderId, existing.leaderId),
+      existing.leaderId
     );
 
     // No Consumer upsert here either — see the create path (ADR-0033 §3).
