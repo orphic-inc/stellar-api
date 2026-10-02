@@ -285,7 +285,17 @@ describe('the migration backfill (ADR-0054 §6)', () => {
 
   it('rebuilds from the audit log what the writers logged', async () => {
     const id = await createCommunity('Jazz', leaderId);
-    await putLeader(id, leaderId); // a no-op audit row (#901)
+    // A no-op audit row, as a staff PUT wrote before #901, for the backfill
+    // to skip. The route no longer writes one.
+    await testPrisma.auditLog.create({
+      data: {
+        actorId: staffId,
+        action: 'community.leader.set',
+        targetType: 'community',
+        targetId: id,
+        metadata: { leaderId, previousLeaderId: leaderId }
+      }
+    });
     await putLeader(id, curatorId);
     await handOff(id, curatorId, successorId);
     await putLeader(id, null);

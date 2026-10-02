@@ -559,7 +559,9 @@ router.put(
     );
 
     // No Consumer upsert here either — see the create path (ADR-0033 §3).
-    if (leaderId !== undefined) {
+    // Audited only when the leader changes: a form that resends the whole
+    // community would otherwise record a change that never happened (#901).
+    if (leaderId !== undefined && leaderId !== existing.leaderId) {
       await audit(
         prisma,
         req.user!.id,

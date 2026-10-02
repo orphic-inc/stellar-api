@@ -955,6 +955,31 @@ describe('PUT /api/communities/:id', () => {
     });
   });
 
+  // A form that resends the whole community records no leader change (#901).
+  it('does not audit a leader sent unchanged', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 7, curators: [{ id: 7 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
+    prismaMock.community.update.mockResolvedValue(
+      makeCommunity({ leaderId: 7 }) as never
+    );
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ leaderId: 7, description: 'Edited' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'community.leader.set' })
+      })
+    );
+  });
+
   describe('clearing the leader (#892)', () => {
     beforeEach(() => {
       prismaMock.userRank.findUnique.mockResolvedValue(
