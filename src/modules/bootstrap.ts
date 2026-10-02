@@ -23,6 +23,13 @@ import {
 import { site } from './config';
 import { FORUM_STRUCTURE, type ForumEntry } from './forumStructure';
 
+/**
+ * The default ladder, written once, when a fresh install's seed finds no ranks
+ * (#882). These values reach **new installs only**: the seed never rewrites an
+ * existing rank. A change meant for existing installs ships as a data migration
+ * as well — #851's `invites_note` grant and #882's entry-rank `assetLimit` are
+ * the examples.
+ */
 export const DEFAULT_RANKS = [
   {
     level: 100,
@@ -246,42 +253,23 @@ export const DEFAULT_RANKS = [
   }
 ] as const;
 
+/**
+ * Create the default ladder on a fresh install (#882). Once any rank exists the
+ * ranks belong to staff: the seed never rewrites one and never recreates one
+ * staff deleted. One INSERT, so a concurrent seed's unique-key conflict rolls
+ * back its whole batch rather than leaving half a ladder.
+ */
 export async function seedRanks(client: PrismaClient): Promise<void> {
-  for (const rank of DEFAULT_RANKS) {
-    const existing = await client.userRank.findUnique({
-      where: { level: rank.level }
+  if ((await client.userRank.count()) > 0) return;
+  try {
+    await client.userRank.createMany({
+      data: DEFAULT_RANKS.map((rank) => ({
+        ...rank,
+        permittedForumIds: [...rank.permittedForumIds]
+      }))
     });
-
-    if (!existing) {
-      try {
-        await client.userRank.create({
-          data: {
-            ...rank,
-            permittedForumIds: [...rank.permittedForumIds]
-          }
-        });
-      } catch (err) {
-        if (!hasPrismaCode(err, 'P2002')) throw err;
-      }
-      continue;
-    }
-
-    if (existing.name !== rank.name) continue;
-
-    await client.userRank.update({
-      where: { id: existing.id },
-      data: {
-        name: rank.name,
-        secondary: rank.secondary,
-        permittedForumIds: [...rank.permittedForumIds],
-        color: rank.color,
-        badge: rank.badge,
-        personalCollageLimit: rank.personalCollageLimit,
-        assetLimit: rank.assetLimit,
-        notificationFilterLimit: rank.notificationFilterLimit,
-        permissions: rank.permissions
-      }
-    });
+  } catch (err) {
+    if (!hasPrismaCode(err, 'P2002')) throw err;
   }
 }
 
@@ -302,43 +290,43 @@ const evaluatorLevelOf = (fixtureRankId: number): number => {
 };
 
 /**
- * Seed the promotion-rule ladder (USER_CLASSES_PLAN §5). Create-if-absent: once a
- * rule exists, re-seeding leaves it alone so runtime tuning via the admin editor
- * (#170) stays authoritative. A rung whose from/to rank isn't seeded yet is
- * skipped rather than failing the bootstrap.
+ * Seed the promotion-rule ladder (USER_CLASSES_PLAN §5) on a fresh install.
+ * Once any rule exists the rules belong to staff (#170, #882): the seed never
+ * rewrites one and never recreates one staff deleted. A rung whose from/to rank
+ * doesn't exist is skipped rather than failing the bootstrap. One INSERT, so a
+ * concurrent seed's unique-key conflict rolls back its whole batch.
  */
 export async function seedRankPromotionRules(
   client: PrismaClient
 ): Promise<void> {
+  if ((await client.rankPromotionRule.count()) > 0) return;
   const ranks = await client.userRank.findMany({
     select: { id: true, level: true }
   });
   const idByLevel = new Map(ranks.map((r) => [r.level, r.id]));
 
-  for (const rule of DEFAULT_RULES) {
+  const data = DEFAULT_RULES.flatMap((rule) => {
     const fromRankId = idByLevel.get(evaluatorLevelOf(rule.fromRankId));
     const toRankId = idByLevel.get(evaluatorLevelOf(rule.toRankId));
-    if (fromRankId === undefined || toRankId === undefined) continue;
+    if (fromRankId === undefined || toRankId === undefined) return [];
+    return [
+      {
+        fromRankId,
+        toRankId,
+        minContributed: rule.minContributed,
+        minRatio: rule.minRatio,
+        minContributions: rule.minContributions,
+        minAccountAgeDays: rule.minAccountAgeDays,
+        extra: rule.extra,
+        enabled: rule.enabled
+      }
+    ];
+  });
 
-    // Prisma sends this upsert as a read then an insert, not ON CONFLICT.
-    try {
-      await client.rankPromotionRule.upsert({
-        where: { fromRankId_toRankId: { fromRankId, toRankId } },
-        update: {},
-        create: {
-          fromRankId,
-          toRankId,
-          minContributed: rule.minContributed,
-          minRatio: rule.minRatio,
-          minContributions: rule.minContributions,
-          minAccountAgeDays: rule.minAccountAgeDays,
-          extra: rule.extra,
-          enabled: rule.enabled
-        }
-      });
-    } catch (err) {
-      if (!hasPrismaCode(err, 'P2002')) throw err;
-    }
+  try {
+    await client.rankPromotionRule.createMany({ data });
+  } catch (err) {
+    if (!hasPrismaCode(err, 'P2002')) throw err;
   }
 }
 

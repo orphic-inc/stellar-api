@@ -18,12 +18,13 @@ All notable changes to stellar-api are documented here.
 ### Changed
 
 - **A fresh install's entry rank (User) can upload one image** (#876). The seeded `assetLimit` goes from `0` to `1`, so a new member can upload an avatar; stellar-ui is moving to upload-only avatar fields. The rest of the ladder is unchanged, with Member also at 1.
-  - **Existing installs take the new value at their next container start.** The container seeds on every boot, and the seed rewrites a seeded rank's limits whenever its name still matches (#882), so an install's User rank moves to `1` as well. A User rank that was renamed keeps its value.
+  - **Existing installs get it through a migration** (#882): the rank at level 100 moves from `0` to `1`, whatever its name. Any other value staff set is left alone.
 - **`personalCollageLimit` and `authorStylesheetLimit` read `0` as none and `null` as unlimited** (#881), as `assetLimit` and `notificationFilterLimit` do. One rank form edits all four limits, and before this `0` meant unlimited for these two and none for the others.
   - **A contract change.** Both are now `integer | null` on `UserRank` responses, on `POST` and `PUT /tools/user-ranks`, and on the session's `userRank`, where they are now always present. The session used to say `0` for unlimited and now says `null`.
   - **No rank changes behaviour.** A migration turns each `0` (and any negative) into `null`.
   - **A rank created without either field grants none** (default `0`). A rank at `0` refuses the first personal collage or authored stylesheet, and a secondary rank can still raise it.
   - **Fresh installs cap author stylesheets** up the ladder: User 1, Member 1, Power User 2, Elite 3, Stellarific 4, Stellartastic 5, Stellarige 6, and Staff and SysOp unlimited. Before, every rank could author unlimited stylesheets, and authoring has no permission gate. The seed writes this only when it creates a rank, so existing installs keep unlimited stylesheets.
+- **`PUT /tools/user-ranks/{id}` refuses to move the entry rank off level 100 with `409`** (#882). Registration, staff-created users and the System user take the rank at level 100, and the seed no longer recreates one. Renaming that rank and editing its other fields still work.
 
 ### Fixed
 
@@ -46,6 +47,7 @@ All notable changes to stellar-api are documented here.
   - The wire format is unchanged. A spec fails the build if any `allOf` member carries `nullable` again.
 - **The session's `userRank.assetLimit` now arrives** (#716). `AuthUser` declared it, but the session never selected it, so a client read `undefined`. It's now always present: the primary rank's value, as `POST /asset` enforces it. `null` means unlimited and `0` means no uploads.
 - **Replacing or clearing an uploaded image frees its slot at once** (#871). A replaced avatar, donor icon or second avatar used to count toward `assetLimit` until the orphan sweep reclaimed it, up to 48 hours later, so a member on a 1-upload rank couldn't change their avatar. A write that moves every image field off an asset the member owns now marks it released (`Asset.releasedAt`), and the quota stops counting it. Setting it again re-counts it. Deletion stays with the sweep, which can see the same image embedded in a stylesheet.
+- **Staff changes to the default ranks and promotion rules now survive a restart** (#882). The container seeds on every boot, and the seed rewrote each default rank whose name still matched: its permissions, forum overrides, limits, colour and badge. It also recreated any default rank or promotion rule staff had deleted. The seed now creates ranks and rules only on a fresh install, and leaves them to staff after that.
 
 ### Removed
 

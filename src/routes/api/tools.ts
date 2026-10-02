@@ -33,6 +33,7 @@ import {
   type UpdateStaffGroupInput
 } from '../../schemas/staff';
 import * as promotionRules from '../../modules/promotionRules';
+import { ENTRY_RANK_LEVEL } from '../../modules/rankProgression';
 
 const router = express.Router();
 
@@ -245,6 +246,13 @@ router.post(
   })
 );
 
+// Registration, staff-created users and the System user take the rank at the
+// entry level, and the boot seed no longer recreates it (#882), so that rank
+// keeps its level. Renaming it and editing everything else stay allowed.
+const ENTRY_RANK_MOVE_REFUSED = `New members join at level ${ENTRY_RANK_LEVEL}, so that rank keeps its level`;
+const movesEntryRank = (current: number, next: number | undefined) =>
+  current === ENTRY_RANK_LEVEL && next !== undefined && next !== current;
+
 // PUT /api/tools/user-ranks/:id — update rank
 router.put(
   '/user-ranks/:id',
@@ -274,6 +282,9 @@ router.put(
       displayStaff,
       staffGroupId
     } = parsedBody<UpdateRankInput>(res);
+
+    if (movesEntryRank(existing.level, level))
+      return res.status(409).json({ msg: ENTRY_RANK_MOVE_REFUSED });
 
     if (staffGroupId != null) {
       const group = await prisma.staffGroup.findUnique({

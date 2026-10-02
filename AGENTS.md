@@ -588,6 +588,12 @@ Adding a 404 or 409 to an operation is a contract change. It needs a
 `CHANGELOG` entry. It also moves an entry out of `noFailureModes` in
 `openapi-failure-coverage-baseline.json`.
 
+### The boot seed is create-only
+
+The container runs `seedAll` on every boot. Its rank and promotion-rule seeders create rows only on a fresh install, and leave existing rows to staff (#882).
+
+To change rows on existing installs, ship a data migration, as #851 did for `invites_note`.
+
 ### Soft delete
 
 Users are never hard-deleted — set `disabled: true`. Filter active users with `where: { disabled: false }`. Forum topics and posts use `deletedAt`.
