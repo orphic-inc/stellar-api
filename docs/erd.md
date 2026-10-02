@@ -710,6 +710,7 @@ erDiagram
     "communities" o{--}o "consumers" : ""
     "communities" o{--}o "contributors" : ""
     "communities" }o--|o users : "leader"
+    "communities" }o--|o users : "leaderOfferTo"
     "consumers" |o--|| users : "user"
     "consumers" o{--}o "releases" : ""
     "consumers" o{--}o "contributions" : ""

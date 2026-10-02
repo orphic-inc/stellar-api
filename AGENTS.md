@@ -297,6 +297,7 @@ src/
     ircNick.ts                # IRC nick verification (ADR-0015) — challenge/nonce proof-of-control promoting a Nick Claim to a verified nick
     contributionLimits.ts     # Per-ReleaseType contribution size ceilings (#93) — the real product limits, distinct from the overflow guard
     contributionQuality.ts    # Per-contribution quality grade (ADR-0002) off the typed Bitrate enum on the ReleaseFile satellite
+    communityLeadership.ts    # Community leadership (ADR-0053, #896): the leader rules a staff community update applies, and the handoff — offer, withdraw, accept/decline; `liveLeaderOfferWhere` is the one lapse rule (lazy, no job)
     communityAccess.ts        # Community membership + access (#419, ADR-0030, ADR-0033): the communityRoleUnion where-fragment (consumer ∪ contributor ∪ curator) that DEFINES membership, the hasCommunityAccess gate (ex-`isCommunityMember`) and its load-then-gate assertCommunityAccess, plus listCommunityMembers projecting the same union into a roster. Never reads announceVisibility
     releaseBrowse.ts          # listCommunityReleases — the community release browse/list read
     releaseGroup.ts           # ReleaseGroup identity node (ADR-0023, #265): access-filtered resolver, find-or-create, attach/detach, merge/split, group log (covers are in releaseGroupCovers.ts). `collapseByGroup` (ADR-0037 §2) is the read-time dedup — it applies NO access rule and inherits its safety from the caller
@@ -411,6 +412,7 @@ src/
       artist.ts             # Artist CRUD + history/similar/alias/tag
       contributions.ts      # Contribution CRUD + domain gate + approve
       dnc.ts                # Community Do-Not-Contribute list management
+      leaderOffer.ts        # Leadership handoff under /:id/leader-offer: offer, withdraw, accept, decline (#896)
     forum/
       forumRoute.ts         # Forum CRUD
       forumCategory.ts      # ForumCategory CRUD

@@ -6,6 +6,18 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **A community's leader hands off leadership by offer, and the successor accepts or declines** (#896, ADR-0053 §3–8).
+  - `POST /communities/{id}/leader-offer` `{ userId }` offers leadership to an enabled curator. It is the leader's alone, and a new offer replaces a pending one. `DELETE` withdraws it.
+  - `POST …/leader-offer/accept` and `…/decline` are the named successor's. An accept makes them leader, and the outgoing leader stays a curator. Anyone else gets the same `404` as a missing offer, so other curators can't learn an offer exists.
+  - Each answers `204` (#711).
+  - **An offer lapses lazily**, with no job: after 7 days, or once the successor is no longer an enabled curator, or once the leader is disabled. An accept re-checks all of them in the same conditional write that moves the leader, so a concurrent change is never overwritten.
+  - **A staff `PUT /communities/{id}` that changes the leader ends the offer.** One that sends the current leader unchanged leaves it alone.
+  - **`GET /communities/{id}` gains `leaderOffer`**: `{ to: { id, username }, offeredAt }` for the leader, the successor or `communities_manage`, and `null` for everyone else or once it lapses. No community response carries the stored offer columns.
+  - Three notifications, `community_leader_offered`, `community_leader_accepted` and `community_leader_declined`. A withdrawal, a lapse and a staff reassign notify no one.
+  - Audited as `community.leader.offer`, `.accept`, `.decline` and `.withdraw`; an accept also writes `community.leader.set`.
+
 ## [0.10.2] — 2026-10-02
 
 ### Changed

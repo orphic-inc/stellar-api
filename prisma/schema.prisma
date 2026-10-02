@@ -149,6 +149,10 @@ enum NotificationType {
   global_notice
   rank_promoted
   rank_demoted
+  // A leadership handoff (ADR-0053 §6): to the successor, then to the leader.
+  community_leader_offered
+  community_leader_accepted
+  community_leader_declined
 }
 
 // Extra, non-numeric criteria a promotion rule may layer on top of the stock
@@ -547,6 +551,7 @@ model User {
   friendRequestsReceived   FriendRelationship[]             @relation("FriendRecipient")
   communitiesCurated       Community[]                      @relation("CommunityCurators")
   communitiesLed           Community[]                      @relation("CommunityLeader")
+  communityLeaderOffers    Community[]                      @relation("CommunityLeaderOffer")
   consumer                 Consumer?
   contributor              Contributor?
   contributions            Contribution[]
@@ -1262,6 +1267,14 @@ model Community {
   // rather than orphaning the community.
   leaderId              Int?
   leader                User?                     @relation("CommunityLeader", fields: [leaderId], references: [id])
+  // The pending leadership handoff (ADR-0053 §5): one at a time, a new offer
+  // replaces the old, and the audit log keeps the history. It lapses lazily,
+  // read through `liveLeaderOfferWhere` (modules/communityLeadership.ts); a
+  // stored offer is not necessarily a live one. Omitted from every read unless
+  // selected (lib/prisma.ts), so a community response never carries it.
+  leaderOfferToId       Int?
+  leaderOfferTo         User?                     @relation("CommunityLeaderOffer", fields: [leaderOfferToId], references: [id])
+  leaderOfferedAt       DateTime?
   doNotContribute       DoNotContribute[]
   bookmarks             BookmarkCommunity[]
   createdAt             DateTime                  @default(now())
@@ -1270,6 +1283,7 @@ model Community {
   healthSnapshots       CommunityHealthSnapshot[]
 
   @@index([leaderId])
+  @@index([leaderOfferToId])
   @@map("communities")
 }
 
