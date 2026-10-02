@@ -5246,7 +5246,11 @@ registry.registerPath({
     'cannot configure their own community, so everything here including ' +
     '`announceVisibility` is site-staff-only. That is the settled position, ' +
     'not an oversight: ADR-0030 section 5 was amended to match the code ' +
-    '(PR #469).',
+    '(PR #469).\n\n' +
+    '`leaderId: null` clears the leader and removes their curator role; a ' +
+    'new `leaderId` hands off and leaves the outgoing leader a curator. An ' +
+    'invite-only or closed community needs a leader, so a call that would ' +
+    'leave one leaderless answers `409` (#892).',
   request: {
     params: z.object({ id: z.string() }),
     body: {
@@ -5259,7 +5263,10 @@ registry.registerPath({
       content: { 'application/json': { schema: Community } }
     },
     404: msgResponse('Community, or the named leader user, not found'),
-    409: msgResponse('A community with that name already exists'),
+    409: msgResponse(
+      'A community with that name already exists, or the change would leave ' +
+        'an invite-only or closed community without a leader'
+    ),
     429: imageCeilingResponse
   }
 });
