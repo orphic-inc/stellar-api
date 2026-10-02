@@ -136,7 +136,7 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
 
   it('an unlimited primary rank is not capped by a donor secondary (#369)', async () => {
     // The Math.max inversion: a perk must never lower a ceiling. The seeded
-    // primary rank leaves authorStylesheetLimit at its 0 default = unlimited.
+    // primary rank's authorStylesheetLimit is null, unlimited.
     const author = await createUser();
     const donorRank = await testPrisma.userRank.create({
       data: {
@@ -159,6 +159,43 @@ describe('AuthorStylesheet save → list (PRD-03 #118/#146, many per author)', (
         where: { authorId: author.id }
       })
     ).toBe(3);
+  });
+
+  it('refuses the first stylesheet for a rank at 0, none (#881)', async () => {
+    const author = await createUser();
+    await testPrisma.userRank.update({
+      where: { id: author.userRankId },
+      data: { authorStylesheetLimit: 0 }
+    });
+
+    await expect(
+      createAuthorStylesheet(author.id, { name: 'First', source: 'a {}' })
+    ).rejects.toThrow('Author stylesheet limit reached (0)');
+  });
+
+  it('lets a donor secondary raise a primary rank at 0 (#881)', async () => {
+    const author = await createUser();
+    await testPrisma.userRank.update({
+      where: { id: author.userRankId },
+      data: { authorStylesheetLimit: 0 }
+    });
+    const donorRank = await testPrisma.userRank.create({
+      data: {
+        level: 150,
+        name: `Donor-${Date.now()}`,
+        permissions: {},
+        secondary: true,
+        authorStylesheetLimit: 1
+      }
+    });
+    await testPrisma.userSecondaryRank.create({
+      data: { userId: author.id, userRankId: donorRank.id }
+    });
+
+    await createAuthorStylesheet(author.id, { name: 'One', source: 'a {}' });
+    await expect(
+      createAuthorStylesheet(author.id, { name: 'Two', source: 'b {}' })
+    ).rejects.toThrow('Author stylesheet limit reached (1)');
   });
 
   it('rejects creation past the rank-configured registry-space limit (#146)', async () => {

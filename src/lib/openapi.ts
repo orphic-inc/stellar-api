@@ -376,8 +376,10 @@ const AuthUser = registry.register(
       color: z.string(),
       badge: z.string().optional(),
       permissions: z.record(z.string(), z.boolean()).optional(),
-      personalCollageLimit: z.number().int().optional(),
-      authorStylesheetLimit: z.number().int().optional(),
+      // Resolved across primary + secondary ranks (#369). Null is unlimited and
+      // 0 is none (#881), as for the two limits below.
+      personalCollageLimit: z.number().int().nullable(),
+      authorStylesheetLimit: z.number().int().nullable(),
       // #716: the primary rank's upload allowance, as enforced. Null is
       // unlimited and 0 is none, so a client disables its upload control on 0.
       assetLimit: z.number().int().nullable(),
@@ -4924,8 +4926,8 @@ registry.register(
 // on the wire like the rest. `secondary` and `permittedForumIds` are live reads
 // in stellar-ui's rank manager, rank form and profile rank pickers.
 //
-// Only `assetLimit` and `staffGroupId` are nullable, and both because the
-// column is (`Int?`) — for assetLimit null means UNCAPPED, not absent (#342).
+// The nullable fields are nullable because the column is (`Int?`). For the
+// rank limits null means UNCAPPED, not absent (#342, #881).
 const UserRank = registry.register(
   'UserRank',
   z.object({
@@ -4942,8 +4944,9 @@ const UserRank = registry.register(
     permittedForumIds: z.array(z.number().int()),
     color: z.string(),
     badge: z.string(),
-    personalCollageLimit: z.number().int(),
-    authorStylesheetLimit: z.number().int(),
+    // The nullable rank limits (#342, #881): 0 = none, N = the cap, null = unlimited.
+    personalCollageLimit: z.number().int().nullable(),
+    authorStylesheetLimit: z.number().int().nullable(),
     assetLimit: z.number().int().nullable(),
     // #282 invite faucet. Not nullable: unlike assetLimit there is no uncapped
     // tier, and 0 (the default every pre-existing rank carries) means this

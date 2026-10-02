@@ -348,12 +348,18 @@ model UserRank {
   color                   String              @default("")
   badge                   String              @default("")
   uploadRequired          Int                 @default(0)
-  personalCollageLimit    Int                 @default(0)
-  authorStylesheetLimit   Int                 @default(0)
+  /// How many personal collages a member of this rank may keep. Like every
+  /// nullable rank limit here: `0` means none, `null` means unlimited, and a
+  /// positive N is the cap (#881). Default 0, so a rank created without an
+  /// explicit value grants nothing rather than everything.
+  personalCollageLimit    Int?                @default(0)
+  /// How many author stylesheets a member of this rank may keep (#146). The
+  /// only control on authoring, which has no permission gate. Same reading as
+  /// personalCollageLimit (#881).
+  authorStylesheetLimit   Int?                @default(0)
   /// How many images a member of this rank may upload: stylesheet assets and
-  /// avatars (#342, #871). NOTE: the semantic is the OPPOSITE of
-  /// authorStylesheetLimit above — here `0` means none, `null` means unlimited,
-  /// and a positive N is the cap. The integer says exactly what it counts. A
+  /// avatars (#342, #871). `0` means none, `null` means unlimited, and a
+  /// positive N is the cap. The integer says exactly what it counts. A
   /// brand-new User uploads one image, their avatar (#876); the allowance
   /// scales up the ladder like personalCollageLimit; staff are null (uncapped).
   /// Default 0, so a rank created without an explicit value can upload nothing

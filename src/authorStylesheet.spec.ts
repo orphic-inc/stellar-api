@@ -123,7 +123,7 @@ describe('POST /api/stylesheet/author', () => {
     // lower a ceiling.
     prismaMock.user.findUnique.mockResolvedValue(
       makeRankQuotas(
-        { authorStylesheetLimit: 0 },
+        { authorStylesheetLimit: null },
         { authorStylesheetLimit: 5 }
       ) as never
     );
@@ -135,6 +135,22 @@ describe('POST /api/stylesheet/author', () => {
 
     expect(res.status).toBe(201);
     expect(prismaMock.authorStylesheet.count).not.toHaveBeenCalled();
+  });
+
+  // #881: 0 is none, so the first sheet is refused rather than unlimited.
+  it('refuses the first stylesheet for a rank at 0', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ authorStylesheetLimit: 0 }) as never
+    );
+    prismaMock.authorStylesheet.count.mockResolvedValue(0);
+
+    const res = await request(app)
+      .post('/api/stylesheet/author')
+      .send({ name: 'None', source: 'body { color: red; }' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('Author stylesheet limit reached (0)');
+    expect(prismaMock.authorStylesheet.create).not.toHaveBeenCalled();
   });
 
   it('allows creation below the rank-configured limit', async () => {

@@ -196,11 +196,13 @@ router.post(
           permittedForumIds: permittedForumIds ?? [],
           color: color ?? '',
           badge: badge ?? '',
-          personalCollageLimit: personalCollageLimit ?? 0,
-          authorStylesheetLimit: authorStylesheetLimit ?? 0,
           // Tri-state: undefined → default 0 (none); an explicit null → unlimited;
           // N → cap. `?? 0` would collapse null to none, silently downgrading an
-          // uncapped rank, so branch on undefined instead.
+          // uncapped rank, so branch on undefined instead (#881 for the first two).
+          personalCollageLimit:
+            personalCollageLimit === undefined ? 0 : personalCollageLimit,
+          authorStylesheetLimit:
+            authorStylesheetLimit === undefined ? 0 : authorStylesheetLimit,
           assetLimit: assetLimit === undefined ? 0 : assetLimit,
           // #282 fail-closed: a rank created without an explicit allowance earns
           // and holds nothing, so adding a class never opens the faucet by

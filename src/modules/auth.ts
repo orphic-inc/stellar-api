@@ -62,7 +62,7 @@ export const authUserSelect = {
       authorStylesheetLimit: true,
       // The primary rank's alone (#715), because that is what
       // getFilterAllowance enforces. Null is unlimited and stays null on the
-      // wire: `0` means the rank has no filters, unlike the two limits above.
+      // wire: `0` means the rank has no filters, as for the two limits above.
       notificationFilterLimit: true,
       // The primary rank's alone (#716), as routes/api/asset.ts enforces it,
       // with the same null-is-unlimited reading: `0` means no uploads.
@@ -127,9 +127,9 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => {
   const { ratioPolicyState, warnings, ...rest } = raw;
   const rankQuotaInputs = (
     field: 'personalCollageLimit' | 'authorStylesheetLimit'
-  ): number[] => [
-    raw.userRank[field] ?? 0,
-    ...raw.secondaryRanks.map((entry) => entry.userRank[field] ?? 0)
+  ): (number | null)[] => [
+    raw.userRank[field],
+    ...raw.secondaryRanks.map((entry) => entry.userRank[field])
   ];
 
   return {
@@ -154,16 +154,17 @@ export const toAuthUser = (raw: RawAuthUser): AuthUser => {
           }
         }))
       }).permissions,
-      // Resolved across primary + secondary ranks, with 0 meaning unlimited.
-      // The wire keeps representing unlimited as 0, which is what it has always
-      // meant here — resolveRankQuota's null is the internal spelling only.
-      // Math.max alone inverted the semantic: an unlimited primary rank plus a
-      // donor secondary of 5 advertised 5, i.e. a perk that *lowered* a ceiling
-      // (#369). Enforcement reads the same resolver via getUserRankQuotas.
-      personalCollageLimit:
-        resolveRankQuota(rankQuotaInputs('personalCollageLimit')) ?? 0,
-      authorStylesheetLimit:
-        resolveRankQuota(rankQuotaInputs('authorStylesheetLimit')) ?? 0
+      // Resolved across primary + secondary ranks: null is unlimited and 0 is
+      // none (#881), on the wire as in enforcement. Math.max alone inverted
+      // this: an unlimited primary rank plus a donor secondary of 5 advertised
+      // 5, a perk that *lowered* a ceiling (#369). Enforcement reads the same
+      // resolver via getUserRankQuotas.
+      personalCollageLimit: resolveRankQuota(
+        rankQuotaInputs('personalCollageLimit')
+      ),
+      authorStylesheetLimit: resolveRankQuota(
+        rankQuotaInputs('authorStylesheetLimit')
+      )
     },
     ratio: computeRatio(raw.contributed, raw.consumed),
     contributed: raw.contributed.toString(),

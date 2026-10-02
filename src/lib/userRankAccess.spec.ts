@@ -17,26 +17,27 @@ describe('resolveRankQuota', () => {
     expect(resolveRankQuota([2])).toBe(2);
   });
 
-  it('treats 0 as unlimited wherever it appears in the set', () => {
+  it('treats null as unlimited wherever it appears in the set', () => {
     // The Math.max inversion: an unlimited primary rank plus a donor secondary
-    // of 5 used to resolve to 5 — a perk that *lowered* a ceiling.
-    expect(resolveRankQuota([0, 5])).toBeNull();
-    expect(resolveRankQuota([5, 0])).toBeNull();
-    expect(resolveRankQuota([0])).toBeNull();
-    expect(resolveRankQuota([0, 0])).toBeNull();
+    // of 5 used to resolve to 5 — a perk that *lowered* a ceiling (#369).
+    expect(resolveRankQuota([null, 5])).toBeNull();
+    expect(resolveRankQuota([5, null])).toBeNull();
+    expect(resolveRankQuota([null])).toBeNull();
+    expect(resolveRankQuota([0, null])).toBeNull();
+  });
+
+  // #881: 0 is none, so it is a cap like any other and a higher one beats it.
+  it('reads 0 as none, which any higher cap in the set raises', () => {
+    expect(resolveRankQuota([0])).toBe(0);
+    expect(resolveRankQuota([0, 0])).toBe(0);
+    expect(resolveRankQuota([0, 3])).toBe(3);
+    expect(resolveRankQuota([3, 0])).toBe(3);
   });
 
   it('is unlimited for an empty rank set', () => {
     // Preserves the replaced call sites' behaviour: both read
     // `if (rank && rank.limit > 0)`, so a missing rank row enforced nothing.
     expect(resolveRankQuota([])).toBeNull();
-  });
-
-  it('folds a stray negative into unlimited rather than refusing every write', () => {
-    // The columns are Int with no check constraint; reading -1 as a cap would
-    // make `count >= -1` true forever.
-    expect(resolveRankQuota([-1])).toBeNull();
-    expect(resolveRankQuota([-1, 5])).toBeNull();
   });
 });
 
@@ -67,13 +68,13 @@ describe('getUserRankQuotas', () => {
     const quotas = await getUserRankQuotas(
       1,
       clientFor({
-        userRank: { personalCollageLimit: 0, authorStylesheetLimit: 2 },
+        userRank: { personalCollageLimit: null, authorStylesheetLimit: 2 },
         secondaryRanks: [
           { userRank: { personalCollageLimit: 4, authorStylesheetLimit: 6 } }
         ]
       })
     );
-    // Unlimited collages, capped stylesheets — one 0 must not leak sideways.
+    // Unlimited collages, capped stylesheets — one null must not leak sideways.
     expect(quotas).toEqual({
       personalCollageLimit: null,
       authorStylesheetLimit: 6

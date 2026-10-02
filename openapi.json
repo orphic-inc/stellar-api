@@ -303,10 +303,12 @@
                 }
               },
               "personalCollageLimit": {
-                "type": "integer"
+                "type": "integer",
+                "nullable": true
               },
               "authorStylesheetLimit": {
-                "type": "integer"
+                "type": "integer",
+                "nullable": true
               },
               "assetLimit": {
                 "type": "integer",
@@ -321,6 +323,8 @@
               "level",
               "name",
               "color",
+              "personalCollageLimit",
+              "authorStylesheetLimit",
               "assetLimit",
               "notificationFilterLimit"
             ]
@@ -5337,10 +5341,12 @@
             "type": "string"
           },
           "personalCollageLimit": {
-            "type": "integer"
+            "type": "integer",
+            "nullable": true
           },
           "authorStylesheetLimit": {
-            "type": "integer"
+            "type": "integer",
+            "nullable": true
           },
           "assetLimit": {
             "type": "integer",
@@ -26910,10 +26916,12 @@
                   },
                   "personalCollageLimit": {
                     "type": "integer",
+                    "nullable": true,
                     "minimum": 0
                   },
                   "authorStylesheetLimit": {
                     "type": "integer",
+                    "nullable": true,
                     "minimum": 0
                   },
                   "assetLimit": {
@@ -27380,10 +27388,12 @@
                   },
                   "personalCollageLimit": {
                     "type": "integer",
+                    "nullable": true,
                     "minimum": 0
                   },
                   "authorStylesheetLimit": {
                     "type": "integer",
+                    "nullable": true,
                     "minimum": 0
                   },
                   "assetLimit": {

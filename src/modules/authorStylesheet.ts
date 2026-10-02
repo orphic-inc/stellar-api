@@ -24,8 +24,8 @@ import type { PageParams } from '../lib/pagination';
 /**
  * Create a new AuthorStylesheet for the calling author (many per author),
  * gated by the author's rank-configured registry-space count (#146,
- * `UserRank.authorStylesheetLimit`, mirroring `personalCollageLimit`'s
- * 0-means-unlimited shape).
+ * `UserRank.authorStylesheetLimit`: `0` none, `null` unlimited, as for
+ * `personalCollageLimit` — #881).
  *
  * The quota is resolved across the author's **primary and secondary ranks**
  * (ADR-0032 §4). This previously read the primary rank alone while `toAuthUser`

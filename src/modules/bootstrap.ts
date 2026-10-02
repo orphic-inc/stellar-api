@@ -32,6 +32,10 @@ export const DEFAULT_RANKS = [
     color: '',
     badge: '',
     personalCollageLimit: 1,
+    // Author stylesheets (#881) scale up the ladder like collages; staff are
+    // null (unlimited). Written when a rank is created, never on a re-seed
+    // (#882).
+    authorStylesheetLimit: 1,
     // Asset upload scales up the ladder like personalCollageLimit (#342). It
     // starts at one (#876): an avatar can only be set by upload, so a
     // brand-new User needs a slot for it. 0 = none, null = unlimited (staff).
@@ -55,6 +59,7 @@ export const DEFAULT_RANKS = [
     color: '',
     badge: '',
     personalCollageLimit: 1,
+    authorStylesheetLimit: 1,
     assetLimit: 1,
     notificationFilterLimit: 0,
     // One step past User: unlocks advanced discovery. Identity stays understated
@@ -76,6 +81,7 @@ export const DEFAULT_RANKS = [
     color: '#e2a822',
     badge: '',
     personalCollageLimit: 2,
+    authorStylesheetLimit: 2,
     assetLimit: 2,
     notificationFilterLimit: 0,
     permissions: {
@@ -96,6 +102,7 @@ export const DEFAULT_RANKS = [
     color: '#3a9bd9',
     badge: '',
     personalCollageLimit: 3,
+    authorStylesheetLimit: 3,
     assetLimit: 3,
     notificationFilterLimit: 0,
     // Top of the "earns new powers" range: adds elevated user search and collage
@@ -122,6 +129,7 @@ export const DEFAULT_RANKS = [
     color: '#9b59d0',
     badge: '',
     personalCollageLimit: 4,
+    authorStylesheetLimit: 4,
     assetLimit: 4,
     notificationFilterLimit: 0,
     permissions: {
@@ -143,6 +151,7 @@ export const DEFAULT_RANKS = [
     color: '#c061e8',
     badge: '',
     personalCollageLimit: 5,
+    authorStylesheetLimit: 5,
     assetLimit: 5,
     notificationFilterLimit: 0,
     permissions: {
@@ -164,6 +173,7 @@ export const DEFAULT_RANKS = [
     color: '#d4a5ff',
     badge: '',
     personalCollageLimit: 6,
+    authorStylesheetLimit: 6,
     assetLimit: 6,
     notificationFilterLimit: 0,
     permissions: {
@@ -185,6 +195,7 @@ export const DEFAULT_RANKS = [
     color: '#e22a2a',
     badge: '',
     personalCollageLimit: 3,
+    authorStylesheetLimit: null,
     // Staff and SysOp are uncapped (null): they curate site fixtures and have no
     // reason to hit an upload ceiling. Diverges from personalCollageLimit, which
     // gives staff a concrete number — assets are the resource we want unlimited.
@@ -228,6 +239,7 @@ export const DEFAULT_RANKS = [
     color: '#a0d468',
     badge: '',
     personalCollageLimit: 4,
+    authorStylesheetLimit: null,
     assetLimit: null,
     notificationFilterLimit: null,
     permissions: ALL_PERMISSIONS

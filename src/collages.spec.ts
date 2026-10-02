@@ -187,11 +187,11 @@ describe('POST /api/collages', () => {
   it('lets an unlimited primary rank survive a capped donor rank (#369)', async () => {
     prismaMock.userRank.findUnique.mockResolvedValue({
       ...makeUserRank(),
-      personalCollageLimit: 0
+      personalCollageLimit: null
     } as never);
     prismaMock.user.findUnique.mockResolvedValue(
       makeRankQuotas(
-        { personalCollageLimit: 0 },
+        { personalCollageLimit: null },
         { personalCollageLimit: 2 }
       ) as never
     );
@@ -206,6 +206,29 @@ describe('POST /api/collages', () => {
 
     expect(res.status).toBe(201);
     expect(prismaMock.collage.count).not.toHaveBeenCalled();
+  });
+
+  // #881: 0 is none, so the first personal collage is refused.
+  it('refuses the first personal collage for a rank at 0', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue({
+      ...makeUserRank(),
+      personalCollageLimit: 0
+    } as never);
+    prismaMock.user.findUnique.mockResolvedValue(
+      makeRankQuotas({ personalCollageLimit: 0 }) as never
+    );
+    prismaMock.collage.findFirst.mockResolvedValue(null);
+    prismaMock.collage.count.mockResolvedValue(0);
+
+    const res = await request(app).post('/api/collages').send({
+      name: 'No Personal Collages',
+      description: 'A sufficiently long description for testing purposes.',
+      categoryId: 0
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toBe('Personal collage limit reached (0)');
+    expect(prismaMock.collage.create).not.toHaveBeenCalled();
   });
 
   it('staff (staff perm) bypass: creates personal collage even when count is at limit', async () => {
