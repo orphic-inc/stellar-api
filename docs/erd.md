@@ -176,6 +176,11 @@ erDiagram
     }
   
 
+  "community_leadership_events" {
+
+    }
+  
+
   "consumers" {
 
     }
@@ -711,6 +716,10 @@ erDiagram
     "communities" o{--}o "contributors" : ""
     "communities" }o--|o users : "leader"
     "communities" }o--|o users : "leaderOfferTo"
+    "community_leadership_events" }o--|| communities : "community"
+    "community_leadership_events" }o--|o users : "from"
+    "community_leadership_events" }o--|o users : "to"
+    "community_leadership_events" }o--|o users : "actor"
     "consumers" |o--|| users : "user"
     "consumers" o{--}o "releases" : ""
     "consumers" o{--}o "contributions" : ""

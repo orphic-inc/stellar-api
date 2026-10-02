@@ -41,8 +41,17 @@ const makeCommunity = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => resetApiTestState());
 
-// A PUT that changes the leader also ends any pending handoff (#896).
-const offerCleared = { leaderOfferToId: null, leaderOfferedAt: null };
+// A PUT that changes the leader also ends any pending handoff (#896), and logs
+// the change, by the caller (#897).
+const leaderChanged = (
+  kind: 'assigned' | 'cleared',
+  fromUserId: number | null,
+  toUserId: number | null
+) => ({
+  leaderOfferToId: null,
+  leaderOfferedAt: null,
+  leadershipEvents: { create: { kind, fromUserId, toUserId, actorId: 7 } }
+});
 
 // The predicate itself is unit-tested in modules/communityAccess.spec.ts; here
 // it is exercised through the routes that gate on it.
@@ -902,7 +911,7 @@ describe('PUT /api/communities/:id', () => {
       where: { id: 1 },
       data: {
         leaderId: 7,
-        ...offerCleared,
+        ...leaderChanged('assigned', null, 7),
         curators: { connect: { id: 7 } }
       }
     });
@@ -938,7 +947,11 @@ describe('PUT /api/communities/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.community.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { leaderId: 7, ...offerCleared, curators: { connect: { id: 7 } } }
+      data: {
+        leaderId: 7,
+        ...leaderChanged('assigned', 8, 7),
+        curators: { connect: { id: 7 } }
+      }
     });
   });
 
@@ -968,7 +981,7 @@ describe('PUT /api/communities/:id', () => {
         where: { id: 1 },
         data: {
           leaderId: null,
-          ...offerCleared,
+          ...leaderChanged('cleared', 8, null),
           curators: { disconnect: { id: 8 } }
         }
       });
@@ -996,7 +1009,7 @@ describe('PUT /api/communities/:id', () => {
         where: { id: 1 },
         data: {
           leaderId: null,
-          ...offerCleared,
+          ...leaderChanged('cleared', 8, null),
           curators: { set: [{ id: 8 }, { id: 9 }] }
         }
       });
@@ -1016,7 +1029,7 @@ describe('PUT /api/communities/:id', () => {
         where: { id: 1 },
         data: {
           leaderId: null,
-          ...offerCleared,
+          ...leaderChanged('cleared', 8, null),
           curators: { set: [{ id: 9 }] }
         }
       });
@@ -1077,7 +1090,7 @@ describe('PUT /api/communities/:id', () => {
       where: { id: 1 },
       data: {
         leaderId: 7,
-        ...offerCleared,
+        ...leaderChanged('assigned', null, 7),
         curators: { set: [{ id: 8 }, { id: 9 }, { id: 7 }] }
       }
     });

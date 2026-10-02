@@ -1,6 +1,6 @@
 {
   "$comment": "Guard-coverage ratchet (#564). `unreviewed` is a backlog to burn down, not a mute button: a new unguarded site fails, and an entry that becomes guarded or disappears fails as stale. `internallyDerived` records sites whose constrained ids cannot dangle (session- or internally-sourced), each with the reason — a prior read is NOT a reason, it leaves a TOCTOU window. Regenerate with: npm run prisma:guard-coverage -- --write",
-  "generated": "2026-09-30",
+  "generated": "2026-10-02",
   "internallyDerived": {
     "POST /announcements/blog::blog.create": "Blog's only foreign key is userId, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
     "POST /announcements/global-notice::globalNotice.create": "GlobalNotice's only foreign key is createdById, set from req.user.id. A session-derived id cannot dangle, and the model carries no unique constraint.",
@@ -120,7 +120,8 @@
     "src/modules/profile.ts::updateProfile::userSettings.update": "Addressed by the userSettingsId read off the member's own User row in this call; PUT /profile/me takes the member from the session. Settings rows are never hard-deleted (noHardDelete.spec.ts). activeAuthorStylesheetId is pre-read, and author stylesheets are withdrawn by deletedAt, never deleted (noHardDelete.spec.ts). No unique column is written. #828.",
     "src/modules/donor.ts::updateDonorRewards::donorReward.upsert": "userId is the session user (PUT /profile/me/donor-rewards), and users are never hard-deleted (noHardDelete.spec.ts). The upsert runs only with a non-empty update, which Prisma compiles to a native INSERT … ON CONFLICT (\"userId\"), so two first writes cannot meet the unique key. #830.",
     "src/modules/notificationFilters.ts::created::notificationFilter.create": "userId is the session user (POST /notification-filters), and users are never hard-deleted (noHardDelete.spec.ts). NotificationFilter carries no unique constraint, and artistIds/communityIds are plain arrays, not relations. #831.",
-    "src/modules/tag.ts::tag::tag.upsert": "promoteTag's upsert has one unique field (name) in its where, a scalar update and no nested writes, so Prisma compiles it to a native INSERT … ON CONFLICT (\"name\") DO UPDATE (probed); two concurrent promotions of one new name both succeed. Tag has no foreign key the create sets. #841."
+    "src/modules/tag.ts::tag::tag.upsert": "promoteTag's upsert has one unique field (name) in its where, a scalar update and no nested writes, so Prisma compiles it to a native INSERT … ON CONFLICT (\"name\") DO UPDATE (probed); two concurrent promotions of one new name both succeed. Tag has no foreign key the create sets. #841.",
+    "src/modules/communityLeadership.ts::recordAnswer::communityLeadershipEvent.create": "CommunityLeadershipEvent's foreign keys are communityId, fromUserId, toUserId and actorId, and it has no unique constraint. The write runs in the accept's transaction right after a conditional updateMany matched (and row-locked) this community, and the user ids are the session caller and that community's leader as read; users are never hard-deleted. None can dangle (#897)."
   },
   "unreviewed": []
 }

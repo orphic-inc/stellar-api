@@ -1,4 +1,9 @@
-import { NotificationType, Prisma, RegistrationStatus } from '@prisma/client';
+import {
+  LeadershipEventKind,
+  NotificationType,
+  Prisma,
+  RegistrationStatus
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { audit } from '../lib/audit';
@@ -293,6 +298,17 @@ const recordAnswer = async (
     leaderId: outgoingId
   });
   if (accept) {
+    // The leadership log's row (ADR-0054). Its ids cannot dangle: the claim
+    // above just matched this community, and users are never deleted.
+    await tx.communityLeadershipEvent.create({
+      data: {
+        communityId,
+        kind: LeadershipEventKind.handed_off,
+        fromUserId: outgoingId,
+        toUserId: callerId,
+        actorId: callerId
+      }
+    });
     await audit(
       tx,
       callerId,
@@ -314,4 +330,92 @@ const recordAnswer = async (
     page: 'communities',
     pageId: communityId
   });
+};
+
+/**
+ * What a staff `PUT /communities/:id` writes beside the leader, when it
+ * changes the leader: it ends any pending handoff (ADR-0053 §5, #896) and logs
+ * the change (ADR-0054, #897). An unchanged leader writes neither, so a form
+ * that resends the whole community neither cancels an offer nor logs a change.
+ */
+export const leaderChangeWrite = (
+  leaderId: number | null | undefined,
+  previousLeaderId: number | null,
+  actorId: number
+) => {
+  if (leaderId === undefined || leaderId === previousLeaderId) return {};
+  return {
+    ...LEADER_OFFER_CLEARED,
+    leadershipEvents: {
+      create: {
+        kind:
+          leaderId === null
+            ? LeadershipEventKind.cleared
+            : LeadershipEventKind.assigned,
+        fromUserId: previousLeaderId,
+        toUserId: leaderId,
+        actorId
+      }
+    }
+  };
+};
+
+/**
+ * What a community create writes for its leader, if it names one: the pointer,
+ * and the leadership log's first row (ADR-0054).
+ */
+export const leaderCreateWrite = (
+  leaderId: number | undefined,
+  actorId: number
+) =>
+  leaderId === undefined
+    ? {}
+    : {
+        leaderId,
+        leadershipEvents: {
+          create: {
+            kind: LeadershipEventKind.founded,
+            toUserId: leaderId,
+            actorId
+          }
+        }
+      };
+
+const userRef = { select: { id: true, username: true } } as const;
+
+/**
+ * A community's leadership log, newest first (ADR-0054). Anyone who can read
+ * the community reads it, answering as `GET /:id` does (#771). `actor` names a
+ * staff member on most kinds, so only staff are sent it (ADR-0054 §5).
+ */
+export const listLeadershipLog = async (
+  communityId: number,
+  viewerId: number,
+  isStaff: boolean,
+  page: { skip: number; limit: number }
+) => {
+  await loadReadable(communityId, viewerId);
+  const where = { communityId };
+  const [rows, total] = await Promise.all([
+    prisma.communityLeadershipEvent.findMany({
+      where,
+      select: {
+        id: true,
+        kind: true,
+        at: true,
+        from: userRef,
+        to: userRef,
+        actor: userRef
+      },
+      orderBy: [{ at: 'desc' }, { id: 'desc' }],
+      skip: page.skip,
+      take: page.limit
+    }),
+    prisma.communityLeadershipEvent.count({ where })
+  ]);
+  const data = rows.map((row) => ({
+    ...row,
+    actor: isStaff ? row.actor : null
+  }));
+  return { data, total };
 };

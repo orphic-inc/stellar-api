@@ -5902,6 +5902,59 @@
           "voteAggregate"
         ]
       },
+      "CommunityLeadershipEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "founded",
+              "assigned",
+              "handed_off",
+              "cleared"
+            ]
+          },
+          "from": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommunityCurator"
+              }
+            ],
+            "nullable": true
+          },
+          "to": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommunityCurator"
+              }
+            ],
+            "nullable": true
+          },
+          "actor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommunityCurator"
+              }
+            ],
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "from",
+          "to",
+          "actor",
+          "at"
+        ]
+      },
       "ReleaseGroupMember": {
         "type": "object",
         "properties": {
@@ -23682,6 +23735,113 @@
           },
           "429": {
             "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/communities/{id}/leadership-log": {
+      "get": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "The community's leadership log",
+        "description": "Each change of leader, newest first: founded, assigned (by staff), handed off (an accepted offer) or cleared. Offers, declines and withdrawals are not logged. Anyone who can read the community reads it; `actor` is sent to `communities_manage` or `admin` only (#897, ADR-0054).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated leadership events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunityLeadershipEvent"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path or query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a member of this community",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Community not found",
             "content": {
               "application/json": {
                 "schema": {

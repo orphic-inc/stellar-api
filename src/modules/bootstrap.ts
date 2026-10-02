@@ -458,7 +458,11 @@ export async function seedDefaultCommunity(
         registrationStatus: RegistrationStatus.open,
         image: '/images/defaults/music.png',
         leader: { connect: { id: ownerUserId } },
-        curators: { connect: { id: ownerUserId } }
+        curators: { connect: { id: ownerUserId } },
+        // The leadership log's first row, with no actor (ADR-0054).
+        leadershipEvents: {
+          create: { kind: 'founded', to: { connect: { id: ownerUserId } } }
+        }
       }
     });
   } catch (err) {

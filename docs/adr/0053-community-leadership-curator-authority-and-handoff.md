@@ -64,9 +64,11 @@ Nothing happens automatically when a leader is disabled. ADR-0021's reason stand
 
 `GET /communities/:id` carries `leaderOffer: { to: { id, username }, offeredAt } | null`. It is non-null only for the leader, the named successor, or a viewer holding `communities_manage`, and only while the offer is live. Other curators see the outcome when `leaderId` changes, not the leader's intent beforehand.
 
+Staff see it only where they can read the community: `GET /communities/:id` refuses `communities_manage` a closed community they hold no role in. Whether staff read every community is [#902](https://github.com/orphic-inc/stellar-api/issues/902)'s to decide (amended 2026-10-02, ADR-0054).
+
 ### 9. The flow is audited, and shown elsewhere
 
-Offer, accept, decline and withdraw are audited as `community.leader.offer`, `.accept`, `.decline` and `.withdraw`, alongside the existing `community.leader.set`. A history surface is [#897](https://github.com/orphic-inc/stellar-api/issues/897). No route reads the audit log yet, so serving it is a decision of its own.
+Offer, accept, decline and withdraw are audited as `community.leader.offer`, `.accept`, `.decline` and `.withdraw`, alongside the existing `community.leader.set`. The history surface is [ADR-0054](0054-product-history-gets-a-dedicated-log.md) (amended 2026-10-02): a dedicated leadership log of changes only, not a read of the audit log. Offers, declines and withdrawals stay in the audit log.
 
 ## Consequences
 

@@ -552,6 +552,9 @@ model User {
   communitiesCurated       Community[]                      @relation("CommunityCurators")
   communitiesLed           Community[]                      @relation("CommunityLeader")
   communityLeaderOffers    Community[]                      @relation("CommunityLeaderOffer")
+  leadershipEventsFrom     CommunityLeadershipEvent[]       @relation("LeadershipEventFrom")
+  leadershipEventsTo       CommunityLeadershipEvent[]       @relation("LeadershipEventTo")
+  leadershipEventsActed    CommunityLeadershipEvent[]       @relation("LeadershipEventActor")
   consumer                 Consumer?
   contributor              Contributor?
   contributions            Contribution[]
@@ -1237,13 +1240,13 @@ model SimilarArtist {
 // ─── Community ────────────────────────────────────────────────────────────────
 
 model Community {
-  id                    Int                       @id @default(autoincrement())
-  name                  String                    @unique
-  description           String?                   @db.Text
+  id                    Int                        @id @default(autoincrement())
+  name                  String                     @unique
+  description           String?                    @db.Text
   image                 String
   registrationStatus    RegistrationStatus
   type                  CommunityType
-  allowDuplicateFormats Boolean                   @default(true)
+  allowDuplicateFormats Boolean                    @default(true)
   // Routes announce delivery and nothing else (ADR-0030): PUBLIC goes to
   // korin's `#announce`, PRIVATE to a gated `#c-<id>`. Deliberately NOT named
   // `visibility` — it must never enter an access check. Access is governed by
@@ -1251,40 +1254,69 @@ model Community {
   // PRIVATE community registered `open` stays readable by anyone (ADR-0015,
   // Golden Rule 3). Non-retroactive: a flip is picked up on the next reconcile
   // tick and does not unsend past lines.
-  announceVisibility    AnnounceVisibility        @default(PUBLIC)
-  consumers             Consumer[]                @relation("CommunityConsumers")
-  contributors          Contributor[]             @relation("CommunityContributors")
+  announceVisibility    AnnounceVisibility         @default(PUBLIC)
+  consumers             Consumer[]                 @relation("CommunityConsumers")
+  contributors          Contributor[]              @relation("CommunityContributors")
   releases              Release[]
   comments              Comment[]
   // Per-community role relation (Axis-1). Named Curator, not staff: "staff" is
   // reserved site-wide for the Axis-2 rank capability in rankPermissions.ts,
   // and the two meet in the same code path (ADR-0033).
-  curators              User[]                    @relation("CommunityCurators")
+  curators              User[]                     @relation("CommunityCurators")
   // The founding/owning member. A superset of `curators`: setting it always
   // connects the same user to `curators` (ADR-0021, narrowed by ADR-0033 —
   // no Consumer is written; belonging is the role union, not consumption).
   // Nullable so a disabled/departed leader leaves a recoverable pointer
   // rather than orphaning the community.
   leaderId              Int?
-  leader                User?                     @relation("CommunityLeader", fields: [leaderId], references: [id])
+  leader                User?                      @relation("CommunityLeader", fields: [leaderId], references: [id])
   // The pending leadership handoff (ADR-0053 §5): one at a time, a new offer
   // replaces the old, and the audit log keeps the history. It lapses lazily,
   // read through `liveLeaderOfferWhere` (modules/communityLeadership.ts); a
   // stored offer is not necessarily a live one. Omitted from every read unless
   // selected (lib/prisma.ts), so a community response never carries it.
   leaderOfferToId       Int?
-  leaderOfferTo         User?                     @relation("CommunityLeaderOffer", fields: [leaderOfferToId], references: [id])
+  leaderOfferTo         User?                      @relation("CommunityLeaderOffer", fields: [leaderOfferToId], references: [id])
   leaderOfferedAt       DateTime?
   doNotContribute       DoNotContribute[]
   bookmarks             BookmarkCommunity[]
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
   Request               Request[]
   healthSnapshots       CommunityHealthSnapshot[]
+  leadershipEvents      CommunityLeadershipEvent[]
 
   @@index([leaderId])
   @@index([leaderOfferToId])
   @@map("communities")
+}
+
+enum LeadershipEventKind {
+  founded
+  assigned
+  handed_off
+  cleared
+}
+
+// A community's leadership log (ADR-0054, #897): one row per CHANGE of leader,
+// written with the change. Product history, so not a read of the audit log,
+// which stays forensic. Offers, declines and withdrawals are not logged
+// (ADR-0053 §8). `actorId` is null for the boot seed and backfilled rows.
+model CommunityLeadershipEvent {
+  id          Int                 @id @default(autoincrement())
+  communityId Int
+  community   Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  kind        LeadershipEventKind
+  fromUserId  Int?
+  from        User?               @relation("LeadershipEventFrom", fields: [fromUserId], references: [id])
+  toUserId    Int?
+  to          User?               @relation("LeadershipEventTo", fields: [toUserId], references: [id])
+  actorId     Int?
+  actor       User?               @relation("LeadershipEventActor", fields: [actorId], references: [id])
+  at          DateTime            @default(now())
+
+  @@index([communityId, at])
+  @@map("community_leadership_events")
 }
 
 model Consumer {
