@@ -6,6 +6,12 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A community's leader stays one of its curators** (#891). ADR-0021 holds that the leader is always a curator, and two paths could break it:
+  - **`DELETE /communities/{id}/curators/{userId}` refuses the leader with `409`**, for every caller. Any curator could remove the leader from the curators, leaving them named as leader without the curator powers. Reassign the leader through `PUT /communities/{id}` first. **A contract change:** the operation gains the `409`.
+  - **`PUT /communities/{id}` keeps the current leader in a replaced curator set.** `curatorIds` replaces the whole set, and the leader was folded back in only when `leaderId` was sent too.
+
 ## [0.10.1] — 2026-10-02
 
 ### Added

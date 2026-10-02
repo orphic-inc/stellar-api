@@ -23235,6 +23235,7 @@
           "Communities"
         ],
         "summary": "Demote a community curator",
+        "description": "The leader is always a curator, so removing them is refused for every caller; reassign the leader through `PUT /communities/{id}` first (#891).",
         "parameters": [
           {
             "schema": {
@@ -23289,6 +23290,16 @@
           },
           "404": {
             "description": "Community or user not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The target is the community leader",
             "content": {
               "application/json": {
                 "schema": {

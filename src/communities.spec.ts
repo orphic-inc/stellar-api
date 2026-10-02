@@ -498,6 +498,37 @@ describe('DELETE /api/communities/:id/curators/:userId', () => {
       data: { curators: { disconnect: { id: 8 } } }
     });
   });
+
+  // The leader is always a curator (ADR-0021, narrowed by ADR-0033). A
+  // leader stops being one only by being replaced as leader, through PUT /:id
+  // (#891).
+  it('refuses with 409 when a curator targets the leader', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8, curators: [{ id: 7 }, { id: 8 }] }) as never
+    );
+
+    const res = await request(app).delete('/api/communities/1/curators/8');
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      msg: 'User is the community leader; reassign the leader first'
+    });
+    expect(prismaMock.community.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses with 409 for communities_manage too', async () => {
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+    );
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+
+    const res = await request(app).delete('/api/communities/1/curators/8');
+
+    expect(res.status).toBe(409);
+    expect(prismaMock.community.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/communities', () => {
@@ -708,6 +739,28 @@ describe('PUT /api/communities/:id', () => {
         registrationStatus: 'invite',
         curators: { set: [{ id: 8 }, { id: 9 }] }
       }
+    });
+  });
+
+  // curatorIds replaces the whole set; without leaderId in the body, the
+  // current leader is folded back in so they stay a curator (#891).
+  it('keeps the current leader in a replaced curator set', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+    );
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ curatorIds: [9] });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { curators: { set: [{ id: 9 }, { id: 8 }] } }
     });
   });
 

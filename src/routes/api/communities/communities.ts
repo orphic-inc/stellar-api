@@ -332,7 +332,16 @@ router.delete(
   authHandler(async (req, res) => {
     const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
 
-    await assertCommunityAdminOrCurator(id, req, res);
+    const community = await assertCommunityAdminOrCurator(id, req, res);
+
+    // The leader is always a curator (ADR-0021, narrowed by ADR-0033), so this
+    // route refuses them for every caller. A leader stops being a curator only
+    // by being replaced as leader, through PUT /:id (#891).
+    if (community.leaderId === userId) {
+      return res.status(409).json({
+        msg: 'User is the community leader; reassign the leader first'
+      });
+    }
 
     try {
       await prisma.community.update({
@@ -467,12 +476,14 @@ router.put(
         return res.status(404).json({ msg: 'Leader user not found' });
     }
 
-    // `curatorIds` (when given) replaces the whole curator set, so the new leader
+    // `curatorIds` (when given) replaces the whole curator set, so the leader
     // might not be in it — fold them back in to preserve the leader ⊇ curators
-    // invariant (ADR-0021, narrowed by ADR-0033).
+    // invariant (ADR-0021, narrowed by ADR-0033). With no `leaderId` in the
+    // body, that is the current leader (#891).
+    const keptLeaderId = leaderId ?? existing.leaderId;
     const curatorConnect =
-      leaderId !== undefined && curatorIds !== undefined
-        ? [...new Set([...curatorIds, leaderId])]
+      curatorIds !== undefined && keptLeaderId !== null
+        ? [...new Set([...curatorIds, keptLeaderId])]
         : curatorIds;
 
     let community;

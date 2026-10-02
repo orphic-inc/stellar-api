@@ -46,6 +46,10 @@ The detail response gains a `members` view derived from the union, each entry ca
 
 `DELETE /:id/members/:userId` operates on the `Consumer` link. When the target holds a curator or leader role, it fails with a 409 naming the blocking role rather than partially removing them or silently stripping the role. Removing a curator is `DELETE /:id/curators/:userId`, and the leader is reassigned through `PUT /:id`. No route removes a role as a side effect of removing a membership.
 
+`DELETE /:id/curators/:userId` refuses the leader the same way, with a 409, for every caller (#891). It used to accept them, so any curator could break the `leaderId ⟹ user ∈ curators` invariant. `PUT /:id` folds the current leader back into a replaced `curatorIds` set.
+
+**Curators are peers today, and that is not the intended model** (Kai, 2026-10-02). Any curator can add or remove any other, since both curator routes gate on `assertCommunityAdminOrCurator`. The intent is that only a community's leader adds or removes curators. That is a leader power, so it is decided in #219, the succession policy, not here.
+
 `POST /:id/members` is unchanged: it means "add an ordinary joined-to-consume member", which is the one place a `Consumer` link is the honest representation.
 
 ## Consequences
