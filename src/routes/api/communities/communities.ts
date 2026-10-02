@@ -75,6 +75,91 @@ const assertCommunityAdminOrCurator = async (
   return community;
 };
 
+/**
+ * The curator write a PUT /:id makes, so the leader stays a curator
+ * (ADR-0021, narrowed by ADR-0033).
+ *
+ * - `curatorIds` replaces the whole set, so the leader is folded back in: the
+ *   body's `leaderId` when sent, else the current leader (#891). A cleared
+ *   leader is not folded, so the list stands as given (#892).
+ * - Otherwise a new leader is connected, leaving the outgoing one a curator (a
+ *   handoff), and a cleared leader is disconnected: a clear with no successor
+ *   is a demotion (#892, ADR-0033 §5).
+ */
+const leaderCuratorWrite = (
+  curatorIds: number[] | undefined,
+  leaderId: number | null | undefined,
+  previousLeaderId: number | null
+) => {
+  if (curatorIds !== undefined) {
+    const kept = leaderId !== undefined ? leaderId : previousLeaderId;
+    const ids =
+      kept !== null ? [...new Set([...curatorIds, kept])] : curatorIds;
+    return { set: ids.map((cid) => ({ id: cid })) };
+  }
+  if (leaderId === undefined) return undefined;
+  if (leaderId !== null) return { connect: { id: leaderId } };
+  return previousLeaderId !== null
+    ? { disconnect: { id: previousLeaderId } }
+    : undefined;
+};
+
+/**
+ * Invite-only and closed communities need a leader, as at create. Checked on
+ * the state a PUT /:id would leave, and only when it changes either side, so
+ * an unrelated edit to an older row is not refused (#892).
+ */
+const leavesLeaderless = (
+  registrationStatus: RegistrationStatus | undefined,
+  leaderId: number | null | undefined,
+  existing: { registrationStatus: RegistrationStatus; leaderId: number | null }
+) => {
+  if (registrationStatus === undefined && leaderId === undefined) return false;
+  const status = registrationStatus ?? existing.registrationStatus;
+  const leader = leaderId !== undefined ? leaderId : existing.leaderId;
+  return status !== RegistrationStatus.open && leader === null;
+};
+
+/** The write PUT /:id makes, with its constraint translation (#564). */
+const updateCommunityRow = async (
+  id: number,
+  body: UpdateCommunityInput,
+  curators: ReturnType<typeof leaderCuratorWrite>
+) => {
+  const {
+    name,
+    description,
+    image,
+    registrationStatus,
+    announceVisibility,
+    allowDuplicateFormats,
+    leaderId
+  } = body;
+  try {
+    return await prisma.community.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(image !== undefined && { image }),
+        ...(registrationStatus !== undefined && { registrationStatus }),
+        ...(announceVisibility !== undefined && { announceVisibility }),
+        ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
+        ...(leaderId !== undefined && { leaderId }),
+        ...(curators !== undefined && { curators })
+      }
+    });
+  } catch (err) {
+    // P2025 is the community going away; P2003 can only be `leaderId`, so the
+    // two are distinguishable here. Matches the create path's wording (#564).
+    translatePrismaError(err, {
+      P2025: [404, 'Community not found'],
+      P2002: [409, 'A community with that name already exists'],
+      P2003: [404, 'Leader user not found']
+    });
+  }
+};
+
 const router = express.Router();
 const communityIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
@@ -459,67 +544,25 @@ router.put(
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
-    const {
-      name,
-      description,
-      image,
-      registrationStatus,
-      announceVisibility,
-      allowDuplicateFormats,
-      curatorIds,
-      leaderId
-    } = parsedBody<UpdateCommunityInput>(res);
+    const body = parsedBody<UpdateCommunityInput>(res);
+    const { registrationStatus, curatorIds, leaderId } = body;
 
-    if (leaderId !== undefined) {
+    if (leaderId != null) {
       const leader = await prisma.user.findUnique({ where: { id: leaderId } });
       if (!leader)
         return res.status(404).json({ msg: 'Leader user not found' });
     }
 
-    // `curatorIds` (when given) replaces the whole curator set, so the leader
-    // might not be in it — fold them back in to preserve the leader ⊇ curators
-    // invariant (ADR-0021, narrowed by ADR-0033). With no `leaderId` in the
-    // body, that is the current leader (#891).
-    const keptLeaderId = leaderId ?? existing.leaderId;
-    const curatorConnect =
-      curatorIds !== undefined && keptLeaderId !== null
-        ? [...new Set([...curatorIds, keptLeaderId])]
-        : curatorIds;
+    if (leavesLeaderless(registrationStatus, leaderId, existing))
+      return res.status(409).json({
+        msg: 'Leader user ID is required for invite-only and closed communities'
+      });
 
-    let community;
-    try {
-      community = await prisma.community.update({
-        where: { id },
-        data: {
-          ...(name !== undefined && { name }),
-          ...(description !== undefined && { description }),
-          ...(image !== undefined && { image }),
-          ...(registrationStatus !== undefined && { registrationStatus }),
-          ...(announceVisibility !== undefined && { announceVisibility }),
-          ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
-          ...(leaderId !== undefined && { leaderId }),
-          ...(curatorConnect !== undefined && {
-            curators: {
-              set: curatorConnect.map((cid: number) => ({ id: cid }))
-            }
-          }),
-          // Leader given but curator set untouched: connect (don't replace) so the
-          // invariant holds without disturbing existing curators.
-          ...(leaderId !== undefined &&
-            curatorIds === undefined && {
-              curators: { connect: { id: leaderId } }
-            })
-        }
-      });
-    } catch (err) {
-      // P2025 is the community going away; P2003 can only be `leaderId`, so the
-      // two are distinguishable here. Matches the create path's wording (#564).
-      translatePrismaError(err, {
-        P2025: [404, 'Community not found'],
-        P2002: [409, 'A community with that name already exists'],
-        P2003: [404, 'Leader user not found']
-      });
-    }
+    const community = await updateCommunityRow(
+      id,
+      body,
+      leaderCuratorWrite(curatorIds, leaderId, existing.leaderId)
+    );
 
     // No Consumer upsert here either — see the create path (ADR-0033 §3).
     if (leaderId !== undefined) {

@@ -718,7 +718,10 @@ describe('PUT /api/communities/:id', () => {
     prismaMock.userRank.findUnique.mockResolvedValue(
       makeUserRank({ communities_manage: true })
     );
-    prismaMock.community.findUnique.mockResolvedValue(makeCommunity() as never);
+    // An invite-only community needs a leader (#892); 8 is already a curator.
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8 }) as never
+    );
     prismaMock.community.update.mockResolvedValue(
       makeCommunity({ name: 'Updated' }) as never
     );
@@ -837,6 +840,132 @@ describe('PUT /api/communities/:id', () => {
         })
       })
     );
+  });
+
+  // A handoff keeps the outgoing leader a curator; only a clear removes the
+  // role (#892).
+  it('keeps the outgoing leader a curator on a handoff', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+    );
+    prismaMock.user.findUnique.mockResolvedValue({ id: 7 } as never);
+    prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+
+    const res = await request(app)
+      .put('/api/communities/1')
+      .send({ leaderId: 7 });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { leaderId: 7, curators: { connect: { id: 7 } } }
+    });
+  });
+
+  describe('clearing the leader (#892)', () => {
+    beforeEach(() => {
+      prismaMock.userRank.findUnique.mockResolvedValue(
+        makeUserRank({ communities_manage: true })
+      );
+      prismaMock.community.update.mockResolvedValue(makeCommunity() as never);
+    });
+
+    it("clears an open community's leader and removes their curator role", async () => {
+      prismaMock.community.findUnique.mockResolvedValue(
+        makeCommunity({
+          leaderId: 8,
+          curators: [{ id: 8 }, { id: 9 }]
+        }) as never
+      );
+
+      const res = await request(app)
+        .put('/api/communities/1')
+        .send({ leaderId: null });
+
+      expect(res.status).toBe(200);
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.community.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { leaderId: null, curators: { disconnect: { id: 8 } } }
+      });
+      expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'community.leader.set',
+            metadata: { leaderId: null, previousLeaderId: 8 }
+          })
+        })
+      );
+    });
+
+    it('takes curatorIds as given, keeping the old leader only when named', async () => {
+      prismaMock.community.findUnique.mockResolvedValue(
+        makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+      );
+
+      const res = await request(app)
+        .put('/api/communities/1')
+        .send({ leaderId: null, curatorIds: [8, 9] });
+
+      expect(res.status).toBe(200);
+      expect(prismaMock.community.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { leaderId: null, curators: { set: [{ id: 8 }, { id: 9 }] } }
+      });
+    });
+
+    it('does not fold the old leader back into a replaced set', async () => {
+      prismaMock.community.findUnique.mockResolvedValue(
+        makeCommunity({ leaderId: 8, curators: [{ id: 8 }] }) as never
+      );
+
+      const res = await request(app)
+        .put('/api/communities/1')
+        .send({ leaderId: null, curatorIds: [9] });
+
+      expect(res.status).toBe(200);
+      expect(prismaMock.community.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { leaderId: null, curators: { set: [{ id: 9 }] } }
+      });
+    });
+
+    // Invite-only and closed communities need a leader on the resulting
+    // state, not only at create (#892).
+    it('refuses with 409 to clear the leader of an invite-only community', async () => {
+      prismaMock.community.findUnique.mockResolvedValue(
+        makeCommunity({
+          leaderId: 8,
+          registrationStatus: RegistrationStatus.invite
+        }) as never
+      );
+
+      const res = await request(app)
+        .put('/api/communities/1')
+        .send({ leaderId: null });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({
+        msg: 'Leader user ID is required for invite-only and closed communities'
+      });
+      expect(prismaMock.community.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses with 409 to close a leaderless community', async () => {
+      prismaMock.community.findUnique.mockResolvedValue(
+        makeCommunity({ leaderId: null }) as never
+      );
+
+      const res = await request(app)
+        .put('/api/communities/1')
+        .send({ registrationStatus: 'closed' });
+
+      expect(res.status).toBe(409);
+      expect(prismaMock.community.update).not.toHaveBeenCalled();
+    });
   });
 
   it('folds the new leader into a replaced curator set', async () => {

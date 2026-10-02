@@ -66,7 +66,8 @@ export const updateCommunitySchema = z.object({
   announceVisibility: announceVisibilityEnum.optional(),
   allowDuplicateFormats: z.boolean().optional(),
   curatorIds: z.array(z.number().int().positive()).optional(),
-  leaderId: z.number().int().positive().optional()
+  // null clears the leader (#892)
+  leaderId: z.number().int().positive().nullable().optional()
 });
 
 export const createReleaseSchema = z.object({

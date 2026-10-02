@@ -11,6 +11,10 @@ All notable changes to stellar-api are documented here.
 - **A community's leader stays one of its curators** (#891). ADR-0021 holds that the leader is always a curator, and two paths could break it:
   - **`DELETE /communities/{id}/curators/{userId}` refuses the leader with `409`**, for every caller. Any curator could remove the leader from the curators, leaving them named as leader without the curator powers. Reassign the leader through `PUT /communities/{id}` first. **A contract change:** the operation gains the `409`.
   - **`PUT /communities/{id}` keeps the current leader in a replaced curator set.** `curatorIds` replaces the whole set, and the leader was folded back in only when `leaderId` was sent too.
+- **`PUT /communities/{id}` can clear a community's leader** (#892). `leaderId: null` was refused with `400`, so no leader could be removed. stellar-ui's Community Manager sends `null` for a blank leader field, so saving any edit to a leaderless community failed. The form closed as if it had saved, because it doesn't check the result (stellar-ui#456).
+  - **A cleared leader stops being a curator**, since a clear with no successor is a demotion. A handoff to a new `leaderId` still leaves the outgoing leader a curator. A `curatorIds` sent in the same call stands as given.
+  - **An invite-only or closed community needs a leader after an update, as at create.** Clearing its leader, or switching a leaderless community to `invite` or `closed`, answers `409`. An edit that changes neither is not checked.
+  - **A contract change:** `leaderId` is nullable on the request body, and the operation's `409` covers the new refusal.
 
 ## [0.10.1] — 2026-10-02
 
