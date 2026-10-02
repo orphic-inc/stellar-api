@@ -5364,6 +5364,9 @@ registry.registerPath({
   path: '/communities/{id}/curators/{userId}',
   tags: ['Communities'],
   summary: 'Demote a community curator',
+  description:
+    'The leader is always a curator, so removing them is refused for every ' +
+    'caller; reassign the leader through `PUT /communities/{id}` first (#891).',
   request: {
     params: z.object({ id: z.string(), userId: z.string() })
   },
@@ -5372,7 +5375,8 @@ registry.registerPath({
       description: 'Curator removed'
     },
     403: msgResponse('Not a community admin or curator'),
-    404: msgResponse('Community or user not found')
+    404: msgResponse('Community or user not found'),
+    409: msgResponse('The target is the community leader')
   }
 });
 
