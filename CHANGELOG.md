@@ -6,6 +6,8 @@ All notable changes to stellar-api are documented here.
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-10-02
+
 ### Changed
 
 - **Only a community's leader, or staff, adds or removes its curators** (#895, ADR-0053). Any curator could add or remove any other, which was never the intended model.
@@ -3819,7 +3821,8 @@ _Commits: `1e48a45` `06e4a61` `db95fc6` `3320608` `8f056e9` `c3d2568` (+ `52e9a0
 
 ---
 
-[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/orphic-inc/stellar-api/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/orphic-inc/stellar-api/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/orphic-inc/stellar-api/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/orphic-inc/stellar-api/compare/v0.9.11...v0.10.0
 [0.9.11]: https://github.com/orphic-inc/stellar-api/compare/v0.9.10...v0.9.11
