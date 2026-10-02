@@ -17,6 +17,12 @@ All notable changes to stellar-api are documented here.
   - **`GET /communities/{id}` gains `leaderOffer`**: `{ to: { id, username }, offeredAt }` for the leader, the successor or `communities_manage`, and `null` for everyone else or once it lapses. No community response carries the stored offer columns.
   - Three notifications, `community_leader_offered`, `community_leader_accepted` and `community_leader_declined`. A withdrawal, a lapse and a staff reassign notify no one.
   - Audited as `community.leader.offer`, `.accept`, `.decline` and `.withdraw`; an accept also writes `community.leader.set`.
+- **A community's leadership log** (#897, ADR-0054). `GET /communities/{id}/leadership-log` lists each change of leader, newest first and paginated.
+  - **Four kinds of change:** founded, assigned by staff, handed off (an accepted offer), and cleared. Offers, declines and withdrawals are not logged; they stay in the audit log (ADR-0053 §8).
+  - **Anyone who can read the community reads its log,** answering `403` and `404` as `GET /communities/{id}` does. `actor`, who made the change, is sent to `communities_manage` or `admin` only.
+  - **A new `community_leadership_events` table,** written with each change: create, a staff `PUT` that changes the leader (not one that resends it), an accepted handoff, and the boot seed's site community.
+  - **Existing installs are backfilled** in the migration, from the `community.leader.set` audit rows. A leader no audit row explains, such as the boot seed's, is logged as founded at the community's creation.
+  - **ADR-0054:** no route serves the audit log. A history a product shows gets its own table.
 
 ## [0.10.2] — 2026-10-02
 

@@ -43,8 +43,10 @@ import {
 } from '../../../lib/pagination';
 import releaseRouter from './release';
 import leaderOfferRouter from './leaderOffer';
+import leadershipLogRouter from './leadershipLog';
 import {
-  LEADER_OFFER_CLEARED,
+  leaderCreateWrite,
+  leaderChangeWrite,
   leaderCuratorWrite,
   leaderOfferFor,
   leavesLeaderless
@@ -97,7 +99,7 @@ const updateCommunityRow = async (
   id: number,
   body: UpdateCommunityInput,
   curators: ReturnType<typeof leaderCuratorWrite>,
-  previousLeaderId: number | null
+  leaderChange: ReturnType<typeof leaderChangeWrite>
 ) => {
   const {
     name,
@@ -119,10 +121,8 @@ const updateCommunityRow = async (
         ...(announceVisibility !== undefined && { announceVisibility }),
         ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
         ...(leaderId !== undefined && { leaderId }),
-        // A changed leader ends any pending handoff (ADR-0053 §5, #896).
-        ...(leaderId !== undefined &&
-          leaderId !== previousLeaderId &&
-          LEADER_OFFER_CLEARED),
+        // A changed leader ends any handoff and is logged (#896, #897).
+        ...leaderChange,
         ...(curators !== undefined && { curators })
       }
     });
@@ -147,6 +147,7 @@ const memberParamsSchema = z.object({
 });
 router.use('/:communityId/releases', releaseRouter);
 router.use('/:id/leader-offer', leaderOfferRouter);
+router.use('/:id/leadership-log', leadershipLogRouter);
 
 const communitiesQuerySchema = z.object({ ...paginationBase });
 const healthHistoryQuerySchema = z.object({
@@ -486,7 +487,7 @@ router.post(
           image: image ?? defaultImages[type] ?? '/images/defaults/music.png',
           ...(announceVisibility !== undefined && { announceVisibility }),
           ...(allowDuplicateFormats !== undefined && { allowDuplicateFormats }),
-          ...(leaderId !== undefined && { leaderId }),
+          ...leaderCreateWrite(leaderId, req.user!.id),
           ...(allCuratorIds.length && {
             curators: {
               connect: [...new Set(allCuratorIds)].map((cid) => ({ id: cid }))
@@ -554,7 +555,7 @@ router.put(
       id,
       body,
       leaderCuratorWrite(curatorIds, leaderId, existing.leaderId),
-      existing.leaderId
+      leaderChangeWrite(leaderId, existing.leaderId, req.user!.id)
     );
 
     // No Consumer upsert here either — see the create path (ADR-0033 §3).

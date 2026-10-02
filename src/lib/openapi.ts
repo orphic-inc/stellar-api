@@ -13,6 +13,7 @@ import {
   FileType,
   InviteStatus,
   NotificationType,
+  LeadershipEventKind,
   RatioDisableCause,
   RatioPolicyStatus,
   ReleaseCategory,
@@ -5477,6 +5478,58 @@ registry.registerPath({
     204: { description: 'Offer declined' },
     403: msgResponse('Not a member of this community'),
     404: leaderOfferNotFound
+  }
+});
+
+// One change of a community's leader (#897, ADR-0054).
+const CommunityLeadershipEvent = registry.register(
+  'CommunityLeadershipEvent',
+  z.object({
+    id: z.number(),
+    kind: z.nativeEnum(LeadershipEventKind),
+    // The previous leader; null when founded.
+    from: CommunityCurator.nullable(),
+    // The new leader; null when cleared.
+    to: CommunityCurator.nullable(),
+    // Who made the change: sent to `communities_manage`/`admin` viewers only,
+    // and null for everyone else, the boot seed and backfilled founders.
+    actor: CommunityCurator.nullable(),
+    at: z.string().datetime()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/communities/{id}/leadership-log',
+  tags: ['Communities'],
+  summary: "The community's leadership log",
+  description:
+    'Each change of leader, newest first: founded, assigned (by staff), ' +
+    'handed off (an accepted offer) or cleared. Offers, declines and ' +
+    'withdrawals are not logged. Anyone who can read the community reads ' +
+    'it; `actor` is sent to `communities_manage` or `admin` only ' +
+    '(#897, ADR-0054).',
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated leadership events',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(CommunityLeadershipEvent),
+            meta: PaginationMeta
+          })
+        }
+      }
+    },
+    403: msgResponse('Not a member of this community'),
+    404: msgResponse('Community not found')
   }
 });
 
