@@ -40,6 +40,15 @@ describe('DEFAULT_RANKS ladder', () => {
     const sorted = [...limits].sort((a, b) => a - b);
     expect(limits).toEqual(sorted);
   });
+
+  // #876: an avatar can only be set by upload, so the entry rank needs a slot.
+  it('lets the entry rank upload one image, and never fewer up the ladder', () => {
+    const limits = DEFAULT_RANKS.filter((r) => r.level <= 450).map(
+      (r) => r.assetLimit ?? Infinity
+    );
+    expect(limits[0]).toBe(1);
+    expect(limits).toEqual([...limits].sort((a, b) => a - b));
+  });
 });
 
 describe('seedRankPromotionRules', () => {

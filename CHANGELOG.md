@@ -15,6 +15,11 @@ All notable changes to stellar-api are documented here.
   - A rank whose level crosses 500 changes all three for everyone holding it. The change is allowed, and its `PUT` response carries the new value.
 - **`POST /asset` takes an optional `field`** (`avatar`, `customIcon` or `secondAvatar`), the image field the upload will replace (#871). That field's current asset doesn't count toward `assetLimit`, so a member at their limit can upload the replacement. The contract now also declares the existing `kind` parameter.
 
+### Changed
+
+- **A fresh install's entry rank (User) can upload one image** (#876). The seeded `assetLimit` goes from `0` to `1`, so a new member can upload an avatar; stellar-ui is moving to upload-only avatar fields. The rest of the ladder is unchanged, with Member also at 1.
+  - **Existing installs keep their value**, since the seed only creates missing ranks. To let new members upload, raise User's asset limit in the rank editor, or set `"assetLimit"` on the User rank directly while the editor can't (stellar-ui#376).
+
 ### Fixed
 
 - **The egress guard now refuses IPv6 addresses that carry an IPv4 one** (#863). NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible (`::/96`) addresses passed `checkPublicUrl`, because only the IPv4-mapped form was unwrapped. On a network that routes them, the link checker and the remote image import could be pointed at loopback or cloud metadata. Each prefix is now blocked whole.
