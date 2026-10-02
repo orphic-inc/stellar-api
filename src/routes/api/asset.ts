@@ -139,7 +139,11 @@ const deliver = (res: express.Response, asset: ResolvedAsset): void => {
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('ETag', `"${asset.hash}"`);
-  res.send(asset.data);
+  // Prisma returns `Bytes` as a Uint8Array, which `res.send` serialises as a
+  // JSON object unless it is a Buffer. A view over the same memory, not a copy.
+  res.send(
+    Buffer.from(asset.data.buffer, asset.data.byteOffset, asset.data.byteLength)
+  );
 };
 
 router.get(
