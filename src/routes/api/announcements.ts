@@ -134,7 +134,7 @@ router.post(
   '/album-of-month',
   ...requirePermission('news_manage'),
   featuredAlbumBody,
-  registerBodyImages('image'),
+  registerBodyImages(featuredAlbumBody, 'image'),
   asyncHandler(async (_req: Request, res: Response) => {
     const { groupId, threadId, title, image, started, ended } =
       featuredAlbumBody.read(res);

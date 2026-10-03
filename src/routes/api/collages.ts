@@ -13,12 +13,9 @@ import {
   requirePermission
 } from '../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import {
   releaseCreditsSelect,
@@ -33,9 +30,9 @@ import { sanitizeHtml } from '../../lib/sanitize';
 import { renderSiteBBCode, resolveViewer } from '../../modules/bbcodeRender';
 import { registerBBCodeImages } from '../../modules/remoteImage';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import { hasPermission } from '../../lib/rankPermissions';
 import {
@@ -44,11 +41,7 @@ import {
   collageQuerySchema,
   addEntrySchema,
   reorderEntriesSchema,
-  type CreateCollageInput,
-  type UpdateCollageInput,
-  type CollageQueryInput,
-  type AddEntryInput,
-  type ReorderEntriesInput
+  type UpdateCollageInput
 } from '../../schemas/collage';
 import type { AuthenticatedRequest } from '../../types/auth';
 
@@ -297,12 +290,19 @@ const personalCollageQuotaExceeded = async (
 };
 
 const router = express.Router();
+const updateCollageBody = validate(updateCollageSchema);
+const reorderEntriesBody = validate(reorderEntriesSchema);
+const createCollageBody = validate(createCollageSchema);
+const collageQuery = validateQuery(collageQuerySchema);
+const addEntryBody = validate(addEntrySchema);
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 const entryParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   releaseId: z.coerce.number().int().positive()
 });
+const entryParams = validateParams(entryParamsSchema);
 
 const collageInclude = {
   user: { select: { id: true, username: true, avatar: true } },
@@ -341,15 +341,16 @@ const collageDetailInclude = (viewerId: number) => ({
 const isPersonal = (categoryId: number) => categoryId === 0;
 
 const deletedCollagesQuerySchema = z.object({ ...paginationBase });
+const deletedCollagesQuery = validateQuery(deletedCollagesQuerySchema);
 
 // ─── GET /api/collages/deleted — staff recovery list (before /:id) ───────────
 
 router.get(
   '/deleted',
   ...requirePermission('collages_moderate'),
-  validateQuery(deletedCollagesQuerySchema),
+  deletedCollagesQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(deletedCollagesQuery.read(res));
     const [collages, total] = await Promise.all([
       prisma.collage.findMany({
         where: { isDeleted: true, categoryId: { gt: 0 } },
@@ -371,12 +372,12 @@ router.get(
 router.get(
   '/',
   requireAuth,
-  validateQuery(collageQuerySchema),
+  collageQuery,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const { search, categoryId, userId, bookmarked, orderBy, order } =
-      parsedQuery<CollageQueryInput>(res);
-    const pg = parsedPage(res);
+      collageQuery.read(res);
+    const pg = pageOf(collageQuery.read(res));
 
     const sortField = orderBy ?? 'createdAt';
     const sortDir = order ?? 'desc';
@@ -432,9 +433,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const authReq = req as AuthenticatedRequest;
 
     const collage = await prisma.collage.findUnique({
@@ -505,10 +506,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(createCollageSchema),
+  createCollageBody,
   authHandler(async (req, res) => {
-    const { name, description, categoryId, tags } =
-      parsedBody<CreateCollageInput>(res);
+    const { name, description, categoryId, tags } = createCollageBody.read(res);
     const userId = req.user.id;
 
     // Personal collage: reset featured if this is the new featured one
@@ -574,11 +574,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
-  validate(updateCollageSchema),
+  idParams,
+  updateCollageBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const updates = parsedBody<UpdateCollageInput>(res);
+    const { id } = idParams.read(res);
+    const updates = updateCollageBody.read(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
     const staff = hasCollageStaffPermission(perms);
@@ -634,9 +634,9 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
     const staff = hasCollageStaffPermission(perms);
@@ -681,9 +681,9 @@ router.delete(
 router.post(
   '/:id/recover',
   ...requirePermission('collages_moderate'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
 
     const collage = await prisma.collage.findUnique({ where: { id } });
     if (!collage) return res.status(404).json({ msg: 'Collage not found' });
@@ -722,11 +722,11 @@ router.post(
 router.post(
   '/:id/entries',
   requireAuth,
-  validateParams(idParamsSchema),
-  validate(addEntrySchema),
+  idParams,
+  addEntryBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { releaseId } = parsedBody<AddEntryInput>(res);
+    const { id } = idParams.read(res);
+    const { releaseId } = addEntryBody.read(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
     const staff = hasCollageStaffPermission(perms);
@@ -816,11 +816,9 @@ router.post(
 router.delete(
   '/:id/entries/:releaseId',
   requireAuth,
-  validateParams(entryParamsSchema),
+  entryParams,
   authHandler(async (req, res) => {
-    const { id, releaseId } = parsedParams<{ id: number; releaseId: number }>(
-      res
-    );
+    const { id, releaseId } = entryParams.read(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
     const staff = hasCollageStaffPermission(perms);
@@ -866,11 +864,11 @@ router.delete(
 router.put(
   '/:id/entries',
   requireAuth,
-  validateParams(idParamsSchema),
-  validate(reorderEntriesSchema),
+  idParams,
+  reorderEntriesBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { entries } = parsedBody<ReorderEntriesInput>(res);
+    const { id } = idParams.read(res);
+    const { entries } = reorderEntriesBody.read(res);
     const userId = req.user.id;
     const perms = await loadPermissions(req, res);
     const staff = hasCollageStaffPermission(perms);
@@ -909,9 +907,9 @@ router.put(
 router.post(
   '/:id/subscribe',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const userId = req.user.id;
 
     // Existence/visibility check only — the collage row itself is not needed.
@@ -979,9 +977,9 @@ router.post(
 router.post(
   '/:id/bookmark',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const userId = req.user.id;
 
     // Existence/visibility check only — the collage row itself is not needed.
@@ -1025,9 +1023,9 @@ router.post(
 router.get(
   '/:id/subscriptions',
   ...requirePermission('collages_moderate'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const collage = await prisma.collage.findUnique({ where: { id } });
     if (!collage) return res.status(404).json({ msg: 'Collage not found' });
 

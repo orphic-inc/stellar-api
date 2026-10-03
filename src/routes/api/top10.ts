@@ -2,25 +2,14 @@ import express, { Request, Response } from 'express';
 import { asyncHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateQuery,
-  parsedBody,
-  parsedQuery
-} from '../../middleware/validate';
+import { validate, validateQuery } from '../../middleware/validate';
 import {
   releasesQuerySchema,
   usersQuerySchema,
   tagsQuerySchema,
   votesQuerySchema,
   historyQuerySchema,
-  snapshotSchema,
-  type ReleasesQuery,
-  type UsersQuery,
-  type TagsQuery,
-  type VotesQuery,
-  type HistoryQuery,
-  type SnapshotInput
+  snapshotSchema
 } from '../../schemas/top10';
 import {
   getTopReleases,
@@ -33,6 +22,12 @@ import {
 import { top10Cache } from '../../lib/ttlCache';
 
 const router = express.Router();
+const votesQuery = validateQuery(votesQuerySchema);
+const usersQuery = validateQuery(usersQuerySchema);
+const tagsQuery = validateQuery(tagsQuerySchema);
+const snapshotBody = validate(snapshotSchema);
+const releasesQuery = validateQuery(releasesQuerySchema);
+const historyQuery = validateQuery(historyQuerySchema);
 
 const TTL = {
   releases: 6 * 60 * 60 * 1000,
@@ -46,9 +41,9 @@ const TTL = {
 router.get(
   '/releases',
   requireAuth,
-  validateQuery(releasesQuerySchema),
+  releasesQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const q = parsedQuery<ReleasesQuery>(res);
+    const q = releasesQuery.read(res);
     const key = `releases:${JSON.stringify(q)}`;
     const cached = top10Cache.get<{ items: unknown[] }>(key);
     if (cached) return res.json(cached);
@@ -63,9 +58,9 @@ router.get(
 router.get(
   '/users',
   requireAuth,
-  validateQuery(usersQuerySchema),
+  usersQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const q = parsedQuery<UsersQuery>(res);
+    const q = usersQuery.read(res);
     const key = `users:${JSON.stringify(q)}`;
     const cached = top10Cache.get<{ items: unknown[] }>(key);
     if (cached) return res.json(cached);
@@ -80,9 +75,9 @@ router.get(
 router.get(
   '/tags',
   requireAuth,
-  validateQuery(tagsQuerySchema),
+  tagsQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const q = parsedQuery<TagsQuery>(res);
+    const q = tagsQuery.read(res);
     const key = `tags:${JSON.stringify(q)}`;
     const cached = top10Cache.get<{ items: unknown[] }>(key);
     if (cached) return res.json(cached);
@@ -97,9 +92,9 @@ router.get(
 router.get(
   '/votes',
   requireAuth,
-  validateQuery(votesQuerySchema),
+  votesQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const q = parsedQuery<VotesQuery>(res);
+    const q = votesQuery.read(res);
     const key = `votes:${JSON.stringify(q)}`;
     const cached = top10Cache.get<{ items: unknown[] }>(key);
     if (cached) return res.json(cached);
@@ -114,9 +109,9 @@ router.get(
 router.get(
   '/history',
   ...requirePermission('staff'),
-  validateQuery(historyQuerySchema),
+  historyQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const q = parsedQuery<HistoryQuery>(res);
+    const q = historyQuery.read(res);
     const key = `history:${JSON.stringify(q)}`;
     const cached = top10Cache.get<object>(key);
     if (cached) return res.json(cached);
@@ -141,9 +136,9 @@ router.get(
 router.post(
   '/snapshot',
   ...requirePermission('admin'),
-  validate(snapshotSchema),
+  snapshotBody,
   asyncHandler(async (_req: Request, res: Response) => {
-    const { type } = parsedBody<SnapshotInput>(res);
+    const { type } = snapshotBody.read(res);
     await createSnapshot(type);
     res.json({ msg: 'Snapshot created' });
   })

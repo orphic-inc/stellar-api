@@ -11,10 +11,7 @@ import {
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import { sanitizePlain } from '../../lib/sanitize';
 // Wiki bodies are stored as raw BBCode and transcribed at read time — the API is
@@ -32,16 +29,18 @@ import {
   wikiCompareQuerySchema,
   addAliasSchema,
   wikiSearchQuerySchema,
-  normalizeSlug,
-  type CreateWikiPageInput,
-  type UpdateWikiPageInput,
-  type AddAliasInput,
-  type WikiSearchQuery,
-  type WikiCompareQuery
+  normalizeSlug
 } from '../../schemas/wiki';
 import type { AuthenticatedRequest } from '../../types/auth';
 
 const router = express.Router();
+const wikiSearchQuery = validateQuery(wikiSearchQuerySchema);
+const wikiRevisionParams = validateParams(wikiRevisionParamsSchema);
+const wikiPageParams = validateParams(wikiPageParamsSchema);
+const wikiCompareQuery = validateQuery(wikiCompareQuerySchema);
+const updateWikiPageBody = validate(updateWikiPageSchema);
+const createWikiPageBody = validate(createWikiPageSchema);
+const addAliasBody = validate(addAliasSchema);
 
 // ID of the root wiki article — protected from deletion
 const INDEX_ARTICLE_ID = 1;
@@ -88,10 +87,9 @@ async function canEdit(
 router.get(
   '/',
   requireAuth,
-  validateQuery(wikiSearchQuerySchema),
+  wikiSearchQuery,
   authHandler(async (req, res) => {
-    const { q, type, order, way, page, limit } =
-      parsedQuery<WikiSearchQuery>(res);
+    const { q, type, order, way, page, limit } = wikiSearchQuery.read(res);
     const skip = (page - 1) * limit;
     const authReq = req as AuthenticatedRequest;
 
@@ -192,9 +190,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
+  wikiPageParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = wikiPageParams.read(res);
     const page = await prisma.wikiPage.findFirst({
       where: { id, deletedAt: null },
       select: PAGE_WITH_BODY_SELECT
@@ -215,9 +213,9 @@ router.get(
 router.get(
   '/:id/revisions',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
+  wikiPageParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = wikiPageParams.read(res);
     const page = await prisma.wikiPage.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -259,9 +257,9 @@ router.get(
 router.get(
   '/:id/revisions/:rev',
   requireAuth,
-  validateParams(wikiRevisionParamsSchema),
+  wikiRevisionParams,
   authHandler(async (req, res) => {
-    const { id, rev } = parsedParams<{ id: number; rev: number }>(res);
+    const { id, rev } = wikiRevisionParams.read(res);
     const page = await prisma.wikiPage.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -312,11 +310,11 @@ router.get(
 router.get(
   '/:id/compare',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
-  validateQuery(wikiCompareQuerySchema),
+  wikiPageParams,
+  wikiCompareQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { old: oldRev, new: newRev } = parsedQuery<WikiCompareQuery>(res);
+    const { id } = wikiPageParams.read(res);
+    const { old: oldRev, new: newRev } = wikiCompareQuery.read(res);
 
     if (oldRev >= newRev) {
       return res.status(400).json({ msg: '`old` must be less than `new`' });
@@ -425,9 +423,9 @@ const resolveCreateLevels = (
 router.post(
   '/',
   requireAuth,
-  validate(createWikiPageSchema),
+  createWikiPageBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<CreateWikiPageInput>(res);
+    const input = createWikiPageBody.read(res);
     const authReq = req as AuthenticatedRequest;
     const perms = await loadPermissions(authReq, res);
     const levels = resolveCreateLevels(perms, input);
@@ -502,11 +500,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
-  validate(updateWikiPageSchema),
+  wikiPageParams,
+  updateWikiPageBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const input = parsedBody<UpdateWikiPageInput>(res);
+    const { id } = wikiPageParams.read(res);
+    const input = updateWikiPageBody.read(res);
     const authReq = req as AuthenticatedRequest;
 
     const page = await prisma.wikiPage.findFirst({
@@ -597,9 +595,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('wiki_manage', 'admin'),
-  validateParams(wikiPageParamsSchema),
+  wikiPageParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = wikiPageParams.read(res);
 
     if (id === INDEX_ARTICLE_ID) {
       return res
@@ -640,11 +638,11 @@ router.delete(
 router.post(
   '/:id/aliases',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
-  validate(addAliasSchema),
+  wikiPageParams,
+  addAliasBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { alias: rawAlias } = parsedBody<AddAliasInput>(res);
+    const { id } = wikiPageParams.read(res);
+    const { alias: rawAlias } = addAliasBody.read(res);
     const authReq = req as AuthenticatedRequest;
 
     const page = await prisma.wikiPage.findFirst({
@@ -684,9 +682,9 @@ router.post(
 router.delete(
   '/:id/aliases/:alias',
   requireAuth,
-  validateParams(wikiPageParamsSchema),
+  wikiPageParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = wikiPageParams.read(res);
     const alias = normalizeSlug(req.params.alias);
     const authReq = req as AuthenticatedRequest;
 
@@ -726,9 +724,9 @@ router.delete(
 router.post(
   '/:id/rollback/:rev',
   requireAuth,
-  validateParams(wikiRevisionParamsSchema),
+  wikiRevisionParams,
   authHandler(async (req, res) => {
-    const { id, rev } = parsedParams<{ id: number; rev: number }>(res);
+    const { id, rev } = wikiRevisionParams.read(res);
     const authReq = req as AuthenticatedRequest;
 
     const page = await prisma.wikiPage.findFirst({

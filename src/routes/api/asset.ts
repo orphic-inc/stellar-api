@@ -2,12 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { assets } from '../../modules/config';
 import { asyncHandler } from '../../modules/asyncHandler';
-import {
-  validateParams,
-  parsedParams,
-  validateQuery,
-  parsedQuery
-} from '../../middleware/validate';
+import { validateParams, validateQuery } from '../../middleware/validate';
 import { requireAuth } from '../../middleware/auth';
 import { AppError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
@@ -27,6 +22,7 @@ const router = express.Router();
 const assetHashParamsSchema = z.object({
   hash: z.string().regex(/^[0-9a-f]{64}$/)
 });
+const assetHashParams = validateParams(assetHashParamsSchema);
 
 // The member-uploadable kinds. `ThemeFont` is absent on purpose: fonts stay
 // seeder-only, the #343 redistribution boundary, and `uploadAsset` enforces
@@ -38,7 +34,7 @@ const assetUploadQuerySchema = z.object({
   // does not count against the quota the replacement is checked against.
   field: z.enum(IMAGE_FIELDS).optional()
 });
-type AssetUploadQuery = z.infer<typeof assetUploadQuerySchema>;
+const assetUploadQuery = validateQuery(assetUploadQuerySchema);
 
 /**
  * POST /api/asset — store an uploaded image, returning its content address (#342).
@@ -59,14 +55,14 @@ type AssetUploadQuery = z.infer<typeof assetUploadQuerySchema>;
 router.post(
   '/',
   requireAuth,
-  validateQuery(assetUploadQuerySchema),
+  assetUploadQuery,
   // Its size limit answers 413 before the handler runs (#558).
   markGate(
     express.raw({ type: ALLOWED_MIMES as string[], limit: assets.maxBytes }),
     'bodyLimit'
   ),
   asyncHandler(async (req, res) => {
-    const { kind, field } = parsedQuery<AssetUploadQuery>(res);
+    const { kind, field } = assetUploadQuery.read(res);
 
     // A Content-Type outside the allowlist leaves express.raw with nothing to
     // claim, so req.body arrives as the empty object express.json left behind.
@@ -148,10 +144,10 @@ const deliver = (res: express.Response, asset: ResolvedAsset): void => {
 
 router.get(
   '/:hash',
-  validateParams(assetHashParamsSchema),
+  assetHashParams,
   markNotGate(
     asyncHandler(async (_req, res, next) => {
-      const { hash } = parsedParams<{ hash: string }>(res);
+      const { hash } = assetHashParams.read(res);
       const asset = await getAssetByHash(hash);
       if (!asset) {
         res.status(404).json({ msg: 'Asset not found' });

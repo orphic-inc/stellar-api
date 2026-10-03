@@ -447,7 +447,7 @@ router.post(
   '/',
   ...requirePermission('communities_manage'),
   createCommunityBody,
-  registerBodyImages('image'),
+  registerBodyImages(createCommunityBody, 'image'),
   asyncHandler(async (req: Request, res: Response) => {
     const {
       name,
@@ -538,7 +538,7 @@ router.put(
   ...requirePermission('communities_manage'),
   communityIdParams,
   updateCommunityBody,
-  registerBodyImages('image'),
+  registerBodyImages(updateCommunityBody, 'image'),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = communityIdParams.read(res);
     const existing = await prisma.community.findUnique({ where: { id } });
