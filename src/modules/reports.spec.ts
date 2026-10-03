@@ -407,6 +407,8 @@ describe('listMyReports', () => {
     prismaMock.contribution.findMany.mockResolvedValue([
       { id: 99, releaseId: 123, release: { communityId: 5 } }
     ]);
+    // The reporter can see release 123 (#773).
+    prismaMock.release.findMany.mockResolvedValue([{ id: 123 }]);
 
     const result = await listMyReports({ id: 7, userRankLevel: 100 }, 1);
 

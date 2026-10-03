@@ -28,6 +28,10 @@ All notable changes to stellar-api are documented here.
   - `GET /communities/{id}` and `GET /communities/{id}/leadership-log` now admit `communities_manage` and `admin` on every community. Before, a closed community they held no role in answered `403`, though they could already edit or delete it. That brings the pending leader offer and the leadership log with them.
   - **Contents stay member-only:** releases, contributions, downloads, requests, comments and health keep the member gate. The handoff routes stay the leader's and the successor's.
   - `GET /communities/{id}` now declares its `403` in the contract.
+- **A report opens the release it concerns, for `reports_manage`** (#905, ADR-0055 §3).
+  - While a report is `Open` or `Claimed`, a `reports_manage` holder reads `GET /communities/{id}/releases/{rid}` and `…/contributions` for the release it targets. A report concerns a release when it targets the release, one of its contributions, or a comment in either's thread. Before, a closed community they held no role in answered `403`.
+  - **Read only.** That read's contributions carry `downloadUrl` as an empty string. Downloads, edits, votes, other releases and every list stay member-only. Resolving the report closes the page again.
+  - **The staff queue's `sourceUrl` follows the same rule.** It linked every release before, including ones whose page refused staff. A link into a release page now appears only when the page will open, so a resolved report in a closed community links nowhere.
 
 ## [0.10.2] — 2026-10-02
 

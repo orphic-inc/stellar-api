@@ -137,7 +137,8 @@ export async function listReports(opts: {
       id: r.id,
       targetType: r.targetType,
       targetId: r.targetId
-    }))
+    })),
+    { staffId: staffUserId }
   );
   const reports: ReportRow[] = rawReports.map((r) => ({
     ...r,
@@ -149,7 +150,8 @@ export async function listReports(opts: {
 
 /**
  * One report, for staff or for its reporter. The reporter's `sourceUrl` is
- * resolved as them (#773), as in `listMyReports`; staff see every link.
+ * resolved as them (#773), as in `listMyReports`; staff see every link the
+ * page behind it will open for (ADR-0055 §3, #905).
  */
 export async function getReport(
   id: number,
@@ -172,7 +174,7 @@ export async function getReport(
         targetId: report.targetId
       }
     ],
-    isStaff ? undefined : requester
+    isStaff ? { staffId: requester.id } : requester
   );
   return {
     ok: true as const,

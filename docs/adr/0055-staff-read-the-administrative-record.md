@@ -11,7 +11,7 @@ That left staff responsible for communities they could not see:
 - `PUT` and `DELETE /communities/{id}`, and `POST /communities/{id}/releases`, are gated on `communities_manage` alone. Staff could write to a closed community they hold no role in, but `GET /communities/{id}` answered `403`.
 - Community Manager listed through `GET /communities`, the member browse, so a closed community never appeared there at all.
 - The pending leader offer ([ADR-0053](0053-community-leadership-curator-authority-and-handoff.md) §8) and the leadership log ([ADR-0054](0054-product-history-gets-a-dedicated-log.md) §4) inherited the same `403`.
-- The staff report queue builds each source link through `releaseVisibleTo(staff)`. A report against content in such a community had no link, and its release page answered `403`.
+- A report against content in such a community could not be acted on: its release page answered `403`. The staff queue still linked to it, since staff links skipped every visibility check. (This ADR first said the queue built them through `releaseVisibleTo(staff)` and so showed no link; #905 found otherwise.)
 
 The legacy implementation has no communities, so there is no parity to keep.
 
@@ -32,7 +32,9 @@ Its **contents** stay member-only: releases, contributions and their downloads, 
 
 ### 3. A report opens the release it concerns
 
-A holder of `reports_manage` reads **the page of the release a report concerns** while that report is `Open` or `Claimed`: the release detail and its contributions list. A report concerns a release when it targets the release, one of its contributions, or a comment in the thread of either. The report queue's source link follows the same rule.
+A holder of `reports_manage` reads **the page of the release a report concerns** while that report is `Open` or `Claimed`: the release detail and its contributions list. A report concerns a release when it targets the release, one of its contributions, or a comment in the thread of either. The report queue's source link follows the same rule: a link into a release page appears only when the page will open for that staff member, as a member or through an open report.
+
+That read gets each contribution's `downloadUrl` as an empty string. The URL is the download without the grant's debit, and the grant here is to look.
 
 Nothing else opens: no download, no other release, and no search, feed, notification or Top 10 entry. Resolving the report ends the grant. Editing the release still goes through the workbench's own gate. Comments on requests and on communities are left out until a report needs them.
 

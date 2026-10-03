@@ -14,14 +14,53 @@ import type {
 } from './types';
 import type { AddContributionToReleaseInput } from '../../schemas/contribution';
 
+const releaseContributionDetailSelect = {
+  id: true,
+  userId: true,
+  releaseId: true,
+  contributorId: true,
+  releaseDescription: true,
+  downloadUrl: true,
+  sizeInBytes: true,
+  linkStatus: true,
+  linkCheckedAt: true,
+  ratioExempt: true,
+  type: true,
+  createdAt: true,
+  updatedAt: true,
+  user: { select: { id: true, username: true } },
+  collaborators: { select: { id: true, name: true } },
+  releaseFile: {
+    select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
+  },
+  edition: {
+    select: {
+      id: true,
+      media: true,
+      year: true,
+      recordLabel: true,
+      catalogueNumber: true,
+      title: true,
+      isRemaster: true,
+      isUnknownEdition: true
+    }
+  }
+} as const;
+
 // The rip-quality satellite + full edition identity for one release's
 // contributions. Kept off the release detail view (which is growing heavy) and
 // served from its own release-scoped GET so the UI can lazy-load an edition
 // stack (bitrate/media/flags) on demand. Gated identically to the detail read.
+//
+// A read a report opens (ADR-0055 §3, #905) gets every `downloadUrl` as an empty
+// string: the grant is to look, and the URL is the download without the
+// grant's debit. The empty string keeps the contract's shape.
 export const listReleaseContributions = async (
   ref: ReleaseWorkbenchRef
 ): Promise<ReleaseContributionDetailView[]> => {
-  await loadReleaseWorkbenchAuthority(ref);
+  const { reportScoped } = await loadReleaseWorkbenchAuthority(ref, {
+    allowReportScoped: true
+  });
 
   // 404 rather than an empty 200 when the named release isn't in this community —
   // matches the sibling detail GET and the attach POST.
@@ -39,42 +78,12 @@ export const listReleaseContributions = async (
       release: { communityId: ref.communityId }
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: {
-      id: true,
-      userId: true,
-      releaseId: true,
-      contributorId: true,
-      releaseDescription: true,
-      downloadUrl: true,
-      sizeInBytes: true,
-      linkStatus: true,
-      linkCheckedAt: true,
-      ratioExempt: true,
-      type: true,
-      createdAt: true,
-      updatedAt: true,
-      user: { select: { id: true, username: true } },
-      collaborators: { select: { id: true, name: true } },
-      releaseFile: {
-        select: { bitrate: true, hasLog: true, hasCue: true, isScene: true }
-      },
-      edition: {
-        select: {
-          id: true,
-          media: true,
-          year: true,
-          recordLabel: true,
-          catalogueNumber: true,
-          title: true,
-          isRemaster: true,
-          isUnknownEdition: true
-        }
-      }
-    }
+    select: releaseContributionDetailSelect
   });
 
   return contributions.map((contribution) => ({
     ...contribution,
+    downloadUrl: reportScoped ? '' : contribution.downloadUrl,
     sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
   }));
 };
