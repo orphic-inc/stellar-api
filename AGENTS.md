@@ -84,7 +84,6 @@ npm run openapi:completeness # are all mounted routes registered in lib/openapi.
 npm run openapi:gate-marks   # does every layer ahead of a handler carry markGate or markNotGate? (#558; gated)
 npm run openapi:failure-coverage # does every operation declare its handler's 4xx, or sit in noFailureModes? (gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
-npm run validate:handles      # do routes read validated input through the validator's handle? (#234; gated, shrink-only)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run env:coverage     # do the code, .env.default, docs/README.md and this file agree on env vars? (#682; gated)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
@@ -336,7 +335,7 @@ src/
     openapiImageSrc.ts      # applyImageSrcDerivations: declares the `*Src` siblings on 2xx response schemas, by the hook's rule
     expressRoutes.ts        # collectRoutes(app) — the route table read off the built Express app rather than parsed from source (#474)
     gateMarkCoverage.ts     # Pure checker (#558): every layer ahead of a handler is a stamped gate or says why not. CLI wrapper in scripts/
-    pagination.ts           # paginationBase (Zod) + parsedPage(res) → { page, limit, skip }
+    pagination.ts           # paginationBase (Zod) + pageOf(handle.read(res)) → { page, limit, skip }
                             # paginatedResponse(res, data, total, pg)
     rss.ts                  # Feed document rendering shared by the announce push and the Member Feed; pure, no database
     sanitize.ts             # sanitizeHtml(str), sanitizePlain(str)
@@ -488,11 +487,6 @@ router.put(
 There is no `<T>` to pick, so the type cannot drift from the schema. `read`
 throws when the route did not mount that handle, so a mispaired read fails any
 test that reaches it instead of returning `undefined`.
-
-**`parsedBody<T>` / `parsedQuery<T>` / `parsedParams<T>` / `parsedPage` are
-being retired** (#234). `npm run validate:handles` gates them against a
-shrink-only baseline: don't add one, and lower the baseline when you convert a
-file.
 
 ### Static routes before parameterized
 

@@ -1,4 +1,0 @@
-{
-  "$comment": "Unchecked validator reads still to convert (#234). This list only SHRINKS: convert a file to validator handles, then lower or delete its entry. A count above or below its entry fails the check. Regenerate with `npm run validate:handles -- --write-baseline`.",
-  "files": {}
-}

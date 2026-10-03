@@ -79,13 +79,15 @@ throw new Error('User not found'); // Results in a 500 status code
 
 ### Input Validation & Type Safety
 
-We use **Zod** for schema validation. Do not manually cast variables using `as T`. Instead, use the built-in `parsedBody`, `parsedParams`, and `parsedQuery` helpers which infer types securely based on your schema.
+We use **Zod** for schema validation. Do not manually cast variables using `as T`. Each validator returns a handle: mount it on the route, and read what it validated with `handle.read(res)`, typed from its schema (#234).
 
 **Do:**
 
 ```typescript
-import { parsedBody } from '../../middleware/validate';
-const { email, password } = parsedBody<LoginInput>(res);
+const loginBody = validate(loginSchema);
+
+router.post('/', authLimiter, loginBody, asyncHandler(async (req, res) => {
+  const { email, password } = loginBody.read(res);
 ```
 
 ### Separation of Concerns
