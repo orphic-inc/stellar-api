@@ -30,7 +30,7 @@ All notable changes to stellar-api are documented here.
   - `GET /communities/{id}` now declares its `403` in the contract.
 - **A report opens the release it concerns, for `reports_manage`** (#905, ADR-0055 §3).
   - While a report is `Open` or `Claimed`, a `reports_manage` holder reads `GET /communities/{id}/releases/{rid}` and `…/contributions` for the release it targets. A report concerns a release when it targets the release, one of its contributions, or a comment in either's thread. Before, a closed community they held no role in answered `403`.
-  - **Read only.** That read's contributions carry `downloadUrl` as an empty string. Downloads, edits, votes, other releases and every list stay member-only. Resolving the report closes the page again.
+  - **Read only.** That read's contributions carry no `downloadUrl`, as for every reader since #908. Downloads, edits, votes, other releases and every list stay member-only. Resolving the report closes the page again.
   - **The staff queue's `sourceUrl` follows the same rule.** It linked every release before, including ones whose page refused staff. A link into a release page now appears only when the page will open, so a resolved report in a closed community links nowhere.
 - **`npm run e2e:korin`** (`src/scripts/seed-korin-e2e.ts`): fixtures for the korin end-to-end run of private-community announce delivery (#328). It seeds a cast and three communities, then adds contributions, removes members and flips communities to PRIVATE on demand. It refuses any database not named `stellar_e2e`.
 
@@ -42,6 +42,11 @@ All notable changes to stellar-api are documented here.
   - `registerBodyImages` takes the body handle it reads, so its field names are checked against the schema (#914).
   - **Removed** `parsedBody`, `parsedQuery`, `parsedParams` and `parsedPage`, the `res.locals.parsed*` keys they read, and the `validate:handles` gate (#915). With the helpers gone and the three `res.locals` keys typed `never`, `tsc` enforces the rule.
   - No response or status changes.
+
+- **A contribution's `downloadUrl` reaches a member only through the Download Grant** (#908). `GET /communities/{id}/releases/{releaseId}/contributions` sent every reader each contribution's URL, so a direct API caller could skip `POST /contributions/{id}/access` and its debit. That list no longer carries the field, for any reader.
+  - **Contract:** `ReleaseContributionDetail`, `ReleaseContribution` (the release detail's `contributions[]`) and `Contribution` no longer declare `downloadUrl`. The last two declared it as required, but their reads never sent it. `Contribution` serves `GET /contributions/{id}`, `POST /contributions` and the release attach.
+  - The uploader's own `GET /contributions` keeps the field, declared as the new `OwnContribution`.
+  - A source-scan spec, `contributionDownloadUrl.spec.ts`, fails on any new query that comes back holding the URL.
 
 ## [0.10.2] — 2026-10-02
 

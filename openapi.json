@@ -4418,9 +4418,6 @@
               "txt"
             ]
           },
-          "downloadUrl": {
-            "type": "string"
-          },
           "sizeInBytes": {
             "type": "number",
             "nullable": true
@@ -4455,7 +4452,6 @@
           "id",
           "user",
           "type",
-          "downloadUrl",
           "collaborators"
         ]
       },
@@ -4528,9 +4524,6 @@
               "txt"
             ]
           },
-          "downloadUrl": {
-            "type": "string"
-          },
           "sizeInBytes": {
             "type": "number",
             "nullable": true
@@ -4587,10 +4580,27 @@
           "user",
           "release",
           "type",
-          "downloadUrl",
           "linkStatus",
           "ratioExempt",
           "collaborators"
+        ]
+      },
+      "OwnContribution": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Contribution"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "downloadUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "downloadUrl"
+            ]
+          }
         ]
       },
       "ReleaseFileQuality": {
@@ -4705,9 +4715,6 @@
             "type": "string",
             "nullable": true
           },
-          "downloadUrl": {
-            "type": "string"
-          },
           "sizeInBytes": {
             "type": "number",
             "nullable": true
@@ -4821,7 +4828,6 @@
           "userId",
           "releaseId",
           "contributorId",
-          "downloadUrl",
           "sizeInBytes",
           "linkStatus",
           "linkCheckedAt",
@@ -26431,7 +26437,7 @@
         "tags": [
           "Communities"
         ],
-        "description": "Readable by whoever may read the release detail, including a `reports_manage` holder whom an open report lets in (ADR-0055 §3, #905). That read gets every `downloadUrl` as an empty string: it grants a look, not a download.",
+        "description": "Readable by whoever may read the release detail, including a `reports_manage` holder whom an open report lets in (ADR-0055 §3, #905). No reader gets a `downloadUrl` here (#908): the download grant hands it out.",
         "parameters": [
           {
             "schema": {
@@ -26706,6 +26712,7 @@
         "tags": [
           "Contributions"
         ],
+        "description": "The caller's own uploads, the one read besides the download grant that carries each `downloadUrl` (#908).",
         "responses": {
           "200": {
             "description": "Paginated contributions",
@@ -26717,7 +26724,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/Contribution"
+                        "$ref": "#/components/schemas/OwnContribution"
                       }
                     },
                     "meta": {

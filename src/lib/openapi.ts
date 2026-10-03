@@ -4625,7 +4625,6 @@ const ReleaseContribution = registry.register(
       username: z.string()
     }),
     type: z.nativeEnum(FileType),
-    downloadUrl: z.string(),
     sizeInBytes: z.number().nullable().optional(),
     collaborators: z.array(
       z.object({
@@ -4652,7 +4651,6 @@ const Contribution = registry.register(
       communityId: z.number().nullable().optional()
     }),
     type: z.nativeEnum(FileType),
-    downloadUrl: z.string(),
     sizeInBytes: z.number().nullable().optional(),
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']),
     linkCheckedAt: z.string().nullable().optional(),
@@ -4666,6 +4664,14 @@ const Contribution = registry.register(
     releaseDescription: z.string().nullable().optional(),
     createdAt: z.string().optional()
   })
+);
+
+// The uploader's own row (#908). Only `GET /contributions` carries the
+// `downloadUrl`; every other read of a contribution leaves it out, because the
+// URL is the download without the grant's debit.
+const OwnContribution = registry.register(
+  'OwnContribution',
+  Contribution.extend({ downloadUrl: z.string() })
 );
 
 // The per-file rip-quality satellite (ReleaseFile), nested on a release-scoped
@@ -4731,7 +4737,6 @@ const ReleaseContributionDetail = registry.register(
     releaseId: z.number(),
     contributorId: z.number(),
     releaseDescription: z.string().nullable().optional(),
-    downloadUrl: z.string(),
     sizeInBytes: z.number().nullable(),
     linkStatus: z.enum(['UNKNOWN', 'PASS', 'WARN', 'FAIL']).nullable(),
     linkCheckedAt: z.string().nullable(),
@@ -5187,8 +5192,8 @@ registry.registerPath({
 
 // One contribution on a community browse row (#728), read off `releaseBrowse`'s
 // select rather than borrowed from `ReleaseContribution`: the browse sends no
-// `downloadUrl` or `collaborators`, and does send link health, the ratio
-// exemption and the consumer count.
+// `collaborators`, and does send link health, the ratio exemption and the
+// consumer count.
 const ReleaseBrowseContribution = registry.register(
   'ReleaseBrowseContribution',
   z.object({
@@ -6278,7 +6283,7 @@ registry.registerPath({
   path: '/communities/{communityId}/releases/{releaseId}/contributions',
   tags: ['Communities'],
   description:
-    'Readable by whoever may read the release detail, including a `reports_manage` holder whom an open report lets in (ADR-0055 §3, #905). That read gets every `downloadUrl` as an empty string: it grants a look, not a download.',
+    'Readable by whoever may read the release detail, including a `reports_manage` holder whom an open report lets in (ADR-0055 §3, #905). No reader gets a `downloadUrl` here (#908): the download grant hands it out.',
   request: {
     params: z.object({
       communityId: z.string(),
@@ -6338,13 +6343,16 @@ registry.registerPath({
   method: 'get',
   path: '/contributions',
   tags: ['Contributions'],
+  description:
+    "The caller's own uploads, the one read besides the download grant that " +
+    'carries each `downloadUrl` (#908).',
   responses: {
     200: {
       description: 'Paginated contributions',
       content: {
         'application/json': {
           schema: z.object({
-            data: z.array(Contribution),
+            data: z.array(OwnContribution),
             meta: PaginationMeta
           })
         }

@@ -43,6 +43,10 @@ _Avoid_: contribution credit, ratio bonus, approved bytes
 The generic `Contribution` model — the type-agnostic unit of shared content (a Download URL) carried across every CommunityType. Holds only fields every Contribution has (ids, `downloadUrl`, `sizeInBytes`, `linkStatus`, the `type` format discriminator, accounting). A Release is the primary Contribution type; Film/eLearning/ApiPlugin follow. Type-specific metadata lives in satellite models, never on the spine (ADR-0008).
 _Avoid_: contribution table, base contribution, release row
 
+**Download Grant**:
+The debit-bearing act that reveals a Contribution's Download URL: `POST /contributions/:id/access` checks `canDownload`, debits the consumer's `consumed`, credits the contributor, and returns the `downloadUrl` (`downloads.ts`). No read reveals the URL without one (#908). The one exception is the uploader's own uploads list, `GET /contributions`. `/access/latest` re-serves a grant made in the last two minutes, so a retried click is not charged twice. Staff reverse a grant with `POST /downloads/:grantId/reverse`.
+_Avoid_: download link, access grant, download token
+
 **Release File**:
 The per-file rip-metadata satellite (`ReleaseFile`, 1:1 with a music Contribution): `bitrate`, `hasLog`, `hasCue`, `isScene` — the fingerprint the quality grade reads. Per-file, so distinct from the per-pressing `Edition`. The music analog of the satellite each future Contribution type attaches. Since #129 it is also client-surfaced — nested on the release-scoped contributions read (`GET /communities/:id/releases/:id/contributions`) that feeds the UI edition stack — not only read by the grade.
 _Avoid_: contribution metadata, file info, rip record

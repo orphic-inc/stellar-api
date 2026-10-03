@@ -36,6 +36,8 @@ A holder of `reports_manage` reads **the page of the release a report concerns**
 
 That read gets each contribution's `downloadUrl` as an empty string. The URL is the download without the grant's debit, and the grant here is to look.
 
+> **Amended 2026-10-03 ([#908](https://github.com/orphic-inc/stellar-api/issues/908)).** That read no longer carries `downloadUrl` at all. #908 removed it from the contributions list for every reader, so there is nothing left for this read to blank.
+
 Nothing else opens: no download, no other release, and no search, feed, notification or Top 10 entry. Resolving the report ends the grant. Editing the release still goes through the workbench's own gate. Comments on requests and on communities are left out until a report needs them.
 
 A report is a request for staff to look at one thing, so it is the narrowest grant that lets them do it. It is built in [#905](https://github.com/orphic-inc/stellar-api/issues/905).

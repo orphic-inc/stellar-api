@@ -110,7 +110,7 @@ describe('listReleaseContributions', () => {
     // Spine facts — format is the contribution type, size normalized to a number.
     expect(entry.type).toBe(FileType.flac);
     expect(entry.sizeInBytes).toBe(5_000_000_000);
-    expect(entry.downloadUrl).toBe('https://example.com/kob.torrent');
+    expect(entry).not.toHaveProperty('downloadUrl');
 
     // Rip-quality satellite (ReleaseFile) — the whole point of #129.
     expect(entry.releaseFile).not.toBeNull();
@@ -126,6 +126,34 @@ describe('listReleaseContributions', () => {
     expect(entry.edition?.title).toBe('Legacy Edition');
     expect(entry.edition?.year).toBe(1997);
     expect(entry.edition?.isRemaster).toBe(true);
+  });
+
+  // The URL is the download without the grant's debit (#908): only the grant
+  // and the uploader's own list carry it.
+  it("gives a community member no contribution's download URL", async () => {
+    const uploader = await createUser('uploader');
+    const member = await createUser('member');
+    const community = await createCommunity();
+    await testPrisma.consumer.create({
+      data: {
+        userId: member.id,
+        communities: { connect: { id: community.id } }
+      }
+    });
+
+    const created = await createContributionSubmission({
+      userId: uploader.id,
+      input: losslessInput(community.id)
+    });
+
+    const contributions = await listReleaseContributions({
+      actorId: member.id,
+      communityId: community.id,
+      releaseId: created!.releaseId
+    });
+
+    expect(contributions).toHaveLength(1);
+    expect(contributions[0]).not.toHaveProperty('downloadUrl');
   });
 
   it('returns an empty array for a release with no contributions', async () => {

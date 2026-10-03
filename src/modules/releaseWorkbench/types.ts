@@ -57,7 +57,6 @@ export type ReleaseContributionDetailView = {
   releaseId: number;
   contributorId: number;
   releaseDescription: string | null;
-  downloadUrl: string;
   sizeInBytes: number | null;
   linkStatus: string | null;
   linkCheckedAt: Date | null;
