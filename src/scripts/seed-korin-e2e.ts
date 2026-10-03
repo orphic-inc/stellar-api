@@ -52,7 +52,8 @@ async function user(username: string, ircNick: string | null) {
       userRankId: rank.id,
       userSettingsId: settings.id,
       profileId: profile.id,
-      ircNick
+      ircNick,
+      inviteTree: { create: { inviterId: null } }
     }
   });
 }
