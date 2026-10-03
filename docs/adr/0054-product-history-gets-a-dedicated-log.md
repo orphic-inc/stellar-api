@@ -35,7 +35,7 @@ Offers, declines and withdrawals are not logged. ADR-0053 §8 keeps the leader's
 
 `GET /communities/{id}/leadership-log` is paginated and newest first. It answers `403` and `404` exactly as `GET /communities/{id}` does ([#771](https://github.com/orphic-inc/stellar-api/issues/771)). The current leader is already public on that read, and the log is the same fact over time.
 
-Staff read it only where they can read the community. Whether `communities_manage` reads every community is [#902](https://github.com/orphic-inc/stellar-api/issues/902)'s to decide.
+Staff (`communities_manage` or `admin`) read it on every community, as part of its administrative record ([ADR-0055](0055-staff-read-the-administrative-record.md), amended 2026-10-02).
 
 ### 5. The actor is shown to staff only
 

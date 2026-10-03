@@ -22276,11 +22276,101 @@
         ]
       }
     },
+    "/communities/manage": {
+      "get": {
+        "tags": [
+          "Communities"
+        ],
+        "summary": "Every community, for staff",
+        "description": "Requires `communities_manage`. Lists every community, closed ones included, with the same projection as `GET /communities`, ordered by id. `GET /communities` stays the member browse (#902, ADR-0055).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated communities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Community"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing communities_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
     "/communities/{id}": {
       "get": {
         "tags": [
           "Communities"
         ],
+        "description": "The community's administrative record. Members read it, and so do `communities_manage` and `admin` on every community, closed ones included; the community's contents keep the member gate on their own routes (#902, ADR-0055).",
         "parameters": [
           {
             "schema": {
@@ -22314,6 +22404,16 @@
           },
           "401": {
             "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A closed community the caller holds no role in, and not staff",
             "content": {
               "application/json": {
                 "schema": {
@@ -23757,7 +23857,7 @@
           "Communities"
         ],
         "summary": "The community's leadership log",
-        "description": "Each change of leader, newest first: founded, assigned (by staff), handed off (an accepted offer) or cleared. Offers, declines and withdrawals are not logged. Anyone who can read the community reads it; `actor` is sent to `communities_manage` or `admin` only (#897, ADR-0054).",
+        "description": "Each change of leader, newest first: founded, assigned (by staff), handed off (an accepted offer) or cleared. Offers, declines and withdrawals are not logged. Anyone who can read the community reads it, and so do `communities_manage` and `admin` on every community (ADR-0055); `actor` is sent to them only (#897, ADR-0054).",
         "parameters": [
           {
             "schema": {

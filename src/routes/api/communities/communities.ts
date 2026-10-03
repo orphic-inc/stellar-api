@@ -44,6 +44,7 @@ import {
 import releaseRouter from './release';
 import leaderOfferRouter from './leaderOffer';
 import leadershipLogRouter from './leadershipLog';
+import manageRouter from './manage';
 import {
   leaderCreateWrite,
   leaderChangeWrite,
@@ -145,6 +146,8 @@ const memberParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   userId: z.coerce.number().int().positive()
 });
+// Static before `/:id`, or Express shadows it.
+router.use('/manage', manageRouter);
 router.use('/:communityId/releases', releaseRouter);
 router.use('/:id/leader-offer', leaderOfferRouter);
 router.use('/:id/leadership-log', leadershipLogRouter);
@@ -205,18 +208,19 @@ router.get(
       }
     });
     if (!community) return res.status(404).json({ msg: 'Community not found' });
+    // This is the administrative record, which staff read for every community
+    // (ADR-0055, #902); its contents keep the member gate on their own routes.
+    const perms = await loadPermissions(req, res);
+    const isStaff = !!(perms['communities_manage'] || perms['admin']);
     if (
+      !isStaff &&
       !(await hasCommunityAccess(id, req.user.id, community.registrationStatus))
     ) {
       return res.status(403).json({ msg: 'Not a member of this community' });
     }
     // `members` replaces the `consumers[]`-plus-Staff-chip idiom the UI used to
-    // reconstruct a roster from (ADR-0033 §Decision 4). Loaded after the gate so
-    // a 403 costs nothing extra; `_count` stays relation counts, which is what
-    // it always was.
-    // The pending handoff, for its parties and staff only (ADR-0053 §8, #896).
-    const perms = await loadPermissions(req, res);
-    const isStaff = !!(perms['communities_manage'] || perms['admin']);
+    // reconstruct a roster from (ADR-0033 §Decision 4). `_count` stays relation
+    // counts. The pending handoff goes to its parties and staff (ADR-0053 §8).
     res.json({
       ...community,
       members: await listCommunityMembers(id),

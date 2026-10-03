@@ -82,6 +82,7 @@ npm run test:integration # integration tests (requires .env.test)
 npm run openapi:export   # generate openapi spec via ts-node src/scripts/export-openapi.ts
 npm run openapi:completeness # are all mounted routes registered in lib/openapi.ts? (#474; CI gates it)
 npm run openapi:gate-marks   # does every layer ahead of a handler carry markGate or markNotGate? (#558; gated)
+npm run openapi:failure-coverage # does every operation declare its handler's 4xx, or sit in noFailureModes? (gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run env:coverage     # do the code, .env.default, docs/README.md and this file agree on env vars? (#682; gated)
@@ -414,6 +415,7 @@ src/
       dnc.ts                # Community Do-Not-Contribute list management
       leaderOffer.ts        # Leadership handoff under /:id/leader-offer: offer, withdraw, accept, decline (#896)
       leadershipLog.ts      # GET /:id/leadership-log — each change of leader, newest first (#897, ADR-0054)
+      manage.ts             # GET /manage — every community, for communities_manage (#902, ADR-0055); mounted before /:id
     forum/
       forumRoute.ts         # Forum CRUD
       forumCategory.ts      # ForumCategory CRUD

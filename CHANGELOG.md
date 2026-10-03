@@ -23,6 +23,11 @@ All notable changes to stellar-api are documented here.
   - **A new `community_leadership_events` table,** written with each change: create, a staff `PUT` that changes the leader (not one that resends it), an accepted handoff, and the boot seed's site community.
   - **Existing installs are backfilled** in the migration, from the `community.leader.set` audit rows. A leader no audit row explains, such as the boot seed's, is logged as founded at the community's creation.
   - **ADR-0054:** no route serves the audit log. A history a product shows gets its own table.
+- **Staff read every community's administrative record** (#902, ADR-0055).
+  - `GET /communities/manage` lists every community, closed ones included, for `communities_manage`. `GET /communities` stays the member browse, for staff too.
+  - `GET /communities/{id}` and `GET /communities/{id}/leadership-log` now admit `communities_manage` and `admin` on every community. Before, a closed community they held no role in answered `403`, though they could already edit or delete it. That brings the pending leader offer and the leadership log with them.
+  - **Contents stay member-only:** releases, contributions, downloads, requests, comments and health keep the member gate. The handoff routes stay the leader's and the successor's.
+  - `GET /communities/{id}` now declares its `403` in the contract.
 
 ## [0.10.2] — 2026-10-02
 

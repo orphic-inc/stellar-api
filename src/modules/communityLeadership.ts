@@ -137,14 +137,23 @@ export const leaderOfferFor = async (
   return isStaff || isParty ? offer : null;
 };
 
-/** A missing or hidden community answers exactly as `GET /:id` does (#771). */
-const loadReadable = async (communityId: number, callerId: number) => {
+/**
+ * A missing or hidden community answers exactly as `GET /:id` does (#771).
+ * `staffRead` admits staff to the administrative record (ADR-0055); the
+ * handoff writes never pass it.
+ */
+const loadReadable = async (
+  communityId: number,
+  callerId: number,
+  staffRead = false
+) => {
   const community = await prisma.community.findUnique({
     where: { id: communityId },
     select: { id: true, leaderId: true, registrationStatus: true }
   });
   if (!community) throw new AppError(404, 'Community not found');
   if (
+    !staffRead &&
     !(await hasCommunityAccess(
       communityId,
       callerId,
@@ -394,7 +403,8 @@ export const listLeadershipLog = async (
   isStaff: boolean,
   page: { skip: number; limit: number }
 ) => {
-  await loadReadable(communityId, viewerId);
+  // Part of the administrative record, which staff read everywhere (ADR-0055).
+  await loadReadable(communityId, viewerId, isStaff);
   const where = { communityId };
   const [rows, total] = await Promise.all([
     prisma.communityLeadershipEvent.findMany({
