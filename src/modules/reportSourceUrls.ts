@@ -3,7 +3,8 @@ import { prisma } from '../lib/prisma';
 import { canAccessForumLevel } from '../lib/userRankAccess';
 import type { AuthUser } from '../types/auth';
 import { canSeeThreadOf } from './comment';
-import { contributionVisibleTo, releaseVisibleTo } from './communityAccess';
+import { releaseVisibleTo } from './communityAccess';
+import { releasesUnderOpenReport } from './reportedRelease';
 
 // ─── UI deep-link paths ───────────────────────────────────────────────────────
 
@@ -37,17 +38,28 @@ const communityPath = (communityId: number): string =>
  * Whose report list the links are for (#773). A reporter sees a link only to a
  * target they may see: one they cannot answers `null`, exactly as a target that
  * no longer exists does, so their own list cannot confirm a hidden id or name
- * the community or forum holding it. The staff queue passes no viewer and sees
- * every link.
+ * the community or forum holding it.
  */
 export type SourceViewer = Pick<
   AuthUser,
   'id' | 'userRankLevel' | 'permittedForumIds'
 >;
 
+/**
+ * A `reports_manage` holder reading the queue. They see every link except one
+ * into a release page that would refuse them: a release they cannot see as a
+ * member and that no open report concerns (ADR-0055 §3, #905).
+ */
+export type StaffSourceViewer = { staffId: number };
+
 type Entry = { reportId: number; targetId: number };
 type Resolved = Array<[reportId: number, url: string | null]>;
-type Resolver = (entries: Entry[], viewer?: SourceViewer) => Promise<Resolved>;
+type Viewer = SourceViewer | StaffSourceViewer;
+type Resolver = (entries: Entry[], viewer: Viewer) => Promise<Resolved>;
+
+/** The reporter, when it is a reporter's list; staff pass every check below it. */
+const reporterOf = (viewer: Viewer): SourceViewer | undefined =>
+  'staffId' in viewer ? undefined : viewer;
 
 const idsOf = (entries: Entry[]) => entries.map((e) => e.targetId);
 
@@ -68,10 +80,40 @@ const fromId =
   async (entries) =>
     entries.map(({ reportId, targetId }) => [reportId, path(targetId)]);
 
+/**
+ * Which of these releases the viewer's release page will open for: as a
+ * member, or, for staff, because an open report concerns it.
+ */
+const openableReleases = async (
+  releaseIds: number[],
+  viewer: Viewer
+): Promise<Set<number>> => {
+  if (releaseIds.length === 0) return new Set();
+  const reporter = reporterOf(viewer);
+  const [visible, reported] = await Promise.all([
+    prisma.release.findMany({
+      where: {
+        AND: [
+          { id: { in: releaseIds } },
+          releaseVisibleTo('staffId' in viewer ? viewer.staffId : viewer.id)
+        ]
+      },
+      select: { id: true }
+    }),
+    reporter ? new Set<number>() : releasesUnderOpenReport(releaseIds)
+  ]);
+  return new Set([...visible.map((r) => r.id), ...reported]);
+};
+
 const forumReadable = (
-  viewer: SourceViewer | undefined,
+  viewer: Viewer,
   forum: { id: number; minClassRead: number }
-) => !viewer || canAccessForumLevel(viewer, forum.id, forum.minClassRead);
+) => {
+  const reporter = reporterOf(viewer);
+  return (
+    !reporter || canAccessForumLevel(reporter, forum.id, forum.minClassRead)
+  );
+};
 
 const resolveUsers: Resolver = async (entries) => {
   const users = await prisma.user.findMany({
@@ -85,35 +127,33 @@ const resolveUsers: Resolver = async (entries) => {
 
 const resolveReleases: Resolver = async (entries, viewer) => {
   const releases = await prisma.release.findMany({
-    where: {
-      AND: [
-        { id: { in: idsOf(entries) } },
-        viewer ? releaseVisibleTo(viewer.id) : {}
-      ]
-    },
+    where: { id: { in: idsOf(entries) } },
     select: { id: true, communityId: true }
   });
+  const openable = await openableReleases(
+    releases.map((r) => r.id),
+    viewer
+  );
   return byTarget(entries, new Map(releases.map((r) => [r.id, r])), (r, id) =>
-    r.communityId ? releasePath(r.communityId, id) : null
+    r.communityId && openable.has(id) ? releasePath(r.communityId, id) : null
   );
 };
 
 const resolveContributions: Resolver = async (entries, viewer) => {
   const contribs = await prisma.contribution.findMany({
-    where: {
-      AND: [
-        { id: { in: idsOf(entries) } },
-        viewer ? contributionVisibleTo(viewer.id) : {}
-      ]
-    },
+    where: { id: { in: idsOf(entries) } },
     select: {
       id: true,
       releaseId: true,
       release: { select: { communityId: true } }
     }
   });
+  const openable = await openableReleases(
+    contribs.map((c) => c.releaseId),
+    viewer
+  );
   return byTarget(entries, new Map(contribs.map((c) => [c.id, c])), (c) =>
-    c.release?.communityId
+    c.release?.communityId && openable.has(c.releaseId)
       ? releasePath(c.release.communityId, c.releaseId)
       : null
   );
@@ -188,16 +228,37 @@ const COMMENT_URLS: Record<CommentPage, (c: CommentRow) => string | null> = {
   communities: (c) => (c.communityId ? communityPath(c.communityId) : null)
 };
 
+/** The release whose page a comment links to, if it links to one. */
+const releaseOfComment = (c: CommentRow): number | null =>
+  c.page === 'release'
+    ? c.releaseId
+    : c.page === 'contributions'
+      ? (c.contribution?.releaseId ?? null)
+      : null;
+
 // A comment is visible exactly when its thread is (#697), so a reporter gets
-// the link only when canSeeThreadOf lets them read that thread.
+// the link only when canSeeThreadOf lets them read that thread. Staff get it
+// when the page it links to will open for them.
 const resolveComments: Resolver = async (entries, viewer) => {
   const comments = await prisma.comment.findMany({
     where: { id: { in: idsOf(entries) } },
     select: commentSelect
   });
   const visible = new Map<number, CommentRow>();
-  for (const c of comments) {
-    if (!viewer || (await canSeeThreadOf(c, viewer.id))) visible.set(c.id, c);
+  const reporter = reporterOf(viewer);
+  if (reporter) {
+    for (const c of comments) {
+      if (await canSeeThreadOf(c, reporter.id)) visible.set(c.id, c);
+    }
+  } else {
+    const releaseIds = comments
+      .map(releaseOfComment)
+      .filter((id): id is number => id !== null);
+    const openable = await openableReleases(releaseIds, viewer);
+    for (const c of comments) {
+      const releaseId = releaseOfComment(c);
+      if (releaseId === null || openable.has(releaseId)) visible.set(c.id, c);
+    }
   }
   return byTarget(entries, visible, (c) => COMMENT_URLS[c.page](c));
 };
@@ -221,7 +282,7 @@ const RESOLVERS: Record<ReportTargetType, Resolver> = {
 /** Each report's `sourceUrl`, keyed by report id, one query per target type. */
 export async function resolveSourceUrls(
   items: Array<{ id: number; targetType: ReportTargetType; targetId: number }>,
-  viewer?: SourceViewer
+  viewer: Viewer
 ): Promise<Map<number, string | null>> {
   const byType = new Map<ReportTargetType, Entry[]>();
   for (const r of items) {

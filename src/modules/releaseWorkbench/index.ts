@@ -30,7 +30,8 @@ import {
 } from './credits';
 
 const createSession = (ref: ReleaseWorkbenchRef): ReleaseWorkbenchSession => ({
-  getView: () => getReleaseWorkbenchView(ref),
+  // The release page's two reads are the ones a report opens (ADR-0055 §3).
+  getView: () => getReleaseWorkbenchView(ref, { allowReportScoped: true }),
   getHistoryPage: (input) => getReleaseWorkbenchHistoryPage(ref, input),
   updateMetadata: (
     input: UpdateReleaseMetadataInput

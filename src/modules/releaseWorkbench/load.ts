@@ -24,11 +24,12 @@ const normalizePage = (page?: number, limit?: number) => {
 
 export const getReleaseWorkbenchView = async (
   ref: ReleaseWorkbenchRef,
-  options: { requireCommunityAccess?: boolean } = {}
+  options: {
+    requireCommunityAccess?: boolean;
+    allowReportScoped?: boolean;
+  } = {}
 ): Promise<ReleaseWorkbenchView> => {
-  const permissions = await loadReleaseWorkbenchAuthority(ref, {
-    requireCommunityAccess: options.requireCommunityAccess
-  });
+  const permissions = await loadReleaseWorkbenchAuthority(ref, options);
 
   const [release, myVoteRecord] = await Promise.all([
     prisma.release.findFirst({

@@ -5698,6 +5698,8 @@ registry.registerPath({
   method: 'get',
   path: '/communities/{communityId}/releases/{releaseId}',
   tags: ['Communities'],
+  description:
+    "Readable by the community's members, and by `reports_manage` holders while an `Open` or `Claimed` report targets the release, one of its contributions, or a comment in either's thread (ADR-0055 §3, #905).",
   request: {
     params: z.object({
       communityId: z.string(),
@@ -6275,6 +6277,8 @@ registry.registerPath({
   method: 'get',
   path: '/communities/{communityId}/releases/{releaseId}/contributions',
   tags: ['Communities'],
+  description:
+    'Readable by whoever may read the release detail, including a `reports_manage` holder whom an open report lets in (ADR-0055 §3, #905). That read gets every `downloadUrl` as an empty string: it grants a look, not a download.',
   request: {
     params: z.object({
       communityId: z.string(),
