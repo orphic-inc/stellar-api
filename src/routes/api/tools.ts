@@ -5,12 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import {
   normalizePermissions,
@@ -20,32 +15,35 @@ import {
   createRankSchema,
   updateRankSchema,
   createPromotionRuleSchema,
-  updatePromotionRuleSchema,
-  type CreateRankInput,
-  type UpdateRankInput,
-  type CreatePromotionRuleInput,
-  type UpdatePromotionRuleInput
+  updatePromotionRuleSchema
 } from '../../schemas/tools';
 import {
   createStaffGroupSchema,
-  updateStaffGroupSchema,
-  type CreateStaffGroupInput,
-  type UpdateStaffGroupInput
+  updateStaffGroupSchema
 } from '../../schemas/staff';
 import * as promotionRules from '../../modules/promotionRules';
 import { ENTRY_RANK_LEVEL } from '../../modules/rankProgression';
 
 const router = express.Router();
+const updateStaffGroupBody = validate(updateStaffGroupSchema);
+const updateRankBody = validate(updateRankSchema);
+const updatePromotionRuleBody = validate(updatePromotionRuleSchema);
+const createStaffGroupBody = validate(createStaffGroupSchema);
+const createRankBody = validate(createRankSchema);
+const createPromotionRuleBody = validate(createPromotionRuleSchema);
 
 const userRankIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const userRankIdParams = validateParams(userRankIdParamsSchema);
 const staffGroupIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const staffGroupIdParams = validateParams(staffGroupIdParamsSchema);
 const promotionRuleIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const promotionRuleIdParams = validateParams(promotionRuleIdParamsSchema);
 
 const formatPromotionRule = (
   r: Prisma.RankPromotionRuleGetPayload<{
@@ -128,9 +126,9 @@ router.get(
 router.get(
   '/user-ranks/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(userRankIdParamsSchema),
+  userRankIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userRankIdParams.read(res);
 
     const rank = await prisma.userRank.findUnique({
       where: { id },
@@ -146,7 +144,7 @@ router.get(
 router.post(
   '/user-ranks',
   ...requirePermission('rank_permissions_manage'),
-  validate(createRankSchema),
+  createRankBody,
   authHandler(async (req, res) => {
     const {
       name,
@@ -164,7 +162,7 @@ router.post(
       notificationFilterLimit,
       displayStaff,
       staffGroupId
-    } = parsedBody<CreateRankInput>(res);
+    } = createRankBody.read(res);
 
     if (staffGroupId != null) {
       const group = await prisma.staffGroup.findUnique({
@@ -257,10 +255,10 @@ const movesEntryRank = (current: number, next: number | undefined) =>
 router.put(
   '/user-ranks/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(userRankIdParamsSchema),
-  validate(updateRankSchema),
+  userRankIdParams,
+  updateRankBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userRankIdParams.read(res);
 
     const existing = await prisma.userRank.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Rank not found' });
@@ -281,7 +279,7 @@ router.put(
       notificationFilterLimit,
       displayStaff,
       staffGroupId
-    } = parsedBody<UpdateRankInput>(res);
+    } = updateRankBody.read(res);
 
     if (movesEntryRank(existing.level, level))
       return res.status(409).json({ msg: ENTRY_RANK_MOVE_REFUSED });
@@ -370,9 +368,9 @@ router.put(
 router.delete(
   '/user-ranks/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(userRankIdParamsSchema),
+  userRankIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userRankIdParams.read(res);
 
     const [userCount, secondaryUserCount] = await Promise.all([
       prisma.user.count({ where: { userRankId: id } }),
@@ -444,9 +442,9 @@ router.get(
 router.get(
   '/promotion-rules/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(promotionRuleIdParamsSchema),
+  promotionRuleIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = promotionRuleIdParams.read(res);
     const rule = await prisma.rankPromotionRule.findUnique({
       where: { id },
       include: promotionRuleInclude
@@ -460,9 +458,9 @@ router.get(
 router.post(
   '/promotion-rules',
   ...requirePermission('rank_permissions_manage'),
-  validate(createPromotionRuleSchema),
+  createPromotionRuleBody,
   authHandler(async (req, res) => {
-    const data = parsedBody<CreatePromotionRuleInput>(res);
+    const data = createPromotionRuleBody.read(res);
 
     const pairError = await validatePromotionRulePair(
       data.fromRankId,
@@ -512,10 +510,10 @@ router.post(
 router.put(
   '/promotion-rules/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(promotionRuleIdParamsSchema),
-  validate(updatePromotionRuleSchema),
+  promotionRuleIdParams,
+  updatePromotionRuleBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = promotionRuleIdParams.read(res);
 
     const existing = await prisma.rankPromotionRule.findUnique({
       where: { id }
@@ -524,7 +522,7 @@ router.put(
       return res.status(404).json({ msg: 'Promotion rule not found' });
     }
 
-    const body = parsedBody<UpdatePromotionRuleInput>(res);
+    const body = updatePromotionRuleBody.read(res);
 
     if (body.fromRankId !== undefined || body.toRankId !== undefined) {
       const pairError = await validatePromotionRulePair(
@@ -583,9 +581,9 @@ router.put(
 router.delete(
   '/promotion-rules/:id',
   ...requirePermission('rank_permissions_manage'),
-  validateParams(promotionRuleIdParamsSchema),
+  promotionRuleIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = promotionRuleIdParams.read(res);
 
     const existing = await prisma.rankPromotionRule.findUnique({
       where: { id },
@@ -642,9 +640,9 @@ router.get(
 router.post(
   '/staff-groups',
   ...requirePermission('staff_groups_manage'),
-  validate(createStaffGroupSchema),
+  createStaffGroupBody,
   authHandler(async (req, res) => {
-    const { name, sortOrder } = parsedBody<CreateStaffGroupInput>(res);
+    const { name, sortOrder } = createStaffGroupBody.read(res);
 
     try {
       const group = await prisma.staffGroup.create({
@@ -682,11 +680,11 @@ router.post(
 router.put(
   '/staff-groups/:id',
   ...requirePermission('staff_groups_manage'),
-  validateParams(staffGroupIdParamsSchema),
-  validate(updateStaffGroupSchema),
+  staffGroupIdParams,
+  updateStaffGroupBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { name, sortOrder } = parsedBody<UpdateStaffGroupInput>(res);
+    const { id } = staffGroupIdParams.read(res);
+    const { name, sortOrder } = updateStaffGroupBody.read(res);
 
     const existing = await prisma.staffGroup.findUnique({ where: { id } });
     if (!existing)
@@ -729,9 +727,9 @@ router.put(
 router.delete(
   '/staff-groups/:id',
   ...requirePermission('staff_groups_manage'),
-  validateParams(staffGroupIdParamsSchema),
+  staffGroupIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = staffGroupIdParams.read(res);
 
     const existing = await prisma.staffGroup.findUnique({
       where: { id },

@@ -7,23 +7,23 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateQuery,
-  validateParams,
-  parsedBody,
-  parsedParams
+  validateParams
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import {
   paginationBase,
-  parsedPage,
-  paginatedResponse
+  paginatedResponse,
+  pageOf
 } from '../../lib/pagination';
 import { normalizePassword } from '../../modules/badPasswords';
 
 const router = express.Router();
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 
 const listQuerySchema = z.object({ ...paginationBase });
+const listQuery = validateQuery(listQuerySchema);
 
 // Six characters is the floor every creation path enforces
 // (`src/schemas/auth.ts`, `src/schemas/user.ts`), so a shorter entry could
@@ -35,8 +35,7 @@ const badPasswordSchema = z.object({
     .min(6, 'Denied passwords must be at least 6 characters')
     .max(255)
 });
-
-type BadPasswordInput = z.infer<typeof badPasswordSchema>;
+const badPasswordBody = validate(badPasswordSchema);
 
 // GET /api/bad-passwords
 //
@@ -46,9 +45,9 @@ type BadPasswordInput = z.infer<typeof badPasswordSchema>;
 router.get(
   '/',
   ...requirePermission('bad_passwords_manage'),
-  validateQuery(listQuerySchema),
+  listQuery,
   authHandler(async (_req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(listQuery.read(res));
     const [rows, total] = await Promise.all([
       prisma.badPassword.findMany({
         orderBy: [{ password: 'asc' }, { id: 'asc' }],
@@ -65,9 +64,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('bad_passwords_manage'),
-  validate(badPasswordSchema),
+  badPasswordBody,
   authHandler(async (req, res) => {
-    const { password } = parsedBody<BadPasswordInput>(res);
+    const { password } = badPasswordBody.read(res);
     // Normalised on the way in, exactly as `isPasswordBanned` normalises on the
     // way out. A mixed-case row would be stored but never matched.
     const normalized = normalizePassword(password);
@@ -111,9 +110,9 @@ router.post(
 router.delete(
   '/:id',
   ...requirePermission('bad_passwords_manage'),
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const entry = await prisma.badPassword.findUnique({ where: { id } });
     if (!entry) return res.status(404).json({ msg: 'Entry not found' });
     try {

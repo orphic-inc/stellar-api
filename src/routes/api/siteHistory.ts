@@ -5,19 +5,16 @@ import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
-import { siteHistorySchema, type SiteHistoryInput } from '../../schemas/user';
+import { validate, validateParams } from '../../middleware/validate';
+import { siteHistorySchema } from '../../schemas/user';
 
 const router = express.Router();
+const siteHistoryBody = validate(siteHistorySchema);
 
-const siteHistoryIdParams = z.object({
+const siteHistoryIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const siteHistoryIdParams = validateParams(siteHistoryIdParamsSchema);
 
 // GET /api/site-history
 router.get(
@@ -36,9 +33,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('site_history_manage'),
-  validate(siteHistorySchema),
+  siteHistoryBody,
   authHandler(async (req, res) => {
-    const { title, body } = parsedBody<SiteHistoryInput>(res);
+    const { title, body } = siteHistoryBody.read(res);
     const entry = await prisma.siteHistory.create({
       data: { authorId: req.user.id, title, body }
     });
@@ -50,11 +47,11 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('site_history_manage'),
-  validateParams(siteHistoryIdParams),
-  validate(siteHistorySchema),
+  siteHistoryIdParams,
+  siteHistoryBody,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { title, body } = parsedBody<SiteHistoryInput>(res);
+    const { id } = siteHistoryIdParams.read(res);
+    const { title, body } = siteHistoryBody.read(res);
     const existing = await prisma.siteHistory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Entry not found' });
     let entry;
@@ -74,9 +71,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('site_history_manage'),
-  validateParams(siteHistoryIdParams),
+  siteHistoryIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = siteHistoryIdParams.read(res);
     const existing = await prisma.siteHistory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Entry not found' });
     try {

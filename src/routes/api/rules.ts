@@ -3,12 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { authHandler } from '../../modules/asyncHandler';
 import { AppError } from '../../lib/errors';
 import { audit } from '../../lib/audit';
@@ -18,13 +13,15 @@ import {
   updateRulesPageSchema,
   rulesPageParamsSchema,
   rulesSlugParamsSchema,
-  normalizeRulesSlug,
-  type CreateRulesPageInput,
-  type UpdateRulesPageInput
+  normalizeRulesSlug
 } from '../../schemas/rules';
 import { resolveSiteVariables } from '../../modules/siteVariables';
 
 const router = Router();
+const updateRulesPageBody = validate(updateRulesPageSchema);
+const rulesSlugParams = validateParams(rulesSlugParamsSchema);
+const rulesPageParams = validateParams(rulesPageParamsSchema);
+const createRulesPageBody = validate(createRulesPageSchema);
 
 const pageSelect = {
   id: true,
@@ -85,9 +82,9 @@ router.get(
 router.get(
   '/:slug',
   requireAuth,
-  validateParams(rulesSlugParamsSchema),
+  rulesSlugParams,
   authHandler(async (_req, res) => {
-    const { slug } = parsedParams<{ slug: string }>(res);
+    const { slug } = rulesSlugParams.read(res);
     const page = await prisma.rulesPage.findUnique({
       where: { slug },
       select: pageSelect
@@ -101,9 +98,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('rules_manage'),
-  validate(createRulesPageSchema),
+  createRulesPageBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<CreateRulesPageInput>(res);
+    const input = createRulesPageBody.read(res);
     const slug = input.slug ?? normalizeRulesSlug(input.title);
     const body = sanitizeHtml(input.body);
 
@@ -160,11 +157,11 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('rules_manage'),
-  validateParams(rulesPageParamsSchema),
-  validate(updateRulesPageSchema),
+  rulesPageParams,
+  updateRulesPageBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const input = parsedBody<UpdateRulesPageInput>(res);
+    const { id } = rulesPageParams.read(res);
+    const input = updateRulesPageBody.read(res);
 
     let page;
     try {
@@ -212,9 +209,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('rules_manage'),
-  validateParams(rulesPageParamsSchema),
+  rulesPageParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = rulesPageParams.read(res);
 
     try {
       await prisma.$transaction(async (tx) => {

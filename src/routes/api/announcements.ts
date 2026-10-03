@@ -10,31 +10,29 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams
+  validateQuery
 } from '../../middleware/validate';
-import { parsedPage, paginatedResponse } from '../../lib/pagination';
+import { paginatedResponse, pageOf } from '../../lib/pagination';
 import {
   announcementSchema,
   globalNoticeSchema,
-  newsListQuerySchema,
-  type AnnouncementInput,
-  type GlobalNoticeInput
+  newsListQuerySchema
 } from '../../schemas/announcement';
-import {
-  featuredAlbumSchema,
-  type FeaturedAlbumInput
-} from '../../schemas/featuredAlbum';
+import { featuredAlbumSchema } from '../../schemas/featuredAlbum';
 import { sanitizePlain } from '../../lib/sanitize';
 import { emitNotifications } from '../../lib/notifications';
 import { registerBBCodeImages } from '../../modules/remoteImage';
 import { registerBodyImages } from '../../middleware/imageSrc';
 
 const router = express.Router();
+const newsListQuery = validateQuery(newsListQuerySchema);
+const globalNoticeBody = validate(globalNoticeSchema);
+const featuredAlbumBody = validate(featuredAlbumSchema);
+const announcementBody = validate(announcementSchema);
 const idParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const idParams = validateParams(idParamsSchema);
 
 // GET /api/announcements
 //
@@ -62,9 +60,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('news_manage'),
-  validate(announcementSchema),
+  announcementBody,
   authHandler(async (req, res) => {
-    const { title, body } = parsedBody<AnnouncementInput>(res);
+    const { title, body } = announcementBody.read(res);
     const stored = sanitizePlain(body);
     // Before the write, so a 429 refuses the announcement whole (#737).
     await registerBBCodeImages(stored, req.user.id);
@@ -103,9 +101,9 @@ router.post(
 router.get(
   '/news',
   requireAuth,
-  validateQuery(newsListQuerySchema),
+  newsListQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(newsListQuery.read(res));
     const [news, total] = await Promise.all([
       prisma.news.findMany({
         // `id` breaks the tie: `createdAt` is not unique, and two items sharing
@@ -135,11 +133,11 @@ router.get(
 router.post(
   '/album-of-month',
   ...requirePermission('news_manage'),
-  validate(featuredAlbumSchema),
+  featuredAlbumBody,
   registerBodyImages('image'),
   asyncHandler(async (_req: Request, res: Response) => {
     const { groupId, threadId, title, image, started, ended } =
-      parsedBody<FeaturedAlbumInput>(res);
+      featuredAlbumBody.read(res);
 
     // Staff curation is an act of publication (ADR-0036 §4). Featuring a
     // release makes its identity public, so the refusal belongs HERE, at the
@@ -181,14 +179,15 @@ router.post(
 const albumIdParamsSchema = z.object({
   albumId: z.coerce.number().int().positive()
 });
+const albumIdParams = validateParams(albumIdParamsSchema);
 
 // DELETE /api/announcements/album-of-month/:albumId — delete featured album (staff)
 router.delete(
   '/album-of-month/:albumId',
   ...requirePermission('news_manage'),
-  validateParams(albumIdParamsSchema),
+  albumIdParams,
   asyncHandler(async (_req: Request, res: Response) => {
-    const { albumId } = parsedParams<{ albumId: number }>(res);
+    const { albumId } = albumIdParams.read(res);
     const existing = await prisma.featuredAlbum.findUnique({
       where: { id: albumId }
     });
@@ -211,11 +210,11 @@ router.delete(
 router.put(
   '/:id',
   ...requirePermission('news_manage'),
-  validateParams(idParamsSchema),
-  validate(announcementSchema),
+  idParams,
+  announcementBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { title, body } = parsedBody<AnnouncementInput>(res);
+    const { id } = idParams.read(res);
+    const { title, body } = announcementBody.read(res);
     const stored = body && sanitizePlain(body);
     await registerBBCodeImages(stored, req.user!.id);
     let news;
@@ -243,9 +242,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('news_manage'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     try {
       await prisma.news.delete({ where: { id } });
     } catch (err) {
@@ -264,9 +263,9 @@ router.delete(
 router.post(
   '/blog',
   ...requirePermission('news_manage'),
-  validate(announcementSchema),
+  announcementBody,
   authHandler(async (req, res) => {
-    const { title, body } = parsedBody<AnnouncementInput>(res);
+    const { title, body } = announcementBody.read(res);
     const post = await prisma.blog.create({
       data: {
         title: sanitizePlain(title),
@@ -283,9 +282,9 @@ router.post(
 router.delete(
   '/blog/:id',
   ...requirePermission('news_manage'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     try {
       await prisma.blog.delete({ where: { id } });
     } catch (err) {
@@ -314,9 +313,9 @@ router.get(
 router.post(
   '/global-notice',
   ...requirePermission('news_manage'),
-  validate(globalNoticeSchema),
+  globalNoticeBody,
   authHandler(async (req, res) => {
-    const { message, url, expiresAt } = parsedBody<GlobalNoticeInput>(res);
+    const { message, url, expiresAt } = globalNoticeBody.read(res);
     const notice = await prisma.$transaction(async (tx) => {
       const created = await tx.globalNotice.create({
         data: {
@@ -347,9 +346,9 @@ router.post(
 router.delete(
   '/global-notice/:id',
   ...requirePermission('news_manage'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     try {
       await prisma.globalNotice.delete({ where: { id } });
     } catch (err) {

@@ -10,20 +10,13 @@ import {
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import {
   fileReportSchema,
   resolveReportSchema,
   addNoteSchema,
-  reportListQuerySchema,
-  type FileReportInput,
-  type ResolveReportInput,
-  type AddNoteInput,
-  type ReportListQueryInput
+  reportListQuerySchema
 } from '../../schemas/reports';
 import {
   fileReport,
@@ -44,10 +37,18 @@ import type {
 } from '@prisma/client';
 
 const router = express.Router();
+const pageQuery = validateQuery(
+  z.object({ page: z.coerce.number().int().min(1).default(1) })
+);
+const resolveReportBody = validate(resolveReportSchema);
+const reportListQuery = validateQuery(reportListQuerySchema);
+const fileReportBody = validate(fileReportSchema);
+const addNoteBody = validate(addNoteSchema);
 
 const reportIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const reportIdParams = validateParams(reportIdSchema);
 
 // GET /api/reports/counts — open + claimed counts (staff)
 router.get(
@@ -73,9 +74,9 @@ router.get(
 router.get(
   '/mine',
   requireAuth,
-  validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
+  pageQuery,
   authHandler(async (req, res) => {
-    const { page } = parsedQuery<{ page: number }>(res);
+    const { page } = pageQuery.read(res);
     const result = await listMyReports(req.user, page);
     res.json(result);
   })
@@ -85,10 +86,10 @@ router.get(
 router.get(
   '/',
   ...requirePermission('reports_manage'),
-  validateQuery(reportListQuerySchema),
+  reportListQuery,
   authHandler(async (req, res) => {
     const { page, status, targetType, claimedByMe, reporterUsername } =
-      parsedQuery<ReportListQueryInput>(res);
+      reportListQuery.read(res);
     const result = await listReports({
       page,
       status: status as ReportStatus | 'all',
@@ -105,9 +106,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(fileReportSchema),
+  fileReportBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<FileReportInput>(res);
+    const input = fileReportBody.read(res);
     const category =
       input.targetType === 'Release' ? input.releaseCategory : input.category;
     const releaseCategory =
@@ -130,9 +131,9 @@ router.post(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(reportIdSchema),
+  reportIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = reportIdParams.read(res);
     const isStaff = hasPermission(
       await loadPermissions(req, res),
       'reports_manage'
@@ -151,9 +152,9 @@ router.get(
 router.post(
   '/:id/claim',
   ...requirePermission('reports_manage'),
-  validateParams(reportIdSchema),
+  reportIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = reportIdParams.read(res);
     const result = await claimReport(id, req.user.id);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
@@ -173,9 +174,9 @@ router.post(
 router.post(
   '/:id/unclaim',
   ...requirePermission('reports_manage'),
-  validateParams(reportIdSchema),
+  reportIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = reportIdParams.read(res);
     const result = await unclaimReport(id, req.user.id);
     if (!result.ok) {
       const statusMap: Record<string, number> = {
@@ -195,12 +196,11 @@ router.post(
 router.post(
   '/:id/resolve',
   ...requirePermission('reports_manage'),
-  validateParams(reportIdSchema),
-  validate(resolveReportSchema),
+  reportIdParams,
+  resolveReportBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { resolution, resolutionAction } =
-      parsedBody<ResolveReportInput>(res);
+    const { id } = reportIdParams.read(res);
+    const { resolution, resolutionAction } = resolveReportBody.read(res);
     const result = await resolveReport(
       id,
       req.user.id,
@@ -224,11 +224,11 @@ router.post(
 router.post(
   '/:id/notes',
   ...requirePermission('reports_manage'),
-  validateParams(reportIdSchema),
-  validate(addNoteSchema),
+  reportIdParams,
+  addNoteBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { body } = parsedBody<AddNoteInput>(res);
+    const { id } = reportIdParams.read(res);
+    const { body } = addNoteBody.read(res);
     const result = await addNote(id, req.user.id, body);
     if (!result.ok) {
       return res.status(404).json({ msg: 'Report not found' });

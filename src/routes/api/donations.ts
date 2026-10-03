@@ -6,43 +6,38 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
-  parsedBody,
   validateParams,
-  parsedParams,
-  validateQuery,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
-import {
-  createDonationSchema,
-  type CreateDonationInput
-} from '../../schemas/donations';
+import { createDonationSchema } from '../../schemas/donations';
 
 const router = express.Router();
+const createDonationBody = validate(createDonationSchema);
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 
 const donationsQuerySchema = z.object({
   ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
-
-type DonationsQuery = z.infer<typeof donationsQuerySchema>;
+const donationsQuery = validateQuery(donationsQuerySchema);
 
 // GET /api/donations
 router.get(
   '/',
   ...requirePermission('admin'),
-  validateQuery(donationsQuerySchema),
+  donationsQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const { userId } = parsedQuery<DonationsQuery>(res);
+    const { userId } = donationsQuery.read(res);
     const where = userId ? { userId } : undefined;
-    const pg = parsedPage(res);
+    const pg = pageOf(donationsQuery.read(res));
     const [rows, total] = await Promise.all([
       prisma.donation.findMany({
         where,
@@ -63,9 +58,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('admin'),
-  validate(createDonationSchema),
+  createDonationBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<CreateDonationInput>(res);
+    const input = createDonationBody.read(res);
     const user = await prisma.user.findUnique({ where: { id: input.userId } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
     let donation;
@@ -106,9 +101,9 @@ router.post(
 router.delete(
   '/:id',
   ...requirePermission('admin'),
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const donation = await prisma.donation.findUnique({ where: { id } });
     if (!donation) return res.status(404).json({ msg: 'Donation not found' });
     try {
