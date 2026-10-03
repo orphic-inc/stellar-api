@@ -93,72 +93,89 @@ async function community(
   return c.id;
 }
 
+async function seed() {
+  await seedAll(prisma);
+  const alice = await user('alice', 'alice');
+  const bob = await user('bob', 'bob');
+  const carol = await user('carol', null);
+  const dave = await user('dave', 'dave');
+  const privateClub = await community('Private Club', 'PRIVATE', [
+    alice.id,
+    bob.id,
+    carol.id
+  ]);
+  const squatClub = await community('Squat Club', 'PUBLIC', [alice.id]);
+  const openHouse = await community('Open House', 'PUBLIC', [alice.id]);
+  console.log(
+    JSON.stringify({ privateClub, squatClub, openHouse, dave: dave.id })
+  );
+}
+
+async function contribute(a: string) {
+  const communityId = Number(a);
+  const release = await prisma.release.findFirstOrThrow({
+    where: { communityId },
+    include: { editions: true }
+  });
+  const alice = await prisma.user.findUniqueOrThrow({
+    where: { username: 'alice' }
+  });
+  const contributor = await prisma.contributor.upsert({
+    where: { userId: alice.id },
+    update: { communities: { connect: { id: communityId } } },
+    create: {
+      userId: alice.id,
+      communities: { connect: { id: communityId } }
+    }
+  });
+  const types = [FileType.flac, FileType.mp3, FileType.aac, FileType.ogg];
+  const n = await prisma.contribution.count({
+    where: { releaseId: release.id }
+  });
+  const c = await prisma.contribution.create({
+    data: {
+      userId: alice.id,
+      releaseId: release.id,
+      contributorId: contributor.id,
+      editionId: release.editions[0].id,
+      type: types[n % types.length],
+      downloadUrl: `https://e2e.test/${Date.now()}`,
+      sizeInBytes: 1000,
+      approvedAccountingBytes: BigInt(1000),
+      releaseDescription: 'e2e'
+    }
+  });
+  console.log(JSON.stringify({ contribution: c.id, release: release.title }));
+}
+
+async function removeConsumer(a: string, b: string) {
+  const u = await prisma.user.findUniqueOrThrow({ where: { username: b } });
+  await prisma.consumer.update({
+    where: { userId: u.id },
+    data: { communities: { disconnect: { id: Number(a) } } }
+  });
+  console.log('removed');
+}
+
+async function setPrivate(a: string) {
+  await prisma.community.update({
+    where: { id: Number(a) },
+    data: { announceVisibility: 'PRIVATE' }
+  });
+  console.log('private');
+}
+
+const commands: Record<string, (a: string, b: string) => Promise<void>> = {
+  seed,
+  contribute,
+  'remove-consumer': removeConsumer,
+  'set-private': setPrivate
+};
+
 async function main() {
   const [cmd, a, b] = process.argv.slice(2);
-  if (cmd === 'seed') {
-    await seedAll(prisma);
-    const alice = await user('alice', 'alice');
-    const bob = await user('bob', 'bob');
-    const carol = await user('carol', null);
-    const dave = await user('dave', 'dave');
-    const privateClub = await community('Private Club', 'PRIVATE', [
-      alice.id,
-      bob.id,
-      carol.id
-    ]);
-    const squatClub = await community('Squat Club', 'PUBLIC', [alice.id]);
-    const openHouse = await community('Open House', 'PUBLIC', [alice.id]);
-    console.log(
-      JSON.stringify({ privateClub, squatClub, openHouse, dave: dave.id })
-    );
-  } else if (cmd === 'contribute') {
-    const communityId = Number(a);
-    const release = await prisma.release.findFirstOrThrow({
-      where: { communityId },
-      include: { editions: true }
-    });
-    const alice = await prisma.user.findUniqueOrThrow({
-      where: { username: 'alice' }
-    });
-    const contributor = await prisma.contributor.upsert({
-      where: { userId: alice.id },
-      update: { communities: { connect: { id: communityId } } },
-      create: {
-        userId: alice.id,
-        communities: { connect: { id: communityId } }
-      }
-    });
-    const types = [FileType.flac, FileType.mp3, FileType.aac, FileType.ogg];
-    const n = await prisma.contribution.count({
-      where: { releaseId: release.id }
-    });
-    const c = await prisma.contribution.create({
-      data: {
-        userId: alice.id,
-        releaseId: release.id,
-        contributorId: contributor.id,
-        editionId: release.editions[0].id,
-        type: types[n % types.length],
-        downloadUrl: `https://e2e.test/${Date.now()}`,
-        sizeInBytes: 1000,
-        approvedAccountingBytes: BigInt(1000),
-        releaseDescription: 'e2e'
-      }
-    });
-    console.log(JSON.stringify({ contribution: c.id, release: release.title }));
-  } else if (cmd === 'remove-consumer') {
-    const u = await prisma.user.findUniqueOrThrow({ where: { username: b } });
-    await prisma.consumer.update({
-      where: { userId: u.id },
-      data: { communities: { disconnect: { id: Number(a) } } }
-    });
-    console.log('removed');
-  } else if (cmd === 'set-private') {
-    await prisma.community.update({
-      where: { id: Number(a) },
-      data: { announceVisibility: 'PRIVATE' }
-    });
-    console.log('private');
-  } else throw new Error(`unknown command ${cmd}`);
+  const run = commands[cmd];
+  if (!run) throw new Error(`unknown command ${cmd}`);
+  await run(a, b);
 }
 main().finally(() => prisma.$disconnect());
