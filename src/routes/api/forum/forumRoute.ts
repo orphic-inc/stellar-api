@@ -7,24 +7,17 @@ import { deleteForum } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
-import {
-  parsedBody,
-  validate,
-  validateParams,
-  parsedParams
-} from '../../../middleware/validate';
-import {
-  createForumSchema,
-  updateForumSchema,
-  type CreateForumInput,
-  type UpdateForumInput
-} from '../../../schemas/forum';
+import { validate, validateParams } from '../../../middleware/validate';
+import { createForumSchema, updateForumSchema } from '../../../schemas/forum';
 import forumTopicRouter from './forumTopic';
 
 const router = express.Router();
+const updateForumBody = validate(updateForumSchema);
+const createForumBody = validate(createForumSchema);
 const forumIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const forumIdParams = validateParams(forumIdParamsSchema);
 
 router.use('/:forumId/topics', forumTopicRouter);
 
@@ -55,9 +48,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(forumIdParamsSchema),
+  forumIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumIdParams.read(res);
     const forum = await prisma.forum.findUnique({
       where: { id },
       include: {
@@ -82,9 +75,9 @@ router.get(
 router.post(
   '/:id/catchup',
   requireAuth,
-  validateParams(forumIdParamsSchema),
+  forumIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumIdParams.read(res);
     const forum = await prisma.forum.findUnique({ where: { id } });
     if (!forum) return res.status(404).json({ msg: 'Forum not found' });
     if (!canAccessForumLevel(req.user, forum.id, forum.minClassRead)) {
@@ -125,7 +118,7 @@ router.post(
 router.post(
   '/',
   ...requirePermission('forums_manage'),
-  validate(createForumSchema),
+  createForumBody,
   asyncHandler(async (req: Request, res: Response) => {
     const {
       forumCategoryId,
@@ -137,7 +130,7 @@ router.post(
       minClassCreate,
       autoLock,
       autoLockWeeks
-    } = parsedBody<CreateForumInput>(res);
+    } = createForumBody.read(res);
 
     let forum;
     try {
@@ -167,10 +160,10 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('forums_manage'),
-  validateParams(forumIdParamsSchema),
-  validate(updateForumSchema),
+  forumIdParams,
+  updateForumBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumIdParams.read(res);
     const existing = await prisma.forum.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Forum not found' });
 
@@ -183,7 +176,7 @@ router.put(
       minClassCreate,
       autoLock,
       autoLockWeeks
-    } = parsedBody<UpdateForumInput>(res);
+    } = updateForumBody.read(res);
     let forum;
     try {
       forum = await prisma.forum.update({
@@ -212,9 +205,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('forums_manage'),
-  validateParams(forumIdParamsSchema),
+  forumIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumIdParams.read(res);
     const result = await deleteForum(id);
     if (!result.ok) {
       if (result.reason === 'not_found')

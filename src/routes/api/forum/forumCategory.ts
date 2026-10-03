@@ -9,23 +9,19 @@ import {
   loadPermissions
 } from '../../../middleware/permissions';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
-import {
-  parsedBody,
-  validate,
-  validateParams,
-  parsedParams
-} from '../../../middleware/validate';
+import { validate, validateParams } from '../../../middleware/validate';
 import {
   createForumCategorySchema,
-  updateForumCategorySchema,
-  type CreateForumCategoryInput,
-  type UpdateForumCategoryInput
+  updateForumCategorySchema
 } from '../../../schemas/forumCategory';
 
 const router = express.Router();
+const updateForumCategoryBody = validate(updateForumCategorySchema);
+const createForumCategoryBody = validate(createForumCategorySchema);
 const forumCategoryIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const forumCategoryIdParams = validateParams(forumCategoryIdParamsSchema);
 
 // GET /api/forums/categories — pass ?all=true to skip the empty-category filter (admin)
 router.get(
@@ -79,9 +75,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(forumCategoryIdParamsSchema),
+  forumCategoryIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumCategoryIdParams.read(res);
     const category = await prisma.forumCategory.findUnique({
       where: { id },
       include: {
@@ -114,9 +110,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('forums_manage'),
-  validate(createForumCategorySchema),
+  createForumCategoryBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, sort } = parsedBody<CreateForumCategoryInput>(res);
+    const { name, sort } = createForumCategoryBody.read(res);
     const category = await prisma.forumCategory.create({
       data: { name, sort: sort ?? 0 }
     });
@@ -128,13 +124,13 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('forums_manage'),
-  validateParams(forumCategoryIdParamsSchema),
-  validate(updateForumCategorySchema),
+  forumCategoryIdParams,
+  updateForumCategoryBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumCategoryIdParams.read(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
-    const { name, sort } = parsedBody<UpdateForumCategoryInput>(res);
+    const { name, sort } = updateForumCategoryBody.read(res);
     let category;
     try {
       category = await prisma.forumCategory.update({
@@ -155,9 +151,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('forums_manage'),
-  validateParams(forumCategoryIdParamsSchema),
+  forumCategoryIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = forumCategoryIdParams.read(res);
     const existing = await prisma.forumCategory.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Category not found' });
     try {

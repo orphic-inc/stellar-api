@@ -9,31 +9,27 @@ import {
   loadPermissions,
   hasPermission
 } from '../../../middleware/permissions';
-import {
-  parsedBody,
-  validate,
-  validateParams,
-  parsedParams
-} from '../../../middleware/validate';
-import { pollSchema, type PollInput } from '../../../schemas/poll';
+import { validate, validateParams } from '../../../middleware/validate';
+import { pollSchema } from '../../../schemas/poll';
 
 const router = express.Router();
+const pollBody = validate(pollSchema);
 const topicIdParamsSchema = z.object({
   topicId: z.coerce.number().int().positive()
 });
+const topicIdParams = validateParams(topicIdParamsSchema);
 const pollIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const pollIdParams = validateParams(pollIdParamsSchema);
 
 // GET /api/forums/polls/:topicId
 router.get(
   '/:topicId',
   requireAuth,
-  validateParams(topicIdParamsSchema),
+  topicIdParams,
   authHandler(async (req, res) => {
-    const { topicId: forumTopicId } = parsedParams<{
-      topicId: number;
-    }>(res);
+    const { topicId: forumTopicId } = topicIdParams.read(res);
 
     const poll = await prisma.forumPoll.findUnique({
       where: { forumTopicId },
@@ -74,9 +70,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(pollSchema),
+  pollBody,
   authHandler(async (req, res) => {
-    const { forumTopicId, question, answers } = parsedBody<PollInput>(res);
+    const { forumTopicId, question, answers } = pollBody.read(res);
 
     const topic = await prisma.forumTopic.findUnique({
       where: { id: forumTopicId },
@@ -102,9 +98,9 @@ router.post(
 router.put(
   '/:id/close',
   requireAuth,
-  validateParams(pollIdParamsSchema),
+  pollIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = pollIdParams.read(res);
 
     const poll = await prisma.forumPoll.findUnique({
       where: { id },

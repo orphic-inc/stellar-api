@@ -13,22 +13,15 @@ import {
   hasPermission
 } from '../../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams
+  validateQuery
 } from '../../../middleware/validate';
+import { createPostSchema, updatePostSchema } from '../../../schemas/forum';
 import {
-  createPostSchema,
-  updatePostSchema,
-  type CreatePostInput,
-  type UpdatePostInput
-} from '../../../schemas/forum';
-import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import { renderSiteBBCode, resolveViewer } from '../../../modules/bbcodeRender';
 import {
@@ -38,17 +31,22 @@ import {
 import { assertForumReadAccess } from '../../../modules/forumAccess';
 
 const router = express.Router({ mergeParams: true });
+const updatePostBody = validate(updatePostSchema);
+const createPostBody = validate(createPostSchema);
 const forumTopicParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
   topicId: z.coerce.number().int().positive()
 });
+const forumTopicParams = validateParams(forumTopicParamsSchema);
 const forumPostParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
   topicId: z.coerce.number().int().positive(),
   id: z.coerce.number().int().positive()
 });
+const forumPostParams = validateParams(forumPostParamsSchema);
 
 const forumPostsQuerySchema = z.object({ ...paginationBase });
+const forumPostsQuery = validateQuery(forumPostsQuerySchema);
 
 const editHistoryInclude = {
   edits: {
@@ -61,17 +59,14 @@ const editHistoryInclude = {
 router.get(
   '/',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
-  validateQuery(forumPostsQuerySchema),
+  forumTopicParams,
+  forumPostsQuery,
   authHandler(async (req, res) => {
-    const { forumId, topicId } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
+    const { forumId, topicId } = forumTopicParams.read(res);
 
     await assertForumReadAccess(req.user, forumId);
 
-    const pg = parsedPage(res);
+    const pg = pageOf(forumPostsQuery.read(res));
     const [posts, total] = await Promise.all([
       prisma.forumPost.findMany({
         where: {
@@ -110,13 +105,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(forumPostParamsSchema),
+  forumPostParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId, id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-      id: number;
-    }>(res);
+    const { forumId, topicId, id } = forumPostParams.read(res);
 
     await assertForumReadAccess(req.user, forumId);
 
@@ -138,13 +129,9 @@ router.get(
 router.get(
   '/:id/edits',
   requireAuth,
-  validateParams(forumPostParamsSchema),
+  forumPostParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId, id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-      id: number;
-    }>(res);
+    const { forumId, topicId, id } = forumPostParams.read(res);
 
     await assertForumReadAccess(req.user, forumId);
     if (!hasPermission(await loadPermissions(req, res), 'forums_moderate')) {
@@ -171,14 +158,11 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
-  validate(createPostSchema),
+  forumTopicParams,
+  createPostBody,
   authHandler(async (req, res) => {
-    const { forumId, topicId } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
-    const { body } = parsedBody<CreatePostInput>(res);
+    const { forumId, topicId } = forumTopicParams.read(res);
+    const { body } = createPostBody.read(res);
 
     const actor: TopicSessionActor = {
       actorId: req.user.id,
@@ -202,15 +186,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(forumPostParamsSchema),
-  validate(updatePostSchema),
+  forumPostParams,
+  updatePostBody,
   authHandler(async (req, res) => {
-    const { forumId, topicId, id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-      id: number;
-    }>(res);
-    const { body } = parsedBody<UpdatePostInput>(res);
+    const { forumId, topicId, id } = forumPostParams.read(res);
+    const { body } = updatePostBody.read(res);
 
     const post = await prisma.forumPost.findFirst({
       where: {
@@ -248,13 +228,9 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(forumPostParamsSchema),
+  forumPostParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId, id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-      id: number;
-    }>(res);
+    const { forumId, topicId, id } = forumPostParams.read(res);
     const post = await prisma.forumPost.findFirst({
       where: {
         id,

@@ -4,28 +4,22 @@ import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import {
-  parsedBody,
-  validate,
-  validateParams,
-  parsedParams
-} from '../../middleware/validate';
-import {
-  postSchema,
-  postCommentSchema,
-  type PostInput,
-  type PostCommentInput
-} from '../../schemas/post';
+import { validate, validateParams } from '../../middleware/validate';
+import { postSchema, postCommentSchema } from '../../schemas/post';
 import { authorRefSelect, toAuthorRefOrNull } from '../../modules/authorRef';
 
 const router = express.Router();
+const postCommentBody = validate(postCommentSchema);
+const postBody = validate(postSchema);
 const postIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const postIdParams = validateParams(postIdParamsSchema);
 const postCommentParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   commentId: z.coerce.number().int().positive()
 });
+const postCommentParams = validateParams(postCommentParamsSchema);
 
 const postInclude = {
   user: { select: authorRefSelect },
@@ -65,9 +59,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(postIdParamsSchema),
+  postIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = postIdParams.read(res);
     const post = await prisma.post.findUnique({
       where: { id },
       include: postInclude
@@ -81,9 +75,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(postSchema),
+  postBody,
   authHandler(async (req, res) => {
-    const { title, text, category, tags } = parsedBody<PostInput>(res);
+    const { title, text, category, tags } = postBody.read(res);
     const post = await prisma.post.create({
       data: { userId: req.user.id, title, text, category, tags: tags ?? [] },
       include: postInclude
@@ -96,9 +90,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(postIdParamsSchema),
+  postIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = postIdParams.read(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     if (post.userId !== req.user.id)
@@ -116,11 +110,11 @@ router.delete(
 router.post(
   '/:id/comments',
   requireAuth,
-  validateParams(postIdParamsSchema),
-  validate(postCommentSchema),
+  postIdParams,
+  postCommentBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { text } = parsedBody<PostCommentInput>(res);
+    const { id } = postIdParams.read(res);
+    const { text } = postCommentBody.read(res);
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ msg: 'Post not found' });
     let comment;
@@ -142,12 +136,9 @@ router.post(
 router.delete(
   '/:id/comments/:commentId',
   requireAuth,
-  validateParams(postCommentParamsSchema),
+  postCommentParams,
   authHandler(async (req, res) => {
-    const { id: postId, commentId } = parsedParams<{
-      id: number;
-      commentId: number;
-    }>(res);
+    const { id: postId, commentId } = postCommentParams.read(res);
     const comment = await prisma.postComment.findFirst({
       where: { id: commentId, postId }
     });

@@ -9,18 +9,19 @@ import {
   loadPermissions,
   hasPermission
 } from '../../../middleware/permissions';
-import { validate, parsedBody } from '../../../middleware/validate';
-import { pollVoteSchema, type PollVoteInput } from '../../../schemas/poll';
+import { validate } from '../../../middleware/validate';
+import { pollVoteSchema } from '../../../schemas/poll';
 
 const router = express.Router();
+const pollVoteBody = validate(pollVoteSchema);
 
 // POST /api/forums/poll-votes
 router.post(
   '/',
   requireAuth,
-  validate(pollVoteSchema),
+  pollVoteBody,
   authHandler(async (req, res) => {
-    const { forumPollId, vote } = parsedBody<PollVoteInput>(res);
+    const { forumPollId, vote } = pollVoteBody.read(res);
     const actor: TopicSessionActor = {
       actorId: req.user.id,
       userRankLevel: req.user.userRankLevel,

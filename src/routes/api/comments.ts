@@ -12,22 +12,16 @@ import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { loadPermissions, hasPermission } from '../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import { sanitizeHtml } from '../../lib/sanitize';
-import { parsedPage, paginatedResponse } from '../../lib/pagination';
+import { paginatedResponse, pageOf } from '../../lib/pagination';
 import {
   commentQuerySchema,
   createCommentSchema,
-  updateCommentSchema,
-  type CommentQueryInput,
-  type CreateCommentInput,
-  type UpdateCommentInput
+  updateCommentSchema
 } from '../../schemas/comment';
 import {
   canSeeCommentThread,
@@ -120,9 +114,13 @@ const notifyQuoted = async (
 };
 
 const router = express.Router();
+const updateCommentBody = validate(updateCommentSchema);
+const createCommentBody = validate(createCommentSchema);
+const commentQuery = validateQuery(commentQuerySchema);
 const commentIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const commentIdParams = validateParams(commentIdParamsSchema);
 
 // GET /api/comments
 //
@@ -134,14 +132,14 @@ const commentIdParamsSchema = z.object({
 router.get(
   '/',
   requireAuth,
-  validateQuery(commentQuerySchema),
+  commentQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const { context, pageId } = parsedQuery<CommentQueryInput>(res);
+    const { context, pageId } = commentQuery.read(res);
     // A thread follows its page (#697): one the caller cannot see is the same
     // 404 as one that does not exist.
     if (!(await canSeeCommentThread(context, pageId, req.user!.id)))
       return res.status(404).json({ msg: 'Comment thread not found' });
-    const pg = parsedPage(res);
+    const pg = pageOf(commentQuery.read(res));
     const where: Record<string, unknown> = { page: context };
     if (context === CommentPage.communities) where.communityId = pageId;
     else if (context === CommentPage.artist) where.artistId = pageId;
@@ -191,9 +189,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(commentIdParamsSchema),
+  commentIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = commentIdParams.read(res);
     const comment = await prisma.comment.findUnique({
       where: { id, deletedAt: null },
       include: {
@@ -214,7 +212,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(createCommentSchema),
+  createCommentBody,
   authHandler(async (req, res) => {
     const {
       page,
@@ -225,7 +223,7 @@ router.post(
       artistId,
       releaseId,
       collageId
-    } = parsedBody<CreateCommentInput>(res);
+    } = createCommentBody.read(res);
 
     // Map CommentPage + entity FK to SubscriptionPage + pageId for notification lookup
     const subPageMap: Partial<
@@ -303,11 +301,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(commentIdParamsSchema),
-  validate(updateCommentSchema),
+  commentIdParams,
+  updateCommentBody,
   authHandler(async (req, res) => {
-    const { body } = parsedBody<UpdateCommentInput>(res);
-    const { id } = parsedParams<{ id: number }>(res);
+    const { body } = updateCommentBody.read(res);
+    const { id } = commentIdParams.read(res);
     // A soft-deleted comment is missing here, as on `GET /:id` (#703): the
     // body survives deletion, so an edit would resurrect it and quote-notify.
     const comment = await prisma.comment.findUnique({
@@ -380,9 +378,9 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(commentIdParamsSchema),
+  commentIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = commentIdParams.read(res);
 
     // #703: deleting twice re-stamped `deletedAt` and wrote a second audit row.
     const comment = await prisma.comment.findUnique({
