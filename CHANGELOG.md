@@ -32,6 +32,7 @@ All notable changes to stellar-api are documented here.
   - While a report is `Open` or `Claimed`, a `reports_manage` holder reads `GET /communities/{id}/releases/{rid}` and `…/contributions` for the release it targets. A report concerns a release when it targets the release, one of its contributions, or a comment in either's thread. Before, a closed community they held no role in answered `403`.
   - **Read only.** That read's contributions carry `downloadUrl` as an empty string. Downloads, edits, votes, other releases and every list stay member-only. Resolving the report closes the page again.
   - **The staff queue's `sourceUrl` follows the same rule.** It linked every release before, including ones whose page refused staff. A link into a release page now appears only when the page will open, so a resolved report in a closed community links nowhere.
+- **`npm run e2e:korin`** (`src/scripts/seed-korin-e2e.ts`): fixtures for the korin end-to-end run of private-community announce delivery (#328). It seeds a cast and three communities, then adds contributions, removes members and flips communities to PRIVATE on demand. It refuses any database not named `stellar_e2e`.
 
 ### Changed
 
