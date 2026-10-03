@@ -20,7 +20,6 @@ const releaseContributionDetailSelect = {
   releaseId: true,
   contributorId: true,
   releaseDescription: true,
-  downloadUrl: true,
   sizeInBytes: true,
   linkStatus: true,
   linkCheckedAt: true,
@@ -50,15 +49,16 @@ const releaseContributionDetailSelect = {
 // The rip-quality satellite + full edition identity for one release's
 // contributions. Kept off the release detail view (which is growing heavy) and
 // served from its own release-scoped GET so the UI can lazy-load an edition
-// stack (bitrate/media/flags) on demand. Gated identically to the detail read.
+// stack (bitrate/media/flags) on demand. Gated identically to the detail read,
+// including a read a report opens (ADR-0055 §3, #905).
 //
-// A read a report opens (ADR-0055 §3, #905) gets every `downloadUrl` as an empty
-// string: the grant is to look, and the URL is the download without the
-// grant's debit. The empty string keeps the contract's shape.
+// It carries no `downloadUrl`, for any viewer (#908): the URL is the download
+// without the grant's debit, so only the grant and the uploader's own list
+// hand it out.
 export const listReleaseContributions = async (
   ref: ReleaseWorkbenchRef
 ): Promise<ReleaseContributionDetailView[]> => {
-  const { reportScoped } = await loadReleaseWorkbenchAuthority(ref, {
+  await loadReleaseWorkbenchAuthority(ref, {
     allowReportScoped: true
   });
 
@@ -83,7 +83,6 @@ export const listReleaseContributions = async (
 
   return contributions.map((contribution) => ({
     ...contribution,
-    downloadUrl: reportScoped ? '' : contribution.downloadUrl,
     sizeInBytes: sizeBytesToNumber(contribution.sizeInBytes)
   }));
 };

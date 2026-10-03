@@ -244,7 +244,7 @@ describe('a report opens the release it concerns (ADR-0055 §3)', () => {
     const { detail, contributions } = await readPage(staffId);
 
     expect(detail.status).toBe(200);
-    expect(contributions.body[0].downloadUrl).toBe('');
+    expect(contributions.body[0]).not.toHaveProperty('downloadUrl');
     const edit = await request(app)
       .put(`/api${releasePath(releaseId)}`)
       .set(session(staffId))
@@ -252,11 +252,12 @@ describe('a report opens the release it concerns (ADR-0055 §3)', () => {
     expect(edit.status).toBe(403);
   });
 
-  it('gives a member the download URL as before', async () => {
+  // No reader gets it from this list, the uploader included (#908): their
+  // own uploads list carries it, and the grant hands it to everyone else.
+  it('gives the uploader no download URL here either', async () => {
     const { contributions } = await readPage(uploaderId);
-    expect(contributions.body[0].downloadUrl).toBe(
-      'https://example.com/file.torrent'
-    );
+    expect(contributions.status).toBe(200);
+    expect(contributions.body[0]).not.toHaveProperty('downloadUrl');
   });
 
   it('closes again, with its link, once the report is resolved', async () => {
