@@ -9,12 +9,7 @@ import {
   site
 } from '../../modules/config';
 import { requireAuth } from '../../middleware/auth';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import {
   loginSchema,
@@ -22,13 +17,7 @@ import {
   changePasswordSchema,
   changeEmailSchema,
   recoveryRequestSchema,
-  recoveryResetSchema,
-  type LoginInput,
-  type RegisterInput,
-  type ChangePasswordInput,
-  type ChangeEmailInput,
-  type RecoveryRequestInput,
-  type RecoveryResetInput
+  recoveryResetSchema
 } from '../../schemas/auth';
 import {
   authUserSelect,
@@ -49,6 +38,12 @@ import { z } from 'zod';
 const secLog = getLogger('security');
 
 const router = express.Router();
+const registerBody = validate(registerSchema);
+const recoveryResetBody = validate(recoveryResetSchema);
+const recoveryRequestBody = validate(recoveryRequestSchema);
+const loginBody = validate(loginSchema);
+const changePasswordBody = validate(changePasswordSchema);
+const changeEmailBody = validate(changeEmailSchema);
 
 const TOKEN_TTL_SECONDS = 3600; // 1 hour
 const TOKEN_TTL_MS = TOKEN_TTL_SECONDS * 1000;
@@ -77,6 +72,7 @@ const cookieOptions = {
 const sessionIdParamsSchema = z.object({
   id: z.string().min(1)
 });
+const sessionIdParams = validateParams(sessionIdParamsSchema);
 
 // POST /api/auth/logout
 router.post(
@@ -122,10 +118,9 @@ const INVITE_EXPIRED_MSG =
 router.post(
   '/register',
   authLimiter,
-  validate(registerSchema),
+  registerBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password, inviteKey } =
-      parsedBody<RegisterInput>(res);
+    const { username, email, password, inviteKey } = registerBody.read(res);
 
     const settings = await getSettings();
 
@@ -200,10 +195,9 @@ router.get(
 router.post(
   '/password',
   requireAuth,
-  validate(changePasswordSchema),
+  changePasswordBody,
   authHandler(async (req, res) => {
-    const { currentPassword, newPassword } =
-      parsedBody<ChangePasswordInput>(res);
+    const { currentPassword, newPassword } = changePasswordBody.read(res);
     await changePassword(req.user.id, currentPassword, newPassword);
     res.status(204).send();
   })
@@ -213,9 +207,9 @@ router.post(
 router.put(
   '/email',
   requireAuth,
-  validate(changeEmailSchema),
+  changeEmailBody,
   authHandler(async (req, res) => {
-    const { newEmail, password } = parsedBody<ChangeEmailInput>(res);
+    const { newEmail, password } = changeEmailBody.read(res);
     // `req.ip`, not a hand-parsed header: `trust proxy` is configured in
     // createApp, so Express resolves the correct entry. Reading
     // X-Forwarded-For directly took the FIRST entry, which nginx appends
@@ -230,9 +224,9 @@ router.put(
 router.post(
   '/recovery/request',
   authLimiter,
-  validate(recoveryRequestSchema),
+  recoveryRequestBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { email } = parsedBody<RecoveryRequestInput>(res);
+    const { email } = recoveryRequestBody.read(res);
     const genericMsg = 'If that email exists, a recovery link has been sent';
 
     const user = await prisma.user.findUnique({
@@ -258,9 +252,9 @@ router.post(
 router.post(
   '/recovery/reset',
   authLimiter,
-  validate(recoveryResetSchema),
+  recoveryResetBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { token, newPassword } = parsedBody<RecoveryResetInput>(res);
+    const { token, newPassword } = recoveryResetBody.read(res);
     await resetPasswordWithToken(token, newPassword);
     res.json({ msg: 'Password reset successfully' });
   })
@@ -290,9 +284,9 @@ router.get(
 router.delete(
   '/sessions/:id',
   requireAuth,
-  validateParams(sessionIdParamsSchema),
+  sessionIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: string }>(res);
+    const { id } = sessionIdParams.read(res);
 
     const session = await prisma.userSession.findFirst({
       where: { id, userId: req.user.id }
@@ -315,9 +309,9 @@ router.delete(
 router.post(
   '/',
   authLimiter,
-  validate(loginSchema),
+  loginBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = parsedBody<LoginInput>(res);
+    const { email, password } = loginBody.read(res);
 
     // `req.ip`, not a hand-parsed header: `trust proxy` is configured in
     // createApp, so Express resolves the correct entry. Reading

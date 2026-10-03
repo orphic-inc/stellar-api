@@ -3,20 +3,13 @@
   "files": {
     "middleware/imageSrc.ts": 1,
     "routes/api/asset.ts": 2,
-    "routes/api/auth.ts": 7,
     "routes/api/bookmarks.ts": 8,
     "routes/api/collages.ts": 17,
     "routes/api/feeds.ts": 1,
-    "routes/api/friends.ts": 9,
-    "routes/api/messages.ts": 15,
-    "routes/api/notificationFilters.ts": 11,
-    "routes/api/notifications.ts": 2,
-    "routes/api/profile.ts": 7,
     "routes/api/search.ts": 12,
     "routes/api/stylesheet.ts": 14,
     "routes/api/tags.ts": 4,
     "routes/api/top10.ts": 6,
-    "routes/api/user.ts": 61,
     "routes/api/wiki.ts": 14
   }
 }

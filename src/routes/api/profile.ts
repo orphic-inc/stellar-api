@@ -12,16 +12,13 @@ import { listOwnPendingInvites, getInviteRefusal } from '../../modules/invite';
 import { inviteRefusalMsg } from '../../modules/inviteGates';
 import { withdrawInvite } from '../../modules/inviteControls';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import { getReputation, filterReputationView } from '../../modules/reputation';
 import { getCrsHistory, type CrsHistoryPeriod } from '../../modules/crsHistory';
-import {
-  reputationHistoryPeriodQuerySchema,
-  type ReputationHistoryPeriodQuery
-} from '../../schemas/statsHistory';
+import { reputationHistoryPeriodQuerySchema } from '../../schemas/statsHistory';
 import { getPolicyState } from '../../modules/ratioPolicy';
 import { getMemberFeeds, rotateFeedToken } from '../../modules/feedToken';
 import { resolveViewer } from '../../modules/bbcodeRender';
@@ -35,20 +32,13 @@ import { z } from 'zod';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import {
   profileUpdateSchema,
   inviteSchema,
   donorRewardUpdateSchema,
-  donorForumTitleUpdateSchema,
-  type ProfileUpdateInput,
-  type InviteInput,
-  type DonorRewardUpdateInput,
-  type DonorForumTitleUpdateInput
+  donorForumTitleUpdateSchema
 } from '../../schemas/profile';
 import {
   getDonorSettings,
@@ -57,6 +47,13 @@ import {
 } from '../../modules/donor';
 
 const router = express.Router();
+const reputationHistoryPeriodQuery = validateQuery(
+  reputationHistoryPeriodQuerySchema
+);
+const profileUpdateBody = validate(profileUpdateSchema);
+const inviteBody = validate(inviteSchema);
+const donorRewardUpdateBody = validate(donorRewardUpdateSchema);
+const donorForumTitleUpdateBody = validate(donorForumTitleUpdateSchema);
 // GET /api/profile/me
 router.get(
   '/me',
@@ -143,9 +140,9 @@ router.get(
 router.get(
   '/me/reputation/history',
   requireAuth,
-  validateQuery(reputationHistoryPeriodQuerySchema),
+  reputationHistoryPeriodQuery,
   authHandler(async (req, res) => {
-    const { period } = parsedQuery<ReputationHistoryPeriodQuery>(res);
+    const { period } = reputationHistoryPeriodQuery.read(res);
     res.json(await getCrsHistory(req.user.id, period as CrsHistoryPeriod));
   })
 );
@@ -174,9 +171,11 @@ router.post(
 );
 
 const ownInvitesQuerySchema = z.object({ ...paginationBase });
+const ownInvitesQuery = validateQuery(ownInvitesQuerySchema);
 const inviteIdParamsSchema = z.object({
   inviteId: z.coerce.number().int().positive()
 });
+const inviteIdParams = validateParams(inviteIdParamsSchema);
 
 // `invites_unlimited` (ADR-0043 §5) is resolved here and passed down: the
 // invite module never reads permissions.
@@ -217,9 +216,9 @@ router.get(
 router.get(
   '/me/invites',
   requireAuth,
-  validateQuery(ownInvitesQuerySchema),
+  ownInvitesQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(ownInvitesQuery.read(res));
     const { rows, total } = await listOwnPendingInvites(req.user.id, pg);
     paginatedResponse(res, rows, total, pg);
   })
@@ -231,9 +230,9 @@ router.get(
 router.post(
   '/me/invites/:inviteId/withdraw',
   requireAuth,
-  validateParams(inviteIdParamsSchema),
+  inviteIdParams,
   authHandler(async (req, res) => {
-    const { inviteId } = parsedParams<{ inviteId: number }>(res);
+    const { inviteId } = inviteIdParams.read(res);
     const { refunded } = await withdrawInvite(req.user.id, inviteId);
     res.json({
       msg: refunded
@@ -247,9 +246,9 @@ router.post(
 router.put(
   '/me',
   requireAuth,
-  validate(profileUpdateSchema),
+  profileUpdateBody,
   authHandler(async (req, res) => {
-    const data = parsedBody<ProfileUpdateInput>(res);
+    const data = profileUpdateBody.read(res);
     // Before the write, so a 429 refuses the save whole (#737).
     await registerWriteImages(
       { bodies: [data.profileInfo], fields: [data.avatar] },
@@ -304,9 +303,9 @@ router.get(
 router.put(
   '/me/donor-rewards',
   requireAuth,
-  validate(donorRewardUpdateSchema),
+  donorRewardUpdateBody,
   authHandler(async (req, res) => {
-    const fields = parsedBody<DonorRewardUpdateInput>(res);
+    const fields = donorRewardUpdateBody.read(res);
     const settings = await updateDonorRewards(req.user.id, fields);
     res.json(settings);
   })
@@ -316,9 +315,9 @@ router.put(
 router.put(
   '/me/donor-title',
   requireAuth,
-  validate(donorForumTitleUpdateSchema),
+  donorForumTitleUpdateBody,
   authHandler(async (req, res) => {
-    const data = parsedBody<DonorForumTitleUpdateInput>(res);
+    const data = donorForumTitleUpdateBody.read(res);
     const title = await updateDonorForumTitle(req.user.id, data);
     res.json(title);
   })
@@ -328,9 +327,9 @@ router.put(
 router.post(
   '/referral/create-invite',
   requireAuth,
-  validate(inviteSchema),
+  inviteBody,
   authHandler(async (req, res) => {
-    const { email, reason } = parsedBody<InviteInput>(res);
+    const { email, reason } = inviteBody.read(res);
     // Every gate, capacity included (#624, #637), is answered inside
     // createInvite before it writes, so a refused member keeps their invite.
     const note = await inviteNoteFrom(req, res, reason);

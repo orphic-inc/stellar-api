@@ -10,6 +10,7 @@ const router = express.Router();
 const notificationIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const notificationIdParams = validateParams(notificationIdParamsSchema);
 
 type NotificationSource = {
   title: string;
@@ -231,9 +232,9 @@ router.get(
 router.post(
   '/:id/read',
   requireAuth,
-  validateParams(notificationIdParamsSchema),
+  notificationIdParams,
   authHandler(async (req, res) => {
-    const id = Number(res.locals.parsedParams.id);
+    const { id } = notificationIdParams.read(res);
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user.id)
@@ -256,9 +257,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(notificationIdParamsSchema),
+  notificationIdParams,
   authHandler(async (req, res) => {
-    const id = Number(res.locals.parsedParams.id);
+    const { id } = notificationIdParams.read(res);
     const notif = await prisma.notification.findUnique({ where: { id } });
     if (!notif) return res.status(404).json({ msg: 'Notification not found' });
     if (notif.userId !== req.user.id)

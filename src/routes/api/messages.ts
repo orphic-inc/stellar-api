@@ -10,29 +10,16 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import {
   composeMessageSchema,
   replyMessageSchema,
   updateConversationSchema,
   bulkMessageActionSchema,
-  messageListQuerySchema,
-  type ComposeMessageInput,
-  type ReplyMessageInput,
-  type UpdateConversationInput,
-  type BulkMessageActionInput,
-  type MessageListQueryInput
+  messageListQuerySchema
 } from '../../schemas/pm';
-import {
-  pmDraftSchema,
-  massPmSchema,
-  type PmDraftInput,
-  type MassPmInput
-} from '../../schemas/user';
+import { pmDraftSchema, massPmSchema } from '../../schemas/user';
 import {
   listInbox,
   listSentbox,
@@ -47,6 +34,13 @@ import {
 import { AppError } from '../../lib/errors';
 
 const router = express.Router();
+const updateConversationBody = validate(updateConversationSchema);
+const replyMessageBody = validate(replyMessageSchema);
+const pmDraftBody = validate(pmDraftSchema);
+const messageListQuery = validateQuery(messageListQuerySchema);
+const massPmBody = validate(massPmSchema);
+const composeMessageBody = validate(composeMessageSchema);
+const bulkMessageActionBody = validate(bulkMessageActionSchema);
 
 const sendLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -60,10 +54,12 @@ markGate(sendLimiter, 'rateLimit');
 const conversationIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const conversationIdParams = validateParams(conversationIdSchema);
 
 const draftIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const draftIdParams = validateParams(draftIdSchema);
 
 async function resolveDraftRecipient(
   explicitUserId: number | undefined,
@@ -86,9 +82,9 @@ async function resolveDraftRecipient(
 router.get(
   '/',
   requireAuth,
-  validateQuery(messageListQuerySchema),
+  messageListQuery,
   authHandler(async (req, res) => {
-    const { page, search } = parsedQuery<MessageListQueryInput>(res);
+    const { page, search } = messageListQuery.read(res);
     const result = await listInbox(req.user.id, page, search);
     res.json(result);
   })
@@ -108,9 +104,9 @@ router.get(
 router.get(
   '/sent',
   requireAuth,
-  validateQuery(messageListQuerySchema),
+  messageListQuery,
   authHandler(async (req, res) => {
-    const { page } = parsedQuery<MessageListQueryInput>(res);
+    const { page } = messageListQuery.read(res);
     const result = await listSentbox(req.user.id, page);
     res.json(result);
   })
@@ -148,14 +144,14 @@ router.get(
 router.post(
   '/drafts',
   requireAuth,
-  validate(pmDraftSchema),
+  pmDraftBody,
   authHandler(async (req, res) => {
     const {
       toUserId: explicitUserId,
       toUsername,
       subject,
       body
-    } = parsedBody<PmDraftInput>(res);
+    } = pmDraftBody.read(res);
     const toUserId = await resolveDraftRecipient(explicitUserId, toUsername);
     const draft = await prisma.pmDraft.create({
       data: {
@@ -173,16 +169,16 @@ router.post(
 router.put(
   '/drafts/:id',
   requireAuth,
-  validateParams(draftIdSchema),
-  validate(pmDraftSchema),
+  draftIdParams,
+  pmDraftBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = draftIdParams.read(res);
     const {
       toUserId: explicitUserId,
       toUsername,
       subject,
       body
-    } = parsedBody<PmDraftInput>(res);
+    } = pmDraftBody.read(res);
     const toUserId = await resolveDraftRecipient(explicitUserId, toUsername);
 
     const draft = await prisma.pmDraft.findFirst({
@@ -211,9 +207,9 @@ router.put(
 router.delete(
   '/drafts/:id',
   requireAuth,
-  validateParams(draftIdSchema),
+  draftIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = draftIdParams.read(res);
     const draft = await prisma.pmDraft.findFirst({
       where: { id, userId: req.user.id }
     });
@@ -231,9 +227,9 @@ router.delete(
 router.post(
   '/mass',
   ...requirePermission('messages_mass_pm'),
-  validate(massPmSchema),
+  massPmBody,
   authHandler(async (req, res) => {
-    const { subject, body, targetRankId } = parsedBody<MassPmInput>(res);
+    const { subject, body, targetRankId } = massPmBody.read(res);
 
     const users = await prisma.user.findMany({
       where: {
@@ -286,9 +282,9 @@ router.post(
 router.post(
   '/bulk',
   requireAuth,
-  validate(bulkMessageActionSchema),
+  bulkMessageActionBody,
   authHandler(async (req, res) => {
-    const { ids, action } = parsedBody<BulkMessageActionInput>(res);
+    const { ids, action } = bulkMessageActionBody.read(res);
     await bulkUpdateConversations(req.user.id, ids, action);
     res.status(204).send();
   })
@@ -299,10 +295,10 @@ router.post(
   '/',
   requireAuth,
   sendLimiter,
-  validate(composeMessageSchema),
+  composeMessageBody,
   authHandler(async (req, res) => {
     const { toUserId, toUsername, subject, body } =
-      parsedBody<ComposeMessageInput>(res);
+      composeMessageBody.read(res);
 
     let targetId = toUserId;
     if (!targetId && toUsername) {
@@ -335,9 +331,9 @@ router.post(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(conversationIdSchema),
+  conversationIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = conversationIdParams.read(res);
     const result = await viewConversation(id, req.user.id);
     if (!result.ok)
       return res.status(404).json({ msg: 'Conversation not found' });
@@ -350,11 +346,11 @@ router.post(
   '/:id/reply',
   requireAuth,
   sendLimiter,
-  validateParams(conversationIdSchema),
-  validate(replyMessageSchema),
+  conversationIdParams,
+  replyMessageBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { body } = parsedBody<ReplyMessageInput>(res);
+    const { id } = conversationIdParams.read(res);
+    const { body } = replyMessageBody.read(res);
     const result = await replyToConversation(id, req.user.id, body);
     if (!result.ok) {
       return res.status(403).json({ msg: result.reason });
@@ -367,11 +363,11 @@ router.post(
 router.patch(
   '/:id',
   requireAuth,
-  validateParams(conversationIdSchema),
-  validate(updateConversationSchema),
+  conversationIdParams,
+  updateConversationBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const flags = parsedBody<UpdateConversationInput>(res);
+    const { id } = conversationIdParams.read(res);
+    const flags = updateConversationBody.read(res);
     const result = await updateConversationFlags(id, req.user.id, flags);
     if (!result.ok)
       return res.status(404).json({ msg: 'Conversation not found' });
@@ -383,9 +379,9 @@ router.patch(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(conversationIdSchema),
+  conversationIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = conversationIdParams.read(res);
     const result = await deleteConversation(id, req.user.id);
     if (!result.ok)
       return res.status(404).json({ msg: 'Conversation not found' });
