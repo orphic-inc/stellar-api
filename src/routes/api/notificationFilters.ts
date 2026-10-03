@@ -5,12 +5,9 @@ import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
-import { parsedPage, paginatedResponse } from '../../lib/pagination';
+import { paginatedResponse, pageOf } from '../../lib/pagination';
 import {
   catchUpNotificationFilterHits,
   clearReadNotificationFilterHits,
@@ -29,12 +26,7 @@ import {
   notificationFilterCatchupSchema,
   notificationFilterHitScopeSchema,
   notificationFilterHitsQuerySchema,
-  notificationFilterSchema,
-  type MarkNotificationFilterHitReadInput,
-  type NotificationFilterCatchupInput,
-  type NotificationFilterHitScope,
-  type NotificationFilterHitsQuery,
-  type NotificationFilterInput
+  notificationFilterSchema
 } from '../../schemas/notificationFilters';
 
 /**
@@ -52,11 +44,24 @@ import {
  * filter's row.
  */
 const router = express.Router();
+const notificationFilterHitsQuery = validateQuery(
+  notificationFilterHitsQuerySchema
+);
+const notificationFilterHitScopeQuery = validateQuery(
+  notificationFilterHitScopeSchema
+);
+const notificationFilterCatchupBody = validate(notificationFilterCatchupSchema);
+const notificationFilterBody = validate(notificationFilterSchema);
+const markNotificationFilterHitReadBody = validate(
+  markNotificationFilterHitReadSchema
+);
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 const contributionParamsSchema = z.object({
   contributionId: z.coerce.number().int().positive()
 });
+const contributionParams = validateParams(contributionParamsSchema);
 
 // ─── Hits (static segments, so registered before /:id) ────────────────────────
 
@@ -64,11 +69,11 @@ const contributionParamsSchema = z.object({
 router.get(
   '/hits',
   requireAuth,
-  validateQuery(notificationFilterHitsQuerySchema),
+  notificationFilterHitsQuery,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { filterId, unread } = parsedQuery<NotificationFilterHitsQuery>(res);
-    const pg = parsedPage(res);
+    const { filterId, unread } = notificationFilterHitsQuery.read(res);
+    const pg = pageOf(notificationFilterHitsQuery.read(res));
     const { items, total } = await listNotificationFilterHits(req.user.id, {
       filterId,
       unread,
@@ -93,11 +98,11 @@ router.get(
 router.post(
   '/hits/read',
   requireAuth,
-  validate(markNotificationFilterHitReadSchema),
+  markNotificationFilterHitReadBody,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
     const { contributionId, filterId } =
-      parsedBody<MarkNotificationFilterHitReadInput>(res);
+      markNotificationFilterHitReadBody.read(res);
     await markNotificationFilterHitRead(req.user.id, contributionId, filterId);
     res.status(204).send();
   })
@@ -107,10 +112,10 @@ router.post(
 router.post(
   '/hits/catchup',
   requireAuth,
-  validate(notificationFilterCatchupSchema),
+  notificationFilterCatchupBody,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { filterId } = parsedBody<NotificationFilterCatchupInput>(res);
+    const { filterId } = notificationFilterCatchupBody.read(res);
     await catchUpNotificationFilterHits(req.user.id, filterId);
     res.status(204).send();
   })
@@ -120,10 +125,10 @@ router.post(
 router.delete(
   '/hits',
   requireAuth,
-  validateQuery(notificationFilterHitScopeSchema),
+  notificationFilterHitScopeQuery,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { filterId } = parsedQuery<NotificationFilterHitScope>(res);
+    const { filterId } = notificationFilterHitScopeQuery.read(res);
     await clearReadNotificationFilterHits(req.user.id, filterId);
     res.status(204).send();
   })
@@ -133,12 +138,12 @@ router.delete(
 router.delete(
   '/hits/:contributionId',
   requireAuth,
-  validateParams(contributionParamsSchema),
-  validateQuery(notificationFilterHitScopeSchema),
+  contributionParams,
+  notificationFilterHitScopeQuery,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { contributionId } = parsedParams<{ contributionId: number }>(res);
-    const { filterId } = parsedQuery<NotificationFilterHitScope>(res);
+    const { contributionId } = contributionParams.read(res);
+    const { filterId } = notificationFilterHitScopeQuery.read(res);
     await deleteNotificationFilterHit(req.user.id, contributionId, filterId);
     res.status(204).send();
   })
@@ -160,13 +165,13 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(notificationFilterSchema),
+  notificationFilterBody,
   authHandler(async (req, res) => {
     const limit = await getFilterAllowance(req.user.userRankId);
     const filter = await createNotificationFilter(
       req.user.id,
       limit,
-      parsedBody<NotificationFilterInput>(res)
+      notificationFilterBody.read(res)
     );
     res.status(201).json(filter);
   })
@@ -176,16 +181,16 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
-  validate(notificationFilterSchema),
+  idParams,
+  notificationFilterBody,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     res.json(
       await updateNotificationFilter(
         req.user.id,
         id,
-        parsedBody<NotificationFilterInput>(res)
+        notificationFilterBody.read(res)
       )
     );
   })
@@ -195,10 +200,10 @@ router.put(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
     await getFilterAllowance(req.user.userRankId);
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     await deleteNotificationFilter(req.user.id, id);
     res.status(204).send();
   })

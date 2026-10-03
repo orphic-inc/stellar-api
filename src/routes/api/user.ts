@@ -37,10 +37,7 @@ import {
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
 import { Prisma, InviteStatus, StatSnapshotPeriod } from '@prisma/client';
 import {
@@ -57,20 +54,7 @@ import {
   donorRankSchema,
   grantDonorSchema,
   ircNickVerifySchema,
-  staffBioSchema,
-  type AdminCreateUserInput,
-  type UserSettingsInput,
-  type WarnUserInput,
-  type ModerationNoteInput,
-  type SetRankInput,
-  type FeedTokenRotateInput,
-  type RankLockInput,
-  type CanInviteInput,
-  type InviteCountInput,
-  type CancelInviteInput,
-  type DonorRankInput,
-  type GrantDonorInput,
-  type IrcNickVerifyInput
+  staffBioSchema
 } from '../../schemas/user';
 import {
   claimIrcNick,
@@ -79,16 +63,13 @@ import {
 } from '../../modules/ircNick';
 import { audit } from '../../lib/audit';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import { sendRecoveryEmail } from '../../lib/mailer';
 import { email as emailConfig } from '../../modules/config';
-import {
-  statsPeriodQuerySchema,
-  type StatsPeriodQuery
-} from '../../schemas/statsHistory';
+import { statsPeriodQuerySchema } from '../../schemas/statsHistory';
 import { getUserStatHistory } from '../../modules/statsHistory';
 import {
   setCanInvite,
@@ -99,34 +80,54 @@ import { rotateFeedToken } from '../../modules/feedToken';
 import { registerBodyImages } from '../../middleware/imageSrc';
 
 const router = express.Router();
+const warnUserBody = validate(warnUserSchema);
+const userSettingsBody = validate(userSettingsSchema);
+const statsPeriodQuery = validateQuery(statsPeriodQuerySchema);
+const staffBioBody = validate(staffBioSchema);
+const setRankBody = validate(setRankSchema);
+const rankLockBody = validate(rankLockSchema);
+const moderationNoteBody = validate(moderationNoteSchema);
+const ircNickVerifyBody = validate(ircNickVerifySchema);
+const inviteCountBody = validate(inviteCountSchema);
+const grantDonorBody = validate(grantDonorSchema);
+const feedTokenRotateBody = validate(feedTokenRotateSchema);
+const donorRankBody = validate(donorRankSchema);
+const cancelInviteBody = validate(cancelInviteSchema);
+const canInviteBody = validate(canInviteSchema);
+const adminCreateUserBody = validate(adminCreateUserSchema);
 const userIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const userIdParams = validateParams(userIdParamsSchema);
 const rankIdParamsSchema = z.object({
   rankId: z.coerce.number().int().positive()
 });
+const rankIdParams = validateParams(rankIdParamsSchema);
 const noteParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   noteId: z.coerce.number().int().positive()
 });
+const noteParams = validateParams(noteParamsSchema);
 const warningParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   warnId: z.coerce.number().int().positive()
 });
+const warningParams = validateParams(warningParamsSchema);
 const reqIdParamsSchema = z.object({
   reqId: z.coerce.number().int().positive()
 });
+const reqIdParams = validateParams(reqIdParamsSchema);
 const warningsQuerySchema = z.object({
   ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
-type WarningsQuery = z.infer<typeof warningsQuerySchema>;
+const warningsQuery = validateQuery(warningsQuerySchema);
 
 const recoveryRequestsQuerySchema = z.object({
   ...paginationBase,
   status: z.enum(['pending', 'used', 'expired']).optional().default('pending')
 });
-type RecoveryRequestsQuery = z.infer<typeof recoveryRequestsQuerySchema>;
+const recoveryRequestsQuery = validateQuery(recoveryRequestsQuerySchema);
 
 const inviteTreeQuerySchema = z.object({
   ...paginationBase,
@@ -137,8 +138,11 @@ const inviteTreeQuerySchema = z.object({
     .transform((v) => v === 'true')
     .default(false)
 });
+const inviteTreeQuery = validateQuery(inviteTreeQuerySchema);
 const ratioWatchQuerySchema = z.object({ ...paginationBase });
+const ratioWatchQuery = validateQuery(ratioWatchQuerySchema);
 const registrationLogQuerySchema = z.object({ ...paginationBase });
+const registrationLogQuery = validateQuery(registrationLogQuerySchema);
 
 // ─── Donor ranks (static paths — must come before /:id) ──────────────────────
 
@@ -158,10 +162,10 @@ router.get(
 router.post(
   '/donor-ranks',
   ...requirePermission('donor_ranks_manage'),
-  validate(donorRankSchema),
+  donorRankBody,
   authHandler(async (_req, res) => {
     const { name, minDonation, expiresAfterDays, perks, color, badge } =
-      parsedBody<DonorRankInput>(res);
+      donorRankBody.read(res);
     let rank;
     try {
       rank = await prisma.donorRank.create({
@@ -189,12 +193,12 @@ router.post(
 router.put(
   '/donor-ranks/:rankId',
   ...requirePermission('donor_ranks_manage'),
-  validateParams(rankIdParamsSchema),
-  validate(donorRankSchema),
+  rankIdParams,
+  donorRankBody,
   authHandler(async (_req, res) => {
-    const { rankId } = parsedParams<{ rankId: number }>(res);
+    const { rankId } = rankIdParams.read(res);
     const { name, minDonation, expiresAfterDays, perks, color, badge } =
-      parsedBody<DonorRankInput>(res);
+      donorRankBody.read(res);
     const existing = await prisma.donorRank.findUnique({
       where: { id: rankId }
     });
@@ -226,9 +230,9 @@ router.put(
 router.delete(
   '/donor-ranks/:rankId',
   ...requirePermission('donor_ranks_manage'),
-  validateParams(rankIdParamsSchema),
+  rankIdParams,
   authHandler(async (_req, res) => {
-    const { rankId } = parsedParams<{ rankId: number }>(res);
+    const { rankId } = rankIdParams.read(res);
     const existing = await prisma.donorRank.findUnique({
       where: { id: rankId }
     });
@@ -269,10 +273,10 @@ router.get(
 router.put(
   '/settings',
   requireAuth,
-  validate(userSettingsSchema),
+  userSettingsBody,
   registerBodyImages('avatar'),
   authHandler(async (req, res) => {
-    const data = parsedBody<UserSettingsInput>(res);
+    const data = userSettingsBody.read(res);
     const result = await updateUserSettings(req.user.id, data);
     if (!result) return res.status(404).json({ msg: 'User not found' });
     res.json(result);
@@ -284,12 +288,13 @@ router.put(
 
 // GET /api/users/by-irc-nick/:nick — resolve an IRC nick to its Stellar account
 const ircNickParamsSchema = z.object({ nick: z.string().min(1).max(30) });
+const ircNickParams = validateParams(ircNickParamsSchema);
 router.get(
   '/by-irc-nick/:nick',
   requireServiceKey,
-  validateParams(ircNickParamsSchema),
+  ircNickParams,
   asyncHandler(async (_req, res) => {
-    const { nick } = parsedParams<{ nick: string }>(res);
+    const { nick } = ircNickParams.read(res);
     const user = await prisma.user.findUnique({
       where: { ircNick: nick },
       select: { id: true, username: true, ircNick: true, disabled: true }
@@ -310,9 +315,9 @@ router.get(
 router.post(
   '/irc-nick/verify',
   requireServiceKey,
-  validate(ircNickVerifySchema),
+  ircNickVerifyBody,
   asyncHandler(async (_req, res) => {
-    const { nick, code } = parsedBody<IrcNickVerifyInput>(res);
+    const { nick, code } = ircNickVerifyBody.read(res);
     const result = await verifyIrcNick(nick, code);
     res.json(result);
   })
@@ -324,10 +329,10 @@ router.post(
 router.get(
   '/recovery-requests',
   ...requirePermission('recovery_manage'),
-  validateQuery(recoveryRequestsQuerySchema),
+  recoveryRequestsQuery,
   authHandler(async (req, res) => {
-    const { status } = parsedQuery<RecoveryRequestsQuery>(res);
-    const pg = parsedPage(res);
+    const { status } = recoveryRequestsQuery.read(res);
+    const pg = pageOf(recoveryRequestsQuery.read(res));
 
     const now = new Date();
     const where =
@@ -366,9 +371,9 @@ router.get(
 router.delete(
   '/recovery-requests/:reqId',
   ...requirePermission('recovery_manage'),
-  validateParams(reqIdParamsSchema),
+  reqIdParams,
   authHandler(async (req, res) => {
-    const { reqId } = parsedParams<{ reqId: number }>(res);
+    const { reqId } = reqIdParams.read(res);
     const record = await prisma.accountRecovery.findUnique({
       where: { id: reqId }
     });
@@ -402,16 +407,16 @@ const sessionsQuerySchema = z.object({
   ...paginationBase,
   userId: z.coerce.number().int().positive().optional()
 });
-type SessionsQuery = z.infer<typeof sessionsQuerySchema>;
+const sessionsQuery = validateQuery(sessionsQuerySchema);
 
 // GET /api/users/sessions — login watch (must be before /:id)
 router.get(
   '/sessions',
   ...requirePermission('login_watch_view'),
-  validateQuery(sessionsQuerySchema),
+  sessionsQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
-    const { userId } = parsedQuery<SessionsQuery>(res);
+    const pg = pageOf(sessionsQuery.read(res));
+    const { userId } = sessionsQuery.read(res);
     const where = userId ? { userId } : {};
     const [sessions, total] = await Promise.all([
       prisma.userSession.findMany({
@@ -441,19 +446,20 @@ const invitesQuerySchema = z.object({
   // permission, so a filter reveals nothing new.
   email: z.string().trim().min(3).max(254).optional()
 });
-type InvitesQuery = z.infer<typeof invitesQuerySchema>;
+const invitesQuery = validateQuery(invitesQuerySchema);
 const inviteIdParamsSchema = z.object({
   inviteId: z.coerce.number().int().positive()
 });
+const inviteIdParams = validateParams(inviteIdParamsSchema);
 
 // GET /api/users/invites — invite pool (must be before /:id)
 router.get(
   '/invites',
   ...requirePermission('invites_manage'),
-  validateQuery(invitesQuerySchema),
+  invitesQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
-    const { status, email } = parsedQuery<InvitesQuery>(res);
+    const pg = pageOf(invitesQuery.read(res));
+    const { status, email } = invitesQuery.read(res);
     const where: Prisma.InviteWhereInput = {
       ...(status ? { status } : {}),
       ...(email ? { email: { contains: email, mode: 'insensitive' } } : {})
@@ -480,14 +486,14 @@ router.get(
 router.post(
   '/invites/:inviteId/cancel',
   ...requirePermission('invites_edit'),
-  validateParams(inviteIdParamsSchema),
-  validate(cancelInviteSchema),
+  inviteIdParams,
+  cancelInviteBody,
   authHandler(async (req, res) => {
-    const { inviteId } = parsedParams<{ inviteId: number }>(res);
+    const { inviteId } = inviteIdParams.read(res);
     const { refunded } = await cancelInvite(
       req.user.id,
       inviteId,
-      parsedBody<CancelInviteInput>(res)
+      cancelInviteBody.read(res)
     );
     res.json({
       msg: refunded
@@ -501,10 +507,10 @@ router.post(
 router.get(
   '/invite-tree',
   ...requirePermission('invites_manage'),
-  validateQuery(inviteTreeQuerySchema),
+  inviteTreeQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
-    const { all } = parsedQuery<z.infer<typeof inviteTreeQuerySchema>>(res);
+    const pg = pageOf(inviteTreeQuery.read(res));
+    const { all } = inviteTreeQuery.read(res);
     const { rows, total } = await getInviteTree(pg, all);
     paginatedResponse(res, rows, total, pg);
   })
@@ -516,9 +522,9 @@ router.get(
 router.get(
   '/:id/invite-tree',
   requireAuth,
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const isOwner = req.user.id === id;
     const canManage = hasPermission(
       await loadPermissions(req, res),
@@ -536,9 +542,9 @@ router.get(
 router.get(
   '/ratio-watch',
   ...requirePermission('ratio_policy_manage'),
-  validateQuery(ratioWatchQuerySchema),
+  ratioWatchQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(ratioWatchQuery.read(res));
     const { rows, total } = await listRatioWatch(pg);
     paginatedResponse(res, rows, total, pg);
   })
@@ -548,10 +554,10 @@ router.get(
 router.get(
   '/warnings',
   ...requirePermission('admin'),
-  validateQuery(warningsQuerySchema),
+  warningsQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
-    const { userId } = parsedQuery<WarningsQuery>(res);
+    const pg = pageOf(warningsQuery.read(res));
+    const { userId } = warningsQuery.read(res);
     const where = userId ? { userId } : {};
     const [warnings, total] = await Promise.all([
       prisma.userWarning.findMany({
@@ -584,9 +590,9 @@ router.get(
 router.get(
   '/registration-log',
   ...requirePermission('registration_log_view'),
-  validateQuery(registrationLogQuerySchema),
+  registrationLogQuery,
   authHandler(async (_req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(registrationLogQuery.read(res));
     const { rows, total } = await getRegistrationLog(pg);
     paginatedResponse(res, rows, total, pg);
   })
@@ -596,11 +602,11 @@ router.get(
 router.get(
   '/:id/stats/history',
   requireAuth,
-  validateParams(userIdParamsSchema),
-  validateQuery(statsPeriodQuerySchema),
+  userIdParams,
+  statsPeriodQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { period } = parsedQuery<StatsPeriodQuery>(res);
+    const { id } = userIdParams.read(res);
+    const { period } = statsPeriodQuery.read(res);
     const isStaff = hasPermission(await loadPermissions(req, res), 'staff');
     const userAndSettings = await prisma.user.findUnique({
       where: { id },
@@ -631,9 +637,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(userIdParamsSchema),
+  userIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
 
     const user = await prisma.user.findFirst({
       where: { id, disabled: false },
@@ -660,10 +666,10 @@ router.get(
 router.post(
   '/',
   ...requirePermission('users_edit'),
-  validate(adminCreateUserSchema),
+  adminCreateUserBody,
   authHandler(async (req, res) => {
     const { username, email, password, userRankId } =
-      parsedBody<AdminCreateUserInput>(res);
+      adminCreateUserBody.read(res);
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }
@@ -687,11 +693,11 @@ router.post(
 router.put(
   '/:id/staff-bio',
   requireAuth,
-  validateParams(userIdParamsSchema),
-  validate(staffBioSchema),
+  userIdParams,
+  staffBioBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { staffBio } = parsedBody<{ staffBio: string | null }>(res);
+    const { id } = userIdParams.read(res);
+    const { staffBio } = staffBioBody.read(res);
 
     const perms = await loadPermissions(req, res);
     const isAdmin = !!perms['admin'];
@@ -716,9 +722,9 @@ router.put(
 router.post(
   '/:id/recovery',
   ...requirePermission('recovery_manage'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -746,9 +752,9 @@ router.post(
 router.get(
   '/:id/warnings',
   ...requirePermission('users_warn'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const warnings = await prisma.userWarning.findMany({
       where: { userId: id },
       include: { warnedBy: { select: { id: true, username: true } } },
@@ -762,11 +768,11 @@ router.get(
 router.post(
   '/:id/warn',
   ...requirePermission('users_warn'),
-  validateParams(userIdParamsSchema),
-  validate(warnUserSchema),
+  userIdParams,
+  warnUserBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { reason, expiresAt } = parsedBody<WarnUserInput>(res);
+    const { id } = userIdParams.read(res);
+    const { reason, expiresAt } = warnUserBody.read(res);
     const warning = await warnUser(id, req.user.id, reason, expiresAt);
     res.status(201).json({ warning });
   })
@@ -776,9 +782,9 @@ router.post(
 router.delete(
   '/:id/warnings/:warnId',
   ...requirePermission('users_warn'),
-  validateParams(warningParamsSchema),
+  warningParams,
   authHandler(async (_req, res) => {
-    const { id, warnId } = parsedParams<{ id: number; warnId: number }>(res);
+    const { id, warnId } = warningParams.read(res);
     await deleteWarning(id, warnId);
     res.status(204).send();
   })
@@ -790,9 +796,9 @@ router.delete(
 router.get(
   '/:id/notification-filters',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     res.json(await listNotificationFilters(id));
   })
 );
@@ -801,9 +807,9 @@ router.get(
 router.get(
   '/:id/notes',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const notes = await prisma.userModerationNote.findMany({
       where: { userId: id },
       include: { author: { select: { id: true, username: true } } },
@@ -817,11 +823,11 @@ router.get(
 router.post(
   '/:id/notes',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
-  validate(moderationNoteSchema),
+  userIdParams,
+  moderationNoteBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { body } = parsedBody<ModerationNoteInput>(res);
+    const { id } = userIdParams.read(res);
+    const { body } = moderationNoteBody.read(res);
 
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
@@ -843,9 +849,9 @@ router.post(
 router.delete(
   '/:id/notes/:noteId',
   ...requirePermission('users_edit'),
-  validateParams(noteParamsSchema),
+  noteParams,
   authHandler(async (_req, res) => {
-    const { id, noteId } = parsedParams<{ id: number; noteId: number }>(res);
+    const { id, noteId } = noteParams.read(res);
     const note = await prisma.userModerationNote.findFirst({
       where: { id: noteId, userId: id }
     });
@@ -865,9 +871,9 @@ router.delete(
 router.post(
   '/:id/disable',
   ...requirePermission('users_disable'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
     try {
@@ -888,9 +894,9 @@ router.post(
 router.post(
   '/:id/enable',
   ...requirePermission('users_disable'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
     try {
@@ -921,9 +927,9 @@ router.post(
 router.get(
   '/:id/rank',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -950,11 +956,11 @@ router.get(
 router.put(
   '/:id/rank',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
-  validate(setRankSchema),
+  userIdParams,
+  setRankBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { userRankId, secondaryRankIds } = parsedBody<SetRankInput>(res);
+    const { id } = userIdParams.read(res);
+    const { userRankId, secondaryRankIds } = setRankBody.read(res);
     await setUserRank(id, userRankId, secondaryRankIds, req.user.id);
     res.json({ msg: 'Rank updated' });
   })
@@ -968,11 +974,11 @@ router.put(
 router.put(
   '/:id/rank-lock',
   ...requirePermission('users_edit'),
-  validateParams(userIdParamsSchema),
-  validate(rankLockSchema),
+  userIdParams,
+  rankLockBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { rankLocked } = parsedBody<RankLockInput>(res);
+    const { id } = userIdParams.read(res);
+    const { rankLocked } = rankLockBody.read(res);
     const target = await prisma.user.findUnique({
       where: { id },
       select: { id: true }
@@ -997,11 +1003,11 @@ router.put(
 router.put(
   '/:id/can-invite',
   ...requirePermission('invites_edit'),
-  validateParams(userIdParamsSchema),
-  validate(canInviteSchema),
+  userIdParams,
+  canInviteBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const body = parsedBody<CanInviteInput>(res);
+    const { id } = userIdParams.read(res);
+    const body = canInviteBody.read(res);
     await setCanInvite(req.user.id, id, body);
     res.json({
       msg: body.canInvite
@@ -1016,15 +1022,11 @@ router.put(
 router.post(
   '/:id/feed-token/rotate',
   ...requirePermission('users_edit_reset_feeds'),
-  validateParams(userIdParamsSchema),
-  validate(feedTokenRotateSchema),
+  userIdParams,
+  feedTokenRotateBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    await rotateFeedToken(
-      req.user.id,
-      id,
-      parsedBody<FeedTokenRotateInput>(res)
-    );
+    const { id } = userIdParams.read(res);
+    await rotateFeedToken(req.user.id, id, feedTokenRotateBody.read(res));
     res.json({ msg: 'Feed token rotated' });
   })
 );
@@ -1034,11 +1036,11 @@ router.post(
 router.put(
   '/:id/invite-count',
   ...requirePermission('invites_edit'),
-  validateParams(userIdParamsSchema),
-  validate(inviteCountSchema),
+  userIdParams,
+  inviteCountBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    await setInviteCount(req.user.id, id, parsedBody<InviteCountInput>(res));
+    const { id } = userIdParams.read(res);
+    await setInviteCount(req.user.id, id, inviteCountBody.read(res));
     res.json({ msg: 'Invite count updated' });
   })
 );
@@ -1047,11 +1049,11 @@ router.put(
 router.post(
   '/:id/donor',
   ...requirePermission('donor_ranks_manage'),
-  validateParams(userIdParamsSchema),
-  validate(grantDonorSchema),
+  userIdParams,
+  grantDonorBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { donorRankId, expiresAt } = parsedBody<GrantDonorInput>(res);
+    const { id } = userIdParams.read(res);
+    const { donorRankId, expiresAt } = grantDonorBody.read(res);
     await grantDonorStatus(id, donorRankId, expiresAt ?? null, req.user.id);
     res.status(201).json({ msg: 'Donor status granted' });
   })
@@ -1061,9 +1063,9 @@ router.post(
 router.delete(
   '/:id/donor',
   ...requirePermission('donor_ranks_manage'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
@@ -1085,9 +1087,9 @@ router.delete(
 router.get(
   '/:id/ip-history',
   ...requirePermission('users_view_ips'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const history = await getUserIpHistory(id);
     res.json(history);
   })
@@ -1097,9 +1099,9 @@ router.get(
 router.get(
   '/:id/email-history',
   ...requirePermission('users_view_email'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const history = await prisma.userEmailHistory.findMany({
       where: { userId: id },
       select: {
@@ -1131,15 +1133,16 @@ const ircNickSchema = z.object({
     )
     .nullable()
 });
+const ircNickBody = validate(ircNickSchema);
 
 router.put(
   '/:id/irc-nick',
   requireAuth,
-  validateParams(userIdParamsSchema),
-  validate(ircNickSchema),
+  userIdParams,
+  ircNickBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { ircNick } = parsedBody<{ ircNick: string | null }>(res);
+    const { id } = userIdParams.read(res);
+    const { ircNick } = ircNickBody.read(res);
 
     const perms = await loadPermissions(req, res);
     const isAdmin = hasPermission(perms, 'admin');
@@ -1177,9 +1180,9 @@ router.put(
 router.get(
   '/:id/reputation',
   requireServiceKey,
-  validateParams(userIdParamsSchema),
+  userIdParams,
   asyncHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     res.json(await getReputation(id));
   })
 );
@@ -1188,9 +1191,9 @@ router.get(
 router.get(
   '/:id/snatch-list',
   ...requirePermission('staff'),
-  validateParams(userIdParamsSchema),
+  userIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = userIdParams.read(res);
     const items = await getSnatchList(id);
     res.json(items);
   })

@@ -6,28 +6,29 @@ import { translatePrismaError } from '../../lib/prismaErrors';
 import { AppError } from '../../lib/errors';
 import { sanitizePlain } from '../../lib/sanitize';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams
+  validateQuery
 } from '../../middleware/validate';
 import { friendCommentSchema } from '../../schemas/friends';
 
 const router = express.Router();
+const friendCommentBody = validate(friendCommentSchema);
 
 const friendsQuerySchema = z.object({ ...paginationBase });
+const friendsQuery = validateQuery(friendsQuerySchema);
 
-const userIdParams = z.object({
+const userIdParamsSchema = z.object({
   userId: z.coerce.number().int().positive()
 });
+const userIdParams = validateParams(userIdParamsSchema);
 
 const userSummary = { id: true, username: true, avatar: true } as const;
 
@@ -44,9 +45,9 @@ const betweenUsers = (actorId: number, otherId: number) => ({
 router.get(
   '/status/:userId',
   requireAuth,
-  validateParams(userIdParams),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = userIdParams.read(res);
     const rel = await prisma.friendRelationship.findFirst({
       where: betweenUsers(req.user.id, otherId)
     });
@@ -70,9 +71,9 @@ router.get(
 router.get(
   '/requests',
   requireAuth,
-  validateQuery(friendsQuerySchema),
+  friendsQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(friendsQuery.read(res));
     const where = {
       recipientId: req.user.id,
       status: FriendStatus.pending
@@ -101,9 +102,9 @@ router.get(
 router.get(
   '/',
   requireAuth,
-  validateQuery(friendsQuerySchema),
+  friendsQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(friendsQuery.read(res));
     const where = {
       status: FriendStatus.accepted,
       OR: [{ requesterId: req.user.id }, { recipientId: req.user.id }]
@@ -214,9 +215,9 @@ const resolveExisting = async (
 router.post(
   '/:userId',
   requireAuth,
-  validateParams(userIdParams),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = userIdParams.read(res);
 
     if (otherId === req.user.id) {
       throw new AppError(400, 'Cannot add yourself as a friend');
@@ -264,9 +265,9 @@ router.post(
 router.post(
   '/:userId/accept',
   requireAuth,
-  validateParams(userIdParams),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = userIdParams.read(res);
     const pending = await prisma.friendRelationship.findFirst({
       where: {
         requesterId: otherId,
@@ -303,9 +304,9 @@ router.post(
 router.post(
   '/:userId/reject',
   requireAuth,
-  validateParams(userIdParams),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = userIdParams.read(res);
     const result = await prisma.friendRelationship.updateMany({
       where: {
         requesterId: otherId,
@@ -325,9 +326,9 @@ router.post(
 router.delete(
   '/:userId',
   requireAuth,
-  validateParams(userIdParams),
+  userIdParams,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
+    const { userId: otherId } = userIdParams.read(res);
     await prisma.friendRelationship.deleteMany({
       where: betweenUsers(req.user.id, otherId)
     });
@@ -339,11 +340,11 @@ router.delete(
 router.put(
   '/:userId/comment',
   requireAuth,
-  validateParams(userIdParams),
-  validate(friendCommentSchema),
+  userIdParams,
+  friendCommentBody,
   authHandler(async (req, res) => {
-    const { userId: otherId } = parsedParams<{ userId: number }>(res);
-    const { comment } = parsedBody<{ comment: string }>(res);
+    const { userId: otherId } = userIdParams.read(res);
+    const { comment } = friendCommentBody.read(res);
 
     const result = await prisma.friendRelationship.updateMany({
       where: {
