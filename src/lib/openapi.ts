@@ -59,6 +59,10 @@ import {
   massPmSchema
 } from '../schemas/user';
 import {
+  INVITE_SUBTREE_ACTIONS,
+  inviteSubtreeActionSchema
+} from '../schemas/inviteSubtree';
+import {
   contributionFeedQuerySchema,
   feedCredentialsSchema
 } from '../schemas/feeds';
@@ -1819,6 +1823,87 @@ registry.registerPath({
   responses: {
     200: msgResponse('Feed token rotated'),
     404: msgResponse('User not found')
+  }
+});
+
+const InviteSubtreeMember = registry.register(
+  'InviteSubtreeMember',
+  z.object({
+    id: z.number(),
+    username: z.string(),
+    // 1 for a direct invitee of the root.
+    depth: z.number(),
+    disabled: z.boolean(),
+    canInvite: z.boolean()
+  })
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}/invite-subtree/preview',
+  tags: ['Users'],
+  summary: "Staff: preview an action on a member's invite subtree",
+  description:
+    'Requires `invites_manage` (#639). Every descendant of the member, the ' +
+    'member themselves excluded, ordered by depth. `count` is the number to ' +
+    'send as `expectedCount` when applying an action.',
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: 'The subtree an action would touch',
+      content: {
+        'application/json': {
+          schema: z.object({
+            rootUserId: z.number(),
+            count: z.number(),
+            disabled: z.number(),
+            withoutInvites: z.number(),
+            members: z.array(InviteSubtreeMember)
+          })
+        }
+      }
+    },
+    404: msgResponse('User not found')
+  }
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/users/{id}/invite-subtree/action',
+  tags: ['Users'],
+  summary: "Staff: apply one action to a member's whole invite subtree",
+  description:
+    'Requires `invites_manage`, plus the permission the single-member action ' +
+    'needs: `users_edit` for `note`, `users_disable` for `disable`, ' +
+    '`invites_edit` for `revoke_invites` (#639). Every descendant gets a staff ' +
+    'note carrying `reason`. `disable` and `revoke_invites` then change each ' +
+    'member not already in that state, auditing each as the single-member ' +
+    'route does. One transaction: all or nothing. `expectedCount` must match ' +
+    "the subtree's current size. No member is messaged, and there is no bulk " +
+    'undo.',
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { 'application/json': { schema: inviteSubtreeActionSchema } }
+    }
+  },
+  responses: {
+    200: {
+      description: 'The run applied',
+      content: {
+        'application/json': {
+          schema: z.object({
+            action: z.enum(INVITE_SUBTREE_ACTIONS),
+            count: z.number(),
+            changed: z.number(),
+            unchanged: z.number()
+          })
+        }
+      }
+    },
+    403: msgResponse("Lacks the action's own permission"),
+    404: msgResponse('User not found'),
+    409: msgResponse('The subtree no longer has `expectedCount` members')
   }
 });
 

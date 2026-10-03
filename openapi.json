@@ -2158,6 +2158,33 @@
           "msg"
         ]
       },
+      "InviteSubtreeMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "number"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "canInvite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "depth",
+          "disabled",
+          "canInvite"
+        ]
+      },
       "RecoveryRequestItem": {
         "type": "object",
         "properties": {
@@ -13132,6 +13159,263 @@
           },
           "404": {
             "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{id}/invite-subtree/preview": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: preview an action on a member's invite subtree",
+        "description": "Requires `invites_manage` (#639). Every descendant of the member, the member themselves excluded, ordered by depth. `count` is the number to send as `expectedCount` when applying an action.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subtree an action would touch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rootUserId": {
+                      "type": "number"
+                    },
+                    "count": {
+                      "type": "number"
+                    },
+                    "disabled": {
+                      "type": "number"
+                    },
+                    "withoutInvites": {
+                      "type": "number"
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/InviteSubtreeMember"
+                      }
+                    }
+                  },
+                  "required": [
+                    "rootUserId",
+                    "count",
+                    "disabled",
+                    "withoutInvites",
+                    "members"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing invites_manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{id}/invite-subtree/action": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Staff: apply one action to a member's whole invite subtree",
+        "description": "Requires `invites_manage`, plus the permission the single-member action needs: `users_edit` for `note`, `users_disable` for `disable`, `invites_edit` for `revoke_invites` (#639). Every descendant gets a staff note carrying `reason`. `disable` and `revoke_invites` then change each member not already in that state, auditing each as the single-member route does. One transaction: all or nothing. `expectedCount` must match the subtree's current size. No member is messaged, and there is no bulk undo.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "note",
+                      "disable",
+                      "revoke_invites"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "expectedCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  }
+                },
+                "required": [
+                  "action",
+                  "reason",
+                  "expectedCount"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The run applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "note",
+                        "disable",
+                        "revoke_invites"
+                      ]
+                    },
+                    "count": {
+                      "type": "number"
+                    },
+                    "changed": {
+                      "type": "number"
+                    },
+                    "unchanged": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "count",
+                    "changed",
+                    "unchanged"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path parameters or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Lacks the action's own permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsgResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The subtree no longer has `expectedCount` members",
             "content": {
               "application/json": {
                 "schema": {

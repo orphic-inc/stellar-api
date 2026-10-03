@@ -9,6 +9,7 @@ import { computeRatio } from './ratio';
 import { registerBBCodeImages } from './remoteImage';
 import { settlingImageAssets } from './assetStore';
 import { CONTAGION_REACH } from './contagion';
+import { getInviteSubtreeEdges } from './inviteSubtreeWalk';
 import {
   activeDonorRank,
   donorRankSelect,
@@ -235,9 +236,6 @@ export interface InviteSubtreeRow {
   consumed: bigint;
 }
 
-// Depth guard so a corrupt edge can't make the recursion walk forever.
-const MAX_INVITE_TREE_DEPTH = 50;
-
 /**
  * All descendants of `rootUserId` in the invite tree (the root is the anchor,
  * not included). The recursive walk touches only `invite_trees` (topology); the
@@ -246,21 +244,7 @@ const MAX_INVITE_TREE_DEPTH = 50;
 export const getInviteSubtreeRows = async (
   rootUserId: number
 ): Promise<InviteSubtreeRow[]> => {
-  const edges = await prisma.$queryRaw<
-    { userId: number; inviterId: number | null; depth: number }[]
-  >`
-    WITH RECURSIVE subtree AS (
-      SELECT "userId", "inviterId", 1 AS depth
-      FROM "invite_trees"
-      WHERE "inviterId" = ${rootUserId}
-      UNION ALL
-      SELECT it."userId", it."inviterId", s.depth + 1
-      FROM "invite_trees" it
-      JOIN subtree s ON it."inviterId" = s."userId"
-      WHERE s.depth < ${MAX_INVITE_TREE_DEPTH}
-    )
-    SELECT "userId", "inviterId", depth FROM subtree
-  `;
+  const edges = await getInviteSubtreeEdges(rootUserId);
   if (!edges.length) return [];
 
   const meta = new Map(edges.map((e) => [e.userId, e]));

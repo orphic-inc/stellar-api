@@ -288,6 +288,9 @@ src/
     inviteExpiryJob.ts        # Hourly sweep, no mode switch: claims each lapsed invite (`pending → expired`) and refunds it, one transaction per invite. The claim pays the refund, so it happens once
     inviteControls.ts         # Staff invite controls (#636): revoke `canInvite`, compare-and-set `inviteCount`, cancel with a refund; a member's withdraw shares the claim
     inviteGates.ts            # Invite send gates (#637, ADR-0043) — pure: the first refusal, in order, for the send and the eligibility read
+    inviteSubtreeWalk.ts      # getInviteSubtreeEdges — every descendant of a member (root excluded), depth-limited; takes a transaction client
+    inviteSubtree.ts          # Staff actions on a whole invite subtree (#639): preview, then note / disable / revoke invites, bound to the previewed count; one transaction
+    accountDisable.ts         # disableAccounts — the one staff disable write, shared by the single-member disable route and a subtree run (#639); where #634 lands
     assetSweep.ts             # Orphaned-asset reclamation over the content-addressed store (ADR-0026)
     assetSweepJob.ts          # Background job driving that sweep
     remoteImage.ts            # Remote image import (#737): registerRemoteImages (daily ceiling), importRemoteImage/processDueRemoteImages (leased job), importedAssetUrls (render lookup), registerWriteImages (bodies and fields together)
@@ -406,6 +409,7 @@ src/
     tagAliases.ts           # Tag alias CRUD — bad→good tag redirection (staff)
     emailBlacklist.ts       # Email blacklist CRUD (staff)
     ipBans.ts               # IP ban CRUD (staff)
+    inviteSubtree.ts        # /:id/invite-subtree/preview and /:id/invite-subtree/action — staff subtree actions, mounted on the users router (#639)
     devTools.ts             # Dev-only content generation/cleanup: status, runs, estimate, generate, cleanup
     communities/
       communities.ts        # Community CRUD
