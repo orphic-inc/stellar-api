@@ -471,7 +471,7 @@ schema, and reuse them across routes. Name them for the request part:
 
 ```ts
 const releaseParams = validateParams(
-  z.object({ id: z.coerce.number().int().positive() }) // z.coerce, never parseInt + isNaN
+  z.object({ id: z.coerce.number().int().positive() }) // z.coerce converts and 400s in one place
 );
 const updateReleaseBody = validate(updateReleaseSchema);
 
