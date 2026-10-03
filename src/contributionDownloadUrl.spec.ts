@@ -119,26 +119,29 @@ const isInsideInclude = (p: ts.PropertyAssignment): boolean => {
   );
 };
 
+const RELATION_NAMES = new Set(['contribution', 'contributions']);
+
+/** A `downloadUrl: true` select, or a whole-row relation include. */
+const propertyKind = (node: ts.PropertyAssignment): Kind | null => {
+  if (!isTrue(node)) return null;
+  const name = nameOf(node);
+  if (name === 'downloadUrl') return 'select';
+  if (name && RELATION_NAMES.has(name) && isInsideInclude(node)) {
+    return 'include';
+  }
+  return null;
+};
+
+/** A `<client>.contribution.<method>(...)` with no inline `select`. */
+const isBareContributionCall = (node: ts.CallExpression): boolean =>
+  ts.isPropertyAccessExpression(node.expression) &&
+  isContributionDelegate(node.expression.expression) &&
+  CONTRIBUTION_METHODS.has(node.expression.name.text) &&
+  !hasInlineSelect(node.arguments[0]);
+
 const kindOf = (node: ts.Node): Kind | null => {
-  if (ts.isPropertyAssignment(node) && isTrue(node)) {
-    const name = nameOf(node);
-    if (name === 'downloadUrl') return 'select';
-    if (
-      (name === 'contribution' || name === 'contributions') &&
-      isInsideInclude(node)
-    ) {
-      return 'include';
-    }
-  }
-  if (
-    ts.isCallExpression(node) &&
-    ts.isPropertyAccessExpression(node.expression) &&
-    isContributionDelegate(node.expression.expression) &&
-    CONTRIBUTION_METHODS.has(node.expression.name.text) &&
-    !hasInlineSelect(node.arguments[0])
-  ) {
-    return 'bare';
-  }
+  if (ts.isPropertyAssignment(node)) return propertyKind(node);
+  if (ts.isCallExpression(node) && isBareContributionCall(node)) return 'bare';
   return null;
 };
 
