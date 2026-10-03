@@ -29,10 +29,10 @@ const someUser = () => ({ id: 5, username: 'target', disabled: false });
 beforeEach(() => resetApiTestState());
 
 describe('users — a row that vanishes between the read and the write (#564)', () => {
-  it('POST /users/:id/disable answers 404, not 500', async () => {
+  it('POST /users/:id/disable answers 404 when its write matches no row', async () => {
     perms({ users_disable: true });
-    prismaMock.user.findUnique.mockResolvedValue(someUser() as never);
-    prismaMock.user.update.mockRejectedValue(err('P2025'));
+    // No read to race since #639: the shared write's empty match is the 404.
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 });
 
     const res = await request(app).post('/api/users/5/disable');
 

@@ -34,6 +34,12 @@ All notable changes to stellar-api are documented here.
   - **The staff queue's `sourceUrl` follows the same rule.** It linked every release before, including ones whose page refused staff. A link into a release page now appears only when the page will open, so a resolved report in a closed community links nowhere.
 - **`npm run e2e:korin`** (`src/scripts/seed-korin-e2e.ts`): fixtures for the korin end-to-end run of private-community announce delivery (#328). It seeds a cast and three communities, then adds contributions, removes members and flips communities to PRIVATE on demand. It refuses any database not named `stellar_e2e`.
 
+- **Staff act on a member's whole invite subtree** (#639, ADR-0056). Staff can now act on every member invited under someone, directly or down the chain, with that member excluded. There are three actions: a staff note, disable, and revoke invite privileges.
+  - `GET /users/{id}/invite-subtree/preview` lists the members an action would touch, with counts. It needs `invites_manage`.
+  - `POST /users/{id}/invite-subtree/action` `{ action, reason, expectedCount }` applies one action in a single transaction. It needs `invites_manage` plus the action's own permission (`users_edit`, `users_disable` or `invites_edit`); without that it answers `403`. It answers `409` if the subtree no longer has `expectedCount` members.
+  - Every member gets a note with the reason. Members the action changes are audited as the single-member routes audit them, and the root gets one run row listing the ids changed. No member is messaged, and there is no bulk undo.
+- `POST /users/{id}/disable` now writes through the same shared disable as the subtree tool. Its responses are unchanged.
+
 ### Changed
 
 - **Validators return a typed handle** (#234, #909). `validate`, `validateQuery` and `validateParams` are mounted as before, and `handle.read(res)` returns what they parsed, typed from the schema. A read for a route that didn't mount the handle throws, rather than returning `undefined`. `pageOf(handle.read(res))` replaces `parsedPage(res)`.

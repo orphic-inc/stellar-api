@@ -78,6 +78,8 @@ import {
 } from '../../modules/inviteControls';
 import { rotateFeedToken } from '../../modules/feedToken';
 import { registerBodyImages } from '../../middleware/imageSrc';
+import { disableAccounts } from '../../modules/accountDisable';
+import inviteSubtreeRouter from './inviteSubtree';
 
 const router = express.Router();
 const warnUserBody = validate(warnUserSchema);
@@ -538,6 +540,9 @@ router.get(
   })
 );
 
+// /:id/invite-subtree/* — staff actions on a member's invite subtree (#639)
+router.use(inviteSubtreeRouter);
+
 // GET /api/users/ratio-watch — users on ratio watch or download-disabled (must be before /:id)
 router.get(
   '/ratio-watch',
@@ -874,16 +879,10 @@ router.post(
   userIdParams,
   authHandler(async (req, res) => {
     const { id } = userIdParams.read(res);
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-    try {
-      await prisma.user.update({ where: { id }, data: { disabled: true } });
-    } catch (err) {
-      // The findUnique above is a READ; #564 treats it as insufficient because
-      // the row can go between it and the write, where P2025 would 500.
-      translatePrismaError(err, { P2025: [404, 'User not found'] });
+    // The shared staff disable write (#639); a missing user matches nothing.
+    if ((await disableAccounts(prisma, req.user.id, [id])) === 0) {
+      return res.status(404).json({ msg: 'User not found' });
     }
-    await audit(prisma, req.user.id, 'user.disabled', 'User', id);
     res.json({ msg: 'User disabled' });
   })
 );

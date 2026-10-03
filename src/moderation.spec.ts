@@ -234,21 +234,21 @@ describe('POST /api/users/:id/disable', () => {
 
   it('disables the user account and returns a msg', async () => {
     mockTargetUser();
-    prismaMock.user.update.mockResolvedValue(makeUser({ disabled: true }));
+    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.auditLog.create.mockResolvedValue({} as never);
 
     const res = await request(app).post('/api/users/9/disable');
 
     expect(res.status).toBe(200);
     expect(res.body.msg).toBe('User disabled');
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: 9 },
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [9] } },
       data: { disabled: true }
     });
   });
 
   it('returns 404 when the user does not exist', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 });
     const res = await request(app).post('/api/users/999/disable');
     expect(res.status).toBe(404);
   });
