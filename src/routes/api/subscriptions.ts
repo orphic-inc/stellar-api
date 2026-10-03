@@ -4,12 +4,10 @@ import { Prisma, SubscriptionPage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validate, parsedBody, validateQuery } from '../../middleware/validate';
+import { validate, validateQuery } from '../../middleware/validate';
 import {
   subscribeSchema,
-  subscribeCommentsSchema,
-  type SubscribeInput,
-  type SubscribeCommentsInput
+  subscribeCommentsSchema
 } from '../../schemas/subscription';
 
 const commentStatusQuerySchema = z.object({
@@ -18,16 +16,19 @@ const commentStatusQuerySchema = z.object({
   ),
   pageId: z.coerce.number().int().positive()
 });
+const commentStatusQuery = validateQuery(commentStatusQuerySchema);
 
 const router = express.Router();
+const subscribeCommentsBody = validate(subscribeCommentsSchema);
+const subscribeBody = validate(subscribeSchema);
 
 // POST /api/subscriptions/subscribe
 router.post(
   '/subscribe',
   requireAuth,
-  validate(subscribeSchema),
+  subscribeBody,
   authHandler(async (req, res) => {
-    const { topicId, action } = parsedBody<SubscribeInput>(res);
+    const { topicId, action } = subscribeBody.read(res);
     const userId = req.user.id;
 
     if (action === 'subscribe') {
@@ -73,12 +74,9 @@ router.get(
 router.get(
   '/comment-status',
   requireAuth,
-  validateQuery(commentStatusQuerySchema),
+  commentStatusQuery,
   authHandler(async (req, res) => {
-    const { page, pageId } = res.locals.parsedQuery as {
-      page: SubscriptionPage;
-      pageId: number;
-    };
+    const { page, pageId } = commentStatusQuery.read(res);
     const sub = await prisma.commentSubscription.findUnique({
       where: { userId_page_pageId: { userId: req.user.id, page, pageId } }
     });
@@ -90,9 +88,9 @@ router.get(
 router.post(
   '/subscribe-comments',
   requireAuth,
-  validate(subscribeCommentsSchema),
+  subscribeCommentsBody,
   authHandler(async (req, res) => {
-    const { page, pageId, action } = parsedBody<SubscribeCommentsInput>(res);
+    const { page, pageId, action } = subscribeCommentsBody.read(res);
     const userId = req.user.id;
 
     if (action === 'subscribe') {

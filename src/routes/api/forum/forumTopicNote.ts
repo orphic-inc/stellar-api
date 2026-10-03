@@ -6,31 +6,27 @@ import { asyncHandler, authHandler } from '../../../modules/asyncHandler';
 import { createTopicNote } from '../../../modules/forum';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
-import {
-  parsedBody,
-  validate,
-  validateParams,
-  parsedParams
-} from '../../../middleware/validate';
-import { topicNoteSchema, type TopicNoteInput } from '../../../schemas/forum';
+import { validate, validateParams } from '../../../middleware/validate';
+import { topicNoteSchema } from '../../../schemas/forum';
 
 const router = express.Router();
+const topicNoteBody = validate(topicNoteSchema);
 const topicIdParamsSchema = z.object({
   topicId: z.coerce.number().int().positive()
 });
+const topicIdParams = validateParams(topicIdParamsSchema);
 const noteIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const noteIdParams = validateParams(noteIdParamsSchema);
 
 // GET /api/forums/topic-notes/:topicId — moderators only
 router.get(
   '/:topicId',
   ...requirePermission('forums_moderate'),
-  validateParams(topicIdParamsSchema),
+  topicIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { topicId: forumTopicId } = parsedParams<{
-      topicId: number;
-    }>(res);
+    const { topicId: forumTopicId } = topicIdParams.read(res);
     const notes = await prisma.forumTopicNote.findMany({
       where: { forumTopicId },
       include: { author: { select: { id: true, username: true } } }
@@ -43,9 +39,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('forums_moderate'),
-  validate(topicNoteSchema),
+  topicNoteBody,
   authHandler(async (req, res) => {
-    const { forumTopicId, body } = parsedBody<TopicNoteInput>(res);
+    const { forumTopicId, body } = topicNoteBody.read(res);
     const note = await createTopicNote(forumTopicId, req.user.id, body);
     res.status(201).json(note);
   })
@@ -55,9 +51,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(noteIdParamsSchema),
+  noteIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = noteIdParams.read(res);
     const note = await prisma.forumTopicNote.findUnique({ where: { id } });
     if (!note) return res.status(404).json({ msg: 'Note not found' });
     if (note.authorId !== req.user.id)

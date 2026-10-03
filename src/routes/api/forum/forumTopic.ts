@@ -15,22 +15,15 @@ import {
   hasPermission
 } from '../../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams
+  validateQuery
 } from '../../../middleware/validate';
+import { createTopicSchema, updateTopicSchema } from '../../../schemas/forum';
 import {
-  createTopicSchema,
-  updateTopicSchema,
-  type CreateTopicInput,
-  type UpdateTopicInput
-} from '../../../schemas/forum';
-import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import { prisma } from '../../../lib/prisma';
 import { sanitizePlain } from '../../../lib/sanitize';
@@ -41,17 +34,22 @@ import { assertForumReadAccess } from '../../../modules/forumAccess';
 import { resolveViewer } from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
+const updateTopicBody = validate(updateTopicSchema);
+const createTopicBody = validate(createTopicSchema);
 const forumIdParamsSchema = z.object({
   forumId: z.coerce.number().int().positive()
 });
+const forumIdParams = validateParams(forumIdParamsSchema);
 const forumTopicParamsSchema = z.object({
   forumId: z.coerce.number().int().positive(),
   topicId: z.coerce.number().int().positive()
 });
+const forumTopicParams = validateParams(forumTopicParamsSchema);
 
 router.use('/:topicId/posts', forumPostRouter);
 
 const forumTopicsQuerySchema = z.object({ ...paginationBase });
+const forumTopicsQuery = validateQuery(forumTopicsQuerySchema);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,14 +73,14 @@ const buildActor = async (
 router.get(
   '/',
   requireAuth,
-  validateParams(forumIdParamsSchema),
-  validateQuery(forumTopicsQuerySchema),
+  forumIdParams,
+  forumTopicsQuery,
   authHandler(async (req, res) => {
-    const { forumId } = parsedParams<{ forumId: number }>(res);
+    const { forumId } = forumIdParams.read(res);
 
     await assertForumReadAccess(req.user, forumId);
 
-    const pg = parsedPage(res);
+    const pg = pageOf(forumTopicsQuery.read(res));
     const [topics, total] = await Promise.all([
       prisma.forumTopic.findMany({
         where: { forumId, deletedAt: null },
@@ -124,14 +122,11 @@ router.get(
 router.get(
   '/:topicId/session',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
-  validateQuery(forumTopicsQuerySchema),
+  forumTopicParams,
+  forumTopicsQuery,
   authHandler(async (req, res) => {
-    const { forumId, topicId } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
-    const pg = parsedPage(res);
+    const { forumId, topicId } = forumTopicParams.read(res);
+    const pg = pageOf(forumTopicsQuery.read(res));
     const actor = await buildActor(req, res);
 
     const session = await getTopicSession(
@@ -150,12 +145,9 @@ router.get(
 router.get(
   '/:topicId',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
+  forumTopicParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId: id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
+    const { forumId, topicId: id } = forumTopicParams.read(res);
     const [forum, topic] = await Promise.all([
       prisma.forum.findUnique({
         where: { id: forumId },
@@ -187,10 +179,10 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validateParams(forumIdParamsSchema),
-  validate(createTopicSchema),
+  forumIdParams,
+  createTopicBody,
   authHandler(async (req, res) => {
-    const { forumId } = parsedParams<{ forumId: number }>(res);
+    const { forumId } = forumIdParams.read(res);
     const forum = await prisma.forum.findUnique({
       where: { id: forumId },
       select: { id: true, minClassCreate: true }
@@ -202,8 +194,7 @@ router.post(
         .json({ msg: 'Insufficient class to create topics in this forum' });
     }
 
-    const { title, body, question, answers } =
-      parsedBody<CreateTopicInput>(res);
+    const { title, body, question, answers } = createTopicBody.read(res);
     const topic = await createTopic(forumId, req.user.id, {
       title: sanitizePlain(title),
       body,
@@ -219,14 +210,11 @@ router.post(
 router.put(
   '/:topicId',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
-  validate(updateTopicSchema),
+  forumTopicParams,
+  updateTopicBody,
   authHandler(async (req, res) => {
-    const { forumId, topicId: id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
-    const { title, isLocked, isSticky } = parsedBody<UpdateTopicInput>(res);
+    const { forumId, topicId: id } = forumTopicParams.read(res);
+    const { title, isLocked, isSticky } = updateTopicBody.read(res);
     const actor = await buildActor(req, res);
 
     const result = await updateTopic(id, forumId, actor, {
@@ -248,12 +236,9 @@ router.put(
 router.delete(
   '/:topicId',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
+  forumTopicParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId: id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
+    const { forumId, topicId: id } = forumTopicParams.read(res);
     const actor = await buildActor(req, res);
 
     const result = await deleteTopic(id, forumId, actor);
@@ -271,12 +256,9 @@ router.delete(
 router.post(
   '/:topicId/trash',
   requireAuth,
-  validateParams(forumTopicParamsSchema),
+  forumTopicParams,
   authHandler(async (req, res) => {
-    const { forumId, topicId: id } = parsedParams<{
-      forumId: number;
-      topicId: number;
-    }>(res);
+    const { forumId, topicId: id } = forumTopicParams.read(res);
     const actor = await buildActor(req, res);
 
     const result = await trashTopic(id, forumId, actor);

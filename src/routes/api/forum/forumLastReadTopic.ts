@@ -4,10 +4,11 @@ import { translatePrismaError } from '../../../lib/prismaErrors';
 import { canAccessForumLevel } from '../../../lib/userRankAccess';
 import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
-import { validate, parsedBody } from '../../../middleware/validate';
-import { lastReadSchema, type LastReadInput } from '../../../schemas/forum';
+import { validate } from '../../../middleware/validate';
+import { lastReadSchema } from '../../../schemas/forum';
 
 const router = express.Router();
+const lastReadBody = validate(lastReadSchema);
 
 // GET /api/forums/last-read — get all last-read markers for current user
 router.get(
@@ -25,9 +26,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(lastReadSchema),
+  lastReadBody,
   authHandler(async (req, res) => {
-    const { forumTopicId, forumPostId } = parsedBody<LastReadInput>(res);
+    const { forumTopicId, forumPostId } = lastReadBody.read(res);
     const userId = req.user.id;
 
     const post = await prisma.forumPost.findFirst({
