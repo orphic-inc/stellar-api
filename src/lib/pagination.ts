@@ -12,7 +12,7 @@ export interface PageParams {
 
 /**
  * Spread into any Zod query schema to add validated, bounded page/limit fields.
- * Use with validateQuery() then read back with parsedPage(res).
+ * Use with validateQuery() then read back with pageOf(handle.read(res)).
  */
 export const paginationBase = {
   page: z.coerce.number().int().positive().optional().default(1),
@@ -26,7 +26,22 @@ export const paginationBase = {
 };
 
 /**
- * Derive PageParams from a query already validated by validateQuery().
+ * PageParams from a validated query: `pageOf(listQuery.read(res))` (#234).
+ * Pure, so it has no pairing of its own to get wrong; the handle checked it.
+ * A schema that does not spread `paginationBase` has no `page` or `limit`, and
+ * the call stops compiling.
+ */
+export const pageOf = ({
+  page,
+  limit
+}: {
+  page: number;
+  limit: number;
+}): PageParams => ({ page, limit, skip: (page - 1) * limit });
+
+/**
+ * Superseded by `pageOf` (#234), and deleted once every route reads through a
+ * handle. Derive PageParams from a query already validated by validateQuery().
  * The calling route MUST have run validateQuery() with a schema that
  * spreads paginationBase before calling this.
  */

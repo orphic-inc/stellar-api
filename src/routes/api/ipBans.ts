@@ -4,21 +4,16 @@ import { prisma } from '../../lib/prisma';
 import { translatePrismaError } from '../../lib/prismaErrors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { audit } from '../../lib/audit';
 import { normalizeIp, denormalizeIp } from '../../lib/ipAddress';
 import { invalidateIpBanCache } from '../../modules/ipBan';
 
 const router = express.Router();
 
-const ipBanIdParamsSchema = z.object({
-  id: z.coerce.number().int().positive()
-});
+const ipBanIdParams = validateParams(
+  z.object({ id: z.coerce.number().int().positive() })
+);
 
 // Bounds are normalised to 32 hex chars (lib/ipAddress.ts). The route still
 // speaks addresses, so the admin API is unchanged — but it now accepts IPv6 as
@@ -70,7 +65,7 @@ const ipBanSchema = z
     }
   });
 
-type IpBanInput = z.infer<typeof ipBanSchema>;
+const ipBanBody = validate(ipBanSchema);
 
 const serializeBan = (ban: { id: number; fromIp: string; toIp: string }) => ({
   id: ban.id,
@@ -92,9 +87,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('ip_bans_manage'),
-  validate(ipBanSchema),
+  ipBanBody,
   authHandler(async (req, res) => {
-    const { fromIp, toIp } = parsedBody<IpBanInput>(res);
+    const { fromIp, toIp } = ipBanBody.read(res);
     const from = normalizeIp(fromIp);
     const to = normalizeIp(toIp ?? fromIp);
     if (from === null || to === null) {
@@ -116,9 +111,9 @@ router.post(
 router.delete(
   '/:id',
   ...requirePermission('ip_bans_manage'),
-  validateParams(ipBanIdParamsSchema),
+  ipBanIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = ipBanIdParams.read(res);
     const ban = await prisma.ipBan.findUnique({ where: { id } });
     if (!ban) return res.status(404).json({ msg: 'Ban not found' });
     try {
