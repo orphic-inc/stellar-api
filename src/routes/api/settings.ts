@@ -3,15 +3,13 @@ import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
-import { validate, parsedBody } from '../../middleware/validate';
-import {
-  updateSettingsSchema,
-  type UpdateSettingsInput
-} from '../../schemas/settings';
+import { validate } from '../../middleware/validate';
+import { updateSettingsSchema } from '../../schemas/settings';
 import { getSettings, updateSettings } from '../../modules/settings';
 import { audit } from '../../lib/audit';
 
 const router = express.Router();
+const updateSettingsBody = validate(updateSettingsSchema);
 
 // GET /api/settings — any authenticated user
 router.get(
@@ -27,9 +25,9 @@ router.get(
 router.put(
   '/',
   ...requirePermission('admin'),
-  validate(updateSettingsSchema),
+  updateSettingsBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<UpdateSettingsInput>(res);
+    const input = updateSettingsBody.read(res);
     const settings = await updateSettings(input);
     await audit(
       prisma,

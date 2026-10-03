@@ -24,16 +24,10 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, authHandler } from '../../modules/asyncHandler';
 import { requirePermission } from '../../middleware/permissions';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import {
   generateConfigSchema,
-  runIdParamsSchema,
-  type GenerateConfigInput
+  runIdParamsSchema
 } from '../../schemas/devTools';
 import {
   runGeneration,
@@ -45,6 +39,8 @@ import { getLogger } from '../../modules/logging';
 
 const log = getLogger('devTools');
 const router = express.Router();
+const runIdParams = validateParams(runIdParamsSchema);
+const generateConfigBody = validate(generateConfigSchema);
 
 // Belt-and-suspenders production guard on every request
 router.use((_req, res, next) => {
@@ -109,9 +105,9 @@ router.get(
 router.get(
   '/runs/:id',
   ...requirePermission('admin'),
-  validateParams(runIdParamsSchema),
+  runIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: string }>(res);
+    const { id } = runIdParams.read(res);
 
     const run = await prisma.devSeedRun.findUnique({
       where: { id },
@@ -130,9 +126,9 @@ router.get(
 router.post(
   '/estimate',
   ...requirePermission('admin'),
-  validate(generateConfigSchema),
+  generateConfigBody,
   asyncHandler(async (_req: Request, res: Response) => {
-    const body = parsedBody<GenerateConfigInput>(res);
+    const body = generateConfigBody.read(res);
     const config = resolveConfig(body);
     const counts = estimateCounts(config);
 
@@ -157,9 +153,9 @@ router.post(
 router.post(
   '/generate',
   ...requirePermission('admin'),
-  validate(generateConfigSchema),
+  generateConfigBody,
   authHandler(async (req, res) => {
-    const body = parsedBody<GenerateConfigInput>(res);
+    const body = generateConfigBody.read(res);
 
     log.info('Test data generation started', {
       actorId: req.user.id,
@@ -187,9 +183,9 @@ router.post(
 router.post(
   '/runs/:id/cleanup',
   ...requirePermission('admin'),
-  validateParams(runIdParamsSchema),
+  runIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: string }>(res);
+    const { id } = runIdParams.read(res);
 
     const run = await prisma.devSeedRun.findUnique({ where: { id } });
     if (!run) return res.status(404).json({ msg: 'Seed run not found' });

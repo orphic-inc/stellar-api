@@ -11,8 +11,8 @@ import {
 } from '../../modules/config';
 import { installLimiter } from '../../middleware/rateLimiter';
 import { requirePermission } from '../../middleware/permissions';
-import { validate, parsedBody } from '../../middleware/validate';
-import { installSchema, type InstallInput } from '../../schemas/install';
+import { validate } from '../../middleware/validate';
+import { installSchema } from '../../schemas/install';
 import { getSettings, isSiteFull, markInstalled } from '../../modules/settings';
 import { seedDefaultCommunity } from '../../modules/bootstrap';
 import { seedAll } from '../../modules/seedAll';
@@ -111,6 +111,7 @@ function getSetupChecklist(
 }
 
 const router = express.Router();
+const installBody = validate(installSchema);
 
 // GET /api/install — installation status and live environment warnings
 router.get(
@@ -164,13 +165,13 @@ router.post(
 router.post(
   '/',
   installLimiter,
-  validate(installSchema),
+  installBody,
   asyncHandler(async (req: Request, res: Response) => {
     const settings = await getSettings();
     if (settings.installedAt != null)
       return res.status(409).json({ msg: 'Application already installed' });
 
-    const { username, email, password } = parsedBody<InstallInput>(res);
+    const { username, email, password } = installBody.read(res);
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email: email.toLowerCase() }, { username }] }

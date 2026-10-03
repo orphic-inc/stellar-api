@@ -11,10 +11,7 @@ import { prisma } from '../../lib/prisma';
 import {
   validate,
   validateQuery,
-  validateParams,
-  parsedBody,
-  parsedQuery,
-  parsedParams
+  validateParams
 } from '../../middleware/validate';
 import {
   createResponseSchema,
@@ -23,14 +20,7 @@ import {
   replySchema,
   assignSchema,
   queueQuerySchema,
-  bulkResolveSchema,
-  type CreateResponseInput,
-  type UpdateResponseInput,
-  type CreateTicketInput,
-  type ReplyInput,
-  type AssignInput,
-  type QueueQueryInput,
-  type BulkResolveInput
+  bulkResolveSchema
 } from '../../schemas/staffInbox';
 import {
   listResponses,
@@ -50,14 +40,26 @@ import {
 } from '../../modules/staffInbox';
 
 const router = express.Router();
+const pageQuery = validateQuery(
+  z.object({ page: z.coerce.number().int().min(1).default(1) })
+);
+const updateResponseBody = validate(updateResponseSchema);
+const replyBody = validate(replySchema);
+const queueQuery = validateQuery(queueQuerySchema);
+const createTicketBody = validate(createTicketSchema);
+const createResponseBody = validate(createResponseSchema);
+const bulkResolveBody = validate(bulkResolveSchema);
+const assignBody = validate(assignSchema);
 
 const responseIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const responseIdParams = validateParams(responseIdSchema);
 
 const ticketIdSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const ticketIdParams = validateParams(ticketIdSchema);
 
 // ─── Canned Responses ─────────────────────────────────────────────────────────
 
@@ -75,9 +77,9 @@ router.get(
 router.post(
   '/responses',
   ...requirePermission('staff_inbox_manage'),
-  validate(createResponseSchema),
+  createResponseBody,
   authHandler(async (_req, res) => {
-    const { name, body } = parsedBody<CreateResponseInput>(res);
+    const { name, body } = createResponseBody.read(res);
     const response = await createResponse(name, body);
     res.status(201).json(response);
   })
@@ -87,11 +89,11 @@ router.post(
 router.put(
   '/responses/:id',
   ...requirePermission('staff_inbox_manage'),
-  validateParams(responseIdSchema),
-  validate(updateResponseSchema),
+  responseIdParams,
+  updateResponseBody,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const data = parsedBody<UpdateResponseInput>(res);
+    const { id } = responseIdParams.read(res);
+    const data = updateResponseBody.read(res);
     const result = await updateResponse(id, data);
     if (!result.ok) return res.status(404).json({ msg: 'Response not found' });
     res.json(result.response);
@@ -102,9 +104,9 @@ router.put(
 router.delete(
   '/responses/:id',
   ...requirePermission('staff_inbox_manage'),
-  validateParams(responseIdSchema),
+  responseIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = responseIdParams.read(res);
     const result = await deleteResponse(id);
     if (!result.ok) return res.status(404).json({ msg: 'Response not found' });
     res.status(204).send();
@@ -129,9 +131,9 @@ router.get(
 router.get(
   '/tickets',
   requireAuth,
-  validateQuery(z.object({ page: z.coerce.number().int().min(1).default(1) })),
+  pageQuery,
   authHandler(async (req, res) => {
-    const { page } = parsedQuery<{ page: number }>(res);
+    const { page } = pageQuery.read(res);
     const result = await listMyTickets(req.user.id, page);
     res.json(result);
   })
@@ -141,9 +143,9 @@ router.get(
 router.post(
   '/tickets',
   requireAuth,
-  validate(createTicketSchema),
+  createTicketBody,
   authHandler(async (req, res) => {
-    const { subject, body } = parsedBody<CreateTicketInput>(res);
+    const { subject, body } = createTicketBody.read(res);
     const ticket = await createTicket(req.user.id, subject, body);
     res.status(201).json(ticket);
   })
@@ -153,10 +155,9 @@ router.post(
 router.get(
   '/queue',
   ...requirePermission('staff_inbox_manage'),
-  validateQuery(queueQuerySchema),
+  queueQuery,
   authHandler(async (req, res) => {
-    const { page, status, assignedToMe, unassigned } =
-      parsedQuery<QueueQueryInput>(res);
+    const { page, status, assignedToMe, unassigned } = queueQuery.read(res);
     const result = await listQueue({
       page,
       status,
@@ -182,9 +183,9 @@ router.get(
 router.post(
   '/bulk-resolve',
   ...requirePermission('staff_inbox_manage'),
-  validate(bulkResolveSchema),
+  bulkResolveBody,
   authHandler(async (req, res) => {
-    const { ids } = parsedBody<BulkResolveInput>(res);
+    const { ids } = bulkResolveBody.read(res);
     const result = await bulkResolve(ids, req.user.id);
     res.json(result);
   })
@@ -194,9 +195,9 @@ router.post(
 router.get(
   '/tickets/:id',
   requireAuth,
-  validateParams(ticketIdSchema),
+  ticketIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = ticketIdParams.read(res);
     const isStaff = hasPermission(
       await loadPermissions(req, res),
       'staff_inbox_manage'
@@ -211,11 +212,11 @@ router.get(
 router.post(
   '/tickets/:id/reply',
   requireAuth,
-  validateParams(ticketIdSchema),
-  validate(replySchema),
+  ticketIdParams,
+  replyBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { body } = parsedBody<ReplyInput>(res);
+    const { id } = ticketIdParams.read(res);
+    const { body } = replyBody.read(res);
     const isStaff = hasPermission(
       await loadPermissions(req, res),
       'staff_inbox_manage'
@@ -234,9 +235,9 @@ router.post(
 router.post(
   '/tickets/:id/resolve',
   requireAuth,
-  validateParams(ticketIdSchema),
+  ticketIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = ticketIdParams.read(res);
     const isStaff = hasPermission(
       await loadPermissions(req, res),
       'staff_inbox_manage'
@@ -255,9 +256,9 @@ router.post(
 router.post(
   '/tickets/:id/unresolve',
   ...requirePermission('staff_inbox_manage'),
-  validateParams(ticketIdSchema),
+  ticketIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = ticketIdParams.read(res);
     const result = await unresolveTicket(id, req.user.id);
     if (!result.ok) {
       const status = result.reason === 'not_resolved' ? 422 : 404;
@@ -271,11 +272,11 @@ router.post(
 router.post(
   '/tickets/:id/assign',
   ...requirePermission('staff_inbox_manage'),
-  validateParams(ticketIdSchema),
-  validate(assignSchema),
+  ticketIdParams,
+  assignBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { assignedUserId, assignedUsername } = parsedBody<AssignInput>(res);
+    const { id } = ticketIdParams.read(res);
+    const { assignedUserId, assignedUsername } = assignBody.read(res);
 
     let resolvedId: number | null = assignedUserId ?? null;
     if (assignedUsername && assignedUserId === undefined) {

@@ -7,35 +7,35 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams
+  validateQuery
 } from '../../middleware/validate';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import {
   createTagAliasSchema,
-  updateTagAliasSchema,
-  type CreateTagAliasInput,
-  type UpdateTagAliasInput
+  updateTagAliasSchema
 } from '../../schemas/tagAliases';
 import { AppError } from '../../lib/errors';
 import { prepareTagAlias } from '../../modules/tag';
 
 const router = express.Router();
+const updateTagAliasBody = validate(updateTagAliasSchema);
+const createTagAliasBody = validate(createTagAliasSchema);
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 const tagAliasesQuerySchema = z.object({ ...paginationBase });
+const tagAliasesQuery = validateQuery(tagAliasesQuerySchema);
 
 // GET /api/tag-aliases
 router.get(
   '/',
   ...requirePermission('tags_manage'),
-  validateQuery(tagAliasesQuerySchema),
+  tagAliasesQuery,
   asyncHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(tagAliasesQuery.read(res));
     const [aliases, total] = await Promise.all([
       prisma.tagAlias.findMany({
         include: {
@@ -56,10 +56,10 @@ router.get(
 router.post(
   '/',
   ...requirePermission('tags_manage'),
-  validate(createTagAliasSchema),
+  createTagAliasBody,
   authHandler(async (req, res) => {
     const { badTag, goodTagId } = await prepareTagAlias(
-      parsedBody<CreateTagAliasInput>(res)
+      createTagAliasBody.read(res)
     );
     let alias;
     try {
@@ -85,14 +85,14 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('tags_manage'),
-  validateParams(idParamsSchema),
-  validate(updateTagAliasSchema),
+  idParams,
+  updateTagAliasBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const existing = await prisma.tagAlias.findUnique({ where: { id } });
     if (!existing) throw new AppError(404, 'Tag alias not found');
     const { badTag, goodTagId } = await prepareTagAlias(
-      parsedBody<UpdateTagAliasInput>(res)
+      updateTagAliasBody.read(res)
     );
     let alias;
     try {
@@ -118,9 +118,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('tags_manage'),
-  validateParams(idParamsSchema),
+  idParams,
   asyncHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const existing = await prisma.tagAlias.findUnique({ where: { id } });
     if (!existing) throw new AppError(404, 'Tag alias not found');
     try {
