@@ -56,14 +56,14 @@ export type ValidatorHandle<S extends ZodSchema> = RequestHandler & {
 const validator = <S extends ZodSchema>(
   schema: S,
   part: RequestPart,
-  store: (req: Request, res: Response, data: z.infer<S>) => void
+  store: (req: Request, data: z.infer<S>) => void
 ): ValidatorHandle<S> => {
   const key = Symbol(`validated ${part}`);
   const handler = markGate(
     (req: Request, res: Response, next: NextFunction) => {
       const data = validationError(res, schema, req[part]);
       if (!data) return;
-      store(req, res, data);
+      store(req, data);
       res.locals[key as unknown as string] = data;
       next();
     },
@@ -85,34 +85,17 @@ const validator = <S extends ZodSchema>(
   });
 };
 
-// `res.locals.parsed*` stay written until every route reads through a handle
-// (#234); `parsedBody` and its siblings below still read them.
 export const validate = <S extends ZodSchema>(schema: S) =>
-  validator(schema, 'body', (req, res, data) => {
+  validator(schema, 'body', (req, data) => {
     req.body = data;
-    res.locals.parsedBody = data;
   });
 
 export const validateQuery = <S extends ZodSchema>(schema: S) =>
-  validator(schema, 'query', (req, res, data) => {
+  validator(schema, 'query', (req, data) => {
     Object.assign(req.query, data);
-    res.locals.parsedQuery = data;
   });
 
 export const validateParams = <S extends ZodSchema>(schema: S) =>
-  validator(schema, 'params', (req, res, data) => {
+  validator(schema, 'params', (req, data) => {
     Object.assign(req.params, data);
-    res.locals.parsedParams = data;
   });
-
-export function parsedParams<T>(res: Response): T {
-  return res.locals.parsedParams as T;
-}
-
-export function parsedQuery<T>(res: Response): T {
-  return res.locals.parsedQuery as T;
-}
-
-export function parsedBody<T>(res: Response): T {
-  return res.locals.parsedBody as T;
-}

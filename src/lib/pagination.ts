@@ -39,17 +39,6 @@ export const pageOf = ({
   limit: number;
 }): PageParams => ({ page, limit, skip: (page - 1) * limit });
 
-/**
- * Superseded by `pageOf` (#234), and deleted once every route reads through a
- * handle. Derive PageParams from a query already validated by validateQuery().
- * The calling route MUST have run validateQuery() with a schema that
- * spreads paginationBase before calling this.
- */
-export const parsedPage = (res: Response): PageParams => {
-  const q = res.locals.parsedQuery as { page: number; limit: number };
-  return { page: q.page, limit: q.limit, skip: (q.page - 1) * q.limit };
-};
-
 export const paginatedResponse = (
   res: Response,
   data: unknown[],

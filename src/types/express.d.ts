@@ -14,3 +14,18 @@ declare module 'express' {
     user?: AuthUser;
   }
 }
+
+declare module 'express-serve-static-core' {
+  /**
+   * The keys the retired `parsedBody` / `parsedQuery` / `parsedParams` read
+   * (#234, #915). A validator's data is read through its handle, never off
+   * `res.locals`: these are `never`, so `res.locals.parsedParams.id` or
+   * `res.locals.parsedQuery as { page: number }` fails to compile rather than
+   * reading `undefined`.
+   */
+  interface Locals {
+    parsedBody?: never;
+    parsedQuery?: never;
+    parsedParams?: never;
+  }
+}

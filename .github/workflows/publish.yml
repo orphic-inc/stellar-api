@@ -135,13 +135,6 @@ jobs:
         # from internally-read without inter-procedural analysis, and gating on
         # a rule that cannot discriminate would be noise, not a gate.
         run: npm run prisma:guard-coverage
-      - name: Validator handle coverage
-        if: ${{ !cancelled() }}
-        # Every route reads what its validator parsed through the validator's
-        # handle (#234), typed from the schema and checked against the route.
-        # validate-handles-baseline.json lists the reads still to convert; a
-        # new one fails here, and so does an entry left above its count.
-        run: npm run validate:handles
       - name: ERD freshness
         if: ${{ !cancelled() }}
         run: npm run db:erd && git diff --exit-code docs/erd.md
