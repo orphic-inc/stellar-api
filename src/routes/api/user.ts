@@ -274,7 +274,7 @@ router.put(
   '/settings',
   requireAuth,
   userSettingsBody,
-  registerBodyImages('avatar'),
+  registerBodyImages(userSettingsBody, 'avatar'),
   authHandler(async (req, res) => {
     const data = userSettingsBody.read(res);
     const result = await updateUserSettings(req.user.id, data);

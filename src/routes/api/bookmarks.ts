@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { authHandler } from '../../modules/asyncHandler';
 import { requireAuth } from '../../middleware/auth';
-import { validateParams, parsedParams } from '../../middleware/validate';
+import { validateParams } from '../../middleware/validate';
 import {
   releaseCreditsSelect,
   withPrimaryArtist
@@ -19,18 +19,22 @@ import {
 
 const router = express.Router();
 
-const artistIdParams = z.object({
+const artistIdParamsSchema = z.object({
   artistId: z.coerce.number().int().positive()
 });
-const releaseIdParams = z.object({
+const artistIdParams = validateParams(artistIdParamsSchema);
+const releaseIdParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive()
 });
-const communityIdParams = z.object({
+const releaseIdParams = validateParams(releaseIdParamsSchema);
+const communityIdParamsSchema = z.object({
   communityId: z.coerce.number().int().positive()
 });
-const requestIdParams = z.object({
+const communityIdParams = validateParams(communityIdParamsSchema);
+const requestIdParamsSchema = z.object({
   requestId: z.coerce.number().int().positive()
 });
+const requestIdParams = validateParams(requestIdParamsSchema);
 
 // ─── Artist bookmarks ─────────────────────────────────────────────────────────
 
@@ -53,9 +57,9 @@ router.get(
 router.post(
   '/artists/:artistId',
   requireAuth,
-  validateParams(artistIdParams),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { artistId } = parsedParams<{ artistId: number }>(res);
+    const { artistId } = artistIdParams.read(res);
     const existing = await prisma.bookmarkArtist.findUnique({
       where: { userId_artistId: { userId: req.user.id, artistId } }
     });
@@ -92,9 +96,9 @@ router.post(
 router.delete(
   '/artists/:artistId',
   requireAuth,
-  validateParams(artistIdParams),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { artistId } = parsedParams<{ artistId: number }>(res);
+    const { artistId } = artistIdParams.read(res);
     await prisma.bookmarkArtist.deleteMany({
       where: { userId: req.user.id, artistId }
     });
@@ -141,9 +145,9 @@ router.get(
 router.post(
   '/releases/:releaseId',
   requireAuth,
-  validateParams(releaseIdParams),
+  releaseIdParams,
   authHandler(async (req, res) => {
-    const { releaseId } = parsedParams<{ releaseId: number }>(res);
+    const { releaseId } = releaseIdParams.read(res);
     const existing = await prisma.bookmarkRelease.findUnique({
       where: { userId_releaseId: { userId: req.user.id, releaseId } }
     });
@@ -205,9 +209,9 @@ router.delete(
 router.delete(
   '/releases/:releaseId',
   requireAuth,
-  validateParams(releaseIdParams),
+  releaseIdParams,
   authHandler(async (req, res) => {
-    const { releaseId } = parsedParams<{ releaseId: number }>(res);
+    const { releaseId } = releaseIdParams.read(res);
     await prisma.bookmarkRelease.deleteMany({
       where: { userId: req.user.id, releaseId }
     });
@@ -238,9 +242,9 @@ router.get(
 router.post(
   '/communities/:communityId',
   requireAuth,
-  validateParams(communityIdParams),
+  communityIdParams,
   authHandler(async (req, res) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
+    const { communityId } = communityIdParams.read(res);
     const existing = await prisma.bookmarkCommunity.findUnique({
       where: { userId_communityId: { userId: req.user.id, communityId } }
     });
@@ -286,9 +290,9 @@ router.post(
 router.delete(
   '/communities/:communityId',
   requireAuth,
-  validateParams(communityIdParams),
+  communityIdParams,
   authHandler(async (req, res) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
+    const { communityId } = communityIdParams.read(res);
     await prisma.bookmarkCommunity.deleteMany({
       where: { userId: req.user.id, communityId }
     });
@@ -321,9 +325,9 @@ router.get(
 router.post(
   '/requests/:requestId',
   requireAuth,
-  validateParams(requestIdParams),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { requestId } = parsedParams<{ requestId: number }>(res);
+    const { requestId } = requestIdParams.read(res);
     const existing = await prisma.bookmarkRequest.findUnique({
       where: { userId_requestId: { userId: req.user.id, requestId } }
     });
@@ -373,9 +377,9 @@ router.post(
 router.delete(
   '/requests/:requestId',
   requireAuth,
-  validateParams(requestIdParams),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { requestId } = parsedParams<{ requestId: number }>(res);
+    const { requestId } = requestIdParams.read(res);
     await prisma.bookmarkRequest.deleteMany({
       where: { userId: req.user.id, requestId }
     });

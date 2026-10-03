@@ -6,22 +6,17 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams
+  validateQuery
 } from '../../middleware/validate';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import {
   stylesheetSchema,
   stylesheetUpdateSchema,
-  authorStylesheetSchema,
-  type StylesheetInput,
-  type StylesheetUpdateInput,
-  type AuthorStylesheetInput
+  authorStylesheetSchema
 } from '../../schemas/stylesheet';
 import {
   createStylesheet,
@@ -41,13 +36,21 @@ import {
 import { prisma } from '../../lib/prisma';
 
 const router = express.Router();
+const stylesheetUpdateBody = validate(stylesheetUpdateSchema);
+const stylesheetBody = validate(stylesheetSchema);
+const authorStylesheetBody = validate(authorStylesheetSchema);
 const stylesheetIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const stylesheetIdParams = validateParams(stylesheetIdParamsSchema);
 const authorIdParamsSchema = z.object({
   userId: z.coerce.number().int().positive()
 });
+const authorIdParams = validateParams(authorIdParamsSchema);
 const listAuthorStylesheetsQuerySchema = z.object({ ...paginationBase });
+const listAuthorStylesheetsQuery = validateQuery(
+  listAuthorStylesheetsQuerySchema
+);
 
 // ─── AuthorStylesheet (PRD-03 #118/#119/#120/#146) — registered before /:id ───
 
@@ -56,9 +59,9 @@ const listAuthorStylesheetsQuerySchema = z.object({ ...paginationBase });
 router.post(
   '/author',
   requireAuth,
-  validate(authorStylesheetSchema),
+  authorStylesheetBody,
   authHandler(async (req, res) => {
-    const data = parsedBody<AuthorStylesheetInput>(res);
+    const data = authorStylesheetBody.read(res);
     const sheet = await createAuthorStylesheet(req.user.id, data);
     res.status(201).json(sheet);
   })
@@ -68,11 +71,11 @@ router.post(
 router.get(
   '/author/:userId',
   requireAuth,
-  validateParams(authorIdParamsSchema),
-  validateQuery(listAuthorStylesheetsQuerySchema),
+  authorIdParams,
+  listAuthorStylesheetsQuery,
   authHandler(async (_req, res) => {
-    const { userId } = parsedParams<{ userId: number }>(res);
-    const pg = parsedPage(res);
+    const { userId } = authorIdParams.read(res);
+    const pg = pageOf(listAuthorStylesheetsQuery.read(res));
     const [rows, total] = await listAuthorStylesheets(userId, pg);
     paginatedResponse(res, rows, total, pg);
   })
@@ -82,9 +85,9 @@ router.get(
 router.get(
   '/author-stylesheet/:id',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     const sheet = await getAuthorStylesheetById(id);
     if (!sheet) {
       res.status(404).json({ msg: 'Author stylesheet not found' });
@@ -99,11 +102,11 @@ router.get(
 router.put(
   '/author-stylesheet/:id',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
-  validate(authorStylesheetSchema),
+  stylesheetIdParams,
+  authorStylesheetBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const data = parsedBody<AuthorStylesheetInput>(res);
+    const { id } = stylesheetIdParams.read(res);
+    const data = authorStylesheetBody.read(res);
     res.json(await updateAuthorStylesheet(id, req.user.id, data));
   })
 );
@@ -114,9 +117,9 @@ router.put(
 router.delete(
   '/author-stylesheet/:id',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     await deleteAuthorStylesheet(id, req.user.id);
     res.status(204).send();
   })
@@ -130,9 +133,9 @@ router.delete(
 router.get(
   '/author-stylesheet/:id/css',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   authHandler(async (_req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     const sheet = await getAuthorStylesheetCss(id);
     if (!sheet) {
       res.status(404).json({ msg: 'Author stylesheet not found' });
@@ -153,9 +156,9 @@ router.get(
 router.post(
   '/author-stylesheet/:id/adopt',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     const result = await adoptAuthorStylesheet(req.user.id, id);
     res.json(result);
   })
@@ -187,9 +190,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     const stylesheet = await prisma.stylesheet.findUnique({ where: { id } });
     if (!stylesheet)
       return res.status(404).json({ msg: 'Stylesheet not found' });
@@ -201,9 +204,9 @@ router.get(
 router.post(
   '/',
   ...requirePermission('admin'),
-  validate(stylesheetSchema),
+  stylesheetBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const data = parsedBody<StylesheetInput>(res);
+    const data = stylesheetBody.read(res);
     const stylesheet = await createStylesheet({
       name: data.name,
       description: data.description ?? '',
@@ -218,11 +221,11 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('admin'),
-  validateParams(stylesheetIdParamsSchema),
-  validate(stylesheetUpdateSchema),
+  stylesheetIdParams,
+  stylesheetUpdateBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const data = parsedBody<StylesheetUpdateInput>(res);
+    const { id } = stylesheetIdParams.read(res);
+    const data = stylesheetUpdateBody.read(res);
     const stylesheet = await updateStylesheet(id, data);
     res.json(stylesheet);
   })
@@ -232,9 +235,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('admin'),
-  validateParams(stylesheetIdParamsSchema),
+  stylesheetIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = stylesheetIdParams.read(res);
     await deleteStylesheet(id);
     res.status(204).send();
   })

@@ -27,14 +27,14 @@ import {
   renderNewsFeed
 } from '../../modules/feeds';
 import { feedAuthLimiter, feedLimiter } from '../../middleware/rateLimiter';
-import { parsedQuery, validateQuery } from '../../middleware/validate';
+import { validateQuery } from '../../middleware/validate';
 import {
   contributionFeedQuerySchema,
-  feedCredentialsSchema,
-  type ContributionFeedQuery
+  feedCredentialsSchema
 } from '../../schemas/feeds';
 
 const router = express.Router();
+const contributionFeedQuery = validateQuery(contributionFeedQuerySchema);
 
 export const FEED_NOT_FOUND = 'Feed not found';
 
@@ -74,10 +74,9 @@ const feedChain = [feedAuthLimiter, requireFeedOwner, feedLimiter];
 router.get(
   '/contributions.xml',
   ...feedChain,
-  validateQuery(contributionFeedQuerySchema),
+  contributionFeedQuery,
   asyncHandler(async (_req: Request, res: Response) => {
-    const { community, tag, format, bitrate } =
-      parsedQuery<ContributionFeedQuery>(res);
+    const { community, tag, format, bitrate } = contributionFeedQuery.read(res);
     sendFeed(
       res,
       await renderContributionsFeed(ownerOf(res), {

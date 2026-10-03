@@ -1,15 +1,4 @@
 {
   "$comment": "Unchecked validator reads still to convert (#234). This list only SHRINKS: convert a file to validator handles, then lower or delete its entry. A count above or below its entry fails the check. Regenerate with `npm run validate:handles -- --write-baseline`.",
-  "files": {
-    "middleware/imageSrc.ts": 1,
-    "routes/api/asset.ts": 2,
-    "routes/api/bookmarks.ts": 8,
-    "routes/api/collages.ts": 17,
-    "routes/api/feeds.ts": 1,
-    "routes/api/search.ts": 12,
-    "routes/api/stylesheet.ts": 14,
-    "routes/api/tags.ts": 4,
-    "routes/api/top10.ts": 6,
-    "routes/api/wiki.ts": 14
-  }
+  "files": {}
 }

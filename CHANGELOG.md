@@ -37,7 +37,8 @@ All notable changes to stellar-api are documented here.
 
 - **Validators return a typed handle** (#234, #909). `validate`, `validateQuery` and `validateParams` are mounted as before, and `handle.read(res)` returns what they parsed, typed from the schema. A read for a route that didn't mount the handle throws, rather than returning `undefined`. `pageOf(handle.read(res))` replaces `parsedPage(res)`.
   - `parsedBody<T>`, `parsedQuery<T>`, `parsedParams<T>` and `parsedPage` stay until every route is converted. A new gate, `npm run validate:handles`, keeps new ones out against a shrink-only baseline.
-  - Converted so far: communities, releases, release groups, requests and downloads (#910); forum, posts, comments and subscriptions (#911); staff and moderation tools, install, rules and announcements (#912); users, auth, profiles, friends, messages and notifications (#913).
+  - Converted so far: communities, releases, release groups, requests and downloads (#910); forum, posts, comments and subscriptions (#911); staff and moderation tools, install, rules and announcements (#912); users, auth, profiles, friends, messages and notifications (#913); collages, wiki, stylesheets, search, Top 10, tags, bookmarks, feeds and assets (#914). Every route now reads through a handle.
+  - `registerBodyImages` takes the body handle it reads, so its field names are checked against the schema (#914).
   - No response or status changes.
 
 ## [0.10.2] — 2026-10-02

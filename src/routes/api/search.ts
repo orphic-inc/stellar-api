@@ -12,8 +12,8 @@ import {
 import { forumReadableWhere } from '../../modules/forumAccess';
 import { computeRatio } from '../../modules/ratio';
 import { resolveTagNames } from '../../modules/tag';
-import { validateQuery, parsedQuery } from '../../middleware/validate';
-import { parsedPage, paginatedResponse } from '../../lib/pagination';
+import { validateQuery } from '../../middleware/validate';
+import { paginatedResponse, pageOf } from '../../lib/pagination';
 import {
   releaseCreditsSelect,
   withPrimaryArtist
@@ -26,15 +26,18 @@ import {
   searchLogQuerySchema,
   searchUsersQuerySchema,
   type SearchReleasesQuery,
-  type SearchReleaseGroupsQuery,
-  type SearchArtistsQuery,
   type SearchRequestsQuery,
-  type SearchLogQuery,
-  type SearchUsersQuery
+  type SearchLogQuery
 } from '../../schemas/search';
 import type { AuthenticatedRequest } from '../../types/auth';
 
 const router = Router();
+const searchUsersQuery = validateQuery(searchUsersQuerySchema);
+const searchRequestsQuery = validateQuery(searchRequestsQuerySchema);
+const searchReleasesQuery = validateQuery(searchReleasesQuerySchema);
+const searchReleaseGroupsQuery = validateQuery(searchReleaseGroupsQuerySchema);
+const searchLogQuery = validateQuery(searchLogQuerySchema);
+const searchArtistsQuery = validateQuery(searchArtistsQuerySchema);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -301,10 +304,10 @@ const toSearchHit = (
 router.get(
   '/releases',
   requireAuth,
-  validateQuery(searchReleasesQuerySchema),
+  searchReleasesQuery,
   authHandler(async (req, res) => {
-    const q = parsedQuery<SearchReleasesQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchReleasesQuery.read(res);
+    const pg = pageOf(searchReleasesQuery.read(res));
 
     const communityIds = q.communityId
       ? Array.isArray(q.communityId)
@@ -366,10 +369,10 @@ router.get(
 router.get(
   '/release-groups',
   requireAuth,
-  validateQuery(searchReleaseGroupsQuerySchema),
+  searchReleaseGroupsQuery,
   authHandler(async (req, res) => {
-    const q = parsedQuery<SearchReleaseGroupsQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchReleaseGroupsQuery.read(res);
+    const pg = pageOf(searchReleaseGroupsQuery.read(res));
 
     const communityIds = q.communityId
       ? Array.isArray(q.communityId)
@@ -405,10 +408,10 @@ const ARTIST_SELECT = {
 router.get(
   '/artists',
   requireAuth,
-  validateQuery(searchArtistsQuerySchema),
+  searchArtistsQuery,
   asyncHandler(async (req, res) => {
-    const q = parsedQuery<SearchArtistsQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchArtistsQuery.read(res);
+    const pg = pageOf(searchArtistsQuery.read(res));
 
     const tagPredicate = buildArtistTagWhere(
       await resolveTagFilter(q.tags),
@@ -509,10 +512,10 @@ function serializeRequestRow(row: RawRequestRow) {
 router.get(
   '/requests',
   requireAuth,
-  validateQuery(searchRequestsQuerySchema),
+  searchRequestsQuery,
   authHandler(async (req, res) => {
-    const q = parsedQuery<SearchRequestsQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchRequestsQuery.read(res);
+    const pg = pageOf(searchRequestsQuery.read(res));
 
     const where = buildRequestWhere(q);
 
@@ -667,10 +670,10 @@ const logSection = <T>(data: T[], total: number, pg: LogPage) => ({
 router.get(
   '/log',
   requireAuth,
-  validateQuery(searchLogQuerySchema),
+  searchLogQuery,
   authHandler(async (req, res) => {
-    const q = parsedQuery<SearchLogQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchLogQuery.read(res);
+    const pg = pageOf(searchLogQuery.read(res));
 
     const { topicWhere, postWhere } = buildLogWheres(req.user, q);
     const orderBy = { createdAt: q.order } as const;
@@ -719,10 +722,10 @@ const USER_SELECT_STAFF = {
 router.get(
   '/users',
   requireAuth,
-  validateQuery(searchUsersQuerySchema),
+  searchUsersQuery,
   asyncHandler(async (req, res) => {
-    const q = parsedQuery<SearchUsersQuery>(res);
-    const pg = parsedPage(res);
+    const q = searchUsersQuery.read(res);
+    const pg = pageOf(searchUsersQuery.read(res));
     const authedReq = req as AuthenticatedRequest;
 
     const rank = await prisma.userRank.findUnique({

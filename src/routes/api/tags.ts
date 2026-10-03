@@ -8,24 +8,16 @@ import { requirePermission } from '../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../middleware/validate';
-import { parsedPage, paginatedResponse } from '../../lib/pagination';
+import { paginatedResponse, pageOf } from '../../lib/pagination';
 import {
   promoteTag,
   demoteTag,
   listOfficialTags,
   listTags
 } from '../../modules/tag';
-import {
-  promoteTagSchema,
-  tagsQuerySchema,
-  type PromoteTagInput,
-  type TagsQuery
-} from '../../schemas/tags';
+import { promoteTagSchema, tagsQuerySchema } from '../../schemas/tags';
 
 /**
  * The curated tag vocabulary (#298, ADR-0045).
@@ -44,10 +36,13 @@ import {
  * router gates its GET too, and this one must not.
  */
 const router = express.Router();
+const tagsQuery = validateQuery(tagsQuerySchema);
+const promoteTagBody = validate(promoteTagSchema);
 
 const officialParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const officialParams = validateParams(officialParamsSchema);
 
 // GET /api/tags/official — the curated vocabulary, for a member's tag picker.
 // Registered before any parameterized route so Express cannot shadow it.
@@ -63,10 +58,10 @@ router.get(
 router.get(
   '/',
   ...requirePermission('tags_manage'),
-  validateQuery(tagsQuerySchema),
+  tagsQuery,
   asyncHandler(async (_req, res) => {
-    const pg = parsedPage(res);
-    const { q } = parsedQuery<TagsQuery>(res);
+    const pg = pageOf(tagsQuery.read(res));
+    const { q } = tagsQuery.read(res);
     const [tags, total] = await listTags({ q, skip: pg.skip, limit: pg.limit });
     paginatedResponse(res, tags, total, pg);
   })
@@ -76,9 +71,9 @@ router.get(
 router.post(
   '/official',
   ...requirePermission('tags_manage'),
-  validate(promoteTagSchema),
+  promoteTagBody,
   authHandler(async (req, res) => {
-    const { name } = parsedBody<PromoteTagInput>(res);
+    const { name } = promoteTagBody.read(res);
     const tag = await promoteTag(name);
     // `requested` and `name` differ when the typed name was folded or redirected
     // through the alias table. This row is the only record that happened.
@@ -94,9 +89,9 @@ router.post(
 router.delete(
   '/:id/official',
   ...requirePermission('tags_manage'),
-  validateParams(officialParamsSchema),
+  officialParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = officialParams.read(res);
     // An id that names no tag answers 404 from demoteTag.
     const tag = await demoteTag(id);
     await audit(prisma, req.user.id, 'tag.demote', 'Tag', tag.id, {

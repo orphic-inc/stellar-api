@@ -2,7 +2,8 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { authHandler } from '../modules/asyncHandler';
 import { addImageSrcs } from '../modules/imageSrc';
 import { registerWriteImages } from '../modules/remoteImage';
-import { parsedBody } from './validate';
+import type { z, ZodTypeAny } from 'zod';
+import type { ValidatorHandle } from './validate';
 import { markGate, markNotGate } from '../lib/routeGate';
 
 /**
@@ -39,14 +40,21 @@ markNotGate(
  * the handler writes, so a write past the daily ceiling is refused with 429
  * whole (#737, ADR-0051).
  *
- * Mount it after the route's gate and `validate`. It runs before the handler's
- * own checks, so use it only where the gate is the whole authorization;
- * otherwise register inside the handler, after its checks.
+ * Mount it after the route's gate and the body handle it is given. It runs
+ * before the handler's own checks, so use it only where the gate is the whole
+ * authorization; otherwise register inside the handler, after its checks.
+ *
+ * It reads through that handle (#234), so `fields` are checked against the
+ * schema and a route that did not mount the handle throws rather than
+ * registering nothing.
  */
-export const registerBodyImages = (...fields: string[]): RequestHandler =>
+export const registerBodyImages = <S extends ZodTypeAny>(
+  bodyHandle: ValidatorHandle<S>,
+  ...fields: Array<keyof z.infer<S> & string>
+): RequestHandler =>
   markGate(
     authHandler(async (req, res, next) => {
-      const body = parsedBody<Record<string, unknown>>(res) ?? {};
+      const body = bodyHandle.read(res) as Record<string, unknown>;
       const values = fields.map((field) =>
         typeof body[field] === 'string' ? (body[field] as string) : null
       );
