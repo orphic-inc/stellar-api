@@ -37,7 +37,7 @@ src/
 ```
 
 - **Routes → Modules → DB.** A route handler validates input, calls a module, and shapes the response. It never runs raw business logic. Business rules, transactions, and Prisma access live in `src/modules/<domain>.ts`.
-- **Validation is mandatory on mutating routes.** `validate(schema)` / `validateParams(schema)` run before the handler; read the parsed value with `parsedBody<T>(res)` / `parsedParams<T>(res)`. Use `z.coerce` for numeric path params — never hand-rolled `parseInt` + `isNaN`.
+- **Validation is mandatory on mutating routes.** `validate(schema)` / `validateParams(schema)` return a handle that runs before the handler; read the parsed value with `handle.read(res)`, typed from the schema (#234). Use `z.coerce` for numeric path params — never hand-rolled `parseInt` + `isNaN`.
 - **Permissions are granular, not role-based.** Use `requirePermission('name')` or the inline `loadPermissions` + `hasPermission(perms, 'name')`. Do not add named role helpers ([ADR-0001](adr/0001-granular-permission-checks.md)). `req.user` carries `{ id, userRankId, userRankLevel }` for inline class checks.
 - **Errors** are thrown as `new AppError(status, 'message')` from modules; the global handler emits `{ msg }`. Field validation emits `{ errors: { field: [msgs] } }`. Never `{ error }`.
 - **Soft delete**: users are never hard-deleted (`disabled: true`); forum content uses `deletedAt`.
@@ -101,12 +101,14 @@ The end-to-end shape for a new feature, using an existing route as the template:
    ```
 3. **Route** (`src/routes/api/<domain>.ts`) — HTTP only; validate, delegate, shape. Register static segments **before** `/:id`:
    ```ts
+   const createWidgetBody = validate(createWidgetSchema);
+
    router.post(
      '/',
      requirePermission('widgets_manage'),
-     validate(createWidgetSchema),
+     createWidgetBody,
      asyncHandler(async (req, res) => {
-       const input = parsedBody<CreateWidgetInput>(res);
+       const input = createWidgetBody.read(res);
        const widget = await createWidget(input, req.user!.id);
        res.status(201).json(widget);
      })
@@ -114,7 +116,7 @@ The end-to-end shape for a new feature, using an existing route as the template:
    ```
 4. **Contract** — register the response shape in `src/lib/openapi.ts`, then `npm run openapi:export` (regenerates the git-tracked `openapi.json`; the CI freshness gate fails if you forget). Pair a stellar-ui `api:sync` after merge.
 5. **Test** — add a `*.spec.ts` (mock DB) and/or an integration test (`src/integration/`, real DB). Seed deterministic data and assert observable behavior.
-6. **List endpoints** paginate with `parsedPage(res)` + `paginatedResponse(res, rows, total, pg)`. `parsedPage` reads the already-validated query off `res.locals`, so the route must first run `validateQuery` with a schema spreading `paginationBase` — there is no `parsePage(req)`.
+6. **List endpoints** paginate with `pageOf(listQuery.read(res))` + `paginatedResponse(res, rows, total, pg)`, where `listQuery = validateQuery(...)` over a schema spreading `paginationBase`. Without `paginationBase` the `pageOf` call does not compile. There is no `parsePage(req)`.
 
 The **stub models** in `schema.prisma` that have no routes yet (CoverArt, BitcoinDonation, Applicant/Thread, Concert, etc. — see [AGENTS.md](../AGENTS.md#stub-models-no-routes-implemented)) are the standing extension backlog.
 

@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { type ZodTypeAny as ZodSchema } from 'zod';
+import { z, type ZodTypeAny as ZodSchema } from 'zod';
 import { markGate } from '../lib/routeGate';
 
 const VALIDATION_ERROR_MESSAGE = 'Validation failed';
 
-const validationError = (res: Response, schema: ZodSchema, data: unknown) => {
+const validationError = <S extends ZodSchema>(
+  res: Response,
+  schema: S,
+  data: unknown
+): z.infer<S> | null => {
   const result = schema.safeParse(data);
   if (!result.success) {
     res.status(400).json({
@@ -14,6 +18,24 @@ const validationError = (res: Response, schema: ZodSchema, data: unknown) => {
     return null;
   }
   return result.data;
+};
+
+type RequestPart = 'body' | 'query' | 'params';
+
+/**
+ * A mounted validator that also reads back what it validated (#234).
+ *
+ * It is the middleware itself, so a route mounts it exactly as before, and
+ * `read(res)` returns the parsed data typed from the schema. There is no `<T>`
+ * to choose, so the type cannot drift from the schema it names.
+ *
+ * Each handle writes under a symbol of its own, so `read` also proves the
+ * pairing: a handler reading a handle its route never mounted throws, rather
+ * than receiving `undefined` typed as the schema. One handle may be mounted on
+ * any number of routes; each request sees only what its own layers wrote.
+ */
+export type ValidatorHandle<S extends ZodSchema> = RequestHandler & {
+  read(res: Response): z.infer<S>;
 };
 
 /**
@@ -31,50 +53,57 @@ const validationError = (res: Response, schema: ZodSchema, data: unknown) => {
  * validator declared no `400` at all, and the 79 that did said `Validation
  * error` without saying what was invalid.
  */
-export const validate = (schema: ZodSchema): RequestHandler =>
-  markGate(
+const validator = <S extends ZodSchema>(
+  schema: S,
+  part: RequestPart,
+  store: (req: Request, res: Response, data: z.infer<S>) => void
+): ValidatorHandle<S> => {
+  const key = Symbol(`validated ${part}`);
+  const handler = markGate(
     (req: Request, res: Response, next: NextFunction) => {
-      const data = validationError(res, schema, req.body);
+      const data = validationError(res, schema, req[part]);
       if (!data) return;
-      req.body = data;
-      res.locals.parsedBody = data;
+      store(req, res, data);
+      res.locals[key as unknown as string] = data;
       next();
     },
     'validation',
     undefined,
     undefined,
-    ['body']
+    [part]
   );
+  return Object.assign(handler, {
+    read(res: Response): z.infer<S> {
+      const locals = res.locals as Record<symbol, unknown>;
+      if (!(key in locals)) {
+        throw new Error(
+          `read() of a ${part} validator this route did not mount (#234)`
+        );
+      }
+      return locals[key] as z.infer<S>;
+    }
+  });
+};
 
-export const validateQuery = (schema: ZodSchema): RequestHandler =>
-  markGate(
-    (req: Request, res: Response, next: NextFunction) => {
-      const data = validationError(res, schema, req.query);
-      if (!data) return;
-      Object.assign(req.query, data);
-      res.locals.parsedQuery = data;
-      next();
-    },
-    'validation',
-    undefined,
-    undefined,
-    ['query']
-  );
+// `res.locals.parsed*` stay written until every route reads through a handle
+// (#234); `parsedBody` and its siblings below still read them.
+export const validate = <S extends ZodSchema>(schema: S) =>
+  validator(schema, 'body', (req, res, data) => {
+    req.body = data;
+    res.locals.parsedBody = data;
+  });
 
-export const validateParams = (schema: ZodSchema): RequestHandler =>
-  markGate(
-    (req: Request, res: Response, next: NextFunction) => {
-      const data = validationError(res, schema, req.params);
-      if (!data) return;
-      Object.assign(req.params, data);
-      res.locals.parsedParams = data;
-      next();
-    },
-    'validation',
-    undefined,
-    undefined,
-    ['params']
-  );
+export const validateQuery = <S extends ZodSchema>(schema: S) =>
+  validator(schema, 'query', (req, res, data) => {
+    Object.assign(req.query, data);
+    res.locals.parsedQuery = data;
+  });
+
+export const validateParams = <S extends ZodSchema>(schema: S) =>
+  validator(schema, 'params', (req, res, data) => {
+    Object.assign(req.params, data);
+    res.locals.parsedParams = data;
+  });
 
 export function parsedParams<T>(res: Response): T {
   return res.locals.parsedParams as T;

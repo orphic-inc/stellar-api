@@ -84,6 +84,7 @@ npm run openapi:completeness # are all mounted routes registered in lib/openapi.
 npm run openapi:gate-marks   # does every layer ahead of a handler carry markGate or markNotGate? (#558; gated)
 npm run openapi:failure-coverage # does every operation declare its handler's 4xx, or sit in noFailureModes? (gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
+npm run validate:handles      # do routes read validated input through the validator's handle? (#234; gated, shrink-only)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
 npm run env:coverage     # do the code, .env.default, docs/README.md and this file agree on env vars? (#682; gated)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
@@ -460,27 +461,38 @@ if (req.user!.userRankLevel < (forum.minClassRead ?? 0)) { ... }
 
 Route handlers delegate to domain modules in `src/modules/`. Modules own DB queries, transactions, and business rules. Routes handle HTTP concerns (auth, validation, response shape).
 
-### Body validation
+### Validation: read through the validator's handle (#234)
 
-Always run `validate(schema)` before the handler. Read the parsed body with the `parsedBody<T>` helper, typed with the Zod-inferred type:
-
-```ts
-validate(loginSchema),
-asyncHandler(async (req, res) => {
-  const { email, password } = parsedBody<LoginInput>(res);
-```
-
-Use `parsedQuery<T>(res)` / `parsedParams<T>(res)` for `validateQuery` / `validateParams`.
-
-### Param validation
-
-Use `validateParams` with `z.coerce` for numeric IDs — never use raw `parseInt` + `isNaN`:
+`validate`, `validateQuery` and `validateParams` each return a **handle**: the
+middleware you mount, plus `read(res)`, which returns what that validator parsed,
+typed from its schema. Declare handles once at module scope, next to their
+schema, and reuse them across routes. Name them for the request part:
+`releaseParams`, `createReleaseBody`, `listQuery`.
 
 ```ts
-const artistIdParamsSchema = z.object({ id: z.coerce.number().int().positive() });
-router.get('/:id', validateParams(artistIdParamsSchema), asyncHandler(async (req, res) => {
-  const { id } = req.params as unknown as { id: number };
+const releaseParams = validateParams(
+  z.object({ id: z.coerce.number().int().positive() }) // z.coerce, never parseInt + isNaN
+);
+const updateReleaseBody = validate(updateReleaseSchema);
+
+router.put(
+  '/:id',
+  requireAuth,
+  releaseParams,
+  updateReleaseBody,
+  authHandler(async (req, res) => {
+    const { id } = releaseParams.read(res);
+    const { title } = updateReleaseBody.read(res);
 ```
+
+There is no `<T>` to pick, so the type cannot drift from the schema. `read`
+throws when the route did not mount that handle, so a mispaired read fails any
+test that reaches it instead of returning `undefined`.
+
+**`parsedBody<T>` / `parsedQuery<T>` / `parsedParams<T>` / `parsedPage` are
+being retired** (#234). `npm run validate:handles` gates them against a
+shrink-only baseline: don't add one, and lower the baseline when you convert a
+file.
 
 ### Static routes before parameterized
 
@@ -500,19 +512,18 @@ Do not introduce named role checks (`isModerator`, `isStaffUser`). See `docs/adr
 
 ### Pagination
 
-`parsedPage` reads the **already-validated** query off `res.locals`, so it only
-returns anything useful once the route has run `validateQuery` with a schema
-spreading `paginationBase` — without that, `res.locals.parsedQuery` is
-undefined. There is no `parsePage(req)`.
+Spread `paginationBase` into the query schema, then pass what the handle read
+to `pageOf`. A schema without `paginationBase` has no `page` or `limit`, so the
+call does not compile. There is no `parsePage(req)`.
 
 ```ts
-const listQuerySchema = z.object({ ...paginationBase });
+const listQuery = validateQuery(z.object({ ...paginationBase }));
 
 router.get(
   '/',
-  validateQuery(listQuerySchema),
+  listQuery,
   asyncHandler(async (_req, res) => {
-    const pg = parsedPage(res); // { page, limit, skip }
+    const pg = pageOf(listQuery.read(res)); // { page, limit, skip }
     const [rows, total] = await Promise.all([
       prisma.foo.findMany({ skip: pg.skip, take: pg.limit }),
       prisma.foo.count()

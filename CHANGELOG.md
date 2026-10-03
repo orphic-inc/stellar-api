@@ -33,6 +33,12 @@ All notable changes to stellar-api are documented here.
   - **Read only.** That read's contributions carry `downloadUrl` as an empty string. Downloads, edits, votes, other releases and every list stay member-only. Resolving the report closes the page again.
   - **The staff queue's `sourceUrl` follows the same rule.** It linked every release before, including ones whose page refused staff. A link into a release page now appears only when the page will open, so a resolved report in a closed community links nowhere.
 
+### Changed
+
+- **Validators return a typed handle** (#234, #909). `validate`, `validateQuery` and `validateParams` are mounted as before, and `handle.read(res)` returns what they parsed, typed from the schema. A read for a route that didn't mount the handle throws, rather than returning `undefined`. `pageOf(handle.read(res))` replaces `parsedPage(res)`.
+  - `parsedBody<T>`, `parsedQuery<T>`, `parsedParams<T>` and `parsedPage` stay until every route is converted. A new gate, `npm run validate:handles`, keeps new ones out against a shrink-only baseline.
+  - No response or status changes.
+
 ## [0.10.2] — 2026-10-02
 
 ### Changed
