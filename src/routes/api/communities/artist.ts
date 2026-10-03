@@ -14,16 +14,14 @@ import {
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams
+  validateQuery
 } from '../../../middleware/validate';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import {
   artistSchema,
@@ -31,34 +29,38 @@ import {
   similarArtistSchema,
   artistAliasSchema,
   artistTagSchema,
-  vanityHouseSchema,
-  type VanityHouseInput,
-  type ArtistInput,
-  type UpdateArtistInput,
-  type SimilarArtistInput,
-  type ArtistAliasInput,
-  type ArtistTagInput
+  vanityHouseSchema
 } from '../../../schemas/artist';
 
 const router = express.Router();
+const vanityHouseBody = validate(vanityHouseSchema);
+const updateArtistBody = validate(updateArtistSchema);
+const similarArtistBody = validate(similarArtistSchema);
+const artistTagBody = validate(artistTagSchema);
+const artistBody = validate(artistSchema);
+const artistAliasBody = validate(artistAliasSchema);
 const artistIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const artistIdParams = validateParams(artistIdParamsSchema);
 const artistHistoryParamsSchema = z.object({
   artistId: z.coerce.number().int().positive()
 });
+const artistHistoryParams = validateParams(artistHistoryParamsSchema);
 const artistRevertParamsSchema = z.object({
   historyId: z.coerce.number().int().positive()
 });
+const artistRevertParams = validateParams(artistRevertParamsSchema);
 const artistsQuerySchema = z.object({ ...paginationBase });
+const artistsQuery = validateQuery(artistsQuerySchema);
 
 // GET /api/artists
 router.get(
   '/',
   requireAuth,
-  validateQuery(artistsQuerySchema),
+  artistsQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(artistsQuery.read(res));
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
         where: { deletedAt: null },
@@ -77,9 +79,9 @@ router.get(
 router.get(
   '/vanity-house',
   ...requirePermission('admin'),
-  validateQuery(artistsQuerySchema),
+  artistsQuery,
   asyncHandler(async (req: Request, res: Response) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(artistsQuery.read(res));
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
         where: { vanityHouse: true, deletedAt: null },
@@ -98,11 +100,11 @@ router.get(
 router.put(
   '/:id/vanity-house',
   ...requirePermission('news_manage'),
-  validateParams(artistIdParamsSchema),
-  validate(vanityHouseSchema),
+  artistIdParams,
+  vanityHouseBody,
   asyncHandler(async (_req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { vanityHouse } = parsedBody<VanityHouseInput>(res);
+    const { id } = artistIdParams.read(res);
+    const { vanityHouse } = vanityHouseBody.read(res);
     const artist = await prisma.artist.findUnique({
       where: { id, deletedAt: null }
     });
@@ -129,9 +131,9 @@ router.put(
 router.get(
   '/history/:artistId',
   requireAuth,
-  validateParams(artistHistoryParamsSchema),
+  artistHistoryParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId } = parsedParams<{ artistId: number }>(res);
+    const { artistId } = artistHistoryParams.read(res);
     // Each history row's `data` snapshot carries the artist's name, so a
     // withdrawn artist is readable by name through this route (#573). It used
     // to answer an empty 200 for a missing id as well; both now 404.
@@ -149,9 +151,9 @@ router.get(
 router.post(
   '/revert/:historyId',
   ...requirePermission('communities_manage'),
-  validateParams(artistRevertParamsSchema),
+  artistRevertParams,
   authHandler(async (req, res) => {
-    const { historyId } = parsedParams<{ historyId: number }>(res);
+    const { historyId } = artistRevertParams.read(res);
     const artist = await revertArtistFromHistory({
       historyId,
       editedBy: req.user.id
@@ -167,9 +169,9 @@ router.post(
 router.post(
   '/similar',
   requireAuth,
-  validate(similarArtistSchema),
+  similarArtistBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { artistId, similarArtistId } = parsedBody<SimilarArtistInput>(res);
+    const { artistId, similarArtistId } = similarArtistBody.read(res);
     // A soft-deleted artist keeps a live row, so the foreign key below is
     // satisfied and this would record a similarity the read then filters out
     // (#573) — a write reporting success with no possible effect. Same status
@@ -202,9 +204,9 @@ router.post(
 router.post(
   '/alias',
   requireAuth,
-  validate(artistAliasSchema),
+  artistAliasBody,
   authHandler(async (req, res) => {
-    const { artistId, redirectId } = parsedBody<ArtistAliasInput>(res);
+    const { artistId, redirectId } = artistAliasBody.read(res);
     // As on /similar: a withdrawn artist satisfies the foreign key, so without
     // this the alias is created and then filtered out of every read (#573).
     const bodyIdMissing: [number, string] = [
@@ -233,9 +235,9 @@ router.post(
 router.post(
   '/tag',
   requireAuth,
-  validate(artistTagSchema),
+  artistTagBody,
   authHandler(async (req, res) => {
-    const { artistId, tagId } = parsedBody<ArtistTagInput>(res);
+    const { artistId, tagId } = artistTagBody.read(res);
     let tag;
     try {
       tag = await prisma.artistTag.upsert({
@@ -257,9 +259,9 @@ router.post(
 router.post(
   '/',
   requireAuth,
-  validate(artistSchema),
+  artistBody,
   authHandler(async (req, res) => {
-    const { name, vanityHouse } = parsedBody<ArtistInput>(res);
+    const { name, vanityHouse } = artistBody.read(res);
     const artist = await createArtist(name, vanityHouse ?? false, req.user.id);
     res.status(201).json(artist);
   })
@@ -269,9 +271,9 @@ router.post(
 router.get(
   '/:id/subscribe',
   requireAuth,
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = artistIdParams.read(res);
     // POST on this same path already 404s for a missing or withdrawn artist.
     // GET and DELETE answered an unconditional 200, so one resource had two
     // answers depending on the verb (#573, closing the #575 /artists split).
@@ -287,9 +289,9 @@ router.get(
 router.post(
   '/:id/subscribe',
   requireAuth,
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = artistIdParams.read(res);
     await assertArtistLive(id);
     try {
       await prisma.artistSubscription.upsert({
@@ -309,9 +311,9 @@ router.post(
 router.delete(
   '/:id/subscribe',
   requireAuth,
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = artistIdParams.read(res);
     // Gates on the ARTIST, not on the subscription: unsubscribing stays
     // idempotent, so a live artist you were never subscribed to still answers
     // 200 `{ subscribed: false }` rather than 404.
@@ -327,9 +329,9 @@ router.delete(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = artistIdParams.read(res);
 
     const [artist, subscription] = await Promise.all([
       prisma.artist.findUnique({
@@ -390,9 +392,9 @@ router.get(
 router.get(
   '/:id/similar',
   requireAuth,
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id: artistId } = parsedParams<{ id: number }>(res);
+    const { id: artistId } = artistIdParams.read(res);
     // Both directions leaked (#573). The parent was never checked at all, so a
     // withdrawn artist's own similar list stayed readable; and the target was
     // unfiltered, so a withdrawn artist appeared in a live one's list.
@@ -420,12 +422,11 @@ router.get(
 router.put(
   '/:id',
   ...requirePermission('communities_manage'),
-  validateParams(artistIdParamsSchema),
-  validate(updateArtistSchema),
+  artistIdParams,
+  updateArtistBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { name, vanityHouse, description } =
-      parsedBody<UpdateArtistInput>(res);
+    const { id } = artistIdParams.read(res);
+    const { name, vanityHouse, description } = updateArtistBody.read(res);
 
     const existing = await prisma.artist.findUnique({
       where: { id, deletedAt: null }
@@ -455,9 +456,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('admin'),
-  validateParams(artistIdParamsSchema),
+  artistIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = artistIdParams.read(res);
     const artist = await prisma.artist.findUnique({
       where: { id, deletedAt: null }
     });

@@ -2,12 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import { downloadLimiter } from '../../middleware/rateLimiter';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../middleware/validate';
+import { validate, validateParams } from '../../middleware/validate';
 import { authHandler } from '../../modules/asyncHandler';
 import { contributionVisibleTo } from '../../modules/communityAccess';
 import {
@@ -18,26 +13,28 @@ import {
   grantAccessSchema,
   reverseGrantSchema,
   downloadGrantParamsSchema,
-  contributionAccessParamsSchema,
-  type GrantAccessInput,
-  type ReverseGrantInput
+  contributionAccessParamsSchema
 } from '../../schemas/downloads';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { DownloadGrantStatus } from '@prisma/client';
 
 const router = Router();
+const reverseGrantBody = validate(reverseGrantSchema);
+const grantAccessBody = validate(grantAccessSchema);
+const downloadGrantParams = validateParams(downloadGrantParamsSchema);
+const contributionAccessParams = validateParams(contributionAccessParamsSchema);
 
 // POST /api/contributions/:id/access — grant download access and return URL
 router.post(
   '/contributions/:id/access',
   downloadLimiter,
   requireAuth,
-  validateParams(contributionAccessParamsSchema),
-  validate(grantAccessSchema),
+  contributionAccessParams,
+  grantAccessBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { idempotencyKey } = parsedBody<GrantAccessInput>(res);
+    const { id } = contributionAccessParams.read(res);
+    const { idempotencyKey } = grantAccessBody.read(res);
     const result = await grantDownloadAccess(req.user.id, id, idempotencyKey);
     res.json(result);
   })
@@ -47,9 +44,9 @@ router.post(
 router.get(
   '/contributions/:id/access/latest',
   requireAuth,
-  validateParams(contributionAccessParamsSchema),
+  contributionAccessParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = contributionAccessParams.read(res);
     const windowStart = new Date(Date.now() - 120_000);
     const grant = await prisma.downloadAccessGrant.findFirst({
       where: {
@@ -82,11 +79,11 @@ router.get(
 router.post(
   '/downloads/:grantId/reverse',
   ...requirePermission('staff', 'admin'),
-  validateParams(downloadGrantParamsSchema),
-  validate(reverseGrantSchema),
+  downloadGrantParams,
+  reverseGrantBody,
   authHandler(async (req, res) => {
-    const { grantId } = parsedParams<{ grantId: number }>(res);
-    const { reason } = parsedBody<ReverseGrantInput>(res);
+    const { grantId } = downloadGrantParams.read(res);
+    const { reason } = reverseGrantBody.read(res);
     const result = await reverseDownloadAccess(req.user.id, grantId, reason);
     res.json(result);
   })

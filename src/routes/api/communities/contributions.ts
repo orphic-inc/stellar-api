@@ -1,6 +1,5 @@
 import express from 'express';
 import { z } from 'zod';
-import { RatioExempt } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
 import { sizeBytesToNumber } from '../../../lib/serialize';
 import { authHandler } from '../../../modules/asyncHandler';
@@ -15,41 +14,43 @@ import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import { contributionVisibleTo } from '../../../modules/communityAccess';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams
+  validateQuery
 } from '../../../middleware/validate';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import {
   createContributionSchema,
   contributionReportSchema,
-  ratioExemptSchema,
-  type CreateContributionInput
+  ratioExemptSchema
 } from '../../../schemas/contribution';
 import { getSettings } from '../../../modules/settings';
 import { authorRefSelect, toAuthorRefOrNull } from '../../../modules/authorRef';
 import { renderSiteBBCode, resolveViewer } from '../../../modules/bbcodeRender';
 
 const router = express.Router();
+const ratioExemptBody = validate(ratioExemptSchema);
+const createContributionBody = validate(createContributionSchema);
+const contributionReportBody = validate(contributionReportSchema);
 const contributionIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const contributionIdParams = validateParams(contributionIdParamsSchema);
 
 const contributionsQuerySchema = z.object({ ...paginationBase });
+const contributionsQuery = validateQuery(contributionsQuerySchema);
 
 // GET /api/contributions
 router.get(
   '/',
   requireAuth,
-  validateQuery(contributionsQuerySchema),
+  contributionsQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(contributionsQuery.read(res));
     const where = { userId: req.user.id };
     const [contributions, total] = await Promise.all([
       prisma.contribution.findMany({
@@ -115,9 +116,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(contributionIdParamsSchema),
+  contributionIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = contributionIdParams.read(res);
     // Resolved ONCE for the request: the comment map below would otherwise issue
     // one identical settings query per comment (#400).
     const bbViewer = await resolveViewer(req);
@@ -176,9 +177,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(createContributionSchema),
+  createContributionBody,
   authHandler(async (req, res) => {
-    const input = parsedBody<CreateContributionInput>(res);
+    const input = createContributionBody.read(res);
 
     const settings = await getSettings();
     if (settings.approvedDomains.length > 0) {
@@ -230,11 +231,11 @@ router.post(
 router.post(
   '/:id/report',
   requireAuth,
-  validateParams(contributionIdParamsSchema),
-  validate(contributionReportSchema),
+  contributionIdParams,
+  contributionReportBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { reason } = parsedBody<{ reason: string }>(res);
+    const { id } = contributionIdParams.read(res);
+    const { reason } = contributionReportBody.read(res);
 
     // Scoped (#774): a hidden contribution answers as a missing one, and takes
     // no report or link-health strike from a member who cannot see it.
@@ -260,11 +261,11 @@ router.post(
 router.put(
   '/:id/ratio-exempt',
   ...requirePermission('contributions_manage'),
-  validateParams(contributionIdParamsSchema),
-  validate(ratioExemptSchema),
+  contributionIdParams,
+  ratioExemptBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { ratioExempt } = parsedBody<{ ratioExempt: RatioExempt }>(res);
+    const { id } = contributionIdParams.read(res);
+    const { ratioExempt } = ratioExemptBody.read(res);
     const updated = await setContributionRatioExempt(
       req.user.id,
       id,

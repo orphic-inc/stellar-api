@@ -20,26 +20,21 @@ import {
   loadPermissions
 } from '../../../middleware/permissions';
 import {
-  parsedBody,
   validate,
   validateParams,
-  validateQuery,
-  parsedParams,
-  parsedQuery
+  validateQuery
 } from '../../../middleware/validate';
 import {
   createCommunitySchema,
   updateCommunitySchema,
   addCuratorSchema,
   addMemberSchema,
-  type AddMemberInput,
-  type CreateCommunityInput,
   type UpdateCommunityInput
 } from '../../../schemas/community';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import releaseRouter from './release';
 import leaderOfferRouter from './leaderOffer';
@@ -139,13 +134,19 @@ const updateCommunityRow = async (
 };
 
 const router = express.Router();
+const updateCommunityBody = validate(updateCommunitySchema);
+const createCommunityBody = validate(createCommunitySchema);
+const addMemberBody = validate(addMemberSchema);
+const addCuratorBody = validate(addCuratorSchema);
 const communityIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
 });
+const communityIdParams = validateParams(communityIdParamsSchema);
 const memberParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   userId: z.coerce.number().int().positive()
 });
+const memberParams = validateParams(memberParamsSchema);
 // Static before `/:id`, or Express shadows it.
 router.use('/manage', manageRouter);
 router.use('/:communityId/releases', releaseRouter);
@@ -153,17 +154,19 @@ router.use('/:id/leader-offer', leaderOfferRouter);
 router.use('/:id/leadership-log', leadershipLogRouter);
 
 const communitiesQuerySchema = z.object({ ...paginationBase });
+const communitiesQuery = validateQuery(communitiesQuerySchema);
 const healthHistoryQuerySchema = z.object({
   period: z.nativeEnum(StatSnapshotPeriod).default(StatSnapshotPeriod.Daily)
 });
+const healthHistoryQuery = validateQuery(healthHistoryQuerySchema);
 
 // GET /api/communities — only returns communities the user can access
 router.get(
   '/',
   requireAuth,
-  validateQuery(communitiesQuerySchema),
+  communitiesQuery,
   authHandler(async (req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(communitiesQuery.read(res));
     const userId = req.user.id;
     // Same union the gates use (#419), so a curator-only member sees the
     // communities they administer instead of only the ones they consume.
@@ -195,9 +198,9 @@ router.get(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(communityIdParamsSchema),
+  communityIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = communityIdParams.read(res);
     const community = await prisma.community.findUnique({
       where: { id },
       include: {
@@ -233,9 +236,9 @@ router.get(
 router.get(
   '/:id/health',
   requireAuth,
-  validateParams(communityIdParamsSchema),
+  communityIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = communityIdParams.read(res);
     const community = await prisma.community.findUnique({
       where: { id },
       select: { registrationStatus: true }
@@ -255,11 +258,11 @@ router.get(
 router.get(
   '/:id/health/history',
   requireAuth,
-  validateParams(communityIdParamsSchema),
-  validateQuery(healthHistoryQuerySchema),
+  communityIdParams,
+  healthHistoryQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { period } = parsedQuery<{ period: StatSnapshotPeriod }>(res);
+    const { id } = communityIdParams.read(res);
+    const { period } = healthHistoryQuery.read(res);
     const community = await prisma.community.findUnique({
       where: { id },
       select: { registrationStatus: true }
@@ -280,11 +283,11 @@ router.get(
 router.post(
   '/:id/members',
   requireAuth,
-  validateParams(communityIdParamsSchema),
-  validate(addMemberSchema),
+  communityIdParams,
+  addMemberBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { userId, role } = parsedBody<AddMemberInput>(res);
+    const { id } = communityIdParams.read(res);
+    const { userId, role } = addMemberBody.read(res);
 
     await assertCommunityAdminOr(id, req, res, curatorEdge);
 
@@ -320,9 +323,9 @@ router.post(
 router.delete(
   '/:id/members/:userId',
   requireAuth,
-  validateParams(memberParamsSchema),
+  memberParams,
   authHandler(async (req, res) => {
-    const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
+    const { id, userId } = memberParams.read(res);
 
     const community = await assertCommunityAdminOr(id, req, res, curatorEdge);
 
@@ -374,11 +377,11 @@ router.delete(
 router.post(
   '/:id/curators',
   requireAuth,
-  validateParams(communityIdParamsSchema),
-  validate(addCuratorSchema),
+  communityIdParams,
+  addCuratorBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { userId } = parsedBody<{ userId: number }>(res);
+    const { id } = communityIdParams.read(res);
+    const { userId } = addCuratorBody.read(res);
 
     await assertCommunityAdminOr(id, req, res, leaderEdge);
 
@@ -404,9 +407,9 @@ router.post(
 router.delete(
   '/:id/curators/:userId',
   requireAuth,
-  validateParams(memberParamsSchema),
+  memberParams,
   authHandler(async (req, res) => {
-    const { id, userId } = parsedParams<{ id: number; userId: number }>(res);
+    const { id, userId } = memberParams.read(res);
 
     // The leader, or a curator stepping down (#895, ADR-0053).
     const community = await assertCommunityAdminOr(
@@ -443,7 +446,7 @@ router.delete(
 router.post(
   '/',
   ...requirePermission('communities_manage'),
-  validate(createCommunitySchema),
+  createCommunityBody,
   registerBodyImages('image'),
   asyncHandler(async (req: Request, res: Response) => {
     const {
@@ -456,7 +459,7 @@ router.post(
       allowDuplicateFormats,
       curatorIds,
       leaderId
-    } = parsedBody<CreateCommunityInput>(res);
+    } = createCommunityBody.read(res);
 
     if (leaderId !== undefined) {
       const leader = await prisma.user.findUnique({ where: { id: leaderId } });
@@ -533,15 +536,15 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('communities_manage'),
-  validateParams(communityIdParamsSchema),
-  validate(updateCommunitySchema),
+  communityIdParams,
+  updateCommunityBody,
   registerBodyImages('image'),
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = communityIdParams.read(res);
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
 
-    const body = parsedBody<UpdateCommunityInput>(res);
+    const body = updateCommunityBody.read(res);
     const { registrationStatus, curatorIds, leaderId } = body;
 
     if (leaderId != null) {
@@ -584,9 +587,9 @@ router.put(
 router.delete(
   '/:id',
   ...requirePermission('communities_manage'),
-  validateParams(communityIdParamsSchema),
+  communityIdParams,
   asyncHandler(async (req: Request, res: Response) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = communityIdParams.read(res);
     const existing = await prisma.community.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ msg: 'Community not found' });
     try {
