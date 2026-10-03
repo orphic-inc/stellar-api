@@ -5065,14 +5065,52 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
+  path: '/communities/manage',
+  tags: ['Communities'],
+  summary: 'Every community, for staff',
+  description:
+    'Requires `communities_manage`. Lists every community, closed ones ' +
+    'included, with the same projection as `GET /communities`, ordered by ' +
+    'id. `GET /communities` stays the member browse (#902, ADR-0055).',
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Paginated communities',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(Community),
+            meta: PaginationMeta
+          })
+        }
+      }
+    }
+  }
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/communities/{id}',
   tags: ['Communities'],
+  description:
+    "The community's administrative record. Members read it, and so do " +
+    '`communities_manage` and `admin` on every community, closed ones ' +
+    "included; the community's contents keep the member gate on their own " +
+    'routes (#902, ADR-0055).',
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
       description: 'Community',
       content: { 'application/json': { schema: Community } }
     },
+    403: msgResponse(
+      'A closed community the caller holds no role in, and not staff'
+    ),
     404: msgResponse('Not found')
   }
 });
@@ -5507,8 +5545,8 @@ registry.registerPath({
     'Each change of leader, newest first: founded, assigned (by staff), ' +
     'handed off (an accepted offer) or cleared. Offers, declines and ' +
     'withdrawals are not logged. Anyone who can read the community reads ' +
-    'it; `actor` is sent to `communities_manage` or `admin` only ' +
-    '(#897, ADR-0054).',
+    'it, and so do `communities_manage` and `admin` on every community ' +
+    '(ADR-0055); `actor` is sent to them only (#897, ADR-0054).',
   request: {
     params: z.object({ id: z.string() }),
     query: z.object({

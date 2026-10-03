@@ -64,7 +64,7 @@ Nothing happens automatically when a leader is disabled. ADR-0021's reason stand
 
 `GET /communities/:id` carries `leaderOffer: { to: { id, username }, offeredAt } | null`. It is non-null only for the leader, the named successor, or a viewer holding `communities_manage`, and only while the offer is live. Other curators see the outcome when `leaderId` changes, not the leader's intent beforehand.
 
-Staff see it only where they can read the community: `GET /communities/:id` refuses `communities_manage` a closed community they hold no role in. Whether staff read every community is [#902](https://github.com/orphic-inc/stellar-api/issues/902)'s to decide (amended 2026-10-02, ADR-0054).
+Staff read it on every community: `GET /communities/:id` admits `communities_manage` and `admin` as part of the administrative record ([ADR-0055](0055-staff-read-the-administrative-record.md), amended 2026-10-02).
 
 ### 9. The flow is audited, and shown elsewhere
 

@@ -80,6 +80,34 @@ describe('GET /api/communities', () => {
   });
 });
 
+describe('GET /api/communities/manage', () => {
+  it('refuses a member without communities_manage', async () => {
+    const res = await request(app).get('/api/communities/manage');
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.community.findMany).not.toHaveBeenCalled();
+  });
+
+  it('lists every community for staff, with no access filter', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findMany.mockResolvedValue([makeCommunity()] as never);
+    prismaMock.community.count.mockResolvedValue(1);
+
+    const res = await request(app).get('/api/communities/manage?page=2');
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.community.findMany).toHaveBeenCalledWith(
+      expect.not.objectContaining({ where: expect.anything() })
+    );
+    expect(prismaMock.community.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 25, take: 25, orderBy: { id: 'asc' } })
+    );
+    expect(res.body.data).toHaveLength(1);
+  });
+});
+
 describe('GET /api/communities/:id', () => {
   it('returns 404 when the community does not exist', async () => {
     prismaMock.community.findUnique.mockResolvedValue(null);
@@ -99,6 +127,22 @@ describe('GET /api/communities/:id', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ msg: 'Not a member of this community' });
+  });
+
+  // Staff read every community's administrative record (#902, ADR-0055).
+  it('lets communities_manage read a closed community it holds no role in', async () => {
+    prismaMock.userRank.findUnique.mockResolvedValue(
+      makeUserRank({ communities_manage: true })
+    );
+    prismaMock.community.findUnique.mockResolvedValue(
+      makeCommunity({ registrationStatus: RegistrationStatus.closed }) as never
+    );
+    prismaMock.community.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/communities/1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Jazz');
   });
 
   it('lets a curator-only member read a closed community (#419)', async () => {

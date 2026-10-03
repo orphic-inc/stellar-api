@@ -183,15 +183,20 @@ describe('offering leadership', () => {
   });
 
   it('answers a hidden community as GET /:id does (#771)', async () => {
+    const rank = await testPrisma.userRank.findFirstOrThrow({
+      where: { name: 'User' }
+    });
+    const outsiderId = await makeUser('outsider', rank.id);
     const res = await request(app)
       .post(`/api/communities/${communityId}/leader-offer`)
-      .set(session(staffId))
+      .set(session(outsiderId))
       .send({ userId: successorId });
     const read = await request(app)
       .get(`/api/communities/${communityId}`)
-      .set(session(staffId));
+      .set(session(outsiderId));
 
-    // Staff hold no role here, so a closed community is unreadable to them.
+    // An outsider holds no role here, so a closed community is unreadable.
+    // (Staff read its record since ADR-0055, but still cannot offer.)
     expect(res.status).toBe(read.status);
     expect(res.status).toBe(403);
   });
