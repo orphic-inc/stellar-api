@@ -8,16 +8,14 @@ import {
 } from '../../middleware/permissions';
 import { authHandler } from '../../modules/asyncHandler';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../lib/pagination';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedBody,
-  parsedParams
+  validateQuery
 } from '../../middleware/validate';
 import {
   createReleaseGroup,
@@ -37,12 +35,7 @@ import {
   createReleaseGroupSchema,
   mergeReleaseGroupSchema,
   splitReleaseGroupSchema,
-  updateReleaseGroupSchema,
-  type AddCoverInput,
-  type CreateReleaseGroupInput,
-  type MergeReleaseGroupInput,
-  type SplitReleaseGroupInput,
-  type UpdateReleaseGroupInput
+  updateReleaseGroupSchema
 } from '../../schemas/releaseGroup';
 
 // ReleaseGroup — cross-community content identity (ADR-0023, #265).
@@ -52,13 +45,21 @@ import {
 // to that question — `communityReadableWhere` takes a viewer id.
 
 const router = express.Router();
+const updateReleaseGroupBody = validate(updateReleaseGroupSchema);
+const splitReleaseGroupBody = validate(splitReleaseGroupSchema);
+const mergeReleaseGroupBody = validate(mergeReleaseGroupSchema);
+const createReleaseGroupBody = validate(createReleaseGroupSchema);
+const addCoverBody = validate(addCoverSchema);
 
 const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
 const coverParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
   coverId: z.coerce.number().int().positive()
 });
+const coverParams = validateParams(coverParamsSchema);
 const listQuerySchema = z.object({ ...paginationBase });
+const listQuery = validateQuery(listQuerySchema);
 
 // GET /api/release-groups/:id
 //
@@ -69,9 +70,9 @@ const listQuerySchema = z.object({ ...paginationBase });
 router.get(
   '/:id',
   requireAuth,
-  validateParams(idParamsSchema),
+  idParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = idParams.read(res);
     const group = await resolveGroupForViewer(id, req.user.id);
     res.json(group);
   })
@@ -86,9 +87,9 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(createReleaseGroupSchema),
+  createReleaseGroupBody,
   authHandler(async (_req, res) => {
-    const input = parsedBody<CreateReleaseGroupInput>(res);
+    const input = createReleaseGroupBody.read(res);
     const { group, created } = await createReleaseGroup(input);
     res.status(created ? 201 : 200).json(group);
   })
@@ -109,11 +110,11 @@ router.post(
 router.put(
   '/:id',
   ...requirePermission('contributions_manage'),
-  validateParams(idParamsSchema),
-  validate(updateReleaseGroupSchema),
+  idParams,
+  updateReleaseGroupBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const body = parsedBody<UpdateReleaseGroupInput>(res);
+    const { id } = idParams.read(res);
+    const body = updateReleaseGroupBody.read(res);
     const group = await updateGroupIdentity({
       actorId: req.user.id,
       groupId: id,
@@ -127,11 +128,11 @@ router.put(
 router.post(
   '/:id/merge',
   ...requirePermission('contributions_manage'),
-  validateParams(idParamsSchema),
-  validate(mergeReleaseGroupSchema),
+  idParams,
+  mergeReleaseGroupBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { sourceGroupId } = parsedBody<MergeReleaseGroupInput>(res);
+    const { id } = idParams.read(res);
+    const { sourceGroupId } = mergeReleaseGroupBody.read(res);
     const result = await mergeReleaseGroups({
       actorId: req.user.id,
       targetId: id,
@@ -145,11 +146,11 @@ router.post(
 router.post(
   '/:id/split',
   ...requirePermission('contributions_manage'),
-  validateParams(idParamsSchema),
-  validate(splitReleaseGroupSchema),
+  idParams,
+  splitReleaseGroupBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const body = parsedBody<SplitReleaseGroupInput>(res);
+    const { id } = idParams.read(res);
+    const body = splitReleaseGroupBody.read(res);
     const result = await splitReleaseGroup({
       actorId: req.user.id,
       groupId: id,
@@ -163,11 +164,11 @@ router.post(
 router.get(
   '/:id/log',
   requireAuth,
-  validateParams(idParamsSchema),
-  validateQuery(listQuerySchema),
+  idParams,
+  listQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const pg = parsedPage(res);
+    const { id } = idParams.read(res);
+    const pg = pageOf(listQuery.read(res));
     const perms = await loadPermissions(req, res);
     const { data, total } = await listGroupLog(
       id,
@@ -183,11 +184,11 @@ router.get(
 router.get(
   '/:id/covers',
   requireAuth,
-  validateParams(idParamsSchema),
-  validateQuery(listQuerySchema),
+  idParams,
+  listQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const pg = parsedPage(res);
+    const { id } = idParams.read(res);
+    const pg = pageOf(listQuery.read(res));
     const { data, total } = await listGroupCovers(id, req.user.id, {
       skip: pg.skip,
       limit: pg.limit
@@ -200,11 +201,11 @@ router.get(
 router.post(
   '/:id/covers',
   requireAuth,
-  validateParams(idParamsSchema),
-  validate(addCoverSchema),
+  idParams,
+  addCoverBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { image, summary } = parsedBody<AddCoverInput>(res);
+    const { id } = idParams.read(res);
+    const { image, summary } = addCoverBody.read(res);
     const cover = await addGroupCover({
       actorId: req.user.id,
       groupId: id,
@@ -219,9 +220,9 @@ router.post(
 router.delete(
   '/:id/covers/:coverId',
   requireAuth,
-  validateParams(coverParamsSchema),
+  coverParams,
   authHandler(async (req, res) => {
-    const { id, coverId } = parsedParams<{ id: number; coverId: number }>(res);
+    const { id, coverId } = coverParams.read(res);
     const perms = await loadPermissions(req, res);
     await removeGroupCover({
       actorId: req.user.id,

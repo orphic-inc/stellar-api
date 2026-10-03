@@ -4,10 +4,7 @@ import { requireAuth } from '../../middleware/auth';
 import {
   validate,
   validateQuery,
-  validateParams,
-  parsedBody,
-  parsedQuery,
-  parsedParams
+  validateParams
 } from '../../middleware/validate';
 import { authHandler } from '../../modules/asyncHandler';
 import * as requestLifecycle from '../../modules/requestLifecycle';
@@ -19,13 +16,18 @@ import {
   fillRequestSchema,
   unfillRequestSchema,
   listRequestsQuerySchema,
-  requestIdParamsSchema,
-  type ListRequestsQuery,
-  type UpdateRequestInput
+  requestIdParamsSchema
 } from '../../schemas/requests';
 import { AppError } from '../../lib/errors';
 
 const router = Router();
+const updateRequestBody = validate(updateRequestSchema);
+const unfillRequestBody = validate(unfillRequestSchema);
+const requestIdParams = validateParams(requestIdParamsSchema);
+const listRequestsQuery = validateQuery(listRequestsQuerySchema);
+const fillRequestBody = validate(fillRequestSchema);
+const createRequestBody = validate(createRequestSchema);
+const addBountyBody = validate(addBountySchema);
 
 // ─── GET /requests — list with filters ────────────────────────────────────────
 
@@ -36,9 +38,9 @@ const router = Router();
 router.get(
   '/',
   requireAuth,
-  validateQuery(listRequestsQuerySchema),
+  listRequestsQuery,
   authHandler(async (req, res) => {
-    const q = parsedQuery<ListRequestsQuery>(res);
+    const q = listRequestsQuery.read(res);
     const result = await requestLifecycle.listRequests({
       q: q.q,
       artist: q.artist,
@@ -61,7 +63,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  validate(createRequestSchema),
+  createRequestBody,
   authHandler(async (req, res) => {
     const perms = await loadPermissions(req, res);
     if (!hasPermission(perms, 'requests_create')) {
@@ -69,7 +71,7 @@ router.post(
     }
     const request = await requestLifecycle.createRequest(
       req.user.id,
-      parsedBody(res)
+      createRequestBody.read(res)
     );
     res.status(201).json(request);
   })
@@ -80,9 +82,9 @@ router.post(
 router.get(
   '/:id',
   requireAuth,
-  validateParams(requestIdParamsSchema),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = requestIdParams.read(res);
     const result = await requestLifecycle.getRequestDetail(id, req.user.id);
     res.json(result);
   })
@@ -93,9 +95,9 @@ router.get(
 router.post(
   '/:id/vote',
   requireAuth,
-  validateParams(requestIdParamsSchema),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = requestIdParams.read(res);
     const result = await requestLifecycle.toggleVote(id, req.user.id);
     res.json(result);
   })
@@ -106,9 +108,9 @@ router.post(
 router.get(
   '/:id/bounty-history',
   requireAuth,
-  validateParams(requestIdParamsSchema),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = requestIdParams.read(res);
     const result = await requestLifecycle.getBountyHistory(id, req.user.id);
     res.json(result);
   })
@@ -119,11 +121,11 @@ router.get(
 router.post(
   '/:id/bounty',
   requireAuth,
-  validateParams(requestIdParamsSchema),
-  validate(addBountySchema),
+  requestIdParams,
+  addBountyBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { amount } = parsedBody<{ amount: bigint }>(res);
+    const { id } = requestIdParams.read(res);
+    const { amount } = addBountyBody.read(res);
     const request = await requestLifecycle.addBounty(req.user.id, id, amount);
     res.json(request);
   })
@@ -134,11 +136,11 @@ router.post(
 router.post(
   '/:id/fill',
   requireAuth,
-  validateParams(requestIdParamsSchema),
-  validate(fillRequestSchema),
+  requestIdParams,
+  fillRequestBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { contributionId } = parsedBody<{ contributionId: number }>(res);
+    const { id } = requestIdParams.read(res);
+    const { contributionId } = fillRequestBody.read(res);
     const request = await requestLifecycle.fillRequest(
       req.user.id,
       id,
@@ -153,11 +155,11 @@ router.post(
 router.put(
   '/:id',
   requireAuth,
-  validateParams(requestIdParamsSchema),
-  validate(updateRequestSchema),
+  requestIdParams,
+  updateRequestBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const input = parsedBody<UpdateRequestInput>(res);
+    const { id } = requestIdParams.read(res);
+    const input = updateRequestBody.read(res);
     const perms = await loadPermissions(req, res);
     const canModerateRequests = hasPermission(perms, 'requests_moderate');
     const updated = await requestLifecycle.updateRequest({
@@ -175,11 +177,11 @@ router.put(
 router.post(
   '/:id/unfill',
   requireAuth,
-  validateParams(requestIdParamsSchema),
-  validate(unfillRequestSchema),
+  requestIdParams,
+  unfillRequestBody,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const { reason } = parsedBody<{ reason?: string }>(res);
+    const { id } = requestIdParams.read(res);
+    const { reason } = unfillRequestBody.read(res);
     const perms = await loadPermissions(req, res);
     const canModerateRequests = hasPermission(perms, 'requests_moderate');
     const request = await requestLifecycle.unfillRequest({
@@ -197,9 +199,9 @@ router.post(
 router.delete(
   '/:id',
   requireAuth,
-  validateParams(requestIdParamsSchema),
+  requestIdParams,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
+    const { id } = requestIdParams.read(res);
     const perms = await loadPermissions(req, res);
     const canModerateRequests = hasPermission(perms, 'requests_moderate');
     await requestLifecycle.deleteRequest({

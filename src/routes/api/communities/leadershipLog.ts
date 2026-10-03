@@ -4,15 +4,11 @@ import { authHandler } from '../../../modules/asyncHandler';
 import { listLeadershipLog } from '../../../modules/communityLeadership';
 import { requireAuth } from '../../../middleware/auth';
 import { loadPermissions } from '../../../middleware/permissions';
-import {
-  parsedParams,
-  validateParams,
-  validateQuery
-} from '../../../middleware/validate';
+import { validateParams, validateQuery } from '../../../middleware/validate';
 import {
   paginatedResponse,
   paginationBase,
-  parsedPage
+  pageOf
 } from '../../../lib/pagination';
 
 /**
@@ -21,18 +17,20 @@ import {
  * modules/communityLeadership.ts.
  */
 const router = express.Router({ mergeParams: true });
-const paramsSchema = z.object({ id: z.coerce.number().int().positive() });
-const querySchema = z.object({ ...paginationBase });
+const idParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+const idParams = validateParams(idParamsSchema);
+const leadershipLogQuerySchema = z.object({ ...paginationBase });
+const leadershipLogQuery = validateQuery(leadershipLogQuerySchema);
 
 // GET /api/communities/:id/leadership-log — who led the community, and when
 router.get(
   '/',
   requireAuth,
-  validateParams(paramsSchema),
-  validateQuery(querySchema),
+  idParams,
+  leadershipLogQuery,
   authHandler(async (req, res) => {
-    const { id } = parsedParams<{ id: number }>(res);
-    const pg = parsedPage(res);
+    const { id } = idParams.read(res);
+    const pg = pageOf(leadershipLogQuery.read(res));
     const perms = await loadPermissions(req, res);
     const isStaff = !!(perms['communities_manage'] || perms['admin']);
     const { data, total } = await listLeadershipLog(id, req.user.id, isStaff, {

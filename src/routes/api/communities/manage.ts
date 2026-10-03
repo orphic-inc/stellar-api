@@ -7,7 +7,7 @@ import { validateQuery } from '../../../middleware/validate';
 import {
   paginatedResponse,
   paginationBase,
-  parsedPage
+  pageOf
 } from '../../../lib/pagination';
 
 /**
@@ -19,15 +19,16 @@ import {
  * browse's projection, which is the administrative record, never contents.
  */
 const router = express.Router();
-const querySchema = z.object({ ...paginationBase });
+const manageQuerySchema = z.object({ ...paginationBase });
+const manageQuery = validateQuery(manageQuerySchema);
 
 // GET /api/communities/manage — every community (communities_manage)
 router.get(
   '/',
   ...requirePermission('communities_manage'),
-  validateQuery(querySchema),
+  manageQuery,
   asyncHandler(async (_req, res) => {
-    const pg = parsedPage(res);
+    const pg = pageOf(manageQuery.read(res));
     const [communities, total] = await Promise.all([
       prisma.community.findMany({
         orderBy: { id: 'asc' },

@@ -6,9 +6,7 @@ import { requirePermission } from '../../../middleware/permissions';
 import {
   validate,
   validateParams,
-  validateQuery,
-  parsedParams,
-  parsedBody
+  validateQuery
 } from '../../../middleware/validate';
 import {
   createReleaseSchema,
@@ -17,24 +15,14 @@ import {
   releaseTagSchema,
   releaseTagVoteSchema,
   releaseCreditSchema,
-  releaseCreditRoleSchema,
-  type CreateReleaseInput,
-  type UpdateReleaseInput,
-  type ReleaseVoteInput,
-  type ReleaseTagInput,
-  type ReleaseTagVoteInput,
-  type ReleaseCreditInput,
-  type ReleaseCreditRoleInput
+  releaseCreditRoleSchema
 } from '../../../schemas/community';
-import {
-  addContributionToReleaseSchema,
-  type AddContributionToReleaseInput
-} from '../../../schemas/contribution';
+import { addContributionToReleaseSchema } from '../../../schemas/contribution';
 import { resolveTagName } from '../../../modules/tag';
 import {
-  parsedPage,
   paginatedResponse,
-  paginationBase
+  paginationBase,
+  pageOf
 } from '../../../lib/pagination';
 import { releaseWorkbench } from '../../../modules/releaseWorkbench';
 import type { ReleaseWorkbenchView } from '../../../modules/releaseWorkbench/types';
@@ -45,10 +33,7 @@ import {
 import { listCommunityReleases } from '../../../modules/releaseBrowse';
 import { setReleaseGroup } from '../../../modules/releaseGroup';
 import { primaryArtist } from '../../../modules/releaseCredits';
-import {
-  setReleaseGroupSchema,
-  type SetReleaseGroupInput
-} from '../../../schemas/releaseGroup';
+import { setReleaseGroupSchema } from '../../../schemas/releaseGroup';
 import {
   renderSiteBBCode,
   resolveViewer,
@@ -56,15 +41,28 @@ import {
 } from '../../../modules/bbcodeRender';
 
 const router = express.Router({ mergeParams: true });
+const updateReleaseBody = validate(updateReleaseSchema);
+const setReleaseGroupBody = validate(setReleaseGroupSchema);
+const releaseVoteBody = validate(releaseVoteSchema);
+const releaseTagVoteBody = validate(releaseTagVoteSchema);
+const releaseTagBody = validate(releaseTagSchema);
+const releaseCreditRoleBody = validate(releaseCreditRoleSchema);
+const releaseCreditBody = validate(releaseCreditSchema);
+const createReleaseBody = validate(createReleaseSchema);
+const addContributionToReleaseBody = validate(addContributionToReleaseSchema);
 const communityIdParamsSchema = z.object({
   communityId: z.coerce.number().int().positive()
 });
+const communityIdParams = validateParams(communityIdParamsSchema);
 const releasesQuerySchema = z.object({ ...paginationBase });
+const releasesQuery = validateQuery(releasesQuerySchema);
 const releaseHistoryQuerySchema = z.object({ ...paginationBase });
+const releaseHistoryQuery = validateQuery(releaseHistoryQuerySchema);
 const releaseParamsSchema = z.object({
   communityId: z.coerce.number().int().positive(),
   releaseId: z.coerce.number().int().positive()
 });
+const releaseParams = validateParams(releaseParamsSchema);
 
 const serializeReleaseWorkbenchView = async (
   view: ReleaseWorkbenchView,
@@ -94,11 +92,11 @@ const serializeReleaseWorkbenchView = async (
 router.get(
   '/',
   requireAuth,
-  validateParams(communityIdParamsSchema),
-  validateQuery(releasesQuerySchema),
+  communityIdParams,
+  releasesQuery,
   authHandler(async (req, res) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
-    const pg = parsedPage(res);
+    const { communityId } = communityIdParams.read(res);
+    const pg = pageOf(releasesQuery.read(res));
     const result = await listCommunityReleases({
       actorId: req.user.id,
       communityId,
@@ -113,14 +111,11 @@ router.get(
 router.get(
   '/:releaseId/history',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validateQuery(releaseHistoryQuerySchema),
+  releaseParams,
+  releaseHistoryQuery,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
-    const pg = parsedPage(res);
+    const { communityId, releaseId } = releaseParams.read(res);
+    const pg = pageOf(releaseHistoryQuery.read(res));
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -148,21 +143,14 @@ const revertParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive(),
   historyId: z.coerce.number().int().positive()
 });
+const revertParams = validateParams(revertParamsSchema);
 
 router.post(
   '/:releaseId/history/:historyId/revert',
   ...requirePermission('communities_manage', 'admin'),
-  validateParams(revertParamsSchema),
+  revertParams,
   authHandler(async (req, res) => {
-    const {
-      communityId,
-      releaseId: id,
-      historyId
-    } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-      historyId: number;
-    }>(res);
+    const { communityId, releaseId: id, historyId } = revertParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -180,12 +168,9 @@ router.post(
 router.get(
   '/:releaseId',
   requireAuth,
-  validateParams(releaseParamsSchema),
+  releaseParams,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -205,14 +190,14 @@ router.get(
 router.post(
   '/',
   ...requirePermission('communities_manage'),
-  validateParams(communityIdParamsSchema),
-  validate(createReleaseSchema),
+  communityIdParams,
+  createReleaseBody,
   asyncHandler(async (req: Request, res: Response) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
+    const { communityId } = communityIdParams.read(res);
     const release = await createCommunityRelease({
       actorId: req.user!.id,
       communityId,
-      data: parsedBody<CreateReleaseInput>(res)
+      data: createReleaseBody.read(res)
     });
     res.status(201).json(release);
   })
@@ -222,15 +207,12 @@ router.post(
 router.put(
   '/:releaseId',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(updateReleaseSchema),
+  releaseParams,
+  updateReleaseBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     const { title, description, image, year, editSummary } =
-      parsedBody<UpdateReleaseInput>(res);
+      updateReleaseBody.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -255,12 +237,9 @@ router.put(
 router.get(
   '/:releaseId/contributions',
   requireAuth,
-  validateParams(releaseParamsSchema),
+  releaseParams,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -275,14 +254,11 @@ router.get(
 router.post(
   '/:releaseId/contributions',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(addContributionToReleaseSchema),
+  releaseParams,
+  addContributionToReleaseBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
-    const input = parsedBody<AddContributionToReleaseInput>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
+    const input = addContributionToReleaseBody.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -301,19 +277,17 @@ const tagParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive(),
   tagId: z.coerce.number().int().positive()
 });
+const tagParams = validateParams(tagParamsSchema);
 
 // POST /api/communities/:communityId/releases/:releaseId/vote
 router.post(
   '/:releaseId/vote',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(releaseVoteSchema),
+  releaseParams,
+  releaseVoteBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
-    const { positive } = parsedBody<ReleaseVoteInput>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
+    const { positive } = releaseVoteBody.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -332,12 +306,9 @@ router.post(
 router.delete(
   '/:releaseId/vote',
   requireAuth,
-  validateParams(releaseParamsSchema),
+  releaseParams,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -358,14 +329,11 @@ router.delete(
 router.post(
   '/:releaseId/tags',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(releaseTagSchema),
+  releaseParams,
+  releaseTagBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
-    const { name: submittedName } = parsedBody<ReleaseTagInput>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
+    const { name: submittedName } = releaseTagBody.read(res);
     const name = await resolveTagName(submittedName);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
@@ -383,15 +351,11 @@ router.post(
 router.post(
   '/:releaseId/tags/:tagId/vote',
   requireAuth,
-  validateParams(tagParamsSchema),
-  validate(releaseTagVoteSchema),
+  tagParams,
+  releaseTagVoteBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId, tagId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-      tagId: number;
-    }>(res);
-    const { direction } = parsedBody<ReleaseTagVoteInput>(res);
+    const { communityId, releaseId, tagId } = tagParams.read(res);
+    const { direction } = releaseTagVoteBody.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -406,19 +370,11 @@ router.post(
 router.delete(
   '/:releaseId/tags/:tagId',
   ...requirePermission('communities_manage'),
-  validateParams(tagParamsSchema),
+  tagParams,
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) return res.status(401).json({ msg: 'Unauthorized' });
     const actorId = req.user.id;
-    const {
-      communityId,
-      releaseId: id,
-      tagId
-    } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-      tagId: number;
-    }>(res);
+    const { communityId, releaseId: id, tagId } = tagParams.read(res);
 
     const session = await releaseWorkbench.open({
       actorId,
@@ -438,25 +394,23 @@ const creditParamsSchema = z.object({
   releaseId: z.coerce.number().int().positive(),
   creditId: z.coerce.number().int().positive()
 });
+const creditParams = validateParams(creditParamsSchema);
 
 // POST /api/communities/:communityId/releases/:releaseId/credits
 router.post(
   '/:releaseId/credits',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(releaseCreditSchema),
+  releaseParams,
+  releaseCreditBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
       releaseId,
       permissions: req.user.permissions
     });
-    const credit = await session.addCredit(parsedBody<ReleaseCreditInput>(res));
+    const credit = await session.addCredit(releaseCreditBody.read(res));
     res.status(201).json(credit);
   })
 );
@@ -465,21 +419,17 @@ router.post(
 router.patch(
   '/:releaseId/credits/:creditId',
   requireAuth,
-  validateParams(creditParamsSchema),
-  validate(releaseCreditRoleSchema),
+  creditParams,
+  releaseCreditRoleBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId, creditId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-      creditId: number;
-    }>(res);
+    const { communityId, releaseId, creditId } = creditParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
       releaseId,
       permissions: req.user.permissions
     });
-    const { role } = parsedBody<ReleaseCreditRoleInput>(res);
+    const { role } = releaseCreditRoleBody.read(res);
     res.json(await session.changeCreditRole({ creditId, role }));
   })
 );
@@ -488,13 +438,9 @@ router.patch(
 router.delete(
   '/:releaseId/credits/:creditId',
   requireAuth,
-  validateParams(creditParamsSchema),
+  creditParams,
   authHandler(async (req, res) => {
-    const { communityId, releaseId, creditId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-      creditId: number;
-    }>(res);
+    const { communityId, releaseId, creditId } = creditParams.read(res);
     const session = await releaseWorkbench.open({
       actorId: req.user.id,
       communityId,
@@ -524,14 +470,11 @@ router.delete(
 router.put(
   '/:releaseId/release-group',
   requireAuth,
-  validateParams(releaseParamsSchema),
-  validate(setReleaseGroupSchema),
+  releaseParams,
+  setReleaseGroupBody,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
-    const { releaseGroupId } = parsedBody<SetReleaseGroupInput>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
+    const { releaseGroupId } = setReleaseGroupBody.read(res);
 
     const updated = await setReleaseGroup({
       actorId: req.user.id,
@@ -547,12 +490,9 @@ router.put(
 router.delete(
   '/:releaseId',
   ...requirePermission('communities_manage'),
-  validateParams(releaseParamsSchema),
+  releaseParams,
   authHandler(async (req, res) => {
-    const { communityId, releaseId } = parsedParams<{
-      communityId: number;
-      releaseId: number;
-    }>(res);
+    const { communityId, releaseId } = releaseParams.read(res);
     await deleteCommunityRelease({
       actorId: req.user.id,
       communityId,

@@ -6,24 +6,22 @@ import { authHandler } from '../../../modules/asyncHandler';
 import { requireAuth } from '../../../middleware/auth';
 import { requirePermission } from '../../../middleware/permissions';
 import { assertCommunityAccess } from '../../../modules/communityAccess';
-import {
-  validate,
-  validateParams,
-  parsedBody,
-  parsedParams
-} from '../../../middleware/validate';
-import { dncSchema, type DncInput } from '../../../schemas/user';
+import { validate, validateParams } from '../../../middleware/validate';
+import { dncSchema } from '../../../schemas/user';
 
 const router = express.Router({ mergeParams: true });
+const dncBody = validate(dncSchema);
 
-const communityIdParams = z.object({
+const communityIdParamsSchema = z.object({
   communityId: z.coerce.number().int().positive()
 });
+const communityIdParams = validateParams(communityIdParamsSchema);
 
-const dncIdParams = z.object({
+const dncIdParamsSchema = z.object({
   communityId: z.coerce.number().int().positive(),
   dncId: z.coerce.number().int().positive()
 });
+const dncIdParams = validateParams(dncIdParamsSchema);
 
 // GET /api/communities/:communityId/dnc — readable by members of the community
 //
@@ -43,9 +41,9 @@ const dncIdParams = z.object({
 router.get(
   '/',
   requireAuth,
-  validateParams(communityIdParams),
+  communityIdParams,
   authHandler(async (req, res) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
+    const { communityId } = communityIdParams.read(res);
     await assertCommunityAccess(communityId, req.user.id);
     const entries = await prisma.doNotContribute.findMany({
       where: { communityId },
@@ -69,11 +67,11 @@ router.get(
 router.post(
   '/',
   ...requirePermission('dnc_manage'),
-  validateParams(communityIdParams),
-  validate(dncSchema),
+  communityIdParams,
+  dncBody,
   authHandler(async (req, res) => {
-    const { communityId } = parsedParams<{ communityId: number }>(res);
-    const { name, comment } = parsedBody<DncInput>(res);
+    const { communityId } = communityIdParams.read(res);
+    const { name, comment } = dncBody.read(res);
 
     const community = await prisma.community.findUnique({
       where: { id: communityId }
@@ -98,12 +96,9 @@ router.post(
 router.delete(
   '/:dncId',
   ...requirePermission('dnc_manage'),
-  validateParams(dncIdParams),
+  dncIdParams,
   authHandler(async (_req, res) => {
-    const { communityId, dncId } = parsedParams<{
-      communityId: number;
-      dncId: number;
-    }>(res);
+    const { communityId, dncId } = dncIdParams.read(res);
 
     const entry = await prisma.doNotContribute.findFirst({
       where: { id: dncId, communityId }
