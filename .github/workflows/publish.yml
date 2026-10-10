@@ -197,6 +197,24 @@ jobs:
             | CHANGELOG_STDIN=1 \
               CHANGELOG_BASE_FILE="$RUNNER_TEMP/changelog-base.md" \
               npm run changelog:check --silent
+      # Commit message gate: every commit this PR would land meets the house
+      # style. The commit-msg hook catches most at authorship; this catches
+      # `--no-verify`, the GitHub web editor, and bots. It runs here because
+      # rebase-merge keeps each message verbatim, and a merged message cannot be
+      # fixed without force-pushing main. Messages come from the API for the
+      # same shallow-checkout reason as the changelog step.
+      - name: Commit messages
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          # `tojson` makes each commit one line; gh prints a string result raw.
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" \
+            --paginate --jq '.[] | {sha, message: .commit.message} | tojson' \
+            > "$RUNNER_TEMP/commits.ndjson"
+          COMMIT_MESSAGES_FILE="$RUNNER_TEMP/commits.ndjson" \
+            npm run commits:check --silent
 
   # Split from `test` (#306): the integration suite is DB-bound (~4.5 min) and
   # was the long pole of the required check. Running it in parallel cuts the

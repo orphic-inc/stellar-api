@@ -29,6 +29,7 @@
     "version:check": "ts-node -T src/scripts/check-version-consistency.ts",
     "env:coverage": "ts-node -T src/scripts/check-env-coverage.ts",
     "changelog:check": "ts-node -T src/scripts/check-changelog.ts",
+    "commits:check": "ts-node -T src/scripts/check-commit-messages.ts",
     "db:generate": "prisma generate",
     "db:erd": "prisma generate --generator erd",
     "db:migrate": "prisma migrate dev",

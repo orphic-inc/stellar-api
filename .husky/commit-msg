@@ -1,0 +1,5 @@
+# Commit message gate: the house style in AGENTS.md under 'Commit workflow'.
+# A merged message is permanent, so it is checked here, where it is still cheap
+# to fix. The file is passed by environment variable, not argv: argv does not
+# survive npm reliably (see src/scripts/check-changelog.ts).
+COMMIT_MSG_FILE="$1" npm run commits:check --silent
