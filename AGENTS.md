@@ -85,6 +85,7 @@ npm run openapi:gate-marks   # does every layer ahead of a handler carry markGat
 npm run openapi:failure-coverage # does every operation declare its handler's 4xx, or sit in noFailureModes? (gated)
 npm run prisma:guard-coverage # do Prisma writes that can violate a constraint translate the code? (#564; CI gates it)
 npm run changelog:check  # does this branch owe a CHANGELOG entry? (#386; CI runs it per-PR)
+npm run commits:check    # do this branch's commit messages meet the house style? (#929; commit-msg hook + CI per-PR)
 npm run env:coverage     # do the code, .env.default, docs/README.md and this file agree on env vars? (#682; gated)
 npm run db:migrate       # prisma migrate dev (requires interactive TTY)
 npm run db:seed          # recreate default user ranks after a DB reset; then go to /install
@@ -96,7 +97,7 @@ npm run images:backfill  # queue, import and report every stored remote image (#
 
 ## Commit workflow
 
-The `.husky/pre-commit` hook runs on every commit and gates: lint-staged (`eslint --fix` + `prettier --write` on staged files), `npx tsc --noEmit`, `npm run typecheck:test`, and `npm run version:check`. So format/lint/type-check are enforced automatically — don't re-run them by hand as a separate pre-commit ritual.
+The `.husky/pre-commit` hook runs on every commit and gates: lint-staged (`eslint --fix` + `prettier --write` on staged files), `npx tsc --noEmit`, `npm run typecheck:test`, and `npm run version:check`. `.husky/commit-msg` runs `npm run commits:check` on the message. So format/lint/type-check and the message style are enforced automatically — don't re-run them by hand as a separate pre-commit ritual.
 
 What the hook does **not** cover, run yourself before committing:
 
@@ -118,7 +119,18 @@ What the hook does **not** cover, run yourself before committing:
 
    A cut therefore renames `[Unreleased]` to `## [<version>] — <date>`, leaving an empty one above it.
 
-4. Commit with a descriptive message following existing log style
+4. Commit with a message in the house style, which `npm run commits:check` gates at commit time and per-PR:
+
+   ```
+   fix(seed): the boot seed creates ranks and rules on a fresh install only (#882)
+   ```
+
+   - `type(scope): subject`, with a lowercase type from Conventional Commits; scopes may be comma-separated.
+   - The subject states the outcome, or uses the imperative. It stays on one line, at most 100 characters before the `(#NNN)` suffix.
+   - A blank line, then a body that explains why.
+   - A contract change carries `!` before the colon and a `BREAKING CHANGE:` footer. The gate warns on these but cannot fail them, since it reads text, not the diff.
+
+   Rebase-merge lands each message verbatim, and a merged message cannot be fixed without force-pushing `main`. Reword before the merge instead.
 
 > If you do run the checks manually (e.g. before staging, or committing with `--no-verify`): order matters — format before lint (Prettier violations surface as ESLint errors), and lint before type-check.
 
@@ -353,6 +365,7 @@ src/
     userRankAccess.ts       # computeUserRankAccess/getUserRankAccess + canAccessForumLevel — resolved rank capability slice
     version.ts              # appVersion — running API version read from package.json at module load
     versionConsistency.ts   # Pure checkVersionConsistency (#79) — manifest is the source of truth; CLI wrapper in scripts/ feeds it the real surfaces
+    commitMessage.ts        # Pure checkCommitMessage — the commit message house style; the commit-msg hook and the per-PR CI step feed it via scripts/
     sentry.ts               # userContextFromRequest + sentryBeforeSend — Sentry scrubbing/user context
   types/
     auth.ts                 # AuthUser type (id, userRankId, userRankLevel; optional contributed/consumed)

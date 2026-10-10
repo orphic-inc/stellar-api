@@ -39,6 +39,10 @@ All notable changes to stellar-api are documented here.
   - `POST /users/{id}/invite-subtree/action` `{ action, reason, expectedCount }` applies one action in a single transaction. It needs `invites_manage` plus the action's own permission (`users_edit`, `users_disable` or `invites_edit`); without that it answers `403`. It answers `409` if the subtree no longer has `expectedCount` members.
   - Every member gets a note with the reason. Members the action changes are audited as the single-member routes audit them, and the root gets one run row listing the ids changed. No member is messaged, and there is no bulk undo.
 - `POST /users/{id}/disable` now writes through the same shared disable as the subtree tool. Its responses are unchanged.
+- **A gate keeps commit messages in the house style: `npm run commits:check`** (#929), run by a new `commit-msg` hook and per-PR in CI. Rebase-merge lands each message verbatim, so a defect that merges is permanent.
+  - **It fails** a subject with no lowercase Conventional Commits type, one wrapped onto line 2, one longer than 100 characters before its `(#NNN)` suffix, a `WIP` subject, and on a PR a leftover `fixup!` commit.
+  - **It warns** on past-tense or `-ing` subjects, and on a breaking change marked only one way: `!` with no `BREAKING CHANGE:` footer, or the reverse.
+  - Existing history is not rewritten. Of the last 400 commits on `main`, 8 would fail.
 
 ### Changed
 
